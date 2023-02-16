@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">nap511</string>
+    <string name="title_activity_main2">MainActivity2</string>
+    <array name="appBarMenu">
+        <item>按文件名称排序</item>
+        <item>按创建时间排序</item>
+        <item>按修改时间排序</item>
+        <item>刷新</item>
+    </array>
+    <array name="fileMenu">
+        <item>剪切</item>
+        <item>删除</item>
+        <item>重命名</item>
+        <item>文件信息</item>
+    </array>
+</resources>
