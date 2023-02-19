@@ -21,10 +21,16 @@ import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.LocationBean
+import github.zerorooot.nap511.bean.OrderBean
+import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import kotlinx.coroutines.launch
 
-@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
+@SuppressLint(
+    "UnusedMaterial3ScaffoldPaddingParameter",
+    "MutableCollectionMutableState",
+    "UnrememberedMutableState"
+)
 @OptIn(
     ExperimentalAnimationApi::class,
     ExperimentalFoundationApi::class,
@@ -58,7 +64,7 @@ fun FileScreen(
     val floatingActionButtonOnClick = { i: String ->
         when (i) {
             "CutFloatingActionButton" -> fileViewModel.removeFile()
-            "AddFloatingActionButton" -> fileViewModel.isOpenCreateFolder = true
+            "AddFloatingActionButton" -> fileViewModel.isOpenCreateFolderDialog = true
         }
     }
 
@@ -68,11 +74,11 @@ fun FileScreen(
             "删除" -> fileViewModel.delete(index)
             "重命名" -> {
                 fileViewModel.selectIndex = index
-                fileViewModel.isRenameFile = true
+                fileViewModel.isOpenRenameFileDialog = true
             }
             "文件信息" -> {
                 fileViewModel.selectIndex = index
-                fileViewModel.isFileInfo = true
+                fileViewModel.isOpenFileInfoDialog = true
             }
         }
     }
@@ -118,7 +124,15 @@ fun FileScreen(
         }
     }
     val onBack = {
-        val parentDirectory = path.subSequence(0, path.lastIndexOf("/")).toString()
+        val lastIndexOf = path.lastIndexOf("/")
+        val parentDirectory = path.subSequence(
+            0,
+            if (lastIndexOf == -1) {
+                0
+            } else {
+                lastIndexOf
+            }
+        ).toString()
         //appBar 也调用了这个，所以再判断一次
         if (path != "/根目录" && !fileViewModel.isCut && !fileViewModel.isLongClick) {
             //当前目录的位置
@@ -134,7 +148,7 @@ fun FileScreen(
                 )
             }
         }
-        clickIndex = clickMap[parentDirectory]!!
+        clickIndex = clickMap[parentDirectory] ?: run { -1 }
         fileViewModel.back()
     }
     BackHandler(path != "/根目录" || fileViewModel.isCut || fileViewModel.isLongClick, onBack)
@@ -146,8 +160,6 @@ fun FileScreen(
         }
         appBarOnClick.invoke(i)
     }
-
-
 
 
     Column {
@@ -213,24 +225,42 @@ fun FileScreen(
     }
 }
 
+@ExperimentalMaterial3Api
 @Composable
 fun CreateDialogs(fileViewModel: FileViewModel) {
     CreateFolderDialog(fileViewModel) {
         if (it != "") {
             fileViewModel.createFolder(it)
         }
-        fileViewModel.isOpenCreateFolder = false
+        fileViewModel.isOpenCreateFolderDialog = false
     }
     RenameFileDialog(fileViewModel) {
         if (it != "") {
             fileViewModel.rename(it)
         }
-        fileViewModel.isRenameFile = false
+        fileViewModel.isOpenRenameFileDialog = false
     }
     FileInfoDialog(fileViewModel) {
-        fileViewModel.isFileInfo = false
+        fileViewModel.isOpenFileInfoDialog = false
     }
+    FileOrderDialog(fileViewModel = fileViewModel) {
+        fileViewModel.isOpenFileOrderDialog = false
+        if (it != "") {
+            val asc = if (it.subSequence(it.length - 1, it.length) == "↑") 1 else 0
+            val type = when (it.subSequence(0, it.length - 1)) {
+                "文件名称" -> OrderEnum.name
+                "更改时间" -> OrderEnum.change
+                "文件种类" -> OrderEnum.type
+                "文件大小" -> OrderEnum.size
+                else -> OrderEnum.name
+            }
+            fileViewModel.orderBean = OrderBean(type, asc)
+            fileViewModel.order()
 
+        }
+
+
+    }
 }
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
@@ -290,7 +320,7 @@ fun te() {
                         item.hashCode()
                     }) { index, item ->
                         FileCellItem(item,
-                            index, -1,-1,
+                            index, -1, -1,
                             Modifier.animateItemPlacement(),
                             {},
                             {},

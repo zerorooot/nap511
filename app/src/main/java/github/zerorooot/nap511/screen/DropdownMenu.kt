@@ -92,7 +92,6 @@ fun FileMoreMenu(onClick: (String, Int) -> Unit) {
 fun AppTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
     val listOf = stringArrayResource(id = R.array.appBarMenu).toList()
 //    val listOf = listOf("按文件名称排序", "按创建时间排序", "按修改时间排序","刷新")
-
     MyDropdownMenu(
         listOf,
         Modifier.wrapContentSize(Alignment.TopEnd),

@@ -2,9 +2,13 @@ package github.zerorooot.nap511.viewmodel
 
 import android.app.Application
 import android.widget.Toast
-import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.*
 import github.zerorooot.nap511.service.FileService
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,13 +16,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
-import github.zerorooot.nap511.R
+import kotlin.math.roundToInt
 
 class FileViewModel(private val cookie: String, private val application: Application) :
     ViewModel() {
     var fileBeanList = mutableStateListOf<FileBean>()
 
-    var appBarTitle by mutableStateOf("nap511")
+    var appBarTitle by mutableStateOf(application.resources.getString(R.string.app_name))
 
     private val _currentPath = MutableStateFlow("")
     var currentPath = _currentPath.asStateFlow()
@@ -37,13 +41,17 @@ class FileViewModel(private val cookie: String, private val application: Applica
     var isRefreshing = _isRefreshing.asStateFlow()
 
 
-    var isOpenCreateFolder by mutableStateOf(false)
-    var isRenameFile by mutableStateOf(false)
-    var isFileInfo by mutableStateOf(false)
+    var isOpenCreateFolderDialog by mutableStateOf(false)
+    var isOpenRenameFileDialog by mutableStateOf(false)
+    var isOpenFileInfoDialog by mutableStateOf(false)
+    var isOpenFileOrderDialog by mutableStateOf(false)
     var selectIndex by mutableStateOf(0)
     var isLongClick: Boolean by mutableStateOf(false)
     var isCut: Boolean by mutableStateOf(false)
+//    var order = OrderBean.name
+//    var asc = OrderBean.asc
 
+    var orderBean = OrderBean(OrderEnum.name, 1)
     private val fileService: FileService by lazy {
         FileService.getInstance(cookie)
     }
@@ -56,7 +64,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
     fun back() {
         if (isLongClick) {
             isLongClick = false
-            appBarTitle = "nap511"
+            appBarTitle = application.resources.getString(R.string.app_name)
             fileBeanList.map { i -> i.isSelect = false }
             return
         }
@@ -82,65 +90,101 @@ class FileViewModel(private val cookie: String, private val application: Applica
 
         viewModelScope.launch {
             try {
-                val files = fileService.getFiles(cid = cid)
-                val fileBeanList = files.fileBeanList
-                fileBeanList.forEach { fileBean ->
-                    fileBean.updateTimeString =
-                        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
-                            fileBean.updateTime.toLong() * 1000
-                        )
-                    fileBean.createTimeString =
-                        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
-                            fileBean.createTime.toLong() * 1000
-                        )
-                    if (fileBean.fileId == "") {
-                        fileBean.fileId = fileBean.categoryId
-                        fileBean.fileIco = R.drawable.folder
-                        fileBean.isFolder = true
-                        fileBean.modifiedTimeString =
-                            SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
-                                fileBean.modifiedTime.toLong() * 1000
-                            )
-                    } else {
-                        fileBean.sizeString = android.text.format.Formatter.formatFileSize(
-                            application,
-                            if (fileBean.size == "0") "".toLong() else fileBean.size.toLong()
-                        ) + " "
-                        fileBean.modifiedTimeString = fileBean.modifiedTime
-                        fileBean.modifiedTime =
-                            (SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).parse(
-                                fileBean.modifiedTime
-                            )!!.time / 1000).toString()
-                        if (fileBean.currentPlayTime != 0) {
-                            val playTime =
-                                ((fileBean.currentPlayTime.toFloat() / fileBean.playLong) * 100).toString()
-                                    .subSequence(0, 2).toString()
-                            fileBean.createTimeString = "$playTime% ${fileBean.createTimeString}"
-                        }
-                    }
-                    if (fileBean.isVideo == 1) {
-                        fileBean.fileIco = R.drawable.mp4
-                    }
-                    when (fileBean.icoString) {
-                        "apk" -> fileBean.fileIco = R.drawable.apk
-                        "iso" -> fileBean.fileIco = R.drawable.iso
-                        "zip" -> fileBean.fileIco = R.drawable.zip
-                        "7z" -> fileBean.fileIco = R.drawable.zip
-                        "rar" -> fileBean.fileIco = R.drawable.zip
-                        "png" -> fileBean.fileIco = R.drawable.png
-                        "jpg" -> fileBean.fileIco = R.drawable.png
-                        "mp3" -> fileBean.fileIco = R.drawable.mp3
-                        "txt" -> fileBean.fileIco = R.drawable.txt
-                    }
-                }
-                setFiles(files)
+                fileService.order(
+                    hashMapOf(
+                        "user_order" to orderBean.type,
+                        "user_asc" to orderBean.asc.toString(),
+                        "file_id" to currentCid,
+                        "fc_mix" to "0"
+                    )
+                )
 
+                val files =
+                    fileService.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
+                setFileBeanProperty(files.fileBeanList)
+                setFiles(files)
                 _isRefreshing.value = false
             } catch (e: Exception) {
                 e.printStackTrace()
-                Toast.makeText(application, "获取文件列表失败~", Toast.LENGTH_SHORT).show()
+                Toast.makeText(application, "获取文件列表失败，建议更新您的Cookie", Toast.LENGTH_SHORT).show()
                 _isRefreshing.value = false
             }
+        }
+    }
+
+    private fun setFileBeanProperty(fileBeanList: ArrayList<FileBean>) {
+        fileBeanList.forEach { fileBean ->
+            fileBean.updateTimeString =
+                SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
+                    fileBean.updateTime.toLong() * 1000
+                )
+            fileBean.createTimeString =
+                SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
+                    fileBean.createTime.toLong() * 1000
+                )
+            if (fileBean.fileId == "") {
+                fileBean.fileId = fileBean.categoryId
+                fileBean.fileIco = R.drawable.folder
+                fileBean.isFolder = true
+                fileBean.modifiedTimeString =
+                    SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
+                        fileBean.modifiedTime.toLong() * 1000
+                    )
+            } else {
+                fileBean.sizeString = android.text.format.Formatter.formatFileSize(
+                    application,
+                    if (fileBean.size == "0") "".toLong() else fileBean.size.toLong()
+                ) + " "
+                fileBean.modifiedTimeString = fileBean.modifiedTime
+                fileBean.modifiedTime =
+                    (SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).parse(
+                        fileBean.modifiedTime
+                    )!!.time / 1000).toString()
+                if (fileBean.currentPlayTime != 0) {
+                    val playTime =
+                        ((fileBean.currentPlayTime.toFloat() / fileBean.playLong) * 100).roundToInt()
+                    fileBean.createTimeString = "▶️ $playTime% ${fileBean.createTimeString}"
+                }
+            }
+            if (fileBean.isVideo == 1) {
+                fileBean.fileIco = R.drawable.mp4
+            }
+            when (fileBean.icoString) {
+                "apk" -> fileBean.fileIco = R.drawable.apk
+                "iso" -> fileBean.fileIco = R.drawable.iso
+                "zip" -> fileBean.fileIco = R.drawable.zip
+                "7z" -> fileBean.fileIco = R.drawable.zip
+                "rar" -> fileBean.fileIco = R.drawable.zip
+                "png" -> fileBean.fileIco = R.drawable.png
+                "jpg" -> fileBean.fileIco = R.drawable.png
+                "mp3" -> fileBean.fileIco = R.drawable.mp3
+                "txt" -> fileBean.fileIco = R.drawable.txt
+            }
+        }
+    }
+
+    fun order() {
+        /**
+         *
+        user_order:file_size
+        file_id:2573609193685653011
+        user_asc:1
+        fc_mix:0
+         */
+        val map = hashMapOf(
+            "user_order" to orderBean.type,
+            "user_asc" to orderBean.asc.toString(),
+            "file_id" to currentCid,
+            "fc_mix" to "0"
+        )
+        viewModelScope.launch {
+            val order = fileService.order(map)
+            if (order.state) {
+                refresh()
+            } else {
+                Toast.makeText(application, "排序失败", Toast.LENGTH_SHORT).show()
+            }
+
         }
     }
 
@@ -153,7 +197,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         }
         isCut = true
         isLongClick = false
-        appBarTitle = "nap511"
+        appBarTitle = application.resources.getString(R.string.app_name)
     }
 
     fun removeFile() {
@@ -213,7 +257,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         fileListCache.remove(currentCid)
         getFiles(currentCid)
         isLongClick = false
-        appBarTitle = "nap511"
+        appBarTitle = application.resources.getString(R.string.app_name)
     }
 
     fun delete(index: Int) {
@@ -274,7 +318,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             }
             Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
             isLongClick = false
-            appBarTitle = "nap511"
+            appBarTitle = application.resources.getString(R.string.app_name)
         }
     }
 

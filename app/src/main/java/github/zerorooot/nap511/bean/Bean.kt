@@ -17,11 +17,25 @@ data class FilesBean(
     var path: List<PathBean>
 )
 
-object OrderBean {
+object OrderEnum {
     const val change = "user_ptime"
     const val type = "file_type"
     const val name = "file_name"
     const val size = "file_size"
+}
+
+data class OrderBean(var type: String = OrderEnum.name, var asc: Int = 1) {
+    override fun toString(): String {
+        val order = if (asc == 1) "↑" else "↓"
+        val name = when (type) {
+            OrderEnum.name -> "文件名称"
+            OrderEnum.change -> "更改时间"
+            OrderEnum.type -> "文件种类"
+            OrderEnum.size -> "文件大小"
+            else -> "文件名称"
+        }
+        return "$name$order"
+    }
 }
 
 data class PathBean(var cid: String, var name: String, var pid: String)

@@ -55,12 +55,24 @@ interface FileService {
         @Query("cid") cid: String,
         @Query("show_dir") showDir: Int = 1,
         @Query("aid") aid: Int = 1,
-        @Query("o") order: String = OrderBean.name,
+        @Query("asc") asc: Int = 1,
+        @Query("o") order: String = "file_name",
         @Query("limit") limit: Int = 400
     ): FilesBean
 
     @GET("category/get")
     suspend fun getFileInfo(@Query("cid") cid: String): FileInfo
+
+    /**
+     *
+     user_order:file_size
+    file_id:2573609193685653011
+    user_asc:1
+    fc_mix:0
+     */
+    @POST("files/order")
+    @FormUrlEncoded
+    suspend fun order(@FieldMap body: Map<String, String>): BaseReturnMessage
 
     /**
      *

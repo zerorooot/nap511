@@ -6,6 +6,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -62,14 +63,24 @@ fun FileCellItem(
                 Modifier
                     .fillMaxSize()
             ) {
-                Image(
-                    painter = painterResource(image),
-                    contentDescription = "",
-                    modifier = Modifier
-                        .weight(0.2f)
+//                Image(
+//                    painter = painterResource(image),
+//                    contentDescription = "",
+//                    modifier = Modifier
+//                        .weight(0.2f)
+//                        .height(60.dp)
+//                        .align(androidx.compose.ui.Alignment.CenterVertically)
+//                )
+                Box(
+                    Modifier
                         .height(60.dp)
-                        .align(androidx.compose.ui.Alignment.CenterVertically)
-                )
+                        .align(Alignment.CenterVertically)
+                ) {
+                    Image(
+                        painter = painterResource(image),
+                        contentDescription = "",
+                    )
+                }
 
                 Column(
                     verticalArrangement = Arrangement.SpaceEvenly,
@@ -95,7 +106,7 @@ fun FileCellItem(
                         maxLines = 2
                     )
                     Row(
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .padding(start = 5.dp, top = 9.dp)
                             .fillMaxSize()

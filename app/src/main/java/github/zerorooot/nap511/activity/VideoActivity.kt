@@ -52,7 +52,7 @@ class VideoActivity : AppCompatActivity() {
         videoPlayer.setOrientationUtils(orientationUtils)
 
 
-        videoPlayer.fullscreenButton.setOnClickListener { v: View? ->
+        videoPlayer.fullscreenButton.setOnClickListener {
             orientationUtils!!.resolveByClick()
         }
 
