@@ -1,6 +1,6 @@
 #  nap511
 
-一个第三方自用的115网盘客户端，用于[Jetpack Compose](https://developer.android.com/jetpack/compose)练手
+一个Android自用的115网盘客户端，用于[Jetpack Compose](https://developer.android.com/jetpack/compose)练手
 
 # 功能
 

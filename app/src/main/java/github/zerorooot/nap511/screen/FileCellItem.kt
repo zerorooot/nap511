@@ -1,31 +1,36 @@
 package github.zerorooot.nap511.screen
 
-import android.text.Layout.Alignment
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.Paragraph
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.*
 import github.zerorooot.nap511.bean.FileBean
+import kotlin.math.ceil
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FileCellItem(
     fileBean: FileBean,
     index: Int,
+    fileClickIndex: Int = -1,
+    folderClickIndex: Int = -1,
     modifier: Modifier,
     itemOnClick: (Int) -> Unit,
     itemOnLongClick: (Int) -> Unit,
     menuOnClick: (String, Int) -> Unit
 ) {
+
     val image = fileBean.fileIco
     val name = fileBean.name
     val size = fileBean.sizeString
@@ -50,7 +55,7 @@ fun FileCellItem(
                 .padding(4.dp, 4.dp)
                 .height(80.dp),
             colors = CardDefaults.cardColors(
-                containerColor = Color.Transparent
+                containerColor = if ((fileClickIndex == index || folderClickIndex == index) && !fileBean.isSelect) Color.LightGray else Color.Transparent
             ),
         ) {
             Row(
@@ -73,13 +78,21 @@ fun FileCellItem(
                         .fillMaxHeight()
                         .weight(0.7f)
                 ) {
-                    MiddleEllipsisText(
-                        text = name,
-                        style = MaterialTheme.typography.titleMedium,
+//                    MiddleEllipsisText(
+//                        text = name,
+//                        style = MaterialTheme.typography.titleMedium,
+//                        modifier = Modifier
+//                            .padding(start = 4.dp, top = 9.dp)
+//                            .fillMaxWidth(),
+//                        fontWeight = FontWeight.Bold,
+//                    )
+                    AutoSizableTextField(
+                        value = name,
                         modifier = Modifier
                             .padding(start = 4.dp, top = 9.dp)
                             .fillMaxWidth(),
-                        fontWeight = FontWeight.Bold,
+                        minFontSize = 10.sp,
+                        maxLines = 2
                     )
                     Row(
                         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
@@ -118,13 +131,53 @@ fun FileCellItem(
     }
 }
 
-
-@Preview
 @Composable
-private fun test() {
-    val fileBean =
-        FileBean(name = "测试文件名", createTimeString = " 2022-12-27 18:23", sizeString = "624 MB")
+fun AutoSizableTextField(
+    value: String,
+    modifier: Modifier = Modifier,
+    fontSize: TextUnit = 16.sp,
+    maxLines: Int = Int.MAX_VALUE,
+    minFontSize: TextUnit,
+    scaleFactor: Float = 0.9f,
+) {
+    BoxWithConstraints(
+        modifier = modifier
+    ) {
+        var nFontSize = fontSize
 
-    FileCellItem(fileBean, 1, Modifier, { i -> true }, { i -> true }, { i, b -> true })
+        val calculateParagraph = @Composable {
+            Paragraph(
+                text = value,
+                style = TextStyle(fontSize = nFontSize),
+                constraints = Constraints(
+                    maxWidth = ceil(
+                        with(
+                            LocalDensity.current
+                        ) { maxWidth.toPx() }).toInt()
+                ),
+                density = LocalDensity.current,
+                fontFamilyResolver = LocalFontFamilyResolver.current,
+                spanStyles = listOf(),
+                placeholders = listOf(),
+                maxLines = maxLines,
+                ellipsis = false
+            )
+        }
 
+        var intrinsics = calculateParagraph()
+        with(LocalDensity.current) {
+            while ((intrinsics.height.toDp() > maxHeight || intrinsics.didExceedMaxLines) && nFontSize >= minFontSize) {
+                nFontSize *= scaleFactor
+                intrinsics = calculateParagraph()
+            }
+        }
+
+        Text(
+            text = value,
+            style = TextStyle(fontSize = nFontSize),
+            maxLines = maxLines,
+            fontWeight = FontWeight.Bold,
+        )
+    }
 }
+

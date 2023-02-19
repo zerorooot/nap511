@@ -24,12 +24,15 @@ interface FileService {
                         OkHttpClient().newBuilder()
                             .addInterceptor(Interceptor { chain ->
                                 chain.proceed(
-                                    chain.request().newBuilder().addHeader("Cookie", cookie).build()
+                                    chain.request().newBuilder()
+                                        .addHeader("Cookie", cookie)
+                                        .addHeader(
+                                            "User-Agent",
+                                            "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
+                                        )
+                                        .build()
                                 );
                             })
-                            .connectTimeout(1, TimeUnit.SECONDS)
-//                            .readTimeout(10, TimeUnit.SECONDS)
-//                            .writeTimeout(10, TimeUnit.SECONDS)
                             .build()
                     )
                     .build()
@@ -52,7 +55,8 @@ interface FileService {
         @Query("cid") cid: String,
         @Query("show_dir") showDir: Int = 1,
         @Query("aid") aid: Int = 1,
-        @Query("limit") limit: Int = 40
+        @Query("o") order: String = OrderBean.name,
+        @Query("limit") limit: Int = 400
     ): FilesBean
 
     @GET("category/get")

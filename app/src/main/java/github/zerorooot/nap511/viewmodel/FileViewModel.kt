@@ -18,6 +18,8 @@ class FileViewModel(private val cookie: String, private val application: Applica
     ViewModel() {
     var fileBeanList = mutableStateListOf<FileBean>()
 
+    var appBarTitle by mutableStateOf("nap511")
+
     private val _currentPath = MutableStateFlow("")
     var currentPath = _currentPath.asStateFlow()
 
@@ -54,6 +56,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
     fun back() {
         if (isLongClick) {
             isLongClick = false
+            appBarTitle = "nap511"
             fileBeanList.map { i -> i.isSelect = false }
             return
         }
@@ -80,8 +83,8 @@ class FileViewModel(private val cookie: String, private val application: Applica
         viewModelScope.launch {
             try {
                 val files = fileService.getFiles(cid = cid)
-                val fileBean = files.fileBean
-                fileBean.forEach { fileBean ->
+                val fileBeanList = files.fileBeanList
+                fileBeanList.forEach { fileBean ->
                     fileBean.updateTimeString =
                         SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
                             fileBean.updateTime.toLong() * 1000
@@ -101,7 +104,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
                     } else {
                         fileBean.sizeString = android.text.format.Formatter.formatFileSize(
                             application,
-                            fileBean.size.toLong()
+                            if (fileBean.size == "0") "".toLong() else fileBean.size.toLong()
                         ) + " "
                         fileBean.modifiedTimeString = fileBean.modifiedTime
                         fileBean.modifiedTime =
@@ -119,8 +122,8 @@ class FileViewModel(private val cookie: String, private val application: Applica
                         fileBean.fileIco = R.drawable.mp4
                     }
                     when (fileBean.icoString) {
-                        "apk"->fileBean.fileIco = R.drawable.apk
-                        "iso"->fileBean.fileIco = R.drawable.iso
+                        "apk" -> fileBean.fileIco = R.drawable.apk
+                        "iso" -> fileBean.fileIco = R.drawable.iso
                         "zip" -> fileBean.fileIco = R.drawable.zip
                         "7z" -> fileBean.fileIco = R.drawable.zip
                         "rar" -> fileBean.fileIco = R.drawable.zip
@@ -150,6 +153,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         }
         isCut = true
         isLongClick = false
+        appBarTitle = "nap511"
     }
 
     fun removeFile() {
@@ -171,9 +175,9 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 val fileBean = cutFileList[0]
                 val cid = if (fileBean.isFolder) fileBean.parentId else fileBean.categoryId
                 //移除之前目录下剪切的文件
-                fileListCache[cid]!!.fileBean.removeAll(cutFileList)
+                fileListCache[cid]!!.fileBeanList.removeAll(cutFileList)
                 //移除被剪切文件夹的缓存，防止路径未更改
-                cutFileList.forEach {i->
+                cutFileList.forEach { i ->
                     if (i.isFolder) {
                         fileListCache.remove(i.categoryId)
                     }
@@ -208,6 +212,8 @@ class FileViewModel(private val cookie: String, private val application: Applica
     fun refresh() {
         fileListCache.remove(currentCid)
         getFiles(currentCid)
+        isLongClick = false
+        appBarTitle = "nap511"
     }
 
     fun delete(index: Int) {
@@ -221,7 +227,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             val message = if (delete.state) {
                 fileBeanList.remove(fileBean)
 
-                fileListCache[currentCid]!!.fileBean.remove(fileBean)
+                fileListCache[currentCid]!!.fileBeanList.remove(fileBean)
 
                 "删除 ${fileBean.name} 成功"
             } else {
@@ -237,7 +243,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             val rename = fileService.rename(RenameBean(fileBean.fileId, name).toRequestBody())
             val message = if (rename.state) {
                 fileBeanList[selectIndex] = fileBean.copy(name = name)
-                fileListCache[currentCid]!!.fileBean[selectIndex] = fileBean.copy(name = name)
+                fileListCache[currentCid]!!.fileBeanList[selectIndex] = fileBean.copy(name = name)
                 fileListCache[fileBean.categoryId]?.let { it.path.last().name = name }
                 "重命名成功"
             } else {
@@ -260,7 +266,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             val deleteMultiple = fileService.deleteMultiple(mapOf)
             val message = if (deleteMultiple.state) {
                 fileBeanList.removeAll(filter)
-                fileListCache[currentCid]!!.fileBean = ArrayList(fileBeanList)
+                fileListCache[currentCid]!!.fileBeanList = ArrayList(fileBeanList)
 
                 "成功删除 ${filter.size} 个文件"
             } else {
@@ -268,6 +274,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             }
             Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
             isLongClick = false
+            appBarTitle = "nap511"
         }
     }
 
@@ -280,6 +287,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         }
         fileBeanList.clear()
         fileBeanList.addAll(a)
+        appBarTitle = fileBeanList.filter { i -> i.isSelect }.size.toString()
     }
 
     fun selectReverse() {
@@ -290,16 +298,19 @@ class FileViewModel(private val cookie: String, private val application: Applica
         }
         fileBeanList.clear()
         fileBeanList.addAll(a)
+        appBarTitle = fileBeanList.filter { i -> i.isSelect }.size.toString()
     }
 
     fun select(index: Int) {
         val fb = fileBeanList[index]
         fileBeanList[index] = fb.copy(isSelect = !fb.isSelect)
+        appBarTitle = fileBeanList.filter { i -> i.isSelect }.size.toString()
     }
 
     private fun setFiles(files: FilesBean) {
         fileBeanList.clear()
-        fileBeanList.addAll(files.fileBean)
+        fileBeanList.addAll(files.fileBeanList)
+
         currentCid = files.cid
         count = files.count
         pathList = files.path

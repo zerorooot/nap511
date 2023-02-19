@@ -59,11 +59,10 @@ class MainActivity : ComponentActivity() {
 
                     fileViewModel.init()
 
-                    val fileBeanList = fileViewModel.fileBeanList
                     FileScreen(
                         fileViewModel,
                         onItemClick(cookie, fileViewModel),
-                        appBarClick(fileBeanList, fileViewModel),
+                        appBarClick(fileViewModel),
                     )
 
                 }
@@ -71,37 +70,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun appBarClick(fileBeanList: List<FileBean>, fileViewModel: FileViewModel) =
+    private fun appBarClick(fileViewModel: FileViewModel) =
         fun(name: String) {
             when (name) {
                 "cut" -> fileViewModel.cut()
-                "search" -> search(fileBeanList, fileViewModel)
+                "search" -> {}
                 "delete" -> fileViewModel.deleteMultiple()
                 "selectAll" -> fileViewModel.selectAll()
                 "selectReverse" -> fileViewModel.selectReverse()
-                "0" -> orderByName(fileBeanList, fileViewModel)
-                "1" -> orderByCreateTime(fileBeanList, fileViewModel)
-                "2" -> orderByChangeTime(fileBeanList, fileViewModel)
-                "3" -> fileViewModel.refresh()
+                "文件名称" -> {}
+                "创建时间" -> {}
+                "修改时间" -> {}
+                "刷新文件" -> fileViewModel.refresh()
             }
         }
-
-    private fun orderByName(fileBeanList: List<FileBean>, fileViewModel: FileViewModel) {
-
-    }
-
-    private fun orderByCreateTime(fileBeanList: List<FileBean>, fileViewModel: FileViewModel) {
-
-    }
-
-    private fun orderByChangeTime(fileBeanList: List<FileBean>, fileViewModel: FileViewModel) {
-
-    }
-
-
-    private fun search(fileBeanList: List<FileBean>, fileViewModel: FileViewModel) {
-
-    }
 
 
     private fun onItemClick(cookie: String, fileViewModel: FileViewModel) =

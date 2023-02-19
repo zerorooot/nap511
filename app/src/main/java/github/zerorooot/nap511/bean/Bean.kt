@@ -10,12 +10,19 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 
 data class FilesBean(
-    @SerializedName("data") var fileBean: ArrayList<FileBean>,
+    @SerializedName("data") var fileBeanList: ArrayList<FileBean>,
     var cid: String,
     var count: Int,
     var order: String,
     var path: List<PathBean>
 )
+
+object OrderBean {
+    const val change = "user_ptime"
+    const val type = "file_type"
+    const val name = "file_name"
+    const val size = "file_size"
+}
 
 data class PathBean(var cid: String, var name: String, var pid: String)
 
@@ -37,9 +44,9 @@ data class FileBean(
 //    @SerializedName("vdi") var videoDefinition: Int = 0,
     @SerializedName("fuuid") var uuid: Long = 0,
     @SerializedName("sha") var sha1: String = "",
-    @SerializedName("s") var size: String = "",
+    @SerializedName("s") var size: String = "0",
     @SerializedName("current_time") var currentPlayTime: Int = 0,
-    @SerializedName("play_long") var playLong: Int = 0,
+    @SerializedName("play_long") var playLong: Double = 0.00,
     var isFolder: Boolean = false,
     var updateTimeString: String = "",
     var createTimeString: String = "",

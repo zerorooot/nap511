@@ -27,20 +27,22 @@ import kotlinx.coroutines.launch
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @OptIn(
     ExperimentalAnimationApi::class,
-    ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class
+    ExperimentalFoundationApi::class,
+    ExperimentalMaterial3Api::class
 )
 @Composable
 fun FileScreen(
-    fileViewModel: FileViewModel,
-    itemOnClick: (Int) -> Unit,
-    appBarOnClick: (String) -> Unit
+    fileViewModel: FileViewModel, itemOnClick: (Int) -> Unit, appBarOnClick: (String) -> Unit
 ) {
     val fileBeanList = fileViewModel.fileBeanList
     val path by fileViewModel.currentPath.collectAsState()
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
-
     val refreshing by fileViewModel.isRefreshing.collectAsState()
+    val clickMap by remember {
+        mutableStateOf(hashMapOf<String, Int>())
+    }
+    var clickIndex by mutableStateOf(-1)
 
 
     CreateDialogs(fileViewModel)
@@ -49,6 +51,8 @@ fun FileScreen(
         fileViewModel.isLongClick = !fileViewModel.isLongClick
         if (fileViewModel.isLongClick) {
             fileViewModel.select(i)
+        } else {
+            fileViewModel.appBarTitle = "nap511"
         }
     }
     val floatingActionButtonOnClick = { i: String ->
@@ -79,13 +83,18 @@ fun FileScreen(
         } else {
             //记录上级目录当前的位置
             val locationBean = LocationBean(
-                listState.firstVisibleItemIndex,
-                listState.firstVisibleItemScrollOffset
+                listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset
             )
             fileViewModel.currentLocation[path] = locationBean
             val currentFileBean = fileBeanList[i]
             val currentPath = path
 
+            //标记此点击文件，方便确认到底点了那个
+            clickMap[currentPath] = i
+            //currentPath只是当前的，点击后进入下一个文件夹。故仅记录文件
+            if (!currentFileBean.isFolder) {
+                clickIndex = i
+            }
 
             //进入下一级
             itemOnClick.invoke(i)
@@ -95,34 +104,37 @@ fun FileScreen(
                 coroutineScope.launch {
                     val locationBean1 =
                         fileViewModel.currentLocation[currentPath + "/${currentFileBean.name}"]
-                    if (locationBean1 != null) {
-                        listState.animateScrollToItem(
-                            locationBean1.firstVisibleItemIndex,
-                            locationBean1.firstVisibleItemScrollOffset
-                        )
-                    }
+                            ?: run {
+                                LocationBean(0, 0)
+                            }
+                    listState.scrollToItem(
+                        locationBean1.firstVisibleItemIndex,
+                        locationBean1.firstVisibleItemScrollOffset
+                    )
+
 
                 }
             }
         }
     }
     val onBack = {
-        if (path != "/根目录") {
+        val parentDirectory = path.subSequence(0, path.lastIndexOf("/")).toString()
+        //appBar 也调用了这个，所以再判断一次
+        if (path != "/根目录" && !fileViewModel.isCut && !fileViewModel.isLongClick) {
             //当前目录的位置
             fileViewModel.currentLocation[path] = LocationBean(
-                listState.firstVisibleItemIndex,
-                listState.firstVisibleItemScrollOffset
+                listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset
             )
             val locationBean =
-                fileViewModel.currentLocation[path.subSequence(0, path.lastIndexOf("/"))]!!
+                fileViewModel.currentLocation[parentDirectory]!!
 
             coroutineScope.launch {
-                listState.animateScrollToItem(
-                    locationBean.firstVisibleItemIndex,
-                    locationBean.firstVisibleItemScrollOffset
+                listState.scrollToItem(
+                    locationBean.firstVisibleItemIndex, locationBean.firstVisibleItemScrollOffset
                 )
             }
         }
+        clickIndex = clickMap[parentDirectory]!!
         fileViewModel.back()
     }
     BackHandler(path != "/根目录" || fileViewModel.isCut || fileViewModel.isLongClick, onBack)
@@ -143,15 +155,13 @@ fun FileScreen(
             fadeIn() with fadeOut()
         }) {
             if (it) {
-                AppTopBarMultiple(myAppBarOnClick)
+                AppTopBarMultiple(fileViewModel.appBarTitle, myAppBarOnClick)
             } else {
-                AppTopBarNormal(myAppBarOnClick)
+                AppTopBarNormal(fileViewModel.appBarTitle, myAppBarOnClick)
             }
         }
         MiddleEllipsisText(
-            text = path,
-            modifier = Modifier
-                .padding(8.dp, 4.dp)
+            text = path, modifier = Modifier.padding(8.dp, 4.dp)
         )
         Scaffold(floatingActionButton = {
             AnimatedContent(targetState = fileViewModel.isCut, transitionSpec = {
@@ -175,24 +185,21 @@ fun FileScreen(
                 }
             }
         }) {
-            SwipeRefresh(
-                state = rememberSwipeRefreshState(refreshing),
-                onRefresh = {
-                    fileViewModel.refresh()
-                }) {
+            SwipeRefresh(state = rememberSwipeRefreshState(refreshing), onRefresh = {
+                fileViewModel.refresh()
+            }) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     state = listState
                 ) {
-                    itemsIndexed(
-                        items = fileBeanList,
-                        key = { _, item ->
-                            item.hashCode()
-                        }
-                    ) { index, item ->
+                    itemsIndexed(items = fileBeanList, key = { _, item ->
+                        item.hashCode()
+                    }) { index, item ->
                         FileCellItem(
                             item,
                             index,
+                            clickIndex,
+                            clickMap.getOrDefault(path, -1),
                             Modifier.animateItemPlacement(),
                             myItemOnClick,
                             itemOnLongClick,
@@ -235,8 +242,18 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
 @Composable
 fun te() {
     val fileBeanList = arrayListOf<FileBean>()
-    fileBeanList.add(FileBean(name = "1", sizeString = "1", createTimeString = "1"))
-    fileBeanList.add(FileBean(name = "2", sizeString = "2", createTimeString = "2"))
+    fileBeanList.add(
+        FileBean(
+            name = "1dsfsadfasdfasdfsafsdfasdfdasfasfsafsasfdasfsdfasfasdfsdafsdafsafsdarew",
+            sizeString = "1",
+            createTimeString = "1"
+        )
+    )
+    fileBeanList.add(
+        FileBean(
+            name = "2212321sdaffsas312233", sizeString = "2", createTimeString = "2"
+        )
+    )
     fileBeanList.add(FileBean(name = "3", sizeString = "3", createTimeString = "3"))
     fileBeanList.add(FileBean(name = "4", sizeString = "4", createTimeString = "4"))
     fileBeanList.add(FileBean(name = "5", sizeString = "5", createTimeString = "5"))
@@ -251,45 +268,33 @@ fun te() {
     fileBeanList.add(FileBean(name = "49", sizeString = "4", createTimeString = "4"))
     val listState = rememberLazyListState()
     Column {
-        AppTopBarNormal {}
+        AppTopBarNormal("") {}
         MiddleEllipsisText(
-            text = "path",
-            modifier = Modifier
-                .padding(8.dp, 4.dp)
+            text = "path", modifier = Modifier.padding(8.dp, 4.dp)
         )
         Scaffold(floatingActionButton = {
-            FloatingActionButton(onClick = {
-            }) {
+            FloatingActionButton(onClick = {}) {
                 Icon(
-                    painter = painterResource(id = R.drawable.baseline_content_paste_24),
-                    "cut"
+                    painter = painterResource(id = R.drawable.baseline_content_paste_24), "cut"
                 )
             }
 
         }) {
-            SwipeRefresh(
-                state = rememberSwipeRefreshState(false),
-                onRefresh = {
+            SwipeRefresh(state = rememberSwipeRefreshState(false), onRefresh = {
 
-                }) {
+            }) {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    state = listState
+                    modifier = Modifier.fillMaxSize(), state = listState
                 ) {
-                    itemsIndexed(
-                        items = fileBeanList,
-                        key = { _, item ->
-                            item.hashCode()
-                        }
-                    ) { index, item ->
-                        FileCellItem(
-                            item,
-                            index,
+                    itemsIndexed(items = fileBeanList, key = { _, item ->
+                        item.hashCode()
+                    }) { index, item ->
+                        FileCellItem(item,
+                            index, -1,-1,
                             Modifier.animateItemPlacement(),
                             {},
                             {},
-                            { _, _ -> }
-                        )
+                            { _, _ -> })
                     }
                 }
             }

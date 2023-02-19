@@ -20,11 +20,11 @@ import github.zerorooot.nap511.ui.theme.Purple80
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppTopBarNormal(onClick: (name: String) -> Unit) {
+fun AppTopBarNormal(title:String,onClick: (name: String) -> Unit) {
 //    val contextForToast = LocalContext.current.applicationContext
     TopAppBar(
         title = {
-            Text(text = "nap511")
+            Text(text = title)
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
         navigationIcon = {
@@ -43,8 +43,8 @@ fun AppTopBarNormal(onClick: (name: String) -> Unit) {
             ) {
                 onClick.invoke("search")
             }
-            AppTopBarDropdownMenu(onClick = { _, index ->
-                onClick.invoke(index.toString())
+            AppTopBarDropdownMenu(onClick = { itemValue, _ ->
+                onClick.invoke(itemValue)
             })
         }
     )
@@ -52,10 +52,10 @@ fun AppTopBarNormal(onClick: (name: String) -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppTopBarMultiple(onClick: (String) -> Unit) {
+fun AppTopBarMultiple(title:String,onClick: (String) -> Unit) {
     TopAppBar(
         title = {
-            Text(text = "nap511")
+            Text(text = title)
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
         navigationIcon = {
