@@ -9,6 +9,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.res.painterResource
@@ -16,6 +18,10 @@ import androidx.compose.ui.text.Paragraph
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
+import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
+import coil.size.Size
+import coil.transform.CircleCropTransformation
 import github.zerorooot.nap511.bean.FileBean
 import kotlin.math.ceil
 
@@ -77,7 +83,18 @@ fun FileCellItem(
                         .align(Alignment.CenterVertically)
                 ) {
                     Image(
-                        painter = painterResource(image),
+                        painter = if (fileBean.photoThumb == "") painterResource(image) else (
+                                rememberAsyncImagePainter(
+                                    ImageRequest.Builder(LocalContext.current)
+                                        .data(data = fileBean.photoThumb)
+                                        .apply(block = fun ImageRequest.Builder.() {
+                                            scale(coil.size.Scale.FILL)
+                                            placeholder(image)
+                                        }).build()
+                                )
+                                ),
+                        modifier = Modifier.height(60.dp).width(60.dp),
+                        contentScale = ContentScale.Fit,
                         contentDescription = "",
                     )
                 }

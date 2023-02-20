@@ -13,12 +13,12 @@
     <array name="fileOrder">
 <!--        1上，0下-->
         <item>文件名称↑</item>
-        <item>文件大小↑</item>
-        <item>更改时间↑</item>
-        <item>文件种类↑</item>
         <item>文件名称↓</item>
+        <item>文件大小↑</item>
         <item>文件大小↓</item>
+        <item>更改时间↑</item>
         <item>更改时间↓</item>
+        <item>文件种类↑</item>
         <item>文件种类↓</item>
     </array>
 </resources>

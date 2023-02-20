@@ -55,6 +55,7 @@ data class FileBean(
     @SerializedName("tp") var createTime: String = "",
     @SerializedName("t") var modifiedTime: String = "",
     @SerializedName("iv") var isVideo: Int = 0,
+    @SerializedName("u") var photoThumb: String = "",
 //    @SerializedName("vdi") var videoDefinition: Int = 0,
     @SerializedName("fuuid") var uuid: Long = 0,
     @SerializedName("sha") var sha1: String = "",
