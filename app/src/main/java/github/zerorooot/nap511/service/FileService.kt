@@ -63,9 +63,22 @@ interface FileService {
     @GET("category/get")
     suspend fun getFileInfo(@Query("cid") cid: String): FileInfo
 
+    @GET("files/image")
+    suspend fun image(@Query("pickcode") pickCode: String, @Query("_") current: Long): ImageDate
+
+    @GET("files/search")
+    suspend fun search(
+        @Query("cid") cid: String,
+        @Query("search_value") searchValue: String,
+        @Query("aid") aid: Int = 1,
+        @Query("offset") asc: Int = 0,
+        @Query("limit") limit: Int = 400
+    ):FilesBean
+
+
     /**
      *
-     user_order:file_size
+    user_order:file_size
     file_id:2573609193685653011
     user_asc:1
     fc_mix:0

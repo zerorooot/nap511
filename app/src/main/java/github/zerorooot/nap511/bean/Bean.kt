@@ -125,6 +125,19 @@ data class FileInfo(
     @SerializedName("file_category") var fileCategory: String = ""
 )
 
+data class ImageDate(
+    @SerializedName("state") var state: Boolean = false,
+    @SerializedName("data") var imageBean: ImageBean = ImageBean()
+)
+
+data class ImageBean(
+    @SerializedName("url") var url: String = "",
+    @SerializedName("origin_url") var originUrl: String = "",
+    @SerializedName("source_url") var sourceUrl: String = "",
+    @SerializedName("file_name") var fileName: String = "",
+    @SerializedName("file_sha1") var fileSha1: String = "",
+    @SerializedName("pick_code") var pickCode: String = "",
+)
 
 data class BaseReturnMessage(
     @SerializedName("state") var state: Boolean = false,

@@ -19,6 +19,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
 import coil.compose.rememberAsyncImagePainter
+import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Size
 import coil.transform.CircleCropTransformation
@@ -87,13 +88,17 @@ fun FileCellItem(
                                 rememberAsyncImagePainter(
                                     ImageRequest.Builder(LocalContext.current)
                                         .data(data = fileBean.photoThumb)
+                                        .memoryCachePolicy(CachePolicy.ENABLED)
+                                        .diskCachePolicy(CachePolicy.ENABLED)
                                         .apply(block = fun ImageRequest.Builder.() {
                                             scale(coil.size.Scale.FILL)
                                             placeholder(image)
                                         }).build()
                                 )
                                 ),
-                        modifier = Modifier.height(60.dp).width(60.dp),
+                        modifier = Modifier
+                            .height(60.dp)
+                            .width(60.dp),
                         contentScale = ContentScale.Fit,
                         contentDescription = "",
                     )

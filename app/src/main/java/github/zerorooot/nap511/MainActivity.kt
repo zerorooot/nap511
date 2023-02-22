@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
@@ -13,18 +14,23 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import github.zerorooot.nap511.activity.VideoActivity
-import github.zerorooot.nap511.bean.OrderBean
+import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.screen.CookieDialog
 import github.zerorooot.nap511.screen.FileScreen
+import github.zerorooot.nap511.screen.MyPhotoScreen
 import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.SharedPreferencesUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import kotlinx.coroutines.launch
+import kotlin.properties.Delegates
 
 class MainActivity : ComponentActivity() {
     private lateinit var selectedItem: MutableState<String>
+    private lateinit var photoFileBeanList: List<FileBean>
+    private var indexOf by Delegates.notNull<Int>()
 
     @SuppressLint("CoroutineCreationDuringComposition")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,62 +41,93 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    val drawerState = rememberDrawerState(DrawerValue.Closed)
-                    val scope = rememberCoroutineScope()
-                    val itemMap = linkedMapOf(
-                        R.drawable.baseline_login_24 to "登录",
-                        R.drawable.baseline_cloud_24 to "我的文件",
-                        R.drawable.baseline_cloud_download_24 to "离线下载",
-                        R.drawable.baseline_cloud_done_24 to "离线列表",
-                        R.drawable.baseline_settings_24 to "高级设置",
-                        R.drawable.ic_baseline_delete_24 to "回收站"
-                    )
-
+                    val cookie = SharedPreferencesUtil(this).get()
                     selectedItem = remember {
                         mutableStateOf(
-                            SharedPreferencesUtil(this).get()?.let {
+                            cookie?.let {
                                 "我的文件"
                             } ?: kotlin.run {
                                 "登录"
                             }
                         )
                     }
-                    ModalNavigationDrawer(
-                        drawerState = drawerState,
-                        drawerContent = {
-                            ModalDrawerSheet {
-                                Spacer(Modifier.height(12.dp))
-                                itemMap.forEach { (t, u) ->
-                                    NavigationDrawerItem(
-                                        icon = {
-                                            Icon(
-                                                painterResource(t),
-                                                contentDescription = u
-                                            )
-                                        },
-                                        label = { Text(u) },
-                                        selected = u == selectedItem.value,
-                                        onClick = {
-                                            scope.launch { drawerState.close() }
-                                            selectedItem.value = u
-                                        },
-                                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                                    )
-                                }
-                            }
-                        },
-                        content = {
-                            when (selectedItem.value) {
-                                "登录" -> Login()
-                                "我的文件" -> MyFileScreen()
+                    if (cookie == null) {
+                        selectedItem.value = "登录"
+                        return@Surface
+                    }
 
-                            }
-                        }
-                    )
+                    val fileViewModel by viewModels<FileViewModel> {
+                        CookieViewModelFactory(
+                            cookie,
+                            this.application
+                        )
+                    }
 
+                    //恢复因MyPhotoScreen而造成的isSystemBarsVisible为false的情况
+                    var visible by remember {
+                        mutableStateOf(true)
+                    }
+                    rememberSystemUiController().apply {
+                        isSystemBarsVisible = visible
+                    }
+                    BackHandler(selectedItem.value == "photo") {
+                        selectedItem.value = "我的文件"
+                        visible = true
+                    }
+
+                    MyNavigationDrawer(cookie, fileViewModel)
                 }
             }
         }
+    }
+
+    @Composable
+    private fun MyNavigationDrawer(cookie: String, fileViewModel: FileViewModel) {
+        val drawerState = rememberDrawerState(DrawerValue.Closed)
+        val scope = rememberCoroutineScope()
+        val itemMap = linkedMapOf(
+            R.drawable.baseline_login_24 to "登录",
+            R.drawable.baseline_cloud_24 to "我的文件",
+            R.drawable.baseline_cloud_download_24 to "离线下载",
+            R.drawable.baseline_cloud_done_24 to "离线列表",
+            R.drawable.baseline_settings_24 to "高级设置",
+            R.drawable.ic_baseline_delete_24 to "回收站"
+        )
+
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                ModalDrawerSheet {
+                    Spacer(Modifier.height(12.dp))
+                    itemMap.forEach { (t, u) ->
+                        NavigationDrawerItem(
+                            icon = {
+                                Icon(
+                                    painterResource(t),
+                                    contentDescription = u
+                                )
+                            },
+                            label = { Text(u) },
+                            selected = u == selectedItem.value,
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                selectedItem.value = u
+                            },
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+                    }
+                }
+            },
+            content = {
+                when (selectedItem.value) {
+                    "登录" -> Login()
+                    "我的文件" -> MyFileScreen(cookie, fileViewModel)
+                    "photo" -> {
+                        MyPhotoScreen(fileViewModel, photoFileBeanList, indexOf)
+                    }
+                }
+            }
+        )
     }
 
     @Composable
@@ -111,20 +148,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun MyFileScreen() {
-        val cookie = SharedPreferencesUtil(this).get() ?: kotlin.run {
-            Login(true)
-            return
-        }
-
-        val fileViewModel by viewModels<FileViewModel> {
-            CookieViewModelFactory(
-                cookie,
-                this.application
-            )
-        }
-
-
+    private fun MyFileScreen(cookie: String, fileViewModel: FileViewModel) {
         fileViewModel.init()
 
         FileScreen(
@@ -162,6 +186,13 @@ class MainActivity : ComponentActivity() {
                 intent.putExtra("title", fileBean.name)
                 intent.putExtra("pick_code", fileBean.pickCode)
                 startActivity(intent)
+            }
+            //todo location remember
+            if (fileBean.photoThumb != "") {
+                photoFileBeanList =
+                    fileViewModel.fileBeanList.filter { i -> i.photoThumb != "" }
+                indexOf = photoFileBeanList.indexOf(fileBean)
+                selectedItem.value = "photo"
             }
         }
 

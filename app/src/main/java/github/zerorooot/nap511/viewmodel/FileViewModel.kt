@@ -17,11 +17,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.collections.ArrayList
 import kotlin.math.roundToInt
 
 class FileViewModel(private val cookie: String, private val application: Application) :
     ViewModel() {
     var fileBeanList = mutableStateListOf<FileBean>()
+    var imageBeanList = mutableStateListOf<ImageBean>()
 
     var appBarTitle by mutableStateOf(application.resources.getString(R.string.app_name))
 
@@ -49,8 +51,6 @@ class FileViewModel(private val cookie: String, private val application: Applica
     var selectIndex by mutableStateOf(0)
     var isLongClick: Boolean by mutableStateOf(false)
     var isCut: Boolean by mutableStateOf(false)
-//    var order = OrderBean.name
-//    var asc = OrderBean.asc
 
     var orderBean = OrderBean(OrderEnum.name, 1)
     private val fileService: FileService by lazy {
@@ -79,6 +79,37 @@ class FileViewModel(private val cookie: String, private val application: Applica
             isCut = false
             return
         }
+    }
+
+
+    fun getImage(fileBeanList: List<FileBean>, indexOf: Int) {
+        imageBeanList.clear()
+        fileBeanList.forEach { fileBean ->
+            imageBeanList.add(
+                ImageBean(
+                    fileName = fileBean.name,
+                    pickCode = fileBean.pickCode,
+                    fileSha1 = fileBean.sha1
+                )
+            )
+        }
+        viewModelScope.launch {
+            imageBeanList[indexOf] = fileService.image(
+                fileBeanList[indexOf].pickCode,
+                System.currentTimeMillis() / 1000
+            ).imageBean
+        }
+        viewModelScope.launch {
+            fileBeanList.forEachIndexed { index, fileBean ->
+                if (indexOf != index) {
+                    imageBeanList[index] = fileService.image(
+                        fileBean.pickCode,
+                        System.currentTimeMillis() / 1000
+                    ).imageBean
+                }
+            }
+        }
+
     }
 
     fun getFiles(cid: String) {
