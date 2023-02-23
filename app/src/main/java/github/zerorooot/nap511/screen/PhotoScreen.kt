@@ -22,12 +22,10 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Scale
 import com.google.accompanist.pager.*
-import com.google.accompanist.systemuicontroller.SystemUiController
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.smarttoolfactory.zoom.enhancedZoom
 import com.smarttoolfactory.zoom.rememberEnhancedZoomState
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ImageBean
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.viewmodel.FileViewModel
@@ -36,13 +34,10 @@ import github.zerorooot.nap511.viewmodel.FileViewModel
 @Composable
 fun MyPhotoScreen(
     fileViewModel: FileViewModel,
-    photoFileBeanList: List<FileBean>,
-    indexOf: Int
 ) {
-
-    fileViewModel.getImage(photoFileBeanList,indexOf)
+    fileViewModel.getImage(fileViewModel.photoFileBeanList, fileViewModel.photoIndexOf)
     val imageBeanList = fileViewModel.imageBeanList
-    ImageBrowserScreen(imageBeanList, indexOf)
+    ImageBrowserScreen(imageBeanList, fileViewModel.photoIndexOf)
     rememberSystemUiController().apply {
         isSystemBarsVisible = false
     }

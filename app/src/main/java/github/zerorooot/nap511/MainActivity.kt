@@ -29,8 +29,6 @@ import kotlin.properties.Delegates
 
 class MainActivity : ComponentActivity() {
     private lateinit var selectedItem: MutableState<String>
-    private lateinit var photoFileBeanList: List<FileBean>
-    private var indexOf by Delegates.notNull<Int>()
 
     @SuppressLint("CoroutineCreationDuringComposition")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -75,14 +73,14 @@ class MainActivity : ComponentActivity() {
                         visible = true
                     }
 
-                    MyNavigationDrawer(cookie, fileViewModel)
+                    MyNavigationDrawer(fileViewModel)
                 }
             }
         }
     }
 
     @Composable
-    private fun MyNavigationDrawer(cookie: String, fileViewModel: FileViewModel) {
+    private fun MyNavigationDrawer(fileViewModel: FileViewModel) {
         val drawerState = rememberDrawerState(DrawerValue.Closed)
         val scope = rememberCoroutineScope()
         val itemMap = linkedMapOf(
@@ -121,10 +119,15 @@ class MainActivity : ComponentActivity() {
             content = {
                 when (selectedItem.value) {
                     "登录" -> Login()
-                    "我的文件" -> MyFileScreen(cookie, fileViewModel)
+                    "我的文件" -> MyFileScreen(fileViewModel)
                     "photo" -> {
-                        MyPhotoScreen(fileViewModel, photoFileBeanList, indexOf)
+                        MyPhotoScreen(fileViewModel)
                     }
+//                    "video" -> MyVideoScreen(
+//                        cookie = cookie,
+//                        fileBean = fileBean,
+//                        selectedItem = selectedItem
+//                    )
                 }
             }
         )
@@ -148,12 +151,12 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun MyFileScreen(cookie: String, fileViewModel: FileViewModel) {
+    private fun MyFileScreen(fileViewModel: FileViewModel) {
         fileViewModel.init()
 
         FileScreen(
             fileViewModel,
-            onItemClick(cookie, fileViewModel),
+            selectedItem,
             appBarClick(fileViewModel),
         )
     }
@@ -173,28 +176,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-
-    private fun onItemClick(cookie: String, fileViewModel: FileViewModel) =
-        fun(index: Int) {
-            val fileBean = fileViewModel.fileBeanList[index]
-            if (fileBean.isFolder) {
-                fileViewModel.getFiles(fileBean.categoryId)
-            }
-            if (fileBean.isVideo == 1) {
-                val intent = Intent(this, VideoActivity::class.java)
-                intent.putExtra("cookie", cookie)
-                intent.putExtra("title", fileBean.name)
-                intent.putExtra("pick_code", fileBean.pickCode)
-                startActivity(intent)
-            }
-            //todo location remember
-            if (fileBean.photoThumb != "") {
-                photoFileBeanList =
-                    fileViewModel.fileBeanList.filter { i -> i.photoThumb != "" }
-                indexOf = photoFileBeanList.indexOf(fileBean)
-                selectedItem.value = "photo"
-            }
-        }
 
 }
 

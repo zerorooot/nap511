@@ -21,8 +21,6 @@ import androidx.compose.ui.unit.*
 import coil.compose.rememberAsyncImagePainter
 import coil.request.CachePolicy
 import coil.request.ImageRequest
-import coil.size.Size
-import coil.transform.CircleCropTransformation
 import github.zerorooot.nap511.bean.FileBean
 import kotlin.math.ceil
 
@@ -31,8 +29,8 @@ import kotlin.math.ceil
 fun FileCellItem(
     fileBean: FileBean,
     index: Int,
-    fileClickIndex: Int = -1,
-    folderClickIndex: Int = -1,
+    clickIndex: Int = -1,
+    //删除会有动画
     modifier: Modifier,
     itemOnClick: (Int) -> Unit,
     itemOnLongClick: (Int) -> Unit,
@@ -63,7 +61,7 @@ fun FileCellItem(
                 .padding(4.dp, 4.dp)
                 .height(80.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if ((fileClickIndex == index || folderClickIndex == index) && !fileBean.isSelect) Color.LightGray else Color.Transparent
+                containerColor = if ((clickIndex == index) && !fileBean.isSelect) Color.LightGray else Color.Transparent
             ),
         ) {
             Row(

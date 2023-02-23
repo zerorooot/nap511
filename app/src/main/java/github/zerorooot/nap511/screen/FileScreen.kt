@@ -1,26 +1,32 @@
 package github.zerorooot.nap511.screen
 
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.bean.LocationBean
+import github.zerorooot.nap511.activity.VideoActivity
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.viewmodel.FileViewModel
@@ -38,18 +44,23 @@ import kotlinx.coroutines.launch
 )
 @Composable
 fun FileScreen(
-    fileViewModel: FileViewModel, itemOnClick: (Int) -> Unit, appBarOnClick: (String) -> Unit
+    fileViewModel: FileViewModel,
+    //NavigationDrawer path
+    selectedItem: MutableState<String>,
+    appBarOnClick: (String) -> Unit
 ) {
     val fileBeanList = fileViewModel.fileBeanList
     val path by fileViewModel.currentPath.collectAsState()
-    val listState = rememberLazyListState()
+
+    if (!fileViewModel.isFileScreenListState()) {
+        fileViewModel.fileScreenListState = rememberLazyListState()
+    }
+
+    val listState = fileViewModel.fileScreenListState
     val coroutineScope = rememberCoroutineScope()
     val refreshing by fileViewModel.isRefreshing.collectAsState()
-    val clickMap by remember {
-        mutableStateOf(hashMapOf<String, Int>())
-    }
-    var clickIndex by mutableStateOf(-1)
 
+    val activity = LocalContext.current as Activity
 
     CreateDialogs(fileViewModel)
 
@@ -87,38 +98,40 @@ fun FileScreen(
         if (fileViewModel.isLongClick) {
             fileViewModel.select(i)
         } else {
-            //记录上级目录当前的位置
-            val locationBean = LocationBean(
-                listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset
-            )
-            fileViewModel.currentLocation[path] = locationBean
+//            //记录上级目录当前的位置
+            fileViewModel.setListLocationAndClickCache(i)
+
             val currentFileBean = fileBeanList[i]
             val currentPath = path
 
-            //标记此点击文件，方便确认到底点了那个
-            clickMap[currentPath] = i
-            //currentPath只是当前的，点击后进入下一个文件夹。故仅记录文件
-            if (!currentFileBean.isFolder) {
-                clickIndex = i
+            //进入下一级
+            val fileBean = fileViewModel.fileBeanList[i]
+            if (fileBean.isFolder) {
+                fileViewModel.getFiles(fileBean.categoryId)
+            }
+            //todo click to remember
+            if (fileBean.isVideo == 1) {
+                val intent = Intent(activity, VideoActivity::class.java)
+                intent.putExtra("cookie", fileViewModel.myCookie)
+                intent.putExtra("title", fileBean.name)
+                intent.putExtra("pick_code", fileBean.pickCode)
+                activity.startActivity(intent)
+            }
+            if (fileBean.photoThumb != "") {
+                //具体实现在MainActivity#MyNavigationDrawer()
+                val photoFileBeanList =
+                    fileViewModel.fileBeanList.filter { ia -> ia.photoThumb != "" }
+                fileViewModel.photoFileBeanList.clear()
+                fileViewModel.photoFileBeanList.addAll(photoFileBeanList)
+                fileViewModel.photoIndexOf = photoFileBeanList.indexOf(fileBean)
+                selectedItem.value = "photo"
             }
 
-            //进入下一级
-            itemOnClick.invoke(i)
 
             //滚动到当前目录
             if (currentFileBean.isFolder) {
                 coroutineScope.launch {
-                    val locationBean1 =
-                        fileViewModel.currentLocation[currentPath + "/${currentFileBean.name}"]
-                            ?: run {
-                                LocationBean(0, 0)
-                            }
-                    listState.scrollToItem(
-                        locationBean1.firstVisibleItemIndex,
-                        locationBean1.firstVisibleItemScrollOffset
-                    )
-
-
+                    fileViewModel.getListLocation(currentPath + "/${currentFileBean.name}")
                 }
             }
         }
@@ -136,19 +149,12 @@ fun FileScreen(
         //appBar 也调用了这个，所以再判断一次
         if (path != "/根目录" && !fileViewModel.isCut && !fileViewModel.isLongClick) {
             //当前目录的位置
-            fileViewModel.currentLocation[path] = LocationBean(
-                listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset
-            )
-            val locationBean =
-                fileViewModel.currentLocation[parentDirectory]!!
-
+            fileViewModel.setListLocation(path)
             coroutineScope.launch {
-                listState.scrollToItem(
-                    locationBean.firstVisibleItemIndex, locationBean.firstVisibleItemScrollOffset
-                )
+                fileViewModel.getListLocation(parentDirectory)
             }
         }
-        clickIndex = clickMap[parentDirectory] ?: run { -1 }
+        fileViewModel.clickIndex = fileViewModel.clickMap[parentDirectory] ?: run { -1 }
         fileViewModel.back()
     }
     BackHandler(path != "/根目录" || fileViewModel.isCut || fileViewModel.isLongClick, onBack)
@@ -210,8 +216,7 @@ fun FileScreen(
                         FileCellItem(
                             item,
                             index,
-                            clickIndex,
-                            clickMap.getOrDefault(path, -1),
+                            fileViewModel.clickMap.getOrDefault(path, -1),
                             Modifier.animateItemPlacement(),
                             myItemOnClick,
                             itemOnLongClick,
@@ -262,79 +267,3 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
 
     }
 }
-
-@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
-@OptIn(
-
-    ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class
-)
-@Preview
-@Composable
-fun te() {
-    val fileBeanList = arrayListOf<FileBean>()
-    fileBeanList.add(
-        FileBean(
-            name = "1dsfsadfasdfasdfsafsdfasdfdasfasfsafsasfdasfsdfasfasdfsdafsdafsafsdarew",
-            sizeString = "1",
-            createTimeString = "1"
-        )
-    )
-    fileBeanList.add(
-        FileBean(
-            name = "2212321sdaffsas312233", sizeString = "2", createTimeString = "2"
-        )
-    )
-    fileBeanList.add(FileBean(name = "3", sizeString = "3", createTimeString = "3"))
-    fileBeanList.add(FileBean(name = "4", sizeString = "4", createTimeString = "4"))
-    fileBeanList.add(FileBean(name = "5", sizeString = "5", createTimeString = "5"))
-    fileBeanList.add(FileBean(name = "41", sizeString = "4", createTimeString = "4"))
-    fileBeanList.add(FileBean(name = "42", sizeString = "4", createTimeString = "4"))
-    fileBeanList.add(FileBean(name = "43", sizeString = "4", createTimeString = "4"))
-    fileBeanList.add(FileBean(name = "44", sizeString = "4", createTimeString = "4"))
-    fileBeanList.add(FileBean(name = "45", sizeString = "4", createTimeString = "4"))
-    fileBeanList.add(FileBean(name = "46", sizeString = "4", createTimeString = "4"))
-    fileBeanList.add(FileBean(name = "47", sizeString = "4", createTimeString = "4"))
-    fileBeanList.add(FileBean(name = "48", sizeString = "4", createTimeString = "4"))
-    fileBeanList.add(FileBean(name = "49", sizeString = "4", createTimeString = "4"))
-    val listState = rememberLazyListState()
-    Column {
-        AppTopBarNormal("") {}
-        MiddleEllipsisText(
-            text = "path", modifier = Modifier.padding(8.dp, 4.dp)
-        )
-        Scaffold(floatingActionButton = {
-            FloatingActionButton(onClick = {}) {
-                Icon(
-                    painter = painterResource(id = R.drawable.baseline_content_paste_24), "cut"
-                )
-            }
-
-        }) {
-            SwipeRefresh(state = rememberSwipeRefreshState(false), onRefresh = {
-
-            }) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(), state = listState
-                ) {
-                    itemsIndexed(items = fileBeanList, key = { _, item ->
-                        item.hashCode()
-                    }) { index, item ->
-                        FileCellItem(item,
-                            index, -1, -1,
-                            Modifier.animateItemPlacement(),
-                            {},
-                            {},
-                            { _, _ -> })
-                    }
-                }
-            }
-
-        }
-    }
-}
-
-
-
-
-
-

@@ -2,16 +2,14 @@ package github.zerorooot.nap511.viewmodel
 
 import android.app.Application
 import android.widget.Toast
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.*
 import github.zerorooot.nap511.service.FileService
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -23,7 +21,7 @@ import kotlin.math.roundToInt
 class FileViewModel(private val cookie: String, private val application: Application) :
     ViewModel() {
     var fileBeanList = mutableStateListOf<FileBean>()
-    var imageBeanList = mutableStateListOf<ImageBean>()
+    val myCookie = cookie
 
     var appBarTitle by mutableStateOf(application.resources.getString(R.string.app_name))
 
@@ -38,12 +36,11 @@ class FileViewModel(private val cookie: String, private val application: Applica
 
     private var cutFileList = emptyList<FileBean>()
 
-    var currentLocation = hashMapOf<String, LocationBean>()
 
     private val _isRefreshing = MutableStateFlow(false)
     var isRefreshing = _isRefreshing.asStateFlow()
 
-
+    //打开对话框相关
     var isOpenCreateFolderDialog by mutableStateOf(false)
     var isOpenRenameFileDialog by mutableStateOf(false)
     var isOpenFileInfoDialog by mutableStateOf(false)
@@ -52,11 +49,24 @@ class FileViewModel(private val cookie: String, private val application: Applica
     var isLongClick: Boolean by mutableStateOf(false)
     var isCut: Boolean by mutableStateOf(false)
 
+    //图片浏览相关
+    var photoFileBeanList = mutableListOf<FileBean>()
+    var photoIndexOf by mutableStateOf(-1)
+    var imageBeanList = mutableStateListOf<ImageBean>()
+    private val imageBeanCache = hashMapOf<String, SnapshotStateList<ImageBean>>()
+
+    //位置与点击记录相关
+    val clickMap by mutableStateOf(hashMapOf<String, Int>())
+    var clickIndex by mutableStateOf(-1)
+    private var currentLocation = hashMapOf<String, LocationBean>()
+    lateinit var fileScreenListState: LazyListState
+
     var orderBean = OrderBean(OrderEnum.name, 1)
     private val fileService: FileService by lazy {
         FileService.getInstance(cookie)
     }
 
+    fun isFileScreenListState() = ::fileScreenListState.isInitialized
 
     fun init() {
         getFiles(currentCid)
@@ -81,8 +91,45 @@ class FileViewModel(private val cookie: String, private val application: Applica
         }
     }
 
+    fun setListLocation(path: String) {
+        val locationBean = LocationBean(
+            fileScreenListState.firstVisibleItemIndex,
+            fileScreenListState.firstVisibleItemScrollOffset
+        )
+        currentLocation[path] = locationBean
+    }
+
+    fun setListLocationAndClickCache(index: Int) {
+        val currentPath = _currentPath.value
+        //记录上级目录当前的位置
+        setListLocation(currentPath)
+        val currentFileBean = fileBeanList[index]
+
+        //标记此点击文件，方便确认到底点了那个
+        clickMap[currentPath] = index
+        //currentPath只是当前的，点击后进入下一个文件夹。故仅记录文件
+        if (!currentFileBean.isFolder) {
+            clickIndex = index
+        }
+    }
+
+    suspend fun getListLocation(path: String) {
+        val locationBean1 =
+            currentLocation[path]
+                ?: run {
+                    LocationBean(0, 0)
+                }
+        fileScreenListState.scrollToItem(
+            locationBean1.firstVisibleItemIndex,
+            locationBean1.firstVisibleItemScrollOffset
+        )
+    }
 
     fun getImage(fileBeanList: List<FileBean>, indexOf: Int) {
+        if (imageBeanCache.containsKey(currentCid)) {
+            imageBeanList = imageBeanCache[currentCid]!!
+            return
+        }
         imageBeanList.clear()
         fileBeanList.forEach { fileBean ->
             imageBeanList.add(
@@ -93,12 +140,14 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 )
             )
         }
+        //获取当前点击的
         viewModelScope.launch {
             imageBeanList[indexOf] = fileService.image(
                 fileBeanList[indexOf].pickCode,
                 System.currentTimeMillis() / 1000
             ).imageBean
         }
+        //加载其他剩余的
         viewModelScope.launch {
             fileBeanList.forEachIndexed { index, fileBean ->
                 if (indexOf != index) {
@@ -110,6 +159,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             }
         }
 
+        imageBeanCache[currentCid] = imageBeanList
     }
 
     fun getFiles(cid: String) {
@@ -289,6 +339,8 @@ class FileViewModel(private val cookie: String, private val application: Applica
         getFiles(currentCid)
         isLongClick = false
         appBarTitle = application.resources.getString(R.string.app_name)
+        //图片缓存
+        imageBeanCache.remove(currentCid)
     }
 
     fun delete(index: Int) {

@@ -42,6 +42,9 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer{
 
     private OrientationUtils orientationUtils;
 
+    public MyGSYVideoPlayer(Context context) {
+        super(context);
+    }
 
     public MyGSYVideoPlayer(Context context, AttributeSet attrs) {
         super(context, attrs);
