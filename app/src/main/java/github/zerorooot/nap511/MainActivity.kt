@@ -1,8 +1,9 @@
 package github.zerorooot.nap511
 
 import android.annotation.SuppressLint
-import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -12,20 +13,25 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
-import github.zerorooot.nap511.activity.VideoActivity
-import github.zerorooot.nap511.bean.FileBean
+import com.google.gson.Gson
+import com.google.gson.JsonElement
 import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.screen.CookieDialog
 import github.zerorooot.nap511.screen.FileScreen
+import github.zerorooot.nap511.screen.MyOfflineScreen
 import github.zerorooot.nap511.screen.MyPhotoScreen
 import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.SharedPreferencesUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import kotlinx.coroutines.launch
-import kotlin.properties.Delegates
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import kotlin.concurrent.thread
+
 
 class MainActivity : ComponentActivity() {
     private lateinit var selectedItem: MutableState<String>
@@ -39,18 +45,12 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    val cookie = SharedPreferencesUtil(this).get()
+                    val cookie = SharedPreferencesUtil(this).get("cookie")
                     selectedItem = remember {
-                        mutableStateOf(
-                            cookie?.let {
-                                "我的文件"
-                            } ?: kotlin.run {
-                                "登录"
-                            }
-                        )
+                        mutableStateOf("我的文件")
                     }
                     if (cookie == null) {
-                        selectedItem.value = "登录"
+                        Login()
                         return@Surface
                     }
 
@@ -79,6 +79,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     private fun MyNavigationDrawer(fileViewModel: FileViewModel) {
         val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -123,6 +124,7 @@ class MainActivity : ComponentActivity() {
                     "photo" -> {
                         MyPhotoScreen(fileViewModel)
                     }
+                    "离线下载"-> MyOfflineScreen(fileViewModel)
 //                    "video" -> MyVideoScreen(
 //                        cookie = cookie,
 //                        fileBean = fileBean,
@@ -134,18 +136,28 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun Login(restart: Boolean = false) {
+    private fun Login() {
+        val context = LocalContext.current
         CookieDialog {
             if (it != "") {
-                SharedPreferencesUtil(this).save(it.replace(" ", ""))
-                if (restart) {
+                val replace = it.replace(" ", "").replace("\r|\n".toRegex(), "");
+                thread {
+                    val checkLogin = checkLogin(replace)
+                    if (checkLogin == "") {
+                        Handler(Looper.getMainLooper()).post {
+                            Toast.makeText(context, "登录失败~", Toast.LENGTH_SHORT).show()
+                        }
+                    }else{
+                        SharedPreferencesUtil(context).save("cookie", replace)
+                        SharedPreferencesUtil(context).save("uid", checkLogin)
+                    }
                     finish()
                     startActivity(intent)
-                } else {
-                    selectedItem.value = "我的文件"
                 }
+
             } else {
                 Toast.makeText(this, "请输入cookie", Toast.LENGTH_SHORT).show()
+                selectedItem.value = "我的文件"
             }
         }
     }
@@ -176,7 +188,37 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-
+    private fun checkLogin(cookie: String): String {
+        val url =
+            "https://passportapi.115.com/app/1.0/web/1.0/check/sso?_${System.currentTimeMillis() / 1000}"
+        val okHttpClient = OkHttpClient()
+        val request: Request = Request
+            .Builder()
+            .url(url)
+            .addHeader("cookie", cookie)
+            .addHeader("Content-Type", "application/json; Charset=UTF-8")
+            .addHeader(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
+            )
+            .get()
+            .build()
+        val body = okHttpClient.newCall(request).execute().body
+        val uid = if (body != null) {
+            val string = body.string()
+            try {
+                Gson().fromJson(
+                    string,
+                    JsonElement::class.java
+                ).asJsonObject.getAsJsonObject("data").get("user_id").asString
+            } catch (e: Exception) {
+                ""
+            }
+        } else {
+            ""
+        }
+        return uid
+    }
 }
 
 

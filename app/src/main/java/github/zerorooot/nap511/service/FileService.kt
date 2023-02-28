@@ -73,7 +73,7 @@ interface FileService {
         @Query("aid") aid: Int = 1,
         @Query("offset") asc: Int = 0,
         @Query("limit") limit: Int = 400
-    ):FilesBean
+    ): FilesBean
 
 
     /**
@@ -135,6 +135,8 @@ interface FileService {
     @POST("files/batch_rename")
     suspend fun rename(@Body renameBean: RequestBody): BaseReturnMessage
 
+    @POST("offine/downpath")
+    suspend fun setDownloadPath(@Field("file_id") cid: String): BaseReturnMessage
 
 }
 

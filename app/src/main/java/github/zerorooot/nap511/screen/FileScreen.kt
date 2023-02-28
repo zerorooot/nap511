@@ -154,7 +154,6 @@ fun FileScreen(
                 fileViewModel.getListLocation(parentDirectory)
             }
         }
-        fileViewModel.clickIndex = fileViewModel.clickMap[parentDirectory] ?: run { -1 }
         fileViewModel.back()
     }
     BackHandler(path != "/根目录" || fileViewModel.isCut || fileViewModel.isLongClick, onBack)

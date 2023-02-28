@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.viewmodel
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.widget.Toast
 import androidx.compose.foundation.lazy.LazyListState
@@ -10,6 +11,8 @@ import androidx.lifecycle.viewModelScope
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.*
 import github.zerorooot.nap511.service.FileService
+import github.zerorooot.nap511.service.OfflineService
+import github.zerorooot.nap511.util.SharedPreferencesUtil
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -18,6 +21,7 @@ import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.math.roundToInt
 
+@SuppressLint("MutableCollectionMutableState")
 class FileViewModel(private val cookie: String, private val application: Application) :
     ViewModel() {
     var fileBeanList = mutableStateListOf<FileBean>()
@@ -56,8 +60,11 @@ class FileViewModel(private val cookie: String, private val application: Applica
     private val imageBeanCache = hashMapOf<String, SnapshotStateList<ImageBean>>()
 
     //位置与点击记录相关
-    val clickMap by mutableStateOf(hashMapOf<String, Int>())
-    var clickIndex by mutableStateOf(-1)
+    val clickMap = mutableStateMapOf<String, Int>()
+//    private val _clickMap = MutableStateFlow(hashMapOf<String, Int>())
+//    var clickMap = _clickMap.asStateFlow()
+
+
     private var currentLocation = hashMapOf<String, LocationBean>()
     lateinit var fileScreenListState: LazyListState
 
@@ -66,10 +73,19 @@ class FileViewModel(private val cookie: String, private val application: Applica
         FileService.getInstance(cookie)
     }
 
+    //-------------------------------offline------------------------
+    private val _quotaBean = MutableStateFlow(QuotaBean(1500, 1500))
+    var quotaBean = _quotaBean.asStateFlow()
+
+    private val offlineService: OfflineService by lazy {
+        OfflineService.getInstance(cookie)
+    }
+
     fun isFileScreenListState() = ::fileScreenListState.isInitialized
 
     fun init() {
         getFiles(currentCid)
+        quota()
     }
 
     fun back() {
@@ -103,14 +119,8 @@ class FileViewModel(private val cookie: String, private val application: Applica
         val currentPath = _currentPath.value
         //记录上级目录当前的位置
         setListLocation(currentPath)
-        val currentFileBean = fileBeanList[index]
-
         //标记此点击文件，方便确认到底点了那个
         clickMap[currentPath] = index
-        //currentPath只是当前的，点击后进入下一个文件夹。故仅记录文件
-        if (!currentFileBean.isFolder) {
-            clickIndex = index
-        }
     }
 
     suspend fun getListLocation(path: String) {
@@ -355,6 +365,9 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 fileBeanList.remove(fileBean)
 
                 fileListCache[currentCid]!!.fileBeanList.remove(fileBean)
+                clickMap[currentCid] =  clickMap.getOrDefault(currentCid, 0) - 1
+                //delete image bean
+                imageBeanCache[currentCid]?.removeIf { i -> i.fileName == fileBean.name }
 
                 "删除 ${fileBean.name} 成功"
             } else {
@@ -389,12 +402,14 @@ class FileViewModel(private val cookie: String, private val application: Applica
             val filter = fileBeanList.filter { i -> i.isSelect }
             filter.forEachIndexed { index: Int, fileBean: FileBean ->
                 mapOf["fid[$index]"] = fileBean.fileId
+                //update image cache
+                imageBeanCache[currentCid]?.removeIf { i -> i.fileName == fileBean.name }
             }
             val deleteMultiple = fileService.deleteMultiple(mapOf)
             val message = if (deleteMultiple.state) {
                 fileBeanList.removeAll(filter)
                 fileListCache[currentCid]!!.fileBeanList = ArrayList(fileBeanList)
-
+                clickMap[currentCid] =  clickMap.getOrDefault(currentCid, 0) - filter.size
                 "成功删除 ${filter.size} 个文件"
             } else {
                 "删除 ${filter.size} 个文件失败~"
@@ -449,6 +464,48 @@ class FileViewModel(private val cookie: String, private val application: Applica
         _currentPath.value = path
         if (!fileListCache.containsKey(currentCid)) {
             fileListCache[currentCid] = files
+        }
+    }
+
+
+    /**
+     * savepath:
+    wp_path_id:currentCid
+    url[0]:xxxxx
+    url[1]:xxxxx
+    uid:xxxx
+    sign:xxxxxxx
+    time:1675155957
+     */
+    fun addTask(list: List<String>) {
+        viewModelScope.launch {
+            val downloadPath = fileService.setDownloadPath(currentCid)
+            if (!downloadPath.state) {
+                Toast.makeText(application, "设置离线位置失败，默认保存到\"云下载\"目录", Toast.LENGTH_SHORT).show()
+            }
+
+            val map = HashMap<String, String>()
+            map["savepath"] = ""
+            map["wp_path_id"] = currentCid
+            map["uid"] = SharedPreferencesUtil(application).get("uid")!!
+            map["sign"] = offlineService.getSign().sign
+            map["time"] = (System.currentTimeMillis() / 1000).toString()
+            list.forEachIndexed { index, s ->
+                map["url[$index]"] = s
+            }
+            val addTask = offlineService.addTask(map)
+            val message = if (addTask.state) {
+                "任务添加成功"
+            } else {
+                "任务添加失败，${addTask.errorMsg}"
+            }
+            Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun quota() {
+        viewModelScope.launch {
+            _quotaBean.value = offlineService.quota()
         }
     }
 }

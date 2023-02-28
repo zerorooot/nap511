@@ -238,4 +238,18 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer{
         mTitleTextView.setText(title);
         startPlayLogic();
     }
+
+    //todo 视频预览
+    /**
+     * val imageLoader = ImageLoader.Builder(context)
+     * .componentRegistry {
+     *      add(VideoFrameFileFetcher())
+     *      add(VideoFrameUriFetcher())
+     * }
+     * .build()
+     *
+     * imageView.load(File("/path/to/video.mp4",imageLoader)) {
+     * 	videoFrameMillis(1000)
+     * }
+     */
 }

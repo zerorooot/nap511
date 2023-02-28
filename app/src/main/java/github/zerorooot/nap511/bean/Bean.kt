@@ -38,7 +38,19 @@ data class OrderBean(var type: String = OrderEnum.name, var asc: Int = 1) {
     }
 }
 
+data class QuotaBean(var count: Int, var surplus: Int)
 data class PathBean(var cid: String, var name: String, var pid: String)
+
+data class SignBean(
+    @SerializedName("state") var state: Boolean = false,
+//    @SerializedName("data") var data: Int = -1,
+    @SerializedName("size") var size: String = "",
+    @SerializedName("url") var url: String = "",
+    @SerializedName("bt_url") var btUrl: String = "",
+//    @SerializedName("limit") var limit: Int = -1,
+    @SerializedName("sign") var sign: String = "",
+    @SerializedName("time") var time: Int = -1
+)
 
 data class LocationBean(var firstVisibleItemIndex: Int, var firstVisibleItemScrollOffset: Int)
 
@@ -142,7 +154,8 @@ data class ImageBean(
 data class BaseReturnMessage(
     @SerializedName("state") var state: Boolean = false,
     @SerializedName("error") var error: String = "",
-    @SerializedName("errno") var errno: String = ""
+    @SerializedName("errno") var errno: String = "",
+    @SerializedName("error_msg") var errorMsg: String = ""
 )
 
 data class CreateFolderMessage(

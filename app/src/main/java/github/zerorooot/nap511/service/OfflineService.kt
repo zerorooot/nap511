@@ -33,7 +33,13 @@ interface OfflineService {
 
     @FormUrlEncoded
     @POST("web/lixian/?ct=lixian&ac=add_task_urls")
-    suspend fun addTask(@FieldMap body: HashMap<String, String>)
+    suspend fun addTask(@FieldMap body: HashMap<String, String>): BaseReturnMessage
+
+    @GET("web/lixian/?ct=lixian&ac=get_quota_package_info")
+    suspend fun quota(): QuotaBean
+
+    @GET("?ct=offline&ac=space")
+    suspend fun getSign(@Query("_") currentTime: Long = System.currentTimeMillis() / 1000): SignBean
 
 
 }

@@ -88,6 +88,7 @@ fun FileCellItem(
                                         .data(data = fileBean.photoThumb)
                                         .memoryCachePolicy(CachePolicy.ENABLED)
                                         .diskCachePolicy(CachePolicy.ENABLED)
+                                        .networkCachePolicy(CachePolicy.ENABLED)
                                         .apply(block = fun ImageRequest.Builder.() {
                                             scale(coil.size.Scale.FILL)
                                             placeholder(image)

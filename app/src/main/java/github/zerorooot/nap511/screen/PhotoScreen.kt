@@ -104,6 +104,7 @@ private fun FullScreenImage(image: ImageBean) {
                     })
                     .memoryCachePolicy(CachePolicy.ENABLED)
                     .diskCachePolicy(CachePolicy.ENABLED)
+                    .networkCachePolicy(CachePolicy.ENABLED)
                     .build()
             ),
             contentDescription = "",
