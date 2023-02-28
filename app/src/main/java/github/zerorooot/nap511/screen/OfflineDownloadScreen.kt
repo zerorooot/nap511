@@ -1,7 +1,6 @@
 package github.zerorooot.nap511.screen
 
 
-import android.app.Application
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.Surface
 import androidx.compose.material3.Button
@@ -11,20 +10,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.viewmodel.FileViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Preview
-@Composable
-fun test1() {
-    MyOfflineScreen(FileViewModel("", Application()))
-}
 
 @ExperimentalMaterial3Api
 @Composable
-fun MyOfflineScreen(fileViewModel: FileViewModel) {
+fun OfflineDownloadScreen(fileViewModel: FileViewModel) {
     fileViewModel.quota()
     val quotaBean by fileViewModel.quotaBean.collectAsState()
     val path by fileViewModel.currentPath.collectAsState()

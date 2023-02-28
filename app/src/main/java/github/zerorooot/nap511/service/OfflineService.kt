@@ -41,5 +41,17 @@ interface OfflineService {
     @GET("?ct=offline&ac=space")
     suspend fun getSign(@Query("_") currentTime: Long = System.currentTimeMillis() / 1000): SignBean
 
+    /**
+     *
+     */
+    @FormUrlEncoded
+    @POST("web/lixian/?ct=lixian&ac=task_lists")
+    suspend fun taskList(
+        @Field("uid") uid: String = "",
+        @Field("sign") sign: String = "",
+        @Field("page") page: Int = 1,
+        @Field("time") time: Long = System.currentTimeMillis() / 1000
+    ):OfflineInfo
+
 
 }

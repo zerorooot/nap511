@@ -19,14 +19,13 @@ import androidx.compose.ui.unit.dp
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.google.gson.Gson
 import com.google.gson.JsonElement
-import github.zerorooot.nap511.factory.CookieViewModelFactory
-import github.zerorooot.nap511.screen.CookieDialog
-import github.zerorooot.nap511.screen.FileScreen
-import github.zerorooot.nap511.screen.MyOfflineScreen
-import github.zerorooot.nap511.screen.MyPhotoScreen
+import github.zerorooot.nap511.factory.FileCookieViewModelFactory
+import github.zerorooot.nap511.factory.OfflineFileCookieViewModelFactory
+import github.zerorooot.nap511.screen.*
 import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.SharedPreferencesUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
+import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -55,7 +54,13 @@ class MainActivity : ComponentActivity() {
                     }
 
                     val fileViewModel by viewModels<FileViewModel> {
-                        CookieViewModelFactory(
+                        FileCookieViewModelFactory(
+                            cookie,
+                            this.application
+                        )
+                    }
+                    val offlineFileViewModel by viewModels<OfflineFileViewModel> {
+                        OfflineFileCookieViewModelFactory(
                             cookie,
                             this.application
                         )
@@ -73,7 +78,7 @@ class MainActivity : ComponentActivity() {
                         visible = true
                     }
 
-                    MyNavigationDrawer(fileViewModel)
+                    MyNavigationDrawer(fileViewModel, offlineFileViewModel)
                 }
             }
         }
@@ -81,7 +86,10 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    private fun MyNavigationDrawer(fileViewModel: FileViewModel) {
+    private fun MyNavigationDrawer(
+        fileViewModel: FileViewModel,
+        offlineFileViewModel: OfflineFileViewModel
+    ) {
         val drawerState = rememberDrawerState(DrawerValue.Closed)
         val scope = rememberCoroutineScope()
         val itemMap = linkedMapOf(
@@ -124,12 +132,8 @@ class MainActivity : ComponentActivity() {
                     "photo" -> {
                         MyPhotoScreen(fileViewModel)
                     }
-                    "离线下载"-> MyOfflineScreen(fileViewModel)
-//                    "video" -> MyVideoScreen(
-//                        cookie = cookie,
-//                        fileBean = fileBean,
-//                        selectedItem = selectedItem
-//                    )
+                    "离线下载" -> OfflineDownloadScreen(fileViewModel)
+                    "离线列表" -> MyOfflineScreen(offlineFileViewModel)
                 }
             }
         )
@@ -147,7 +151,7 @@ class MainActivity : ComponentActivity() {
                         Handler(Looper.getMainLooper()).post {
                             Toast.makeText(context, "登录失败~", Toast.LENGTH_SHORT).show()
                         }
-                    }else{
+                    } else {
                         SharedPreferencesUtil(context).save("cookie", replace)
                         SharedPreferencesUtil(context).save("uid", checkLogin)
                     }
@@ -160,6 +164,12 @@ class MainActivity : ComponentActivity() {
                 selectedItem.value = "我的文件"
             }
         }
+    }
+
+    //todo click action
+    @Composable
+    private fun MyOfflineScreen(offlineFileViewModel: OfflineFileViewModel) {
+        OfflineFileScreen(offlineFileViewModel, {}, { _, _ -> },{})
     }
 
     @Composable

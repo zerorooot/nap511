@@ -250,8 +250,8 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
     FileOrderDialog(fileViewModel = fileViewModel) {
         fileViewModel.isOpenFileOrderDialog = false
         if (it != "") {
-            val asc = if (it.subSequence(it.length - 1, it.length) == "↑") 1 else 0
-            val type = when (it.subSequence(0, it.length - 1)) {
+            val asc = if (it.subSequence(it.length - 2, it.length) == "⬆️") 1 else 0
+            val type = when (it.subSequence(0, it.length - 2)) {
                 "文件名称" -> OrderEnum.name
                 "更改时间" -> OrderEnum.change
                 "文件种类" -> OrderEnum.type

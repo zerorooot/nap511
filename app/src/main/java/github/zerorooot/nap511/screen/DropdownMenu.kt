@@ -8,14 +8,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringArrayResource
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.DpOffset
-import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.R
 
 @Composable
@@ -71,6 +67,17 @@ private fun MyDropdownMenu(
 fun FileMoreMenu(onClick: (String, Int) -> Unit) {
     val listOf = stringArrayResource(id = R.array.fileMenu).toList()
 //    val listOf = listOf("剪切", "删除", "重命名", "文件信息")
+    BaseMoreMenu(listOf, onClick)
+}
+
+@Composable
+fun OfflineFileMoreMenu(onClick: (String, Int) -> Unit) {
+    val listOf = stringArrayResource(id = R.array.offlineFileMenu).toList()
+    BaseMoreMenu(listOf, onClick)
+}
+
+@Composable
+fun BaseMoreMenu(listOf: List<String>, onClick: (String, Int) -> Unit) {
     MyDropdownMenu(
         listOf,
         Modifier
@@ -104,17 +111,17 @@ fun AppTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
     )
 }
 
-@Preview
 @Composable
-private fun FileMoreMenuPreview() {
-    FileMoreMenu() { _, _ ->
-
-    }
-}
-
-
-@Preview
-@Composable
-private fun DropdownMenuPreview() {
-
+fun OfflineFileAppTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
+    val listOf = stringArrayResource(id = R.array.offlineFileAppBarMenu).toList()
+    MyDropdownMenu(
+        listOf,
+        Modifier.wrapContentSize(Alignment.TopEnd),
+        {
+            Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = "Open Options"
+            )
+        }, onClick
+    )
 }

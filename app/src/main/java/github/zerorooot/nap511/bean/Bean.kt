@@ -26,7 +26,7 @@ object OrderEnum {
 
 data class OrderBean(var type: String = OrderEnum.name, var asc: Int = 1) {
     override fun toString(): String {
-        val order = if (asc == 1) "↑" else "↓"
+        val order = if (asc == 1) "⬆️" else "⬇️"
         val name = when (type) {
             OrderEnum.name -> "文件名称"
             OrderEnum.change -> "更改时间"
@@ -180,4 +180,32 @@ data class RenameBean(var fid: String, var newName: String) {
     }
 }
 
+data class OfflineInfo(
+    @SerializedName("page") var page: Int = -1,
+    @SerializedName("page_count") var pageCount: Int = -1,
+    @SerializedName("page_row") var pageRow: Int = -1,
+    @SerializedName("count") var count: Int = -1,
+    @SerializedName("quota") var quota: Int = -1,
+    @SerializedName("total") var total: Int = -1,
+    @SerializedName("tasks") var tasks: ArrayList<OfflineTask> = arrayListOf(),
+    @SerializedName("state") var state: Boolean = false,
+//    @SerializedName("errtype") var errtype: String = ""
+)
+
+data class OfflineTask(
+    @SerializedName("add_time") var addTime: Long = -1,
+    @SerializedName("percentDone") var percentDone: Double = 0.0,
+    @SerializedName("size") var size: Long = -1,
+    @SerializedName("name") var name: String = "",
+    @SerializedName("file_id") var fileId: String = "",
+    @SerializedName("delete_file_id") var deleteFileId: String = "",
+    @SerializedName("status") var status: Int = -1,
+    @SerializedName("url") var url: String = "",
+    @SerializedName("del_path") var delPath: String = "",
+    @SerializedName("wp_path_id") var wpPathId: String = "",
+    @SerializedName("can_appeal") var canAppeal: Int = -1,
+    var sizeString: String = "",
+    var timeString: String = "",
+    var percentString: String = ""
+)
 

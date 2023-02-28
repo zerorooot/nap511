@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -20,7 +21,7 @@ import github.zerorooot.nap511.ui.theme.Purple80
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppTopBarNormal(title:String,onClick: (name: String) -> Unit) {
+fun AppTopBarNormal(title: String, onClick: (name: String) -> Unit) {
 //    val contextForToast = LocalContext.current.applicationContext
     TopAppBar(
         title = {
@@ -52,7 +53,7 @@ fun AppTopBarNormal(title:String,onClick: (name: String) -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppTopBarMultiple(title:String,onClick: (String) -> Unit) {
+fun AppTopBarMultiple(title: String, onClick: (String) -> Unit) {
     TopAppBar(
         title = {
             Text(text = title)
@@ -101,18 +102,30 @@ fun AppTopBarMultiple(title:String,onClick: (String) -> Unit) {
     )
 }
 
-@Preview
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun testa() {
-//    AppTopBarNormal()
+fun AppTopBarOfflineFile(title: String, onClick: (name: String) -> Unit) {
+//    val contextForToast = LocalContext.current.applicationContext
+    TopAppBar(
+        title = {
+            Text(text = title)
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
+        navigationIcon = {
+            TopAppBarActionButton(
+                imageVector = Icons.Rounded.Menu,
+                description = "navigationIcon"
+            ) {
+                onClick.invoke("ModalNavigationDrawerMenu")
+            }
+        },
+        actions = {
+            OfflineFileAppTopBarDropdownMenu(onClick = { itemValue, _ ->
+                onClick.invoke(itemValue)
+            })
+        }
+    )
 }
-
-@Preview
-@Composable
-private fun test() {
-//    AppTopBarMultiple()
-}
-
 
 @Composable
 private fun TopAppBarActionButton(
