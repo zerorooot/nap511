@@ -26,13 +26,14 @@ class FileViewModel(private val cookie: String, private val application: Applica
     ViewModel() {
     var fileBeanList = mutableStateListOf<FileBean>()
     val myCookie = cookie
+    var selectedItem by mutableStateOf("我的文件")
 
     var appBarTitle by mutableStateOf(application.resources.getString(R.string.app_name))
 
     private val _currentPath = MutableStateFlow("")
     var currentPath = _currentPath.asStateFlow()
 
-    private var currentCid: String by mutableStateOf("0")
+    var currentCid: String by mutableStateOf("0")
     private var count: Int by mutableStateOf(0)
 
     private var fileListCache = hashMapOf<String, FilesBean>()
@@ -61,10 +62,6 @@ class FileViewModel(private val cookie: String, private val application: Applica
 
     //位置与点击记录相关
     val clickMap = mutableStateMapOf<String, Int>()
-//    private val _clickMap = MutableStateFlow(hashMapOf<String, Int>())
-//    var clickMap = _clickMap.asStateFlow()
-
-
     private var currentLocation = hashMapOf<String, LocationBean>()
     lateinit var fileScreenListState: LazyListState
 
@@ -73,19 +70,11 @@ class FileViewModel(private val cookie: String, private val application: Applica
         FileService.getInstance(cookie)
     }
 
-    //-------------------------------offline------------------------
-    private val _quotaBean = MutableStateFlow(QuotaBean(1500, 1500))
-    var quotaBean = _quotaBean.asStateFlow()
-
-    private val offlineService: OfflineService by lazy {
-        OfflineService.getInstance(cookie)
-    }
 
     fun isFileScreenListState() = ::fileScreenListState.isInitialized
 
     fun init() {
         getFiles(currentCid)
-        quota()
     }
 
     fun back() {
@@ -365,7 +354,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 fileBeanList.remove(fileBean)
 
                 fileListCache[currentCid]!!.fileBeanList.remove(fileBean)
-                clickMap[currentCid] =  clickMap.getOrDefault(currentCid, 0) - 1
+                clickMap[currentCid] = clickMap.getOrDefault(currentCid, 0) - 1
                 //delete image bean
                 imageBeanCache[currentCid]?.removeIf { i -> i.fileName == fileBean.name }
 
@@ -409,7 +398,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             val message = if (deleteMultiple.state) {
                 fileBeanList.removeAll(filter)
                 fileListCache[currentCid]!!.fileBeanList = ArrayList(fileBeanList)
-                clickMap[currentCid] =  clickMap.getOrDefault(currentCid, 0) - filter.size
+                clickMap[currentCid] = clickMap.getOrDefault(currentCid, 0) - filter.size
                 "成功删除 ${filter.size} 个文件"
             } else {
                 "删除 ${filter.size} 个文件失败~"
@@ -467,45 +456,4 @@ class FileViewModel(private val cookie: String, private val application: Applica
         }
     }
 
-
-    /**
-     * savepath:
-    wp_path_id:currentCid
-    url[0]:xxxxx
-    url[1]:xxxxx
-    uid:xxxx
-    sign:xxxxxxx
-    time:1675155957
-     */
-    fun addTask(list: List<String>) {
-        viewModelScope.launch {
-            val downloadPath = fileService.setDownloadPath(currentCid)
-            if (!downloadPath.state) {
-                Toast.makeText(application, "设置离线位置失败，默认保存到\"云下载\"目录", Toast.LENGTH_SHORT).show()
-            }
-
-            val map = HashMap<String, String>()
-            map["savepath"] = ""
-            map["wp_path_id"] = currentCid
-            map["uid"] = SharedPreferencesUtil(application).get("uid")!!
-            map["sign"] = offlineService.getSign().sign
-            map["time"] = (System.currentTimeMillis() / 1000).toString()
-            list.forEachIndexed { index, s ->
-                map["url[$index]"] = s
-            }
-            val addTask = offlineService.addTask(map)
-            val message = if (addTask.state) {
-                "任务添加成功"
-            } else {
-                "任务添加失败，${addTask.errorMsg}"
-            }
-            Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    fun quota() {
-        viewModelScope.launch {
-            _quotaBean.value = offlineService.quota()
-        }
-    }
 }

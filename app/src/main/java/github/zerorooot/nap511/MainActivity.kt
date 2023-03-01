@@ -33,8 +33,6 @@ import kotlin.concurrent.thread
 
 
 class MainActivity : ComponentActivity() {
-    private lateinit var selectedItem: MutableState<String>
-
     @SuppressLint("CoroutineCreationDuringComposition")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,9 +43,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background,
                 ) {
                     val cookie = SharedPreferencesUtil(this).get("cookie")
-                    selectedItem = remember {
-                        mutableStateOf("我的文件")
-                    }
+
                     if (cookie == null) {
                         Login()
                         return@Surface
@@ -73,8 +69,8 @@ class MainActivity : ComponentActivity() {
                     rememberSystemUiController().apply {
                         isSystemBarsVisible = visible
                     }
-                    BackHandler(selectedItem.value == "photo") {
-                        selectedItem.value = "我的文件"
+                    BackHandler(fileViewModel.selectedItem == "photo") {
+                        fileViewModel.selectedItem = "我的文件"
                         visible = true
                     }
 
@@ -115,10 +111,10 @@ class MainActivity : ComponentActivity() {
                                 )
                             },
                             label = { Text(u) },
-                            selected = u == selectedItem.value,
+                            selected = u == fileViewModel.selectedItem,
                             onClick = {
                                 scope.launch { drawerState.close() }
-                                selectedItem.value = u
+                                fileViewModel.selectedItem = u
                             },
                             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                         )
@@ -126,14 +122,14 @@ class MainActivity : ComponentActivity() {
                 }
             },
             content = {
-                when (selectedItem.value) {
+                when (fileViewModel.selectedItem) {
                     "登录" -> Login()
                     "我的文件" -> MyFileScreen(fileViewModel)
                     "photo" -> {
                         MyPhotoScreen(fileViewModel)
                     }
-                    "离线下载" -> OfflineDownloadScreen(fileViewModel)
-                    "离线列表" -> MyOfflineScreen(offlineFileViewModel)
+                    "离线下载" -> OfflineDownloadScreen(offlineFileViewModel, fileViewModel)
+                    "离线列表" -> OfflineFileScreen(offlineFileViewModel, fileViewModel)
                 }
             }
         )
@@ -144,32 +140,28 @@ class MainActivity : ComponentActivity() {
         val context = LocalContext.current
         CookieDialog {
             if (it != "") {
-                val replace = it.replace(" ", "").replace("\r|\n".toRegex(), "");
+                val replace = it.replace(" ", "").replace("[\r\n]".toRegex(), "");
                 thread {
                     val checkLogin = checkLogin(replace)
                     if (checkLogin == "") {
                         Handler(Looper.getMainLooper()).post {
-                            Toast.makeText(context, "登录失败~", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "登录失败~，请重试", Toast.LENGTH_SHORT).show()
                         }
                     } else {
                         SharedPreferencesUtil(context).save("cookie", replace)
                         SharedPreferencesUtil(context).save("uid", checkLogin)
+                        Handler(Looper.getMainLooper()).post {
+                            Toast.makeText(context, "登录成功，如果app没重启，还请自行重启", Toast.LENGTH_SHORT)
+                                .show()
+                        }
+                        finish()
+                        startActivity(intent)
                     }
-                    finish()
-                    startActivity(intent)
                 }
-
             } else {
                 Toast.makeText(this, "请输入cookie", Toast.LENGTH_SHORT).show()
-                selectedItem.value = "我的文件"
             }
         }
-    }
-
-    //todo click action
-    @Composable
-    private fun MyOfflineScreen(offlineFileViewModel: OfflineFileViewModel) {
-        OfflineFileScreen(offlineFileViewModel, {}, { _, _ -> },{})
     }
 
     @Composable
@@ -178,7 +170,6 @@ class MainActivity : ComponentActivity() {
 
         FileScreen(
             fileViewModel,
-            selectedItem,
             appBarClick(fileViewModel),
         )
     }

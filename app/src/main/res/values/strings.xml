@@ -6,10 +6,9 @@
     </array>
     <array name="offlineFileAppBarMenu">
         <item>刷新文件</item>
+        <item>复制所有下载链接</item>
         <item>清空已完成</item>
         <item>清空已失败</item>
-        <item>清空进行中</item>
-        <item>清空全部</item>
     </array>
     <array name="fileMenu">
         <item>剪切</item>
@@ -23,7 +22,7 @@
         <item>文件信息</item>
     </array>
     <array name="fileOrder">
-<!--        1上，0下-->
+        <!--        1上，0下-->
         <item>文件名称⬆️</item>
         <item>文件名称⬇️</item>
         <item>文件大小⬆️</item>

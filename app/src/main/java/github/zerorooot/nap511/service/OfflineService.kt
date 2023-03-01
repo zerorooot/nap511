@@ -51,7 +51,24 @@ interface OfflineService {
         @Field("sign") sign: String = "",
         @Field("page") page: Int = 1,
         @Field("time") time: Long = System.currentTimeMillis() / 1000
-    ):OfflineInfo
+    ): OfflineInfo
 
+    /**
+     * hash[0]:xxxxxxx
+     * uid
+     * sign
+     * time
+     */
+    @FormUrlEncoded
+    @POST("web/lixian/?ct=lixian&ac=task_del")
+    suspend fun deleteTask(
+        @FieldMap deleteHash: HashMap<String, String>,
+    ): BaseReturnMessage
 
+    @FormUrlEncoded
+    @POST("web/lixian/?ct=lixian&ac=task_clear")
+    suspend fun clearFinish(@Field("flag") flag: String = "0"):BaseReturnMessage
+    @FormUrlEncoded
+    @POST("web/lixian/?ct=lixian&ac=task_clear")
+    suspend fun clearError(@Field("flag") flag: String = "2"):BaseReturnMessage
 }

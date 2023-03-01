@@ -193,6 +193,7 @@ data class OfflineInfo(
 )
 
 data class OfflineTask(
+    @SerializedName("info_hash") var infoHash: String = "",
     @SerializedName("add_time") var addTime: Long = -1,
     @SerializedName("percentDone") var percentDone: Double = 0.0,
     @SerializedName("size") var size: Long = -1,

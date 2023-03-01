@@ -45,8 +45,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun FileScreen(
     fileViewModel: FileViewModel,
-    //NavigationDrawer path
-    selectedItem: MutableState<String>,
     appBarOnClick: (String) -> Unit
 ) {
     val fileBeanList = fileViewModel.fileBeanList
@@ -124,7 +122,7 @@ fun FileScreen(
                 fileViewModel.photoFileBeanList.clear()
                 fileViewModel.photoFileBeanList.addAll(photoFileBeanList)
                 fileViewModel.photoIndexOf = photoFileBeanList.indexOf(fileBean)
-                selectedItem.value = "photo"
+                fileViewModel.selectedItem = "photo"
             }
 
 

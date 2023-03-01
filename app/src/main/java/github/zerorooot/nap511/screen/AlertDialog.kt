@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.viewmodel.FileViewModel
+import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import kotlinx.coroutines.delay
 
 @Composable
@@ -56,6 +57,24 @@ fun FileInfoDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
             label = "文件信息",
             readOnly = true,
             context = fileBean.toString(),
+            enter = enter
+        )
+    }
+}
+
+@Composable
+fun OfflineFileInfoDialog(
+    offlineFileViewModel: OfflineFileViewModel,
+    enter: (String) -> Unit
+) {
+    val isOpenOfflineDialog by offlineFileViewModel.isOpenOfflineDialog.collectAsState()
+    if (isOpenOfflineDialog) {
+        val offlineTask = offlineFileViewModel.offlineTask
+        BaseDialog(
+            title = offlineTask.name,
+            label = "文件信息",
+            readOnly = true,
+            context = offlineTask.toString(),
             enter = enter
         )
     }

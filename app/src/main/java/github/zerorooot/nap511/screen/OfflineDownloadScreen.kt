@@ -12,13 +12,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.viewmodel.FileViewModel
+import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 
 
 @ExperimentalMaterial3Api
 @Composable
-fun OfflineDownloadScreen(fileViewModel: FileViewModel) {
-    fileViewModel.quota()
-    val quotaBean by fileViewModel.quotaBean.collectAsState()
+fun OfflineDownloadScreen(offlineFileViewModel: OfflineFileViewModel,fileViewModel: FileViewModel) {
+    offlineFileViewModel.quota()
+    val quotaBean by offlineFileViewModel.quotaBean.collectAsState()
     val path by fileViewModel.currentPath.collectAsState()
     val clickFun = { command: String, url: String ->
         when (command) {
@@ -30,7 +31,7 @@ fun OfflineDownloadScreen(fileViewModel: FileViewModel) {
                         true
                     ) || i.startsWith("magnet", true) || i.startsWith("ed2k", true)
                 }.toList()
-                fileViewModel.addTask(urlList)
+                offlineFileViewModel.addTask(urlList,fileViewModel.currentCid)
             }
         }
     }
