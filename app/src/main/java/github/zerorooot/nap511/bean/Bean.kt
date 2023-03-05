@@ -210,3 +210,31 @@ data class OfflineTask(
     var percentString: String = ""
 )
 
+data class RecycleInfo(
+    @SerializedName("count") var count: String = "",
+    @SerializedName("state") var state: Boolean = false,
+    @SerializedName("error") var error: String = "",
+    @SerializedName("offset") var offset: Int = -1,
+    @SerializedName("page_size") var pageSize: Int = -1,
+    @SerializedName("data") var recycleBeanList: ArrayList<RecycleBean> = arrayListOf()
+)
+
+data class RecycleBean(
+    @SerializedName("id") var id: String = "",
+    @SerializedName("file_name") var fileName: String = "",
+    @SerializedName("type") var type: String = "",
+    @SerializedName("file_size") var fileSize: String = "",
+    @SerializedName("dtime") var modifiedTime: String = "",
+    @SerializedName("status") var status: String = "",
+    @SerializedName("cid") var cid: String = "",
+    @SerializedName("parent_name") var parentName: String = "",
+    @SerializedName("iv") var iv: Int = -1,
+    @SerializedName("vdi") var vdi: Int = -1,
+    @SerializedName("ico") var ico: String = "",
+    @SerializedName("u") var photoThumb: String = "",
+    @SerializedName("play_long") var playLong: Int = -1,
+    var isFolder: Boolean = false,
+    var modifiedTimeString: String = "",
+    var fileSizeString: String = "",
+    var fileIco: Int = R.drawable.other
+)

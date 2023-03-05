@@ -2,6 +2,7 @@ package github.zerorooot.nap511.viewmodel
 
 import android.app.Application
 import android.widget.Toast
+import androidx.compose.material3.DrawerState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import github.zerorooot.nap511.bean.OfflineInfo
@@ -10,6 +11,7 @@ import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.OfflineService
 import github.zerorooot.nap511.util.SharedPreferencesUtil
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -18,6 +20,10 @@ import java.util.*
 
 class OfflineFileViewModel(private val cookie: String, private val application: Application) :
     ViewModel() {
+
+    lateinit var drawerState: DrawerState
+    lateinit var scope: CoroutineScope
+
     private val _isRefreshing = MutableStateFlow(false)
     var isRefreshing = _isRefreshing.asStateFlow()
 
@@ -44,6 +50,9 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
     }
 
     fun getOfflineFileList() {
+        if (_offlineFile.value.isNotEmpty()) {
+            return
+        }
         viewModelScope.launch {
             _isRefreshing.value = true
             val uid = SharedPreferencesUtil(application).get("uid")!!
@@ -70,8 +79,10 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
     }
 
     fun refresh() {
+        _offlineFile.value.clear()
         getOfflineFileList()
     }
+
     fun clearFinish() {
         viewModelScope.launch {
             val clearFinish = offlineService.clearFinish()
@@ -83,6 +94,7 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
             Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
         }
     }
+
     fun clearError() {
         viewModelScope.launch {
             val clearError = offlineService.clearError()
@@ -101,6 +113,11 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
         }
     }
 
+    fun openDrawerState() {
+        scope.launch {
+            drawerState.open()
+        }
+    }
     /**
      * savepath:
     wp_path_id:currentCid

@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Application
 import android.widget.Toast
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.lifecycle.ViewModel

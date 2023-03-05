@@ -66,7 +66,12 @@ private fun MyDropdownMenu(
 @Composable
 fun FileMoreMenu(onClick: (String, Int) -> Unit) {
     val listOf = stringArrayResource(id = R.array.fileMenu).toList()
-//    val listOf = listOf("剪切", "删除", "重命名", "文件信息")
+    BaseMoreMenu(listOf, onClick)
+}
+
+@Composable
+fun RecycleMoreMenu(onClick: (String, Int) -> Unit) {
+    val listOf = stringArrayResource(id = R.array.recycleMenu).toList()
     BaseMoreMenu(listOf, onClick)
 }
 
@@ -96,24 +101,26 @@ fun BaseMoreMenu(listOf: List<String>, onClick: (String, Int) -> Unit) {
 }
 
 @Composable
-fun AppTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
+fun FileAppTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
     val listOf = stringArrayResource(id = R.array.appBarMenu).toList()
 //    val listOf = listOf("按文件名称排序", "按创建时间排序", "按修改时间排序","刷新")
-    MyDropdownMenu(
-        listOf,
-        Modifier.wrapContentSize(Alignment.TopEnd),
-        {
-            Icon(
-                imageVector = Icons.Default.MoreVert,
-                contentDescription = "Open Options"
-            )
-        }, onClick
-    )
+    BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }
 
 @Composable
 fun OfflineFileAppTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
     val listOf = stringArrayResource(id = R.array.offlineFileAppBarMenu).toList()
+    BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
+}
+
+@Composable
+fun RecycleAppTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
+    val listOf = listOf("清空所有文件")
+    BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
+}
+
+@Composable
+private fun BaseAppTorBarMenu(listOf: List<String>, onClick: (String, Int) -> Unit) {
     MyDropdownMenu(
         listOf,
         Modifier.wrapContentSize(Alignment.TopEnd),

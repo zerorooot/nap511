@@ -4,6 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -18,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -27,6 +29,7 @@ import androidx.compose.ui.window.DialogProperties
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
+import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import kotlinx.coroutines.delay
 
 @Composable
@@ -64,8 +67,7 @@ fun FileInfoDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
 
 @Composable
 fun OfflineFileInfoDialog(
-    offlineFileViewModel: OfflineFileViewModel,
-    enter: (String) -> Unit
+    offlineFileViewModel: OfflineFileViewModel, enter: (String) -> Unit
 ) {
     val isOpenOfflineDialog by offlineFileViewModel.isOpenOfflineDialog.collectAsState()
     if (isOpenOfflineDialog) {
@@ -75,6 +77,21 @@ fun OfflineFileInfoDialog(
             label = "文件信息",
             readOnly = true,
             context = offlineTask.toString(),
+            enter = enter
+        )
+    }
+}
+
+@Composable
+fun RecyclePasswordDialog(
+    recycleViewModel: RecycleViewModel, enter: (String) -> Unit
+) {
+    val isOpenPasswordDialog by recycleViewModel.isOpenPasswordDialog.collectAsState()
+    if (isOpenPasswordDialog) {
+        BaseDialog(
+            title = "请输入6位数字安全密钥",
+            label = "数字安全密钥",
+            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
             enter = enter
         )
     }
@@ -107,63 +124,53 @@ fun FileOrderDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
 
 @Composable
 private fun RadioButtonDialog(
-    items: List<String>,
-    selectValue: String = "",
-    enter: (String) -> Unit
+    items: List<String>, selectValue: String = "", enter: (String) -> Unit
 ) {
     val selectedValue = remember { mutableStateOf(selectValue) }
 
     val isSelectedItem: (String) -> Boolean = { selectedValue.value == it }
     val onChangeState: (String) -> Unit = { selectedValue.value = it }
 
-    AlertDialog(
-        onDismissRequest = { enter.invoke("") },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    enter.invoke("")
-                },
-            ) {
-                Text(text = "取消")
-            }
-        },
-        title = { Text(text = "选择排序模式") },
-        text = {
-            Column(Modifier.padding(8.dp)) {
-                items.forEach { item ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .selectable(
-                                selected = isSelectedItem(item),
-                                onClick = {
-                                    onChangeState(item)
-                                    enter.invoke(item)
-                                },
-                                role = Role.RadioButton
-                            )
-                            .padding(8.dp)
-                    ) {
-                        Icon(
-                            modifier = Modifier.padding(end = 16.dp),
-                            imageVector = if (isSelectedItem(item)) {
-                                Icons.Outlined.CheckCircle
-                            } else {
-                                Icons.Outlined.RadioButtonUnchecked
-                            },
+    AlertDialog(onDismissRequest = { enter.invoke("") }, confirmButton = {
+        TextButton(
+            onClick = {
+                enter.invoke("")
+            },
+        ) {
+            Text(text = "取消")
+        }
+    }, title = { Text(text = "选择排序模式") }, text = {
+        Column(Modifier.padding(8.dp)) {
+            items.forEach { item ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .selectable(
+                            selected = isSelectedItem(item), onClick = {
+                                onChangeState(item)
+                                enter.invoke(item)
+                            }, role = Role.RadioButton
+                        )
+                        .padding(8.dp)
+                ) {
+                    Icon(
+                        modifier = Modifier.padding(end = 16.dp),
+                        imageVector = if (isSelectedItem(item)) {
+                            Icons.Outlined.CheckCircle
+                        } else {
+                            Icons.Outlined.RadioButtonUnchecked
+                        },
 
-                            contentDescription = null,
-                            tint = Color.Magenta
-                        )
-                        Text(
-                            text = item,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+                        contentDescription = null,
+                        tint = Color.Magenta
+                    )
+                    Text(
+                        text = item, modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }
-    )
+    })
 
 }
 
@@ -174,73 +181,65 @@ private fun BaseDialog(
     label: String,
     context: String = "",
     readOnly: Boolean = false,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     enter: (String) -> Unit
 ) {
     var text by remember {
         mutableStateOf(
             TextFieldValue(
-                text = context,
-                selection = TextRange(context.length)
+                text = context, selection = TextRange(context.length)
             )
         )
     }
     val focusRequester = remember { FocusRequester() }
 
-    AlertDialog(
-        onDismissRequest = {
-            enter.invoke("")
-        },
-        confirmButton = {
-            Button(onClick = {
-                enter.invoke(text.text)
+    AlertDialog(onDismissRequest = {
+        enter.invoke("")
+    }, confirmButton = {
+        Button(onClick = {
+            enter.invoke(text.text)
+            text = TextFieldValue("")
+        }) {
+            Text(text = "确认")
+        }
+    }, dismissButton = {
+        TextButton(
+            onClick = {
+                enter.invoke("")
                 text = TextFieldValue("")
-            }) {
-                Text(text = "确认")
-            }
-        }, dismissButton = {
-            TextButton(
-                onClick = {
-                    enter.invoke("")
-                    text = TextFieldValue("")
-                },
-            ) {
-                Text(text = "取消")
-            }
-        }, title = {
-            Text(text = title, style = MaterialTheme.typography.titleMedium)
-        }, text = {
-            OutlinedTextField(
-                value = text,
-                modifier = Modifier
-                    .focusRequester(focusRequester)
-                    .heightIn(1.dp, Dp.Infinity),
-                readOnly = readOnly,
-                textStyle = if (readOnly) LocalTextStyle.current.copy(textAlign = TextAlign.Center) else LocalTextStyle.current,
-                label = { Text(text = label) },
-                trailingIcon = {
-                    if (!readOnly) {
-                        Icon(
-                            imageVector = Icons.Filled.Delete,
-                            "clear",
-                            modifier = Modifier
-                                .clickable(
-                                    onClick = {
-                                        text = TextFieldValue("")
-                                    }
-                                )
-                        )
-                    }
-                },
-                onValueChange = {
-                    text = it
-                },
-            )
-        },
-        shape = MaterialTheme.shapes.medium,
-        properties = DialogProperties(
-            //自适应OutlinedTextField高
-            usePlatformDefaultWidth = false
+            },
+        ) {
+            Text(text = "取消")
+        }
+    }, title = {
+        Text(text = title, style = MaterialTheme.typography.titleMedium)
+    }, text = {
+        OutlinedTextField(
+            value = text,
+            keyboardOptions = keyboardOptions,
+            modifier = Modifier
+                .focusRequester(focusRequester)
+                .heightIn(1.dp, Dp.Infinity),
+            readOnly = readOnly,
+            textStyle = if (readOnly) LocalTextStyle.current.copy(textAlign = TextAlign.Center) else LocalTextStyle.current,
+            label = { Text(text = label) },
+            trailingIcon = {
+                if (!readOnly) {
+                    Icon(imageVector = Icons.Filled.Delete,
+                        "clear",
+                        modifier = Modifier.clickable(onClick = {
+                                text = TextFieldValue("")
+                            }))
+                }
+            },
+            onValueChange = {
+                text = it
+            },
         )
+    }, shape = MaterialTheme.shapes.medium, properties = DialogProperties(
+        //自适应OutlinedTextField高
+        usePlatformDefaultWidth = false
+    )
     )
     LaunchedEffect(Unit) {
         delay(10)

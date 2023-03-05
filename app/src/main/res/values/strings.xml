@@ -16,6 +16,10 @@
         <item>重命名</item>
         <item>文件信息</item>
     </array>
+    <array name="recycleMenu">
+        <item>还原</item>
+        <item>删除</item>
+    </array>
     <array name="offlineFileMenu">
         <item>复制下载链接</item>
         <item>删除文件</item>

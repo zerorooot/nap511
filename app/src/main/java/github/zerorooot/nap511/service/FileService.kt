@@ -119,6 +119,26 @@ interface FileService {
     ): BaseReturnMessage
 
 
+    @GET("rb")
+    suspend fun recycleList(
+        @Query("aid") aid: String = "7",
+        @Query("cid") cid: String = "0",
+        @Query("offset") offset: String = "0",
+        @Query("limit") limit: String = "400"
+    ): RecycleInfo
+
+    @FormUrlEncoded
+    @POST("rb/clean")
+    suspend fun recycleClean(
+        @Field("rid[0]") rid: String,
+        @Field("password") password: String
+    ): BaseReturnMessage
+
+    @FormUrlEncoded
+    @POST("rb/clean")
+    suspend fun recycleCleanAll(
+        @Field("password") password: String
+    ): BaseReturnMessage
     /**
      * cid 当前目录的cid
      */

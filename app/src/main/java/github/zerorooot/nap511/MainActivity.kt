@@ -19,13 +19,13 @@ import androidx.compose.ui.unit.dp
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.google.gson.Gson
 import com.google.gson.JsonElement
-import github.zerorooot.nap511.factory.FileCookieViewModelFactory
-import github.zerorooot.nap511.factory.OfflineFileCookieViewModelFactory
+import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.screen.*
 import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.SharedPreferencesUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
+import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -50,13 +50,19 @@ class MainActivity : ComponentActivity() {
                     }
 
                     val fileViewModel by viewModels<FileViewModel> {
-                        FileCookieViewModelFactory(
+                        CookieViewModelFactory(
                             cookie,
                             this.application
                         )
                     }
                     val offlineFileViewModel by viewModels<OfflineFileViewModel> {
-                        OfflineFileCookieViewModelFactory(
+                        CookieViewModelFactory(
+                            cookie,
+                            this.application
+                        )
+                    }
+                    val recycleViewModel by viewModels<RecycleViewModel> {
+                        CookieViewModelFactory(
                             cookie,
                             this.application
                         )
@@ -74,7 +80,7 @@ class MainActivity : ComponentActivity() {
                         visible = true
                     }
 
-                    MyNavigationDrawer(fileViewModel, offlineFileViewModel)
+                    MyNavigationDrawer(fileViewModel, offlineFileViewModel, recycleViewModel)
                 }
             }
         }
@@ -84,17 +90,23 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun MyNavigationDrawer(
         fileViewModel: FileViewModel,
-        offlineFileViewModel: OfflineFileViewModel
+        offlineFileViewModel: OfflineFileViewModel,
+        recycleViewModel: RecycleViewModel
     ) {
         val drawerState = rememberDrawerState(DrawerValue.Closed)
         val scope = rememberCoroutineScope()
+
+        offlineFileViewModel.drawerState = drawerState
+        offlineFileViewModel.scope = scope
+        recycleViewModel.drawerState = drawerState
+        recycleViewModel.scope = scope
         val itemMap = linkedMapOf(
             R.drawable.baseline_login_24 to "登录",
             R.drawable.baseline_cloud_24 to "我的文件",
             R.drawable.baseline_cloud_download_24 to "离线下载",
             R.drawable.baseline_cloud_done_24 to "离线列表",
+            R.drawable.ic_baseline_delete_24 to "回收站",
             R.drawable.baseline_settings_24 to "高级设置",
-            R.drawable.ic_baseline_delete_24 to "回收站"
         )
 
         ModalNavigationDrawer(
@@ -130,6 +142,7 @@ class MainActivity : ComponentActivity() {
                     }
                     "离线下载" -> OfflineDownloadScreen(offlineFileViewModel, fileViewModel)
                     "离线列表" -> OfflineFileScreen(offlineFileViewModel, fileViewModel)
+                    "回收站" -> RecycleScreen(recycleViewModel)
                 }
             }
         )

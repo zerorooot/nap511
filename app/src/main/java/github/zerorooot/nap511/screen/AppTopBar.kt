@@ -1,22 +1,16 @@
 package github.zerorooot.nap511.screen
 
-import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.tooling.preview.Preview
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.ui.theme.Pink80
-import github.zerorooot.nap511.ui.theme.Purple40
 import github.zerorooot.nap511.ui.theme.Purple80
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -44,7 +38,7 @@ fun AppTopBarNormal(title: String, onClick: (name: String) -> Unit) {
             ) {
                 onClick.invoke("search")
             }
-            AppTopBarDropdownMenu(onClick = { itemValue, _ ->
+            FileAppTopBarDropdownMenu(onClick = { itemValue, _ ->
                 onClick.invoke(itemValue)
             })
         }
@@ -121,6 +115,30 @@ fun AppTopBarOfflineFile(title: String, onClick: (name: String) -> Unit) {
         },
         actions = {
             OfflineFileAppTopBarDropdownMenu(onClick = { itemValue, _ ->
+                onClick.invoke(itemValue)
+            })
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AppTopBarRecycle(title: String, onClick: (name: String) -> Unit) {
+    TopAppBar(
+        title = {
+            Text(text = title)
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
+        navigationIcon = {
+            TopAppBarActionButton(
+                imageVector = Icons.Rounded.Menu,
+                description = "navigationIcon"
+            ) {
+                onClick.invoke("ModalNavigationDrawerMenu")
+            }
+        },
+        actions = {
+            RecycleAppTopBarDropdownMenu(onClick = { itemValue, _ ->
                 onClick.invoke(itemValue)
             })
         }

@@ -5,9 +5,9 @@ import android.content.SharedPreferences
 
 
 class SharedPreferencesUtil(private val context: Context) {
-    private val FILENAME = "TOKEN"
+    private val FILENAME = "config"
 
-    fun save(name: String, value: String) {
+    fun save(name: String, value: String?) {
         val preferences: SharedPreferences =
             context.getSharedPreferences(FILENAME, Context.MODE_PRIVATE)
         val edit = preferences.edit()
