@@ -2,6 +2,7 @@ package github.zerorooot.nap511.viewmodel
 
 import android.annotation.SuppressLint
 import android.app.Application
+import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.DrawerState
@@ -13,6 +14,7 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.*
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.OfflineService
+import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.SharedPreferencesUtil
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -410,7 +412,14 @@ class FileViewModel(private val cookie: String, private val application: Applica
         }
     }
 
-
+    fun startService(index: Int) {
+        val intent = Intent(application, Sha1Service::class.java)
+        val arrayList = ArrayList<FileBean>()
+        arrayList.add(fileBeanList[index])
+        intent.putParcelableArrayListExtra("list", arrayList)
+        intent.putExtra("cookie", myCookie)
+        application.startService(intent)
+    }
     fun selectAll() {
         val a = arrayListOf<FileBean>()
         fileBeanList.forEach { i ->

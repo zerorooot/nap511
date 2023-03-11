@@ -31,8 +31,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
+import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
+import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import kotlinx.coroutines.launch
 
@@ -92,6 +94,9 @@ fun FileScreen(
             "文件信息" -> {
                 fileViewModel.selectIndex = index
                 fileViewModel.isOpenFileInfoDialog = true
+            }
+            "通过aria2下载" -> {
+                fileViewModel.startService(index)
             }
         }
     }

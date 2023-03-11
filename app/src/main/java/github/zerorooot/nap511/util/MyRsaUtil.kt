@@ -8,16 +8,8 @@ class MyRsaUtil {
         16
     )
     private val e: BigInteger = BigInteger("10001", 16)
+
     fun encrypt(text: String): String {
-        /**
-         *  var m = this.pkcs1pad2(text, 0x80)
-        var c = m.modPow(this.e, this.n)
-        var h = c.toString(16)
-        while (h.length < 0x80 * 2) {
-        h = '0' + h
-        }
-        return h
-         */
         val m = pkcs1pad2(text, 0x80)
         val c = m.modPow(e, n)
         var h = c.toString(16)
@@ -49,19 +41,14 @@ class MyRsaUtil {
         while (c.toCharArray()[i].code != 0) {
             i++
         }
-        //return c.slice(i + 1)
         return c.slice(IntRange(i + 1, c.length - 1))
     }
 
-    private fun pkcs1pad2(s: String, _n: Int): BigInteger {
-        var n = _n
-//        if (n < s.length + 11) {
-//            return null
-//        }
-        val ba = Array(n) { 0 }
-//        intArrayOf(Array(10) {})
-//        val ba = intArrayOf()
+
+    private fun pkcs1pad2(s: String, int: Int): BigInteger {
+        var n = int
         var i = s.length - 1
+        val ba = Array(n) { 0 }
         while (i >= 0 && n > 0) {
             ba[--n] = s.toCharArray()[i--].code
         }
@@ -76,59 +63,31 @@ class MyRsaUtil {
     }
 
     private fun a2hex(byteArray: Array<Int>): String {
-        /**
-         *  var hexString = ''
-        var nextHexByte
-        for (var i = 0; i < byteArray.length; i++) {
-        nextHexByte = byteArray[i].toString(16)
-        if (nextHexByte.length < 2) {
-        nextHexByte = '0' + nextHexByte
-        }
-        hexString += nextHexByte
-        }
-        return hexString
-         */
         var hexString = ""
         var nextHexByte: String
-        byteArray.forEachIndexed { i, _ ->
-            nextHexByte = byteArray[i].toString(16)
+        byteArray.forEach { i ->
+            nextHexByte = i.toString(16)
             if (nextHexByte.length < 2) {
                 nextHexByte = "0$nextHexByte"
             }
             hexString += nextHexByte
         }
-//        for (i in byteArray.iterator()) {
-//            nextHexByte = byteArray[i].toString(16)
-//            if (nextHexByte.length < 2) {
-//                nextHexByte = "0$nextHexByte"
-//            }
-//            hexString += nextHexByte
-//        }
         return hexString
-
     }
 
     private fun hex2a(hex: String): String {
-        /**
-         *   var str = ''
-        for (var i = 0; i < hex.length; i += 2) {
-        str += String.fromCharCode(parseInt(hex.substr(i, 2), 16))
-        }
-        return str
-         */
         var str = ""
-        run {
-            var i = 0
-            while (i < hex.length) {
-                val s = hex.substring(i, i + 2).toInt(16).toChar()
-                str += s
-                i += 2
-            }
+        var i = 0
+        while (i < hex.length) {
+            val s = hex.substring(i, i + 2).toInt(16).toChar()
+            str += s
+            i += 2
         }
+
         return str
     }
 
-    fun hex2aBetyArray(hex: String): ByteArray {
+    fun hex2aByteArray(hex: String): ByteArray {
         val str = arrayListOf<Byte>()
         run {
             var i = 0

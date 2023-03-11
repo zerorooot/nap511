@@ -3,7 +3,9 @@ package github.zerorooot.nap511.service
 
 import android.app.Service
 import android.content.Intent
+import android.os.Build
 import android.os.IBinder
+import androidx.annotation.RequiresApi
 import com.google.gson.JsonParser
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileBeanDownload
@@ -11,7 +13,6 @@ import github.zerorooot.nap511.util.Sha1Util
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.Response
 
 
 class Sha1Service : Service() {
@@ -22,11 +23,13 @@ class Sha1Service : Service() {
     }
 
 
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val fileBeanList = intent!!.getParcelableArrayListExtra<FileBean>("list")!!
+        val fileBeanList = intent!!.getParcelableArrayListExtra("list", FileBean::class.java)!!
         val cookie = intent.getStringExtra("cookie")!!
-        Thread{
+        Thread {
             val downloadUrlAndCookie = getDownloadUrlAndCookie(fileBeanList, cookie)
+            println(downloadUrlAndCookie)
         }.start()
 
 
@@ -43,27 +46,20 @@ class Sha1Service : Service() {
         cookie: String
     ): ArrayList<FileBeanDownload> {
         val list = arrayListOf<FileBeanDownload>()
-        fileBeanList.forEachIndexed { index, fileBean ->
-            val response = getDownloadUrlAndCookie(fileBean.pickCode,  cookie)
-            val returnJson = JsonParser().parse(response.body?.string()).asJsonObject
-            val downloadUrl =
-                returnJson.getAsJsonObject(fileBean.fileId).getAsJsonObject("url").get("url").asString
-            println(response.headers.toString())
-
-            val newCookie = response.headers["Set-Cookie"]!!
-            list.add(FileBeanDownload(newCookie, downloadUrl))
-
+        fileBeanList.forEach { fileBean ->
+            val response = getDownloadUrlAndCookie(fileBean.pickCode, fileBean.fileId, cookie)
+            list.add(response)
         }
         return list
     }
 
     private fun getDownloadUrlAndCookie(
         pickCode: String,
+        fileId: String,
         cookie: String
-    ): Response {
-        val json = "{\"pickcode\":\"${pickCode}\"}"
+    ): FileBeanDownload {
         val tm = System.currentTimeMillis() / 1000
-        val m115Encode = sha1Util.m115_encode(json, tm)
+        val m115Encode = sha1Util.m115_encode(pickCode, tm)
         val map = FormBody.Builder().add("data", m115Encode.data).build()
 
         val request: Request = Request
@@ -78,6 +74,17 @@ class Sha1Service : Service() {
             .post(map)
             .build()
 
-        return okHttpClient.newCall(request).execute()
+        val response = okHttpClient.newCall(request).execute()
+
+        val returnJson = JsonParser().parse(response.body?.string()).asJsonObject
+        val data = returnJson.get("data").asString
+        val m115Decode = sha1Util.m115_decode(data, m115Encode.key)
+
+        val downloadUrl = JsonParser().parse(m115Decode).asJsonObject.getAsJsonObject(fileId)
+            .getAsJsonObject("url").get("url").asString
+
+        val newCookie = response.headers["Set-Cookie"]!!.replace(" ", "")
+        return FileBeanDownload(newCookie, downloadUrl)
+
     }
 }

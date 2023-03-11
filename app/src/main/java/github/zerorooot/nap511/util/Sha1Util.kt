@@ -1,7 +1,7 @@
 package github.zerorooot.nap511.util
 
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
+import android.R.attr
+import java.math.BigInteger
 import java.security.MessageDigest
 import java.util.*
 import kotlin.math.floor
@@ -9,11 +9,9 @@ import kotlin.math.min
 
 
 class Sha1Util {
-    data class KeyBean(val data: String, val key: IntArray)
-
+    data class KeyBean(val data: String, val key: List<Int>)
 
     private val g_kts = intArrayOf(
-
         240,
         229,
         105,
@@ -164,179 +162,103 @@ class Sha1Util {
 
     private val g_key_l = intArrayOf(120, 6, 173, 76, 51, 134, 93, 24, 76, 1, 63, 70)
 
-    /**
-     *  src {"pickcode":"dasfasdfasf"}
-     *  time System.currentTimeMillis()/1000
-     */
-    fun m115_encode(src: String, time: Long): KeyBean {
-        /**
-         *  var key, tmp, zz;
-        key = stringToBytes(md5(`!@###@#${tm}DFDR@#@#`));
-        tmp = stringToBytes(src);
-        tmp = m115_sym_encode(tmp, tmp.length, key, null);
-        tmp = key.slice(0, 16).concat(tmp);
-        return {
-        data: m115_asym_encode(tmp, tmp.length),
-        key
-        };
-         */
-        val key = stringToBytes("!@###@#${time}DFDR@#@#".md5()).toIntArray()
-        val srcBytes = stringToBytes(src).toIntArray()
-
-        var tmp = m115_sym_encode(srcBytes, srcBytes.size, key, null)
-        tmp = key.slice(IntRange(0, 15)).map { it }.plus(tmp)
-
-        var data = m115_asym_encode(tmp, tmp.size)
-        data = URLEncoder.encode(data, Charsets.UTF_8.name())
-        return KeyBean(data, key)
-    }
-
-    fun stringToBytes(text: String): List<Int> {
-        val arrayListOf = arrayListOf<Int>()
-        text.toCharArray().forEach { i->
-            arrayListOf.add(i.code)
-        }
-        return arrayListOf
+    fun m115_encode(pickCode: String, time: Long): KeyBean {
+        val src = "{\"pickcode\":\"$pickCode\"}";
+        val key = stringToBytes(md5("!@###@#${time}DFDR@#@#"))
+        val tmp1 = stringToBytes(src);
+        val tmp2 = m115_sym_encode(tmp1, tmp1.size, key, null)
+        val tmp3 = ArrayList<Int>(key.slice(IntRange(0, 15)))
+        tmp3.addAll(tmp2)
+        val m115AsymEncode = m115_asym_encode(tmp3, tmp3.size)
+        return KeyBean(m115AsymEncode, key)
     }
 
     private fun m115_asym_encode(src: List<Int>, srclen: Int): String {
-        /**
-         *
-         *  var i, j, m, ref, ret
-        m = 128 - 11;
-        ret = '';
-        for (i = j = 0, ref = Math.floor((srclen + m - 1) / m); (0 <= ref ? j < ref : j > ref); i = 0 <= ref ? ++j : --j) {
-        ret += new_rsa.encrypt(bytesToString(src.slice(i * m, Math.min((i + 1) * m, srclen))));
-        }
-        return window.btoa(new_rsa.hex2a(ret));
-         */
-
-        val m = 128 - 11
-        var ret = ""
-        var ref: Double
         val new_rsa = MyRsaUtil()
+        val m = 117
+        var ret = ""
 
-
-        kotlin.run {
-            var j: Int
-            var i = 0.also { j = it }
-            ref = floor(((srclen + m - 1) / m).toDouble())
-            while (if (0 <= ref) j < ref else j > ref) {
-                var text = ""
-                src.slice(IntRange(i * m, min((i + 1) * m, srclen) - 1))
-                    .forEach { a -> text += a.toChar() }
-                ret += new_rsa.encrypt(text)
-                i = if (0 <= ref) ++j else --j
-            }
+        var i: Int
+        var j: Int
+        i = 0.also { j = it }
+        val ref: Double = floor(((srclen + m - 1) / m).toDouble())
+        while (if (0 <= ref) j < ref else j > ref) {
+            val start = i * m
+            val end = min((i + 1) * m, srclen) - 1
+            val slice = src.slice(IntRange(start, end))
+            val s = bytesToString(slice)
+            ret += new_rsa.encrypt(s)
+            i = if (0 <= ref) ++j else --j
         }
-//        return android.util.Base64.encodeToString(new_rsa.hex2a(ret), android.util.Base64.NO_WRAP)
-        val hex2a = new_rsa.hex2aBetyArray(ret)
-        return Base64.getEncoder().encodeToString(hex2a)
+        val a = new_rsa.hex2aByteArray(ret)
+        return Base64.getEncoder().encodeToString(a)
     }
-
 
     private fun m115_sym_encode(
-        src: IntArray,
-        srclen: Int,
-        key1: IntArray,
-        key2: IntArray?
+        src: List<Int>, length: Int, key1: List<Int>, key2: List<Int>?
     ): List<Int> {
-
-        /**
-         * var k1, k2, ret;
-        k1 = m115_getkey(4, key1);
-        k2 = m115_getkey(12, key2);
-        ret = xor115_enc(src, srclen, k1, 4);
-        ret.reverse();
-        ret = xor115_enc(ret, srclen, k2, 12);
-        return ret;
-         */
-        val k1 = m115_getkey(4, key1)
+        val k1 = m115_getkey(4, key1);
         val k2 = m115_getkey(12, key2)
-        var ret = xor115_enc(src.toList(), srclen, k1, 4)
-        ret = ret.reversed()
-        ret = xor115_enc(ret, srclen, k2, 12)
-        return ret
+        val ret = xor115_enc(src, length, k1, 4).reversed()
+        val r = xor115_enc(ret, length, k2, 12)
+        return r
     }
 
-    private fun m115_getkey(length: Int, key: IntArray?): List<Int> {
+    private fun m115_getkey(length: Int, key: List<Int>?): List<Int> {
         if (key != null) {
-            val results = arrayListOf<Int>();
-            run {
-                var j = 0
-                var i = 0
-                while (if (0 <= length) j < length else j > length) {
-                    results.add(key[i] + g_kts[length * i] and 0xff xor g_kts[length * (length - 1 - i)])
-                    i = if (0 <= length) ++j else --j
-                }
+            var j: Int
+            val results = arrayListOf<Int>()
+            var i = 0.also { j = it }
+            val ref: Int = length
+            while (if (0 <= ref) j < ref else j > ref) {
+                results.add(key[i] + g_kts[length * i] and 0xff xor g_kts[length * (length - 1 - i)])
+                i = if (0 <= ref) ++j else --j
             }
             return results
         }
+
         if (length == 12) {
             return g_key_l.toList()
         }
         return g_key_s.toList()
     }
 
-    private fun xor115_enc(
-        src: List<Int>,
-        srclen: Int,
-        key: List<Int>,
-        keyLength: Int
-    ): List<Int> {
 
-        /**
-         *     var i, j, k, mod4, ref, ref1, ref2, ret;
-        mod4 = srclen % 4;
-        ret = [];
-        if (mod4 !== 0) {
-        for (i = j = 0, ref = mod4; (0 <= ref ? j < ref : j > ref); i = 0 <= ref ? ++j : --j) {
-        ret.push(src[i] ^ key[i % keylen]);
-        }
-        }
-        for (i = k = ref1 = mod4, ref2 = srclen; (ref1 <= ref2 ? k < ref2 : k > ref2); i = ref1 <= ref2 ? ++k : --k) {
-        ret.push(src[i] ^ key[(i - mod4) % keylen]);
-        }
-        return ret;
-         */
-
-        val mod4 = srclen % 4
-
+    private fun xor115_enc(src: List<Int>, length: Int, key: List<Int>, keyLen: Int): List<Int> {
+        val mod4 = length % 4;
         val ret = arrayListOf<Int>()
         if (mod4 != 0) {
-            run {
-                var j: Int
-                var i = 0.also { j = it }
-                while (if (0 <= mod4) j < mod4 else j > mod4) {
-                    ret.add(src[i] xor key[i % keyLength])
-                    i = if (0 <= mod4) ++j else --j
-                }
+            var i: Int
+            var j: Int
+            i = 0.also { j = it }
+            val ref: Int = mod4
+            while (if (0 <= ref) j < ref else j > ref) {
+                ret.add(src[i] xor key[i % keyLen])
+                i = if (0 <= ref) ++j else --j
             }
         }
 
-        run {
-            var ref1: Int
-            var k: Int
-            var i = mod4.also { ref1 = it }.also { k = it }
-            while (if (ref1 <= srclen) k < srclen else k > srclen) {
-                ret.add(src[i] xor key[(i - mod4) % keyLength])
-                i = if (ref1 <= srclen) ++k else --k
-            }
+        var i: Int
+        var k: Int
+        var ref1: Int
+        i = mod4.also { ref1 = it }.also { k = it }
+        while (if (ref1 <= length) k < length else k > length) {
+            ret.add(src[i] xor key[(i - mod4) % keyLen])
+            i = if (ref1 <= length) ++k else --k
         }
+
         return ret
     }
 
-    private fun String.md5(): String {
-        val md = MessageDigest.getInstance("MD5")
-        val array = md.digest(this.toByteArray())
-        val sb = StringBuffer()
-        for (i in array.indices) {
-            sb.append(Integer.toHexString(array[i].toInt() and 0xFF or 0x100).substring(1, 3))
+    private fun stringToBytes(s: String): List<Int> {
+        val bytes = arrayListOf<Int>()
+        s.forEach { i ->
+            bytes.add(i.code)
         }
-        return sb.toString()
+        return bytes
     }
 
-    fun m115_decode(src: String, key: IntArray): String {
+    fun m115_decode(src: String, key: List<Int>): String {
         val decode = Base64.getDecoder().decode(src).toList().map { i ->
             if (i < 0) {
                 i + 256
@@ -344,53 +266,60 @@ class Sha1Util {
                 i.toInt()
             }
         }
-
         val tmp = m115_asym_decode(decode, decode.size)
-        //todo check slice
         val src1 = tmp.slice(IntRange(16, tmp.size - 1))
-        val key2 = tmp.slice(IntRange(0, 15)).toIntArray()
-        var text = ""
-        m115_sym_decode(src1, tmp.size - 16, key, key2)
-            .forEach { i -> text += i.toChar() }
-
-        return text
-    }
-
-    private fun m115_asym_decode(src: List<Int>, srclen: Int): List<Int> {
-        val m = 128
-        var ret = ""
-        var ref: Double
-        val new_rsa = MyRsaUtil()
-
-        kotlin.run {
-            var j: Int
-            var i = 0.also { j = it }
-            ref = floor(((srclen + m - 1) / m).toDouble())
-            while (if (0 <= ref) j < ref else j > ref) {
-                var text = ""
-                src.slice(IntRange(i * m, min((i + 1) * m, srclen) - 1))
-                    .forEach { a -> text += a.toChar() }
-                ret += new_rsa.decrypt(text)
-                i = if (0 <= ref) ++j else --j
-            }
-        }
-
-
-        return ret.toCharArray().map { i -> i.code }
+        val key2 = tmp.slice(IntRange(0, 15))
+        val m115SymDecode = m115_sym_decode(src1, tmp.size - 16, key, key2)
+        val bytesToString = bytesToString(m115SymDecode)
+        return bytesToString
     }
 
     private fun m115_sym_decode(
         src: List<Int>,
         srclen: Int,
-        key1: IntArray,
-        key2: IntArray
+        key1: List<Int>,
+        key2: List<Int>
     ): List<Int> {
         val k1 = m115_getkey(4, key1)
         val k2 = m115_getkey(12, key2)
-        var ret = xor115_enc(src, srclen, k2, 12)
-        ret = ret.reversed()
-        ret = xor115_enc(ret, srclen, k1, 4)
+        val reversed = xor115_enc(src, srclen, k2, 12).reversed()
+        val xor115Enc = xor115_enc(reversed, srclen, k1, 4)
+        return xor115Enc
+    }
+
+    private fun m115_asym_decode(src: List<Int>, srclen: Int): List<Int> {
+        val new_rsa = MyRsaUtil()
+        val m = 128
+        var ret = ""
+        var j: Int
+        var i = 0.also { j = it }
+        val ref: Double = floor(((srclen + m - 1) / m).toDouble())
+        while (if (0 <= ref) j < ref else j > ref) {
+            val start = i * m
+            val end = min((i + 1) * m, srclen) - 1
+            val slice = src.slice(IntRange(start, end))
+            val s = bytesToString(slice)
+            ret += new_rsa.decrypt(s)
+            i = if (0 <= ref) ++j else --j
+        }
+        return stringToBytes(ret)
+    }
+
+    private fun bytesToString(b: List<Int>): String {
+        var ret = ""
+        var i: Int
+        var j = 0
+        val len = b.size
+        while (j < len) {
+            i = b[j]
+            ret += i.toChar()
+            j++
+        }
         return ret
     }
 
+    private fun md5(scr: String): String {
+        val md = MessageDigest.getInstance("MD5")
+        return BigInteger(1, md.digest(scr.toByteArray())).toString(16).padStart(32, '0')
+    }
 }

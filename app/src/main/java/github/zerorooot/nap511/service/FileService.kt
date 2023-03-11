@@ -155,6 +155,7 @@ interface FileService {
     @POST("files/batch_rename")
     suspend fun rename(@Body renameBean: RequestBody): BaseReturnMessage
 
+    @FormUrlEncoded
     @POST("offine/downpath")
     suspend fun setDownloadPath(@Field("file_id") cid: String): BaseReturnMessage
 
