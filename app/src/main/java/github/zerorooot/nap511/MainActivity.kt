@@ -22,6 +22,7 @@ import com.google.gson.JsonElement
 import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.screen.*
 import github.zerorooot.nap511.ui.theme.Nap511Theme
+import github.zerorooot.nap511.util.ConfigUtil
 import github.zerorooot.nap511.util.SharedPreferencesUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
@@ -33,6 +34,9 @@ import kotlin.concurrent.thread
 
 
 class MainActivity : ComponentActivity() {
+    private val sharedPreferencesUtil by lazy {
+        SharedPreferencesUtil(this)
+    }
     @SuppressLint("CoroutineCreationDuringComposition")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,7 +46,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    val cookie = SharedPreferencesUtil(this).get("cookie")
+                    val cookie = sharedPreferencesUtil.get(ConfigUtil.cookie)
 
                     if (cookie == null) {
                         Login()
@@ -161,8 +165,8 @@ class MainActivity : ComponentActivity() {
                             Toast.makeText(context, "登录失败~，请重试", Toast.LENGTH_SHORT).show()
                         }
                     } else {
-                        SharedPreferencesUtil(context).save("cookie", replace)
-                        SharedPreferencesUtil(context).save("uid", checkLogin)
+                        sharedPreferencesUtil.save(ConfigUtil.cookie, replace)
+                        sharedPreferencesUtil.save(ConfigUtil.uid, checkLogin)
                         Handler(Looper.getMainLooper()).post {
                             Toast.makeText(context, "登录成功，如果app没重启，还请自行重启", Toast.LENGTH_SHORT)
                                 .show()

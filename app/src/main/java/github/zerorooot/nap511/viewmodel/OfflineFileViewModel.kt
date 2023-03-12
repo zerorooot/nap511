@@ -10,6 +10,7 @@ import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.OfflineService
+import github.zerorooot.nap511.util.ConfigUtil
 import github.zerorooot.nap511.util.SharedPreferencesUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,13 +50,17 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
         FileService.getInstance(cookie)
     }
 
+    private val sharedPreferencesUtil by lazy {
+        SharedPreferencesUtil(application)
+    }
+
     fun getOfflineFileList() {
         if (_offlineFile.value.isNotEmpty()) {
             return
         }
         viewModelScope.launch {
             _isRefreshing.value = true
-            val uid = SharedPreferencesUtil(application).get("uid")!!
+            val uid = sharedPreferencesUtil.get(ConfigUtil.uid)!!
             val sign = offlineService.getSign().sign
             _offlineInfo.value = offlineService.taskList(uid, sign)
             setTaskInfo(_offlineInfo.value.tasks)
@@ -137,7 +142,7 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
             val map = HashMap<String, String>()
             map["savepath"] = ""
             map["wp_path_id"] = currentCid
-            map["uid"] = SharedPreferencesUtil(application).get("uid")!!
+            map["uid"] = sharedPreferencesUtil.get(ConfigUtil.uid)!!
             map["sign"] = offlineService.getSign().sign
             map["time"] = (System.currentTimeMillis() / 1000).toString()
             list.forEachIndexed { index, s ->
@@ -165,7 +170,7 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
     fun delete(offlineTask: OfflineTask) {
         viewModelScope.launch {
             val map = hashMapOf("hash[0]" to offlineTask.infoHash)
-            map["uid"] = SharedPreferencesUtil(application).get("uid")!!
+            map["uid"] = sharedPreferencesUtil.get(ConfigUtil.uid)!!
             map["sign"] = offlineService.getSign().sign
             map["time"] = (System.currentTimeMillis() / 1000).toString()
             val deleteTask = offlineService.deleteTask(map)

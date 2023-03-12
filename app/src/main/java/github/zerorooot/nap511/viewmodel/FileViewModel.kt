@@ -5,7 +5,6 @@ import android.app.Application
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.lifecycle.ViewModel
@@ -13,7 +12,6 @@ import androidx.lifecycle.viewModelScope
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.*
 import github.zerorooot.nap511.service.FileService
-import github.zerorooot.nap511.service.OfflineService
 import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.SharedPreferencesUtil
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,7 +19,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.collections.ArrayList
 import kotlin.math.roundToInt
 
 @SuppressLint("MutableCollectionMutableState")
@@ -53,6 +50,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
     var isOpenRenameFileDialog by mutableStateOf(false)
     var isOpenFileInfoDialog by mutableStateOf(false)
     var isOpenFileOrderDialog by mutableStateOf(false)
+    var isOpenAria2Dialog by mutableStateOf(false)
     var selectIndex by mutableStateOf(0)
     var isLongClick: Boolean by mutableStateOf(false)
     var isCut: Boolean by mutableStateOf(false)
@@ -73,6 +71,9 @@ class FileViewModel(private val cookie: String, private val application: Applica
         FileService.getInstance(cookie)
     }
 
+    private val sharedPreferencesUtil by lazy {
+        SharedPreferencesUtil(application)
+    }
 
     fun isFileScreenListState() = ::fileScreenListState.isInitialized
 
@@ -412,14 +413,20 @@ class FileViewModel(private val cookie: String, private val application: Applica
         }
     }
 
-    fun startService(index: Int) {
+    fun startSendArai2Service(index: Int) {
+        val fileBean = fileBeanList[index]
+        if (fileBean.isFolder) {
+            Toast.makeText(application, "暂时无法下载文件夹", Toast.LENGTH_SHORT).show()
+            return
+        }
         val intent = Intent(application, Sha1Service::class.java)
         val arrayList = ArrayList<FileBean>()
-        arrayList.add(fileBeanList[index])
+        arrayList.add(fileBean)
         intent.putParcelableArrayListExtra("list", arrayList)
         intent.putExtra("cookie", myCookie)
         application.startService(intent)
     }
+
     fun selectAll() {
         val a = arrayListOf<FileBean>()
         fileBeanList.forEach { i ->

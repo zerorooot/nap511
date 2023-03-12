@@ -83,7 +83,7 @@ data class FileBean(
     var fileIco: Int = R.drawable.other
 ) : Parcelable
 
-data class FileBeanDownload(var cookie: String, var downloadUrl: String)
+//data class FileBeanDownload(var downloadUrl: String,val name: String)
 
 /**
  * {

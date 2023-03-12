@@ -2,7 +2,11 @@ package github.zerorooot.nap511.screen
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -29,14 +33,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.google.gson.JsonArray
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
-import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
-import github.zerorooot.nap511.service.Sha1Service
+import github.zerorooot.nap511.util.ConfigUtil
+import github.zerorooot.nap511.util.SharedPreferencesUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import kotlin.concurrent.thread
 
 @SuppressLint(
     "UnusedMaterial3ScaffoldPaddingParameter",
@@ -96,7 +108,13 @@ fun FileScreen(
                 fileViewModel.isOpenFileInfoDialog = true
             }
             "通过aria2下载" -> {
-                fileViewModel.startService(index)
+                val aria2Url = SharedPreferencesUtil(activity).get(ConfigUtil.aria2Url)
+                if (aria2Url == null) {
+                    fileViewModel.isOpenAria2Dialog = true
+                } else {
+                    fileViewModel.startSendArai2Service(index)
+                }
+
             }
         }
     }
@@ -236,30 +254,6 @@ fun FileScreen(
                 )
             }
 
-
-//            SwipeRefresh(state = rememberSwipeRefreshState(refreshing), onRefresh = {
-//                fileViewModel.refresh()
-//            }) {
-//                LazyColumn(
-//                    modifier = Modifier.fillMaxSize(),
-//                    state = listState
-//                ) {
-//                    itemsIndexed(items = fileBeanList, key = { _, item ->
-//                        item.hashCode()
-//                    }) { index, item ->
-//                        FileCellItem(
-//                            item,
-//                            index,
-//                            fileViewModel.clickMap.getOrDefault(path, -1),
-//                            Modifier.animateItemPlacement(),
-//                            myItemOnClick,
-//                            itemOnLongClick,
-//                            menuOnClick
-//                        )
-//                    }
-//                }
-//            }
-
         }
     }
 }
@@ -267,6 +261,8 @@ fun FileScreen(
 @ExperimentalMaterial3Api
 @Composable
 fun CreateDialogs(fileViewModel: FileViewModel) {
+    val context = LocalContext.current
+
     CreateFolderDialog(fileViewModel) {
         if (it != "") {
             fileViewModel.createFolder(it)
@@ -297,7 +293,62 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
             fileViewModel.order()
 
         }
+    }
 
+    Aria2Dialog(
+        fileViewModel = fileViewModel,
+        context = SharedPreferencesUtil(context).get(
+            ConfigUtil.aria2Url,
+            ConfigUtil.aria2UrldefValue
+        )
+    ) {
+        fileViewModel.isOpenAria2Dialog = false
+        if (it != "") {
+            val jsonObject = JsonParser().parse(it).asJsonObject
+            val aria2Url = jsonObject.get(ConfigUtil.aria2Url).asString
+            val aria2Token = jsonObject.get(ConfigUtil.aria2Token).asString
+            thread { checkAria2(aria2Url, aria2Token, context) }
+        }
+    }
+}
 
+/**
+ * {"jsonrpc":"2.0","id":"nap511","method":"aria2.getVersion","params":["token:11"]}
+ */
+private fun checkAria2(aria2Url: String, aria2Token: String, context: Context) {
+    val okHttpClient = OkHttpClient()
+    val jsonObject = JsonObject()
+    jsonObject.addProperty("jsonrpc", "2.0")
+    jsonObject.addProperty("id", "nap511")
+    jsonObject.addProperty("method", "aria2.getVersion")
+
+    val jsonArray = JsonArray()
+    if (aria2Token != "") {
+        jsonArray.add("token:$aria2Token")
+    }
+    jsonObject.add("params", jsonArray)
+
+    val request: Request = Request
+        .Builder()
+        .url(aria2Url)
+        .post(
+            jsonObject.toString()
+                .toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
+        )
+        .build()
+    val body = okHttpClient.newCall(request).execute().body!!.string()
+    val bodyJson = JsonParser().parse(body).asJsonObject
+    Handler(Looper.getMainLooper()).post {
+        if (bodyJson.has("error")) {
+            val message = bodyJson.getAsJsonObject("error").get("message").asString
+            Toast.makeText(context, "aria2配置失败,${message}", Toast.LENGTH_SHORT).show()
+        } else {
+            val sharedPreferencesUtil = SharedPreferencesUtil(context)
+            sharedPreferencesUtil.save(ConfigUtil.aria2Url, aria2Url)
+            if (aria2Token != "") {
+                sharedPreferencesUtil.save(ConfigUtil.aria2Token, aria2Token)
+            }
+            Toast.makeText(context, "aria2配置成功", Toast.LENGTH_SHORT).show()
+        }
     }
 }

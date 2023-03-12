@@ -1,6 +1,5 @@
 package github.zerorooot.nap511.util
 
-import android.R.attr
 import java.math.BigInteger
 import java.security.MessageDigest
 import java.util.*

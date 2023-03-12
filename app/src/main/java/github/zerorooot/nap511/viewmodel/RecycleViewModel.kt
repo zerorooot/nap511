@@ -10,6 +10,7 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.service.FileService
+import github.zerorooot.nap511.util.ConfigUtil
 import github.zerorooot.nap511.util.SharedPreferencesUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +39,10 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
         FileService.getInstance(cookie)
     }
 
+    private val sharedPreferencesUtil by lazy {
+        SharedPreferencesUtil(application)
+    }
+
     fun getRecycleFileList() {
         if (recycleFileList.isNotEmpty()) {
             return
@@ -57,7 +62,7 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
     }
 
     fun delete(index: Int) {
-        val password = SharedPreferencesUtil(application).get("password")
+        val password = sharedPreferencesUtil.get(ConfigUtil.password)
         if (password == null) {
             _isOpenPasswordDialog.value = true
             return
@@ -71,11 +76,11 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
             val message = if (revert.state) {
                 recycleFileList.removeAt(index)
                 if (save) {
-                    SharedPreferencesUtil(application).save("password", password)
+                    sharedPreferencesUtil.save(ConfigUtil.password, password)
                 }
                 "删除成功"
             } else {
-                SharedPreferencesUtil(application).save("password", null)
+                sharedPreferencesUtil.save(ConfigUtil.password, null)
                 "删除失败，${revert.errorMsg}"
             }
             Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
@@ -83,7 +88,7 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
     }
 
     fun deleteAll() {
-        val password = SharedPreferencesUtil(application).get("password")
+        val password = sharedPreferencesUtil.get(ConfigUtil.password)
         if (password == null) {
             _isOpenPasswordDialog.value = true
             return

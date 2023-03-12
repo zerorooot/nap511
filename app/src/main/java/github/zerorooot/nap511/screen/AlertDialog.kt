@@ -26,7 +26,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import com.google.gson.JsonObject
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.util.ConfigUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
@@ -121,6 +123,105 @@ fun FileOrderDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun Aria2Dialog(fileViewModel: FileViewModel, context: String, enter: (String) -> Unit) {
+    if (!fileViewModel.isOpenAria2Dialog) {
+        return
+    }
+
+    var urlText by remember {
+        mutableStateOf(
+            TextFieldValue(
+                text = context, selection = TextRange(context.length)
+            )
+        )
+    }
+
+    var tokenText by remember {
+        mutableStateOf(
+            TextFieldValue("")
+        )
+    }
+
+    val focusRequester = remember { FocusRequester() }
+
+    AlertDialog(onDismissRequest = {
+        enter.invoke("")
+    }, confirmButton = {
+        Button(onClick = {
+            val jsonObject = JsonObject()
+            jsonObject.addProperty(ConfigUtil.aria2Url, urlText.text)
+            jsonObject.addProperty(ConfigUtil.aria2Token, tokenText.text)
+            enter.invoke(jsonObject.toString())
+            urlText = TextFieldValue("")
+            tokenText = TextFieldValue("")
+        }) {
+            Text(text = "确认")
+        }
+    }, dismissButton = {
+        TextButton(
+            onClick = {
+                enter.invoke("")
+                urlText = TextFieldValue("")
+                tokenText = TextFieldValue("")
+            },
+        ) {
+            Text(text = "取消")
+        }
+    }, title = {
+        Text(text = "请配置aria2相关内容", style = MaterialTheme.typography.titleMedium)
+    }, text = {
+        Column(Modifier.padding(8.dp)) {
+            OutlinedTextField(
+                value = urlText,
+                modifier = Modifier
+                    .focusRequester(focusRequester),
+                textStyle = LocalTextStyle.current,
+                label = { Text(text = "aria2网址") },
+                placeholder = { Text(text = "http://x.x.x.x:6800/jsonrpc") },
+                trailingIcon = {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        "clear",
+                        modifier = Modifier.clickable(onClick = {
+                            urlText = TextFieldValue("")
+                        })
+                    )
+                },
+                onValueChange = {
+                    urlText = it
+                },
+            )
+            OutlinedTextField(
+                value = tokenText,
+                textStyle = LocalTextStyle.current,
+                label = { Text(text = "aria2秘钥") },
+                placeholder = { Text(text = "没配置留空即可") },
+                trailingIcon = {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        "clear",
+                        modifier = Modifier.clickable(onClick = {
+                            tokenText = TextFieldValue("")
+                        })
+                    )
+                },
+                onValueChange = {
+                    tokenText = it
+                },
+            )
+        }
+    }, shape = MaterialTheme.shapes.medium, properties = DialogProperties(
+        //自适应OutlinedTextField高
+        usePlatformDefaultWidth = false
+    )
+    )
+    LaunchedEffect(Unit) {
+        delay(10)
+        focusRequester.requestFocus()
+    }
+}
 
 @Composable
 private fun RadioButtonDialog(
@@ -225,11 +326,13 @@ private fun BaseDialog(
             label = { Text(text = label) },
             trailingIcon = {
                 if (!readOnly) {
-                    Icon(imageVector = Icons.Filled.Delete,
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
                         "clear",
                         modifier = Modifier.clickable(onClick = {
-                                text = TextFieldValue("")
-                            }))
+                            text = TextFieldValue("")
+                        })
+                    )
                 }
             },
             onValueChange = {
@@ -251,7 +354,7 @@ private fun BaseDialog(
 @Composable
 @Preview
 fun aa() {
-    CookieDialog {}
+//    Aria2Dialog()
 }
 
 @ExperimentalMaterial3Api

@@ -19,6 +19,10 @@ class SharedPreferencesUtil(private val context: Context) {
         val preferences: SharedPreferences =
             context.getSharedPreferences(FILENAME, Context.MODE_PRIVATE)
         return preferences.getString(name, null)
-
+    }
+    fun get(name: String, defValue: String): String {
+        val preferences: SharedPreferences =
+            context.getSharedPreferences(FILENAME, Context.MODE_PRIVATE)
+        return preferences.getString(name, defValue)!!
     }
 }
