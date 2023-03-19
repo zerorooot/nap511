@@ -16,6 +16,7 @@
         <item>重命名</item>
         <item>文件信息</item>
         <item>通过aria2下载</item>
+        <item>获取SHA1链接</item>
     </array>
     <array name="recycleMenu">
         <item>还原</item>

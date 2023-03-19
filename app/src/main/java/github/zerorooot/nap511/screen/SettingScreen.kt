@@ -9,5 +9,6 @@ import github.zerorooot.nap511.R
 fun SettingScreen() {
 //https://github.com/marcauberer/simple-settings
     val context = LocalContext.current
-    SimpleSettings(context).show(R.xml.preferences)
+    val simpleSettings = SimpleSettings(context)
+    simpleSettings.show(R.xml.preferences)
 }

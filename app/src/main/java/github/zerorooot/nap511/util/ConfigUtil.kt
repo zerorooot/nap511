@@ -8,6 +8,9 @@ class ConfigUtil {
         const val cookie = "cookie"
         const val uid = "uid"
         const val password = "password"
+        const val command = "command"
+        const val sentToAria2="sentToAria2"
+        const val getSha1 = "getSha1"
 
     }
 }

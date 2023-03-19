@@ -113,7 +113,9 @@ fun FileScreen(
                 } else {
                     fileViewModel.startSendAria2Service(index)
                 }
-
+            }
+            "获取SHA1链接"->{
+                fileViewModel.get115Sha1(index)
             }
         }
     }
