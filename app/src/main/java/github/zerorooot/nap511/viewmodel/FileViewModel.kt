@@ -273,6 +273,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     fun cut(index: Int = -1) {
+        unSelect()
         cutFileList = if (index == -1) {
             fileBeanList.filter { i -> i.isSelect }
         } else {
@@ -282,6 +283,12 @@ class FileViewModel(private val cookie: String, private val application: Applica
         isCut = true
         isLongClick = false
         appBarTitle = application.resources.getString(R.string.app_name)
+    }
+
+    fun cancelCut() {
+        unSelect()
+        isCut = false
+        cutFileList = emptyList()
     }
 
     fun removeFile() {
@@ -413,7 +420,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         }
     }
 
-    fun startSendArai2Service(index: Int) {
+    fun startSendAria2Service(index: Int) {
         val fileBean = fileBeanList[index]
         if (fileBean.isFolder) {
             Toast.makeText(application, "暂时无法下载文件夹", Toast.LENGTH_SHORT).show()
@@ -453,6 +460,20 @@ class FileViewModel(private val cookie: String, private val application: Applica
         val fb = fileBeanList[index]
         fileBeanList[index] = fb.copy(isSelect = !fb.isSelect)
         appBarTitle = fileBeanList.filter { i -> i.isSelect }.size.toString()
+    }
+
+    private fun unSelect() {
+        val count = arrayListOf<Int>()
+        fileBeanList.forEachIndexed { index, fileBean ->
+            if (fileBean.isSelect) {
+                count.add(index)
+            }
+        }
+
+        count.forEach { i ->
+            val fileBean = fileBeanList[i]
+            fileBeanList[i] = fileBean.copy(isSelect = false)
+        }
     }
 
     private fun setFiles(files: FilesBean) {

@@ -10,16 +10,14 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
@@ -92,6 +90,7 @@ fun FileScreen(
         when (i) {
             "CutFloatingActionButton" -> fileViewModel.removeFile()
             "AddFloatingActionButton" -> fileViewModel.isOpenCreateFolderDialog = true
+            "CloseFloatingActionButton" -> fileViewModel.cancelCut()
         }
     }
 
@@ -112,7 +111,7 @@ fun FileScreen(
                 if (aria2Url == null) {
                     fileViewModel.isOpenAria2Dialog = true
                 } else {
-                    fileViewModel.startSendArai2Service(index)
+                    fileViewModel.startSendAria2Service(index)
                 }
 
             }
@@ -172,7 +171,7 @@ fun FileScreen(
             }
         ).toString()
         //appBar 也调用了这个，所以再判断一次
-        if (path != "/根目录" && !fileViewModel.isCut && !fileViewModel.isLongClick) {
+        if (path != "/根目录" && !fileViewModel.isLongClick) {
             //当前目录的位置
             fileViewModel.setListLocation(path)
             coroutineScope.launch {
@@ -181,7 +180,7 @@ fun FileScreen(
         }
         fileViewModel.back()
     }
-    BackHandler(path != "/根目录" || fileViewModel.isCut || fileViewModel.isLongClick, onBack)
+    BackHandler(path != "/根目录" || fileViewModel.isLongClick, onBack)
 
 
     val myAppBarOnClick = { i: String ->
@@ -211,13 +210,21 @@ fun FileScreen(
                 fadeIn() with fadeOut()
             }) {
                 if (it) {
-                    FloatingActionButton(onClick = {
-                        floatingActionButtonOnClick.invoke("CutFloatingActionButton")
-                    }) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.baseline_content_paste_24),
-                            "cut"
-                        )
+                    Column() {
+                        FloatingActionButton(onClick = {
+                            floatingActionButtonOnClick.invoke("CloseFloatingActionButton")
+                        }) {
+                            Icon(Icons.Filled.Close, "close")
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        FloatingActionButton(onClick = {
+                            floatingActionButtonOnClick.invoke("CutFloatingActionButton")
+                        }) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.baseline_content_paste_24),
+                                "cut"
+                            )
+                        }
                     }
                 } else {
                     FloatingActionButton(onClick = {
