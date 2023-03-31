@@ -117,7 +117,7 @@ private fun FullScreenImage(image: ImageBean) {
                     limitPan = true,
                     moveToBounds = true
                 ),
-                enabled = { zoom, _, qq_ ->
+                enabled = { zoom, _, _ ->
                     (zoom > 1f)
                 }
             ),

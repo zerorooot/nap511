@@ -91,12 +91,12 @@ fun OfflineDownloadScreen(offlineFileViewModel: OfflineFileViewModel,fileViewMod
                 modifier = Modifier
                     .padding(top = 28.dp),
             ) {
-                Button(onClick = {
-                    clickFun.invoke("sha1", urlText)
-                    urlText = ""
-                }, enabled = false) {
-                    Text(text = "开始sha1转存")
-                }
+//                Button(onClick = {
+//                    clickFun.invoke("sha1", urlText)
+//                    urlText = ""
+//                }, enabled = false) {
+//                    Text(text = "开始sha1转存")
+//                }
                 Spacer(modifier = Modifier.width(28.dp))
                 Button(onClick = {
                     clickFun.invoke("offline", urlText)

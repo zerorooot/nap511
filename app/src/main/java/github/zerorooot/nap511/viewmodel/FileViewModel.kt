@@ -14,7 +14,6 @@ import github.zerorooot.nap511.bean.*
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.ConfigUtil
-import github.zerorooot.nap511.util.SharedPreferencesUtil
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -70,10 +69,6 @@ class FileViewModel(private val cookie: String, private val application: Applica
     var orderBean = OrderBean(OrderEnum.name, 1)
     private val fileService: FileService by lazy {
         FileService.getInstance(cookie)
-    }
-
-    private val sharedPreferencesUtil by lazy {
-        SharedPreferencesUtil(application)
     }
 
     fun isFileScreenListState() = ::fileScreenListState.isInitialized
@@ -274,7 +269,6 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     fun cut(index: Int = -1) {
-        unSelect()
         cutFileList = if (index == -1) {
             fileBeanList.filter { i -> i.isSelect }
         } else {
@@ -284,6 +278,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         isCut = true
         isLongClick = false
         appBarTitle = application.resources.getString(R.string.app_name)
+        unSelect()
     }
 
     fun cancelCut() {
@@ -452,7 +447,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         }
         fileBeanList.clear()
         fileBeanList.addAll(a)
-        appBarTitle = fileBeanList.filter { i -> i.isSelect }.size.toString()
+        appBarTitle = fileBeanList.size.toString()
     }
 
     fun selectReverse() {
