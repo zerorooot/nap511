@@ -319,6 +319,12 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
             thread { checkAria2(aria2Url, aria2Token, context) }
         }
     }
+
+    SearchDialog(fileViewModel){
+        if (it != "") {
+            fileViewModel.search(it)
+        }
+    }
 }
 
 /**

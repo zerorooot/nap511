@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import github.zerorooot.nap511.R
@@ -55,6 +56,9 @@ class FileViewModel(private val cookie: String, private val application: Applica
     var isLongClick: Boolean by mutableStateOf(false)
     var isCut: Boolean by mutableStateOf(false)
 
+    //搜索
+    var isSearch by mutableStateOf(false)
+
     //图片浏览相关
     var photoFileBeanList = mutableListOf<FileBean>()
     var photoIndexOf by mutableStateOf(-1)
@@ -78,6 +82,13 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     fun back() {
+        if ("搜索" == appBarTitle) {
+            fileBeanList.clear()
+            setFiles(fileListCache[currentCid]!!)
+            appBarTitle = application.resources.getString(R.string.app_name)
+            return
+        }
+
         if (isLongClick) {
             isLongClick = false
             appBarTitle = application.resources.getString(R.string.app_name)
@@ -216,10 +227,12 @@ class FileViewModel(private val cookie: String, private val application: Applica
                     if (fileBean.size == "0") "".toLong() else fileBean.size.toLong()
                 ) + " "
                 fileBean.modifiedTimeString = fileBean.modifiedTime
-                fileBean.modifiedTime =
-                    (SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).parse(
-                        fileBean.modifiedTime
-                    )!!.time / 1000).toString()
+                if (fileBean.modifiedTime.isDigitsOnly()) {
+                    fileBean.modifiedTime =
+                        (SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).parse(
+                            fileBean.modifiedTime
+                        )!!.time / 1000).toString()
+                }
                 if (fileBean.currentPlayTime != 0) {
                     val playTime =
                         ((fileBean.currentPlayTime.toFloat() / fileBean.playLong) * 100).roundToInt()
@@ -413,6 +426,17 @@ class FileViewModel(private val cookie: String, private val application: Applica
             Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
             isLongClick = false
             appBarTitle = application.resources.getString(R.string.app_name)
+        }
+    }
+
+    fun search(searchKey: String) {
+        viewModelScope.launch {
+            val files = fileService.search(currentCid, searchKey)
+            setFileBeanProperty(files.fileBeanList)
+            fileBeanList.clear()
+            fileBeanList.addAll(files.fileBeanList)
+            appBarTitle = "搜索"
+            isSearch = false
         }
     }
 

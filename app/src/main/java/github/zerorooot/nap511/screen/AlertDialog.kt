@@ -42,6 +42,14 @@ fun CreateFolderDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
 }
 
 @Composable
+fun SearchDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
+    if (fileViewModel.isSearch) {
+        BaseDialog("在当前目录下搜索", "关键字", enter = enter)
+    }
+}
+
+
+@Composable
 fun RenameFileDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
     if (fileViewModel.isOpenRenameFileDialog) {
         BaseDialog(

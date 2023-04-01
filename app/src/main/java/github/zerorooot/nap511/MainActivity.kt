@@ -197,7 +197,8 @@ class MainActivity : ComponentActivity() {
             when (name) {
 //                "back"->{FileScreen里}
                 "cut" -> fileViewModel.cut()
-                "search" -> {}
+                //具体实现在FileScreen#CreateDialogs()里
+                "search" -> fileViewModel.isSearch = true
                 "delete" -> fileViewModel.deleteMultiple()
                 "selectAll" -> fileViewModel.selectAll()
                 "selectReverse" -> fileViewModel.selectReverse()
