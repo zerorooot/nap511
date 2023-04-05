@@ -3,6 +3,8 @@ package github.zerorooot.nap511.viewmodel
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.*
@@ -15,11 +17,14 @@ import github.zerorooot.nap511.bean.*
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.ConfigUtil
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.concurrent.thread
 import kotlin.math.roundToInt
 
 @SuppressLint("MutableCollectionMutableState")
@@ -124,14 +129,11 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     suspend fun getListLocation(path: String) {
-        val locationBean1 =
-            currentLocation[path]
-                ?: run {
-                    LocationBean(0, 0)
-                }
+        val locationBean1 = currentLocation[path] ?: run {
+            LocationBean(0, 0)
+        }
         fileScreenListState.scrollToItem(
-            locationBean1.firstVisibleItemIndex,
-            locationBean1.firstVisibleItemScrollOffset
+            locationBean1.firstVisibleItemIndex, locationBean1.firstVisibleItemScrollOffset
         )
     }
 
@@ -144,28 +146,28 @@ class FileViewModel(private val cookie: String, private val application: Applica
         fileBeanList.forEach { fileBean ->
             imageBeanList.add(
                 ImageBean(
-                    fileName = fileBean.name,
-                    pickCode = fileBean.pickCode,
-                    fileSha1 = fileBean.sha1
+                    fileName = fileBean.name, pickCode = fileBean.pickCode, fileSha1 = fileBean.sha1
                 )
             )
         }
         //获取当前点击的
         viewModelScope.launch {
             imageBeanList[indexOf] = fileService.image(
-                fileBeanList[indexOf].pickCode,
-                System.currentTimeMillis() / 1000
+                fileBeanList[indexOf].pickCode, System.currentTimeMillis() / 1000
             ).imageBean
         }
         //加载其他剩余的
         viewModelScope.launch {
-            fileBeanList.forEachIndexed { index, fileBean ->
-                if (indexOf != index) {
-                    imageBeanList[index] = fileService.image(
-                        fileBean.pickCode,
-                        System.currentTimeMillis() / 1000
-                    ).imageBean
+            try {
+                fileBeanList.forEachIndexed { index, fileBean ->
+                    if (indexOf != index) {
+                        imageBeanList[index] = fileService.image(
+                            fileBean.pickCode, System.currentTimeMillis() / 1000
+                        ).imageBean
+                    }
                 }
+            } catch (_: Exception) {
+
             }
         }
 
@@ -173,14 +175,17 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     fun getFiles(cid: String) {
-        _isRefreshing.value = true
-        if (fileListCache.containsKey(cid)) {
-            setFiles(fileListCache[cid]!!)
-            _isRefreshing.value = false
-            return
-        }
-
         viewModelScope.launch {
+            _isRefreshing.value = true
+            if (fileListCache.containsKey(cid)) {
+                withContext(Dispatchers.IO) {
+                    Thread.sleep(100)
+                }
+                setFiles(fileListCache[cid]!!)
+                _isRefreshing.value = false
+                return@launch
+            }
+
             try {
                 fileService.order(
                     hashMapOf(
@@ -223,8 +228,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
                     )
             } else {
                 fileBean.sizeString = android.text.format.Formatter.formatFileSize(
-                    application,
-                    if (fileBean.size == "0") "".toLong() else fileBean.size.toLong()
+                    application, if (fileBean.size == "0") "".toLong() else fileBean.size.toLong()
                 ) + " "
                 fileBean.modifiedTimeString = fileBean.modifiedTime
                 if (fileBean.modifiedTime.isDigitsOnly()) {
@@ -436,7 +440,6 @@ class FileViewModel(private val cookie: String, private val application: Applica
             fileBeanList.clear()
             fileBeanList.addAll(files.fileBeanList)
             appBarTitle = "搜索"
-            isSearch = false
         }
     }
 

@@ -38,7 +38,7 @@ android {
         compose true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion '1.2.0'
+        kotlinCompilerExtensionVersion '1.3.0'
     }
     packagingOptions {
         resources {
@@ -52,7 +52,15 @@ android {
 
 dependencies {
     //setting screen
-    implementation 'com.chillibits:simplesettings:1.3.4'
+//    implementation "com.github.JamalMulla:ComposePrefs3:1.0.3"
+    implementation "com.github.JamalMulla:ComposePrefs:1.0.6"
+    implementation "androidx.datastore:datastore-preferences:1.0.0"
+
+//    implementation 'com.github.alorma:compose-settings-ui-m3:0.25.0'
+//    implementation 'com.github.alorma:compose-settings-storage-preferences:0.25.0'
+//    implementation 'com.github.alorma:compose-settings-storage-datastore-proto:0.25.0'
+
+//    implementation 'com.chillibits:simplesettings:1.3.4'
 //    implementation "androidx.preference:preference-ktx:1.2.0"
 
     implementation "com.google.accompanist:accompanist-pager:0.29.1-alpha"
@@ -95,7 +103,8 @@ dependencies {
     implementation "androidx.compose.ui:ui:$compose_version"
     implementation "androidx.compose.ui:ui-util:$compose_version"
     implementation "androidx.compose.ui:ui-tooling-preview:$compose_version"
-    implementation 'androidx.compose.material3:material3:1.1.0-alpha06'
+    implementation 'androidx.compose.material3:material3:1.1.0-beta01'
+//    implementation "androidx.compose.material3:material3:1.0.1"
 
     testImplementation 'junit:junit:4.13.2'
     testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.6.4"

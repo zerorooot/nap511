@@ -97,7 +97,7 @@ fun OfflineDownloadScreen(offlineFileViewModel: OfflineFileViewModel,fileViewMod
 //                }, enabled = false) {
 //                    Text(text = "开始sha1转存")
 //                }
-                Spacer(modifier = Modifier.width(28.dp))
+//                Spacer(modifier = Modifier.width(28.dp))
                 Button(onClick = {
                     clickFun.invoke("offline", urlText)
                     urlText = ""

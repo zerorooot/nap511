@@ -49,7 +49,7 @@ fun RecycleScreen(recycleViewModel: RecycleViewModel) {
             if (deleteIndex == -1) {
                 recycleViewModel.deleteAll()
             }else{
-                recycleViewModel.delete(deleteIndex, it, true)
+                recycleViewModel.delete(deleteIndex, it.subSequence(0, 6).toString(), true)
                 deleteIndex = -1
             }
         }

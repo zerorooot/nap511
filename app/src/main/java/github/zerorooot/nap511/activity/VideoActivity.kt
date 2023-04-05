@@ -13,6 +13,8 @@ import com.shuyu.gsyvideoplayer.player.PlayerFactory
 import com.shuyu.gsyvideoplayer.utils.OrientationUtils
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.service.VideoService
+import github.zerorooot.nap511.util.ConfigUtil
+import github.zerorooot.nap511.util.DataStoreUtil
 import kotlinx.coroutines.launch
 import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
 
@@ -64,15 +66,18 @@ class VideoActivity : AppCompatActivity() {
 
         videoPlayer.startPlayLogic()
 
-        //设置竖屏
-        lifecycleScope.launch {
-            val videoInfo = videoService.videoInfo(pickCode)
-            val videoHeight = videoInfo.height
-            val videoWidth = videoInfo.width
-            if (videoHeight > videoWidth) {
-                orientationUtils!!.resolveByClick()
+        if (DataStoreUtil.getData(ConfigUtil.autoRotate, false)){
+            //设置竖屏
+            lifecycleScope.launch {
+                val videoInfo = videoService.videoInfo(pickCode)
+                val videoHeight = videoInfo.height
+                val videoWidth = videoInfo.width
+                if (videoHeight > videoWidth) {
+                    orientationUtils!!.resolveByClick()
+                }
             }
         }
+
 
         videoPlayer.setVideoAllCallBack(object : GSYSampleCallBack() {
             override fun onPlayError(url: String?, vararg objects: Any?) {

@@ -17,8 +17,9 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.util.ConfigUtil
+import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.Sha1Util
-import github.zerorooot.nap511.util.SharedPreferencesUtil
+//import github.zerorooot.nap511.util.SharedPreferencesUtil
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -30,9 +31,9 @@ import kotlin.concurrent.thread
 class Sha1Service : Service() {
     private val sha1Util = Sha1Util()
     private val okHttpClient = OkHttpClient()
-    private val sharedPreferencesUtil by lazy {
-        SharedPreferencesUtil(application)
-    }
+//    private val sharedPreferencesUtil by lazy {
+//        SharedPreferencesUtil(application)
+//    }
 
     override fun onBind(intent: Intent?): IBinder? {
         TODO("Not yet implemented")
@@ -148,14 +149,19 @@ class Sha1Service : Service() {
     }
      */
     private fun sendToAria2(fileBeanDownloadList: ArrayList<String>) {
-        val aria2Token = sharedPreferencesUtil.get(ConfigUtil.aria2Token)
-        val aria2Url = sharedPreferencesUtil.get(
+//        val aria2Token = sharedPreferencesUtil.get(ConfigUtil.aria2Token)
+//        val aria2Url = sharedPreferencesUtil.get(
+//            ConfigUtil.aria2Url,
+//            ConfigUtil.aria2UrldefValue
+//        ) + "?tm=${System.currentTimeMillis()}"
+        val aria2Token = DataStoreUtil.getData(ConfigUtil.aria2Token, "")
+        val aria2Url = DataStoreUtil.getData(
             ConfigUtil.aria2Url,
             ConfigUtil.aria2UrldefValue
         ) + "?tm=${System.currentTimeMillis()}"
 
         val paramsJsonArray = JsonArray()
-        if (aria2Token != null) {
+        if (aria2Token != "") {
             paramsJsonArray.add("token:$aria2Token")
         }
 

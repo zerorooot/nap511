@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 
 
-class SharedPreferencesUtil(private val context: Context) {
+class SharedPreferencesUtila(private val context: Context) {
     private val FILENAME = "config"
 
     fun save(name: String, value: String?) {

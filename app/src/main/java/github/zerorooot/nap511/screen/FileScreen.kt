@@ -39,7 +39,8 @@ import github.zerorooot.nap511.activity.VideoActivity
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.util.ConfigUtil
-import github.zerorooot.nap511.util.SharedPreferencesUtil
+import github.zerorooot.nap511.util.DataStoreUtil
+//import github.zerorooot.nap511.util.SharedPreferencesUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -107,14 +108,15 @@ fun FileScreen(
                 fileViewModel.isOpenFileInfoDialog = true
             }
             "通过aria2下载" -> {
-                val aria2Url = SharedPreferencesUtil(activity).get(ConfigUtil.aria2Url)
-                if (aria2Url == null) {
+//                val aria2Url = SharedPreferencesUtil(activity).get(ConfigUtil.aria2Url)
+                val aria2Url = DataStoreUtil.getData(ConfigUtil.aria2Url, "")
+                if (aria2Url == "") {
                     fileViewModel.isOpenAria2Dialog = true
                 } else {
                     fileViewModel.startSendAria2Service(index)
                 }
             }
-            "获取SHA1链接"->{
+            "获取SHA1链接" -> {
                 fileViewModel.get115Sha1(index)
             }
         }
@@ -306,7 +308,11 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
 
     Aria2Dialog(
         fileViewModel = fileViewModel,
-        context = SharedPreferencesUtil(context).get(
+//        context = SharedPreferencesUtil(context).get(
+//            ConfigUtil.aria2Url,
+//            ConfigUtil.aria2UrldefValue
+//        )
+        context = DataStoreUtil.getData(
             ConfigUtil.aria2Url,
             ConfigUtil.aria2UrldefValue
         )
@@ -320,10 +326,11 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
         }
     }
 
-    SearchDialog(fileViewModel){
+    SearchDialog(fileViewModel) {
         if (it != "") {
             fileViewModel.search(it)
         }
+        fileViewModel.isSearch = false
     }
 }
 
@@ -351,19 +358,29 @@ private fun checkAria2(aria2Url: String, aria2Token: String, context: Context) {
                 .toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
         )
         .build()
-    val body = okHttpClient.newCall(request).execute().body!!.string()
-    val bodyJson = JsonParser().parse(body).asJsonObject
-    Handler(Looper.getMainLooper()).post {
-        if (bodyJson.has("error")) {
-            val message = bodyJson.getAsJsonObject("error").get("message").asString
-            Toast.makeText(context, "aria2配置失败,${message}", Toast.LENGTH_SHORT).show()
+
+    var message = ""
+    try {
+        val body = okHttpClient.newCall(request).execute().body!!.string()
+        val bodyJson = JsonParser().parse(body).asJsonObject
+
+        message = if (bodyJson.has("error")) {
+            "aria2配置失败," + bodyJson.getAsJsonObject("error").get("message").asString
         } else {
-            val sharedPreferencesUtil = SharedPreferencesUtil(context)
-            sharedPreferencesUtil.save(ConfigUtil.aria2Url, aria2Url)
-            if (aria2Token != "") {
-                sharedPreferencesUtil.save(ConfigUtil.aria2Token, aria2Token)
-            }
-            Toast.makeText(context, "aria2配置成功", Toast.LENGTH_SHORT).show()
+            //            val sharedPreferencesUtil = SharedPreferencesUtil(context)
+            //            sharedPreferencesUtil.save(ConfigUtil.aria2Url, aria2Url)
+            //            if (aria2Token != "") {
+            //                sharedPreferencesUtil.save(ConfigUtil.aria2Token, aria2Token)
+            //            }
+            DataStoreUtil.putData(ConfigUtil.aria2Url, aria2Url)
+            DataStoreUtil.putData(ConfigUtil.aria2Token, aria2Token)
+            "aria2配置成功"
         }
+
+    } catch (e: Exception) {
+        message = "aria2配置失败," + e.message.toString()
+    }
+    Handler(Looper.getMainLooper()).post {
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
 }

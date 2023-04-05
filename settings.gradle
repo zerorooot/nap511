@@ -1,8 +1,9 @@
 pluginManagement {
     repositories {
-        maven{ url 'https://maven.aliyun.com/repository/central' }
-        maven{ url 'https://maven.aliyun.com/repository/public' }
-        maven{ url 'https://maven.aliyun.com/repository/gradle-plugin'}
+        maven { url 'https://maven.aliyun.com/repository/central' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
+//        maven { url 'https://mirrors.163.com/maven/repository/maven-public/' }
         google()
         mavenCentral()
         gradlePluginPortal()

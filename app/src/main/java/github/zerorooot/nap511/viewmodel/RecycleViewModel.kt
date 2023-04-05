@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.viewmodel
 
 import android.app.Application
+import android.database.DatabaseUtils
 import android.widget.Toast
 import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.mutableStateListOf
@@ -11,7 +12,8 @@ import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.util.ConfigUtil
-import github.zerorooot.nap511.util.SharedPreferencesUtil
+import github.zerorooot.nap511.util.DataStoreUtil
+//import github.zerorooot.nap511.util.SharedPreferencesUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,9 +41,9 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
         FileService.getInstance(cookie)
     }
 
-    private val sharedPreferencesUtil by lazy {
-        SharedPreferencesUtil(application)
-    }
+//    private val sharedPreferencesUtil by lazy {
+//        SharedPreferencesUtil(application)
+//    }
 
     fun getRecycleFileList() {
         if (recycleFileList.isNotEmpty()) {
@@ -62,8 +64,9 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
     }
 
     fun delete(index: Int) {
-        val password = sharedPreferencesUtil.get(ConfigUtil.password)
-        if (password == null) {
+//        val password = sharedPreferencesUtil.get(ConfigUtil.password)
+        val password = DataStoreUtil.getData(ConfigUtil.password, "")
+        if (password == "") {
             _isOpenPasswordDialog.value = true
             return
         }
@@ -76,11 +79,13 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
             val message = if (revert.state) {
                 recycleFileList.removeAt(index)
                 if (save) {
-                    sharedPreferencesUtil.save(ConfigUtil.password, password)
+//                    sharedPreferencesUtil.save(ConfigUtil.password, password)
+                    DataStoreUtil.putData(ConfigUtil.password, password)
                 }
                 "删除成功"
             } else {
-                sharedPreferencesUtil.save(ConfigUtil.password, null)
+//                sharedPreferencesUtil.save(ConfigUtil.password, null)
+                DataStoreUtil.putData(ConfigUtil.password, "")
                 "删除失败，${revert.errorMsg}"
             }
             Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
@@ -88,8 +93,9 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
     }
 
     fun deleteAll() {
-        val password = sharedPreferencesUtil.get(ConfigUtil.password)
-        if (password == null) {
+//        val password = sharedPreferencesUtil.get(ConfigUtil.password)
+        val password = DataStoreUtil.getData(ConfigUtil.password, "")
+        if (password == "") {
             _isOpenPasswordDialog.value = true
             return
         }
