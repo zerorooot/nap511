@@ -36,6 +36,9 @@ fun OfflineDownloadScreen(offlineFileViewModel: OfflineFileViewModel,fileViewMod
         }
     }
 
+    OpenWebView(offlineFileViewModel, fileViewModel){
+        offlineFileViewModel.closeWebView()
+    }
 
     var urlText by remember {
         mutableStateOf("")
@@ -108,4 +111,18 @@ fun OfflineDownloadScreen(offlineFileViewModel: OfflineFileViewModel,fileViewMod
         }
     }
 
+}
+
+@Composable
+fun OpenWebView(
+    offlineFileViewModel: OfflineFileViewModel,
+    fileViewModel: FileViewModel,
+    enter: () -> Unit
+) {
+    val isOpen by offlineFileViewModel.isOpenWebView.collectAsState()
+    if (isOpen) {
+//        WebViewScreen(offlineFileViewModel = offlineFileViewModel, fileViewModel = fileViewModel)
+        fileViewModel.selectedItem = "webView"
+    }
+    enter.invoke()
 }

@@ -90,6 +90,7 @@ fun FileScreen(
     val floatingActionButtonOnClick = { i: String ->
         when (i) {
             "CutFloatingActionButton" -> fileViewModel.removeFile()
+            //打开添加文件夹
             "AddFloatingActionButton" -> fileViewModel.isOpenCreateFolderDialog = true
             "CloseFloatingActionButton" -> fileViewModel.cancelCut()
         }
@@ -199,7 +200,7 @@ fun FileScreen(
     Column {
         AnimatedContent(targetState = fileViewModel.isLongClick, transitionSpec = {
             fadeIn() with fadeOut()
-        }) {
+        }, label = "") {
             if (it) {
                 AppTopBarMultiple(fileViewModel.appBarTitle, myAppBarOnClick)
             } else {
@@ -212,7 +213,7 @@ fun FileScreen(
         Scaffold(floatingActionButton = {
             AnimatedContent(targetState = fileViewModel.isCut, transitionSpec = {
                 fadeIn() with fadeOut()
-            }) {
+            }, label = "") {
                 if (it) {
                     Column() {
                         FloatingActionButton(onClick = {

@@ -285,6 +285,30 @@ class FileViewModel(private val cookie: String, private val application: Applica
         }
     }
 
+    fun selectToUp() {
+        try {
+            val indexOf = fileBeanList.indexOf(fileBeanList.filter { i -> i.isSelect }[0])
+            for (i in 0..indexOf) {
+                select(i)
+            }
+        } catch (_: Exception) {
+            Toast.makeText(application, "????????", Toast.LENGTH_SHORT).show()
+        }
+
+    }
+
+    fun selectToDown() {
+        try {
+            val indexOf = fileBeanList.indexOf(fileBeanList.filter { i -> i.isSelect }[0])
+            for (i in indexOf until fileBeanList.size) {
+                select(i)
+            }
+        } catch (_: Exception) {
+            Toast.makeText(application, "????????", Toast.LENGTH_SHORT).show()
+        }
+
+    }
+
     fun cut(index: Int = -1) {
         cutFileList = if (index == -1) {
             fileBeanList.filter { i -> i.isSelect }
@@ -462,6 +486,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         arrayList.add(fileBean)
         intent.putExtra(ConfigUtil.command, command)
         intent.putParcelableArrayListExtra("list", arrayList)
+//        intent.putExtra("list", arrayList)
         intent.putExtra("cookie", myCookie)
         application.startService(intent)
     }

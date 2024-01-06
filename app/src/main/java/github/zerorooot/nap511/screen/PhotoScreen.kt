@@ -1,13 +1,14 @@
 package github.zerorooot.nap511.screen
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.gestures.*
-import androidx.compose.foundation.interaction.*
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -21,7 +22,10 @@ import coil.compose.rememberAsyncImagePainter
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Scale
-import com.google.accompanist.pager.*
+import com.google.accompanist.pager.ExperimentalPagerApi
+import com.google.accompanist.pager.HorizontalPager
+import com.google.accompanist.pager.HorizontalPagerIndicator
+import com.google.accompanist.pager.rememberPagerState
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.smarttoolfactory.zoom.enhancedZoom
 import com.smarttoolfactory.zoom.rememberEnhancedZoomState
@@ -137,7 +141,7 @@ private fun FullScreenImage(image: ImageBean) {
 @Composable
 fun ImageBrowserScreenPreview() {
     val url =
-        "http://192.168.123.159/hdd/tele/%e5%b0%81%e7%96%86%e7%96%86v%20-%20%e9%9f%b6%e5%8d%8e%e6%97%97%e8%a2%8d%e7%96%86%20%5b37P-376M%5d/"
+        "http://192.168.123.154/hdd/tele/%e5%b0%81%e7%96%86%e7%96%86v%20-%20%e9%9f%b6%e5%8d%8e%e6%97%97%e8%a2%8d%e7%96%86%20%5b37P-376M%5d/"
     val images = mutableListOf<ImageBean>()
     for (i in 10..15) {
         images.add(ImageBean("$url$i.jpg", "$i.jpg"))

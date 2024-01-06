@@ -59,6 +59,18 @@ fun AppTopBarMultiple(title: String, onClick: (String) -> Unit) {
             }
         },
         actions = {
+            TopAppBarActionButton(
+                painter = painterResource(id = R.drawable.ic_baseline_arrow_upward_24),
+                description = "up"
+            ) {
+                onClick.invoke("selectToUp")
+            }
+            TopAppBarActionButton(
+                painter = painterResource(id = R.drawable.ic_baseline_arrow_downward_24),
+                description = "down"
+            ) {
+                onClick.invoke("selectToDown")
+            }
             // cut icon
             TopAppBarActionButton(
                 painter = painterResource(id = R.drawable.ic_baseline_content_cut_24),
@@ -146,7 +158,7 @@ fun AppTopBarRecycle(title: String, onClick: (name: String) -> Unit) {
 }
 
 @Composable
-private fun TopAppBarActionButton(
+fun TopAppBarActionButton(
     imageVector: ImageVector? = null,
     painter: Painter? = null,
     description: String,

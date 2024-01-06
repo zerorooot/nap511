@@ -1,7 +1,7 @@
 package github.zerorooot.nap511
 
 import android.annotation.SuppressLint
-import android.content.Context
+import android.app.ActivityManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -17,9 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.preferencesDataStore
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.google.gson.Gson
 import com.google.gson.JsonElement
@@ -28,7 +25,6 @@ import github.zerorooot.nap511.screen.*
 import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.ConfigUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-//import github.zerorooot.nap511.util.SharedPreferencesUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
@@ -37,8 +33,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import kotlin.concurrent.thread
 
+
 class MainActivity : ComponentActivity() {
-//    private val sharedPreferencesUtil by lazy {
+    //    private val sharedPreferencesUtil by lazy {
 //        SharedPreferencesUtil(this)
 //    }
     @SuppressLint("CoroutineCreationDuringComposition")
@@ -154,6 +151,7 @@ class MainActivity : ComponentActivity() {
                     "离线列表" -> OfflineFileScreen(offlineFileViewModel, fileViewModel)
                     "回收站" -> RecycleScreen(recycleViewModel)
                     "高级设置" -> SettingScreen()
+                    "webView" -> WebViewScreen(offlineFileViewModel)
                 }
             }
         )
@@ -181,8 +179,8 @@ class MainActivity : ComponentActivity() {
                             Toast.makeText(context, "登录成功，如果app没重启，还请自行重启", Toast.LENGTH_SHORT)
                                 .show()
                         }
-                        finish()
-                        startActivity(intent)
+                        val manager = context.getSystemService(ACTIVITY_SERVICE) as ActivityManager
+                        manager.killBackgroundProcesses(context.packageName)
                     }
                 }
             } else {
@@ -205,6 +203,8 @@ class MainActivity : ComponentActivity() {
         fun(name: String) {
             when (name) {
 //                "back"->{FileScreen里}
+                "selectToUp" -> fileViewModel.selectToUp()
+                "selectToDown" -> fileViewModel.selectToDown()
                 "cut" -> fileViewModel.cut()
                 //具体实现在FileScreen#CreateDialogs()里
                 "search" -> fileViewModel.isSearch = true

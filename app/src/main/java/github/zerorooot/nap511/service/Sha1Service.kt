@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.service
 
 
+//import github.zerorooot.nap511.util.SharedPreferencesUtil
 import android.app.Service
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -19,12 +20,12 @@ import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.util.ConfigUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.Sha1Util
-//import github.zerorooot.nap511.util.SharedPreferencesUtil
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.security.MessageDigest
-import java.util.StringJoiner
+import java.util.*
+import kotlin.collections.ArrayList
 import kotlin.concurrent.thread
 
 
@@ -43,9 +44,12 @@ class Sha1Service : Service() {
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val command = intent!!.getStringExtra(ConfigUtil.command)
+        val cookie = intent.getStringExtra("cookie")!!
+
         val fileBeanList =
             intent.getParcelableArrayListExtra("list", FileBean::class.java)!!
-        val cookie = intent.getStringExtra("cookie")!!
+//        val fileBeanList =
+//            intent.getSerializableExtra("arrayList", ArrayList::class.java) as ArrayList<FileBean>
 
         thread {
             val downloadUrl = getDownloadUrl(fileBeanList, cookie)

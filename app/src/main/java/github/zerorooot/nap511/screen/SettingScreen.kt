@@ -1,40 +1,16 @@
 package github.zerorooot.nap511.screen
 
-import android.content.Context
-import android.graphics.Bitmap.Config
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Wifi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.preferencesDataStore
-
 import com.jamal.composeprefs.ui.PrefsScreen
-import com.jamal.composeprefs.ui.GroupHeader
-import com.jamal.composeprefs.ui.PrefsScreen
-import com.jamal.composeprefs.ui.prefs.CheckBoxPref
 import com.jamal.composeprefs.ui.prefs.EditTextPref
 import com.jamal.composeprefs.ui.prefs.SwitchPref
-import com.jamal.composeprefs.ui.prefs.TextPref
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.DataStoreUtil.dataStore
-
-//import com.jamal.composeprefs3.ui.GroupHeader
-//import com.jamal.composeprefs3.ui.PrefsScreen
-//import com.jamal.composeprefs3.ui.prefs.EditTextPref
-//import com.jamal.composeprefs3.ui.prefs.SwitchPref
-//import com.jamal.composeprefs3.ui.prefs.TextPref
 
 
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterialApi::class)
@@ -78,7 +54,7 @@ fun SettingScreen() {
         }
         prefsItem {
             EditTextPref(
-                key = ConfigUtil.aria2Url,
+                key = ConfigUtil.aria2Token,
                 title = "aria2秘钥",
                 summary = "没有留空即可",
                 dialogTitle = "请输入新的aria2秘钥",
