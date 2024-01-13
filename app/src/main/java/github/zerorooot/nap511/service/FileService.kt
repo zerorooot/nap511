@@ -57,7 +57,7 @@ interface FileService {
         @Query("aid") aid: Int = 1,
         @Query("asc") asc: Int = 1,
         @Query("o") order: String = "file_name",
-        @Query("limit") limit: Int = 400
+        @Query("limit") limit: Int = 100
     ): FilesBean
 
     @GET("category/get")

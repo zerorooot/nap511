@@ -128,13 +128,15 @@ class FileViewModel(private val cookie: String, private val application: Applica
         clickMap[currentPath] = index
     }
 
-    suspend fun getListLocation(path: String) {
-        val locationBean1 = currentLocation[path] ?: run {
-            LocationBean(0, 0)
+    fun getListLocation(path: String) {
+        viewModelScope.launch {
+            val locationBean1 = currentLocation[path] ?: run {
+                LocationBean(0, 0)
+            }
+            fileScreenListState.scrollToItem(
+                locationBean1.firstVisibleItemIndex, locationBean1.firstVisibleItemScrollOffset
+            )
         }
-        fileScreenListState.scrollToItem(
-            locationBean1.firstVisibleItemIndex, locationBean1.firstVisibleItemScrollOffset
-        )
     }
 
     fun getImage(fileBeanList: List<FileBean>, indexOf: Int) {
@@ -178,9 +180,6 @@ class FileViewModel(private val cookie: String, private val application: Applica
         viewModelScope.launch {
             _isRefreshing.value = true
             if (fileListCache.containsKey(cid)) {
-                withContext(Dispatchers.IO) {
-                    Thread.sleep(100)
-                }
                 setFiles(fileListCache[cid]!!)
                 _isRefreshing.value = false
                 return@launch
@@ -202,7 +201,11 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 _isRefreshing.value = false
             } catch (e: Exception) {
                 e.printStackTrace()
-                Toast.makeText(application, "获取文件列表失败，建议更新您的Cookie", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    application,
+                    "获取文件列表失败，建议更新您的Cookie",
+                    Toast.LENGTH_SHORT
+                ).show()
                 _isRefreshing.value = false
             }
         }
@@ -228,7 +231,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
                     )
             } else {
                 fileBean.sizeString = android.text.format.Formatter.formatFileSize(
-                    application, if (fileBean.size == "0") "".toLong() else fileBean.size.toLong()
+                    application, fileBean.size.toLong()
                 ) + " "
                 fileBean.modifiedTimeString = fileBean.modifiedTime
                 if (fileBean.modifiedTime.isDigitsOnly()) {

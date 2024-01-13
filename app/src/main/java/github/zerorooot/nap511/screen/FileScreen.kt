@@ -104,10 +104,12 @@ fun FileScreen(
                 fileViewModel.selectIndex = index
                 fileViewModel.isOpenRenameFileDialog = true
             }
+
             "文件信息" -> {
                 fileViewModel.selectIndex = index
                 fileViewModel.isOpenFileInfoDialog = true
             }
+
             "通过aria2下载" -> {
 //                val aria2Url = SharedPreferencesUtil(activity).get(ConfigUtil.aria2Url)
                 val aria2Url = DataStoreUtil.getData(ConfigUtil.aria2Url, "")
@@ -117,9 +119,9 @@ fun FileScreen(
                     fileViewModel.startSendAria2Service(index)
                 }
             }
-            "获取SHA1链接" -> {
-                fileViewModel.get115Sha1(index)
-            }
+//            "获取SHA1链接" -> {
+//                fileViewModel.get115Sha1(index)
+//            }
         }
     }
 
@@ -159,9 +161,7 @@ fun FileScreen(
 
             //滚动到当前目录
             if (currentFileBean.isFolder) {
-                coroutineScope.launch {
-                    fileViewModel.getListLocation(currentPath + "/${currentFileBean.name}")
-                }
+                fileViewModel.getListLocation(currentPath + "/${currentFileBean.name}")
             }
         }
     }
@@ -179,9 +179,7 @@ fun FileScreen(
         if (path != "/根目录" && !fileViewModel.isLongClick) {
             //当前目录的位置
             fileViewModel.setListLocation(path)
-            coroutineScope.launch {
-                fileViewModel.getListLocation(parentDirectory)
-            }
+            fileViewModel.getListLocation(parentDirectory)
         }
         fileViewModel.back()
     }

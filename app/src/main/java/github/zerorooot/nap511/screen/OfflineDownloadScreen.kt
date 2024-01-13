@@ -3,14 +3,21 @@ package github.zerorooot.nap511.screen
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.Surface
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import github.zerorooot.nap511.R
+import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 
@@ -46,7 +53,21 @@ fun OfflineDownloadScreen(offlineFileViewModel: OfflineFileViewModel,fileViewMod
     var urlCount by remember {
         mutableStateOf("链接")
     }
-
+Column {
+    TopAppBar(
+        title = {
+            Text(text = stringResource(R.string.app_name))
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
+        navigationIcon = {
+            TopAppBarActionButton(
+                imageVector = Icons.Rounded.Menu,
+                description = "navigationIcon"
+            ) {
+                offlineFileViewModel.openDrawerState()
+            }
+        },
+    )
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -94,13 +115,6 @@ fun OfflineDownloadScreen(offlineFileViewModel: OfflineFileViewModel,fileViewMod
                 modifier = Modifier
                     .padding(top = 28.dp),
             ) {
-//                Button(onClick = {
-//                    clickFun.invoke("sha1", urlText)
-//                    urlText = ""
-//                }, enabled = false) {
-//                    Text(text = "开始sha1转存")
-//                }
-//                Spacer(modifier = Modifier.width(28.dp))
                 Button(onClick = {
                     clickFun.invoke("offline", urlText)
                     urlText = ""
@@ -110,6 +124,8 @@ fun OfflineDownloadScreen(offlineFileViewModel: OfflineFileViewModel,fileViewMod
             }
         }
     }
+}
+
 
 }
 
