@@ -13,6 +13,7 @@ import android.os.Looper
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
+import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
@@ -32,9 +33,6 @@ import kotlin.concurrent.thread
 class Sha1Service : Service() {
     private val sha1Util = Sha1Util()
     private val okHttpClient = OkHttpClient()
-//    private val sharedPreferencesUtil by lazy {
-//        SharedPreferencesUtil(application)
-//    }
 
     override fun onBind(intent: Intent?): IBinder? {
         TODO("Not yet implemented")
@@ -45,11 +43,8 @@ class Sha1Service : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val command = intent!!.getStringExtra(ConfigUtil.command)
         val cookie = intent.getStringExtra("cookie")!!
-
         val fileBeanList =
-            intent.getParcelableArrayListExtra("list", FileBean::class.java)!!
-//        val fileBeanList =
-//            intent.getSerializableExtra("arrayList", ArrayList::class.java) as ArrayList<FileBean>
+            arrayListOf(Gson().fromJson(intent.getStringExtra("list"), FileBean::class.java))
 
         thread {
             val downloadUrl = getDownloadUrl(fileBeanList, cookie)
@@ -57,35 +52,12 @@ class Sha1Service : Service() {
                 ConfigUtil.sentToAria2 -> {
                     sendToAria2(downloadUrl)
                 }
-                ConfigUtil.getSha1 -> {
-                    get115Sha1(downloadUrl, fileBeanList)
-                }
             }
         }
-
-
 
         return super.onStartCommand(intent, flags, startId)
     }
 
-
-    private fun get115Sha1(downloadUrl: ArrayList<String>, fileBeanList: ArrayList<FileBean>) {
-        val sb = StringJoiner("\n")
-        // 115://文件名|大小|sha1|preid
-        downloadUrl.forEachIndexed { index, s ->
-            val preId = getPreId(s)
-            val fileBean = fileBeanList[index]
-            val sha = "115://${fileBean.name}|${fileBean.size}|${fileBean.sha1}|${preId}"
-            sb.add(sha)
-        }
-        val clipboard = ContextCompat.getSystemService(this, ClipboardManager::class.java)
-        val clip = ClipData.newPlainText("115sha1", sb.toString())
-        clipboard?.setPrimaryClip(clip)
-
-        Handler(Looper.getMainLooper()).post {
-            Toast.makeText(this, "获取SHA1成功，已输出至剪贴板", Toast.LENGTH_SHORT).show()
-        }
-    }
 
     private fun getDownloadUrl(
         fileBeanList: ArrayList<FileBean>,
@@ -215,40 +187,4 @@ class Sha1Service : Service() {
 
     }
 
-
-    private fun download(downloadUrl: String, cookie: String) {
-        val request: Request = Request
-            .Builder().url(downloadUrl)
-            .addHeader("cookie", cookie)
-            .addHeader(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
-            )
-            .get()
-            .build()
-        val response = okHttpClient.newCall(request).execute()
-        println(response.body!!.string())
-    }
-
-    private fun getPreId(downloadUrl: String): String {
-        val request: Request = Request
-            .Builder().url(downloadUrl)
-            .addHeader(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
-            )
-            .addHeader("Range", "bytes=0-131072")
-            .get()
-            .build()
-        val response = okHttpClient.newCall(request).execute()
-        val asUByteArray = response.body!!.source().readByteArray(128 * 1024)
-
-        val digest = MessageDigest.getInstance("SHA-1").digest(asUByteArray)
-        val sb = StringBuilder()
-        for (b in digest) {
-            sb.append(String.format("%02X", b))
-        }
-
-        return sb.toString()
-    }
 }

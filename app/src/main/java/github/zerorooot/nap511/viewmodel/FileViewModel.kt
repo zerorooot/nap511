@@ -12,6 +12,8 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.gson.Gson
+import com.google.gson.JsonObject
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.*
 import github.zerorooot.nap511.service.FileService
@@ -471,28 +473,18 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     fun startSendAria2Service(index: Int) {
-        startSha1Service(index, ConfigUtil.sentToAria2)
-    }
-
-    fun get115Sha1(index: Int) {
-        startSha1Service(index, ConfigUtil.getSha1)
-    }
-
-    private fun startSha1Service(index: Int, command: String) {
         val fileBean = fileBeanList[index]
         if (fileBean.isFolder) {
             Toast.makeText(application, "暂时无法下载文件夹", Toast.LENGTH_SHORT).show()
             return
         }
         val intent = Intent(application, Sha1Service::class.java)
-        val arrayList = ArrayList<FileBean>()
-        arrayList.add(fileBean)
-        intent.putExtra(ConfigUtil.command, command)
-        intent.putParcelableArrayListExtra("list", arrayList)
-//        intent.putExtra("list", arrayList)
+        intent.putExtra(ConfigUtil.command, ConfigUtil.sentToAria2)
+        intent.putExtra("list", Gson().toJson(fileBean))
         intent.putExtra("cookie", myCookie)
         application.startService(intent)
     }
+
 
     fun selectAll() {
         val a = arrayListOf<FileBean>()

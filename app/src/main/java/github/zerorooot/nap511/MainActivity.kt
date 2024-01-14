@@ -151,7 +151,7 @@ class MainActivity : ComponentActivity() {
                     "离线列表" -> OfflineFileScreen(offlineFileViewModel, fileViewModel)
                     "回收站" -> RecycleScreen(recycleViewModel)
                     "高级设置" -> SettingScreen()
-                    "webView" -> WebViewScreen(offlineFileViewModel)
+                    "webView" -> WebViewScreen(offlineFileViewModel, fileViewModel)
                 }
             }
         )

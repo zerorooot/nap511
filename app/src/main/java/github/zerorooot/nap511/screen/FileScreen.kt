@@ -40,9 +40,7 @@ import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.util.ConfigUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-//import github.zerorooot.nap511.util.SharedPreferencesUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
-import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -72,7 +70,6 @@ fun FileScreen(
     }
 
     val listState = fileViewModel.fileScreenListState
-    val coroutineScope = rememberCoroutineScope()
     val refreshing by fileViewModel.isRefreshing.collectAsState()
 
     val activity = LocalContext.current as Activity

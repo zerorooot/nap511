@@ -34,9 +34,6 @@
             </intent-filter>
         </activity>
 
-        <service
-            android:name=".service.Sha1Service"
-            android:exported="false" />
     </application>
 
 </manifest>

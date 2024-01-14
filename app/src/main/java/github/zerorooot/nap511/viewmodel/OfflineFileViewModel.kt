@@ -26,7 +26,6 @@ import java.util.Locale
 class OfflineFileViewModel(private val cookie: String, private val application: Application) :
     ViewModel() {
     val myCookie = cookie
-    val myApplication = application
     lateinit var drawerState: DrawerState
     lateinit var scope: CoroutineScope
 

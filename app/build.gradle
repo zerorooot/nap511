@@ -56,6 +56,7 @@ dependencies {
     implementation "com.github.JamalMulla:ComposePrefs:1.0.6"
     implementation "androidx.datastore:datastore-preferences:1.0.0"
 
+    implementation 'com.github.acsbendi:Android-Request-Inspector-WebView:1.0.5'
 //    implementation 'com.github.alorma:compose-settings-ui-m3:0.25.0'
 //    implementation 'com.github.alorma:compose-settings-storage-preferences:0.25.0'
 //    implementation 'com.github.alorma:compose-settings-storage-datastore-proto:0.25.0'
