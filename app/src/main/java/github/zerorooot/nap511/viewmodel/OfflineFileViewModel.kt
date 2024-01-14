@@ -26,6 +26,7 @@ import java.util.Locale
 class OfflineFileViewModel(private val cookie: String, private val application: Application) :
     ViewModel() {
     val myCookie = cookie
+    val myApplication = application
     lateinit var drawerState: DrawerState
     lateinit var scope: CoroutineScope
 
@@ -60,9 +61,6 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
     //网页网址
     var url by mutableStateOf("")
 
-//    private val sharedPreferencesUtil by lazy {
-//        SharedPreferencesUtil(application)
-//    }
 
     fun getOfflineFileList() {
         if (_offlineFile.value.isNotEmpty()) {
@@ -165,11 +163,11 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
             val message = if (addTask.state) {
                 "任务添加成功"
             } else {
-//                if (addTask.errorMsg.contains("请验证账号")) {
-//                    _isOpenWebView.value = true
-//                    url =
-//                        "https://captchaapi.115.com/?ac=security_code&type=web&cb=Close911_" + System.currentTimeMillis()
-//                }
+                if (addTask.errorMsg.contains("请验证账号")) {
+                    _isOpenWebView.value = true
+                    url =
+                        "https://captchaapi.115.com/?ac=security_code&type=web&cb=Close911_" + System.currentTimeMillis()
+                }
                 "任务添加失败，${addTask.errorMsg}"
             }
             Toast.makeText(application, message, Toast.LENGTH_SHORT).show()

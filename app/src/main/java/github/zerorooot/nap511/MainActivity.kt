@@ -176,7 +176,7 @@ class MainActivity : ComponentActivity() {
                         DataStoreUtil.putData(ConfigUtil.uid, checkLogin)
 
                         Handler(Looper.getMainLooper()).post {
-                            Toast.makeText(context, "登录成功，如果app没重启，还请自行重启", Toast.LENGTH_SHORT)
+                            Toast.makeText(context, "请重启app", Toast.LENGTH_SHORT)
                                 .show()
                         }
                         val manager = context.getSystemService(ACTIVITY_SERVICE) as ActivityManager
