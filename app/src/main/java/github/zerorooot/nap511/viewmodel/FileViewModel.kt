@@ -115,6 +115,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     fun setListLocation(path: String) {
+        
         val locationBean = LocationBean(
             fileScreenListState.firstVisibleItemIndex,
             fileScreenListState.firstVisibleItemScrollOffset

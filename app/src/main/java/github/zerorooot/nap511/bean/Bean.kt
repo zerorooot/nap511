@@ -232,7 +232,7 @@ data class RecycleBean(
     @SerializedName("vdi") var vdi: Int = -1,
     @SerializedName("ico") var ico: String = "",
     @SerializedName("u") var photoThumb: String = "",
-    @SerializedName("play_long") var playLong: Int = -1,
+    @SerializedName("play_long") var playLong: Float = -1f,
     var isFolder: Boolean = false,
     var modifiedTimeString: String = "",
     var fileSizeString: String = "",

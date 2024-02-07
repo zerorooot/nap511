@@ -55,12 +55,12 @@ import kotlin.concurrent.thread
 @OptIn(
     ExperimentalAnimationApi::class,
     ExperimentalFoundationApi::class,
-    ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class
+    ExperimentalMaterial3Api::class,
+    ExperimentalMaterialApi::class
 )
 @Composable
 fun FileScreen(
-    fileViewModel: FileViewModel,
-    appBarOnClick: (String) -> Unit
+    fileViewModel: FileViewModel, appBarOnClick: (String) -> Unit
 ) {
     val fileBeanList = fileViewModel.fileBeanList
     val path by fileViewModel.currentPath.collectAsState()
@@ -165,8 +165,7 @@ fun FileScreen(
     val onBack = {
         val lastIndexOf = path.lastIndexOf("/")
         val parentDirectory = path.subSequence(
-            0,
-            if (lastIndexOf == -1) {
+            0, if (lastIndexOf == -1) {
                 0
             } else {
                 lastIndexOf
@@ -237,8 +236,7 @@ fun FileScreen(
         }) {
             Box(Modifier.pullRefresh(pullRefreshState)) {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    state = listState
+                    modifier = Modifier.fillMaxSize(), state = listState
                 ) {
                     itemsIndexed(items = fileBeanList, key = { _, item ->
                         item.hashCode()
@@ -255,9 +253,7 @@ fun FileScreen(
                     }
                 }
                 PullRefreshIndicator(
-                    refreshing,
-                    pullRefreshState,
-                    Modifier.align(Alignment.TopCenter)
+                    refreshing, pullRefreshState, Modifier.align(Alignment.TopCenter)
                 )
             }
 
@@ -303,14 +299,8 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
     }
 
     Aria2Dialog(
-        fileViewModel = fileViewModel,
-//        context = SharedPreferencesUtil(context).get(
-//            ConfigUtil.aria2Url,
-//            ConfigUtil.aria2UrldefValue
-//        )
-        context = DataStoreUtil.getData(
-            ConfigUtil.aria2Url,
-            ConfigUtil.aria2UrldefValue
+        fileViewModel = fileViewModel, context = DataStoreUtil.getData(
+            ConfigUtil.aria2Url, ConfigUtil.aria2UrldefValue
         )
     ) {
         fileViewModel.isOpenAria2Dialog = false
@@ -346,35 +336,25 @@ private fun checkAria2(aria2Url: String, aria2Token: String, context: Context) {
     }
     jsonObject.add("params", jsonArray)
 
-    val request: Request = Request
-        .Builder()
-        .url(aria2Url)
-        .post(
+    val request: Request = Request.Builder().url(aria2Url).post(
             jsonObject.toString()
                 .toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
-        )
-        .build()
+        ).build()
 
-    var message = ""
-    try {
+    val message: String = try {
         val body = okHttpClient.newCall(request).execute().body!!.string()
         val bodyJson = JsonParser().parse(body).asJsonObject
 
-        message = if (bodyJson.has("error")) {
+        if (bodyJson.has("error")) {
             "aria2配置失败," + bodyJson.getAsJsonObject("error").get("message").asString
         } else {
-            //            val sharedPreferencesUtil = SharedPreferencesUtil(context)
-            //            sharedPreferencesUtil.save(ConfigUtil.aria2Url, aria2Url)
-            //            if (aria2Token != "") {
-            //                sharedPreferencesUtil.save(ConfigUtil.aria2Token, aria2Token)
-            //            }
             DataStoreUtil.putData(ConfigUtil.aria2Url, aria2Url)
             DataStoreUtil.putData(ConfigUtil.aria2Token, aria2Token)
             "aria2配置成功"
         }
 
     } catch (e: Exception) {
-        message = "aria2配置失败," + e.message.toString()
+        "aria2配置失败," + e.message.toString()
     }
     Handler(Looper.getMainLooper()).post {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()

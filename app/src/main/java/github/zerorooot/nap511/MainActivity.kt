@@ -1,7 +1,6 @@
 package github.zerorooot.nap511
 
 import android.annotation.SuppressLint
-import android.app.ActivityManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -35,9 +34,7 @@ import kotlin.concurrent.thread
 
 
 class MainActivity : ComponentActivity() {
-    //    private val sharedPreferencesUtil by lazy {
-//        SharedPreferencesUtil(this)
-//    }
+
     @SuppressLint("CoroutineCreationDuringComposition")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,9 +44,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-//                    val cookie = sharedPreferencesUtil.get(ConfigUtil.cookie)
                     val cookie = DataStoreUtil.getData(ConfigUtil.cookie, "")
-
 
                     if (cookie == "") {
                         Login()
@@ -82,7 +77,7 @@ class MainActivity : ComponentActivity() {
                     rememberSystemUiController().apply {
                         isSystemBarsVisible = visible
                     }
-                    BackHandler(fileViewModel.selectedItem == "photo") {
+                    BackHandler(fileViewModel.selectedItem == "photo" || fileViewModel.selectedItem == "webView") {
                         fileViewModel.selectedItem = "我的文件"
                         visible = true
                     }
@@ -151,7 +146,7 @@ class MainActivity : ComponentActivity() {
                     "离线列表" -> OfflineFileScreen(offlineFileViewModel, fileViewModel)
                     "回收站" -> RecycleScreen(recycleViewModel)
                     "高级设置" -> SettingScreen()
-                    "webView" -> WebViewScreen(offlineFileViewModel, fileViewModel)
+                    "webView" -> CaptchaWebViewScreen(offlineFileViewModel, fileViewModel)
                 }
             }
         )
@@ -170,17 +165,13 @@ class MainActivity : ComponentActivity() {
                             Toast.makeText(context, "登录失败~，请重试", Toast.LENGTH_SHORT).show()
                         }
                     } else {
-//                        sharedPreferencesUtil.save(ConfigUtil.cookie, replace)
-//                        sharedPreferencesUtil.save(ConfigUtil.uid, checkLogin)
                         DataStoreUtil.putData(ConfigUtil.cookie, replace)
                         DataStoreUtil.putData(ConfigUtil.uid, checkLogin)
 
                         Handler(Looper.getMainLooper()).post {
-                            Toast.makeText(context, "请重启app", Toast.LENGTH_SHORT)
+                            Toast.makeText(context, "登陆成功，请重启app~", Toast.LENGTH_SHORT)
                                 .show()
                         }
-                        val manager = context.getSystemService(ACTIVITY_SERVICE) as ActivityManager
-                        manager.killBackgroundProcesses(context.packageName)
                     }
                 }
             } else {

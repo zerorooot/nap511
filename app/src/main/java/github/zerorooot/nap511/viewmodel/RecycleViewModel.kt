@@ -41,9 +41,6 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
         FileService.getInstance(cookie)
     }
 
-//    private val sharedPreferencesUtil by lazy {
-//        SharedPreferencesUtil(application)
-//    }
 
     fun getRecycleFileList() {
         if (recycleFileList.isNotEmpty()) {
@@ -64,7 +61,6 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
     }
 
     fun delete(index: Int) {
-//        val password = sharedPreferencesUtil.get(ConfigUtil.password)
         val password = DataStoreUtil.getData(ConfigUtil.password, "")
         if (password == "") {
             _isOpenPasswordDialog.value = true
@@ -79,12 +75,10 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
             val message = if (revert.state) {
                 recycleFileList.removeAt(index)
                 if (save) {
-//                    sharedPreferencesUtil.save(ConfigUtil.password, password)
                     DataStoreUtil.putData(ConfigUtil.password, password)
                 }
                 "删除成功"
             } else {
-//                sharedPreferencesUtil.save(ConfigUtil.password, null)
                 DataStoreUtil.putData(ConfigUtil.password, "")
                 "删除失败，${revert.errorMsg}"
             }
@@ -93,7 +87,6 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
     }
 
     fun deleteAll() {
-//        val password = sharedPreferencesUtil.get(ConfigUtil.password)
         val password = DataStoreUtil.getData(ConfigUtil.password, "")
         if (password == "") {
             _isOpenPasswordDialog.value = true
@@ -148,7 +141,7 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
 
             recycleBean.fileSizeString = android.text.format.Formatter.formatFileSize(
                 application,
-                if (recycleBean.fileSize == "") "".toLong() else recycleBean.fileSize.toLong()
+                if (recycleBean.fileSize == "") "0".toLong() else recycleBean.fileSize.toLong()
             ) + " "
             setIco(recycleBean)
         }

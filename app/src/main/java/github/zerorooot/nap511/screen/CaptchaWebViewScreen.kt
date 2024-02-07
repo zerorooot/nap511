@@ -36,7 +36,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
 @Composable
-fun WebViewScreen(offlineFileViewModel: OfflineFileViewModel,fileViewModel: FileViewModel) {
+fun CaptchaWebViewScreen(offlineFileViewModel: OfflineFileViewModel, fileViewModel: FileViewModel) {
     val cookieManager = CookieManager.getInstance()
     offlineFileViewModel.myCookie.split(";").forEach { a ->
         cookieManager.setCookie("https://captchaapi.115.com", a)
