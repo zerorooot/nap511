@@ -251,6 +251,8 @@ class FileViewModel(private val cookie: String, private val application: Applica
             }
             if (fileBean.isVideo == 1) {
                 fileBean.fileIco = R.drawable.mp4
+                //设置视频时间
+                fileBean.playLongString = generateTime(fileBean.playLong) + " "
             }
             when (fileBean.icoString) {
                 "apk" -> fileBean.fileIco = R.drawable.apk
@@ -547,4 +549,15 @@ class FileViewModel(private val cookie: String, private val application: Applica
         }
     }
 
+    private fun generateTime(totalSeconds: Long): String {
+        val seconds = totalSeconds % 60
+        val minutes = totalSeconds / 60 % 60
+        val hours = totalSeconds / 3600
+        return if (hours > 0) String.format(
+            "%02d:%02d:%02d",
+            hours,
+            minutes,
+            seconds
+        ) else String.format("%02d:%02d", minutes, seconds)
+    }
 }

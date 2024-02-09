@@ -36,8 +36,10 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
+import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
+import github.zerorooot.nap511.screenitem.FileCellItem
 import github.zerorooot.nap511.util.ConfigUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
@@ -283,6 +285,10 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
     }
     FileOrderDialog(fileViewModel = fileViewModel) {
         fileViewModel.isOpenFileOrderDialog = false
+        if (it.contains("视频时间")) {
+            fileViewModel.fileBeanList.sortByDescending { fileBean -> fileBean.playLong }
+            return@FileOrderDialog
+        }
         if (it != "") {
             val asc = if (it.subSequence(it.length - 2, it.length) == "⬆️") 1 else 0
             val type = when (it.subSequence(0, it.length - 2)) {
@@ -337,9 +343,9 @@ private fun checkAria2(aria2Url: String, aria2Token: String, context: Context) {
     jsonObject.add("params", jsonArray)
 
     val request: Request = Request.Builder().url(aria2Url).post(
-            jsonObject.toString()
-                .toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
-        ).build()
+        jsonObject.toString()
+            .toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
+    ).build()
 
     val message: String = try {
         val body = okHttpClient.newCall(request).execute().body!!.string()

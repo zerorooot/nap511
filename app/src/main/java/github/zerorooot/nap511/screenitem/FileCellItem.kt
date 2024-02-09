@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen
+package github.zerorooot.nap511.screenitem
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -22,6 +22,7 @@ import coil.compose.rememberAsyncImagePainter
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.screen.FileMoreMenu
 import kotlin.math.ceil
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -41,6 +42,7 @@ fun FileCellItem(
     val name = fileBean.name
     val size = fileBean.sizeString
     val time = fileBean.createTimeString
+    val playLong = fileBean.playLongString
     Surface(
         shape = MaterialTheme.shapes.medium,
         tonalElevation = 10.dp,
@@ -135,10 +137,13 @@ fun FileCellItem(
                         Text(
                             text = size,
                             style = MaterialTheme.typography.bodyMedium,
-//                            modifier = Modifier.weight(0.3f)
-//                                .padding(4.dp)
-//                                .weight(0.3f)
                         )
+                        if (fileBean.isVideo == 1) {
+                            Text(
+                                text = playLong,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
                         Text(
                             text = time,
                             style = MaterialTheme.typography.bodyMedium,

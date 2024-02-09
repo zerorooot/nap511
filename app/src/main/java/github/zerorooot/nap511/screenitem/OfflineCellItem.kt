@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen
+package github.zerorooot.nap511.screenitem
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -14,6 +14,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.*
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.OfflineTask
+import github.zerorooot.nap511.screen.OfflineFileMoreMenu
 
 
 @OptIn(ExperimentalFoundationApi::class)

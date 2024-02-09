@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen
+package github.zerorooot.nap511.screenitem
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
@@ -20,6 +20,7 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Scale
 import github.zerorooot.nap511.bean.RecycleBean
+import github.zerorooot.nap511.screen.RecycleMoreMenu
 
 @Composable
 fun RecycleCellItem(
