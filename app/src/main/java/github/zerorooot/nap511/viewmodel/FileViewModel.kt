@@ -3,8 +3,6 @@ package github.zerorooot.nap511.viewmodel
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Intent
-import android.os.Handler
-import android.os.Looper
 import android.widget.Toast
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.*
@@ -13,20 +11,17 @@ import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
-import com.google.gson.JsonObject
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.*
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.ConfigUtil
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.concurrent.thread
 import kotlin.math.roundToInt
 
 @SuppressLint("MutableCollectionMutableState")
@@ -76,7 +71,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
     val clickMap = mutableStateMapOf<String, Int>()
     private var currentLocation = hashMapOf<String, LocationBean>()
     lateinit var fileScreenListState: LazyListState
-
+    lateinit var rememberCoroutineScope: CoroutineScope
     var orderBean = OrderBean(OrderEnum.name, 1)
     private val fileService: FileService by lazy {
         FileService.getInstance(cookie)
@@ -115,7 +110,6 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     fun setListLocation(path: String) {
-        
         val locationBean = LocationBean(
             fileScreenListState.firstVisibleItemIndex,
             fileScreenListState.firstVisibleItemScrollOffset
@@ -132,12 +126,13 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     fun getListLocation(path: String) {
-        viewModelScope.launch {
-            val locationBean1 = currentLocation[path] ?: run {
+        rememberCoroutineScope.launch {
+            val locationBean = currentLocation[path] ?: run {
                 LocationBean(0, 0)
             }
+//            Thread.sleep(100)
             fileScreenListState.scrollToItem(
-                locationBean1.firstVisibleItemIndex, locationBean1.firstVisibleItemScrollOffset
+                locationBean.firstVisibleItemIndex, locationBean.firstVisibleItemScrollOffset
             )
         }
     }
@@ -252,7 +247,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             if (fileBean.isVideo == 1) {
                 fileBean.fileIco = R.drawable.mp4
                 //设置视频时间
-                fileBean.playLongString = generateTime(fileBean.playLong) + " "
+                fileBean.playLongString = generateTime(fileBean.playLong.toLong()) + " "
             }
             when (fileBean.icoString) {
                 "apk" -> fileBean.fileIco = R.drawable.apk

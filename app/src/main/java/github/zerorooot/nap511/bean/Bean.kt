@@ -73,7 +73,7 @@ data class FileBean(
     @SerializedName("sha") var sha1: String = "",
     @SerializedName("s") var size: String = "0",
     @SerializedName("current_time") var currentPlayTime: Int = 0,
-    @SerializedName("play_long") var playLong: Long = 0,
+    @SerializedName("play_long") var playLong: Double = 0.00,
     var isFolder: Boolean = false,
     var updateTimeString: String = "",
     var createTimeString: String = "",

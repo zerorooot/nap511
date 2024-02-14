@@ -8,9 +8,18 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.with
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -25,7 +34,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -36,13 +48,13 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
-import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.screenitem.FileCellItem
 import github.zerorooot.nap511.util.ConfigUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
+import kotlinx.coroutines.DelicateCoroutinesApi
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -70,6 +82,7 @@ fun FileScreen(
     if (!fileViewModel.isFileScreenListState()) {
         fileViewModel.fileScreenListState = rememberLazyListState()
     }
+    fileViewModel.rememberCoroutineScope = rememberCoroutineScope()
 
     val listState = fileViewModel.fileScreenListState
     val refreshing by fileViewModel.isRefreshing.collectAsState()
@@ -77,6 +90,8 @@ fun FileScreen(
     val activity = LocalContext.current as Activity
 
     CreateDialogs(fileViewModel)
+
+
 
     val itemOnLongClick = { i: Int ->
         fileViewModel.isLongClick = !fileViewModel.isLongClick
@@ -160,7 +175,9 @@ fun FileScreen(
 
             //滚动到当前目录
             if (currentFileBean.isFolder) {
-                fileViewModel.getListLocation(currentPath + "/${currentFileBean.name}")
+                fileViewModel.getListLocation(
+                    currentPath + "/${currentFileBean.name}"
+                )
             }
         }
     }
@@ -267,7 +284,6 @@ fun FileScreen(
 @Composable
 fun CreateDialogs(fileViewModel: FileViewModel) {
     val context = LocalContext.current
-
     CreateFolderDialog(fileViewModel) {
         if (it != "") {
             fileViewModel.createFolder(it)
@@ -287,6 +303,8 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
         fileViewModel.isOpenFileOrderDialog = false
         if (it.contains("视频时间")) {
             fileViewModel.fileBeanList.sortByDescending { fileBean -> fileBean.playLong }
+            //滚动到顶部
+            fileViewModel.getListLocation("null")
             return@FileOrderDialog
         }
         if (it != "") {
