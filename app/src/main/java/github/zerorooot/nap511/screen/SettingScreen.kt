@@ -61,10 +61,29 @@ fun SettingScreen() {
             )
         }
         prefsItem {
+            EditTextPref(
+                key = ConfigUtil.requestLimitCount,
+                title = "每次请求文件数",
+                summary = DataStoreUtil.getData(ConfigUtil.requestLimitCount, "100"),
+                dialogTitle = "每次请求文件数",
+            )
+        }
+        prefsItem {
             SwitchPref(
                 key = ConfigUtil.autoRotate,
                 title = "屏幕自动旋转",
                 summary = "根据视频横竖自动旋转屏幕",
+            )
+        }
+        prefsItem {
+            EditTextPref(
+                key = ConfigUtil.defaultOfflineCid,
+                title = "默认离线位置",
+                summary = DataStoreUtil.getData(
+                    ConfigUtil.defaultOfflineCid,
+                    "输入文件夹cid,长按目录可复制当前目录cid"
+                ),
+                dialogTitle = "长按路径可当前目录cid",
             )
         }
     }

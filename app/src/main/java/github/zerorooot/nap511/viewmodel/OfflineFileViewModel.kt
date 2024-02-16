@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.viewmodel
 
 
+import android.app.Activity
 import android.app.Application
 import android.widget.Toast
 import androidx.lifecycle.ViewModel
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
+import kotlin.system.exitProcess
 
 class OfflineFileViewModel(private val cookie: String, private val application: Application) :
     ViewModel() {
@@ -121,17 +123,20 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
     sign:xxxxxxx
     time:1675155957
      */
-    fun addTask(list: List<String>, currentCid: String) {
+    fun addTask(list: List<String>, currentCid: String, close: Boolean = false) {
         viewModelScope.launch {
             val downloadPath = fileService.setDownloadPath(currentCid)
             if (!downloadPath.state) {
-                Toast.makeText(application, "设置离线位置失败，默认保存到\"云下载\"目录", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    application,
+                    "设置离线位置失败，默认保存到\"云下载\"目录",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
 
             val map = HashMap<String, String>()
             map["savepath"] = ""
             map["wp_path_id"] = currentCid
-//            map["uid"] = sharedPreferencesUtil.get(ConfigUtil.uid)!!
             map["uid"] = DataStoreUtil.getData(ConfigUtil.uid, "")
             map["sign"] = offlineService.getSign().sign
             map["time"] = (System.currentTimeMillis() / 1000).toString()
@@ -151,6 +156,9 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
                 "任务添加失败，${addTask.errorMsg}"
             }
             Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
+            if (close && message == "任务添加成功") {
+                exitProcess(0);
+            }
         }
     }
 

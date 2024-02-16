@@ -1,13 +1,13 @@
 package github.zerorooot.nap511.service
 
 import github.zerorooot.nap511.bean.*
+import github.zerorooot.nap511.util.App
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
-import java.util.concurrent.TimeUnit
 
 interface FileService {
     companion object {
@@ -57,7 +57,7 @@ interface FileService {
         @Query("aid") aid: Int = 1,
         @Query("asc") asc: Int = 1,
         @Query("o") order: String = "file_name",
-        @Query("limit") limit: Int = 100
+        @Query("limit") limit: Int = App.requestLimitCount
     ): FilesBean
 
     @GET("category/get")

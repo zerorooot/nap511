@@ -51,6 +51,8 @@ android {
 }
 
 dependencies {
+//    implementation 'org.java-websocket:Java-WebSocket:1.5.6'
+//    implementation 'com.pusher:pusher-java-client:0.3.1'
     //setting screen
 //    implementation "com.github.JamalMulla:ComposePrefs3:1.0.3"
     implementation "com.github.JamalMulla:ComposePrefs:1.0.6"

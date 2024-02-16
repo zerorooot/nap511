@@ -1,10 +1,8 @@
 package github.zerorooot.nap511.service
 
 
-//import github.zerorooot.nap511.util.SharedPreferencesUtil
+
 import android.app.Service
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Intent
 import android.os.Build
 import android.os.Handler
@@ -12,7 +10,6 @@ import android.os.IBinder
 import android.os.Looper
 import android.widget.Toast
 import androidx.annotation.RequiresApi
-import androidx.core.content.ContextCompat
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
@@ -21,12 +18,11 @@ import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.util.ConfigUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.Sha1Util
-import okhttp3.*
+import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.security.MessageDigest
-import java.util.*
-import kotlin.collections.ArrayList
 import kotlin.concurrent.thread
 
 

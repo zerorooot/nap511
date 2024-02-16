@@ -9,7 +9,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class App : Application() {
@@ -25,18 +24,20 @@ class App : Application() {
 
         //验证账号网址
         var captchaUrl by mutableStateOf("")
+
+        //每次请求文件数
+        var requestLimitCount: Int = 100
         lateinit var drawerState: DrawerState
         lateinit var scope: CoroutineScope
         private fun isScopeInitialized() = ::scope.isInitialized
 
-        //新cookie登陆时，无需重启，即可直接使用，使用在MainActivity#Login()
-//        var isInit by mutableStateOf(false)
     }
 
     override fun onCreate() {
         super.onCreate()
         instance = this
         cookie = DataStoreUtil.getData(ConfigUtil.cookie, "")
+        requestLimitCount = DataStoreUtil.getData(ConfigUtil.requestLimitCount, "100").toInt()
     }
 
     fun toast(text: String) {

@@ -205,7 +205,6 @@ class FileViewModel(private val cookie: String, private val application: Applica
                     "获取文件列表失败，建议更新您的Cookie",
                     Toast.LENGTH_SHORT
                 ).show()
-//                App.selectedItem = "登录"
             } catch (e: Exception) {
                 e.printStackTrace()
                 Toast.makeText(

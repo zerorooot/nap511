@@ -14,6 +14,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.with
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -40,8 +43,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.ClipboardManager
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
@@ -211,6 +218,7 @@ fun FileScreen(
 
     val pullRefreshState = rememberPullRefreshState(refreshing, { fileViewModel.refresh() })
 
+    val clipboardManager: ClipboardManager = LocalClipboardManager.current
     Column {
         AnimatedContent(targetState = fileViewModel.isLongClick, transitionSpec = {
             fadeIn() with fadeOut()
@@ -222,7 +230,22 @@ fun FileScreen(
             }
         }
         MiddleEllipsisText(
-            text = path, modifier = Modifier.padding(8.dp, 4.dp)
+            text = path, modifier = Modifier
+                .padding(8.dp, 4.dp)
+                .combinedClickable(
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString((path)))
+                        App.instance.toast("$path 已复制到剪切板")
+                    },
+                    onDoubleClick = {
+                        //滚到顶端
+                        fileViewModel.getListLocation("null")
+                    },
+                    onLongClick = {
+                        clipboardManager.setText(AnnotatedString((fileViewModel.currentCid)))
+                        App.instance.toast("cid ${fileViewModel.currentCid} 已复制到剪切板")
+                    },
+                )
         )
         Scaffold(floatingActionButton = {
             AnimatedContent(targetState = fileViewModel.isCut, transitionSpec = {
@@ -362,8 +385,7 @@ private fun checkAria2(aria2Url: String, aria2Token: String, context: Context) {
     jsonObject.add("params", jsonArray)
 
     val request: Request = Request.Builder().url(aria2Url).post(
-        jsonObject.toString()
-            .toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
+        jsonObject.toString().toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
     ).build()
 
     val message: String = try {

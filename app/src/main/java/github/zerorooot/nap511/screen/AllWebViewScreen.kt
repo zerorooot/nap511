@@ -30,7 +30,6 @@ import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -71,6 +70,7 @@ fun BaseWebViewScreen(
                         settings.javaScriptEnabled = true
                         settings.loadWithOverviewMode = true
                         settings.useWideViewPort = true
+                        settings.javaScriptCanOpenWindowsAutomatically = true;
                         settings.setSupportZoom(true)
                         settings.databaseEnabled = true;
                         settings.domStorageEnabled = true;//开启DOM缓存，关闭的话H5自身的一些操作是无效的
@@ -91,29 +91,47 @@ fun BaseWebViewScreen(
 @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
 @Composable
 fun WebViewScreen() {
+    App.gesturesEnabled = false
     BaseWebViewScreen(
         titleText = "网页版",
         topAppBarActionButtonOnClick = {
             App.instance.openDrawerState()
         },
-        webViewClient = { webViewClient() },
+        webViewClient = { webViewClient(it) },
         loadUrl = "https://115.com/"
     )
 }
 
-fun webViewClient(): WebViewClient {
-    return object : WebViewClient() {
-        override fun shouldOverrideUrlLoading(
-            view: WebView?,
-            request: WebResourceRequest?
-        ): Boolean {
-            val url = request!!.url.toString()
-            val map = HashMap<String, String>();
-            map["cookie"] = App.cookie
-            view!!.loadUrl(url, map)
-            return true
+@SuppressLint("JavascriptInterface")
+fun webViewClient(webView: WebView): WebViewClient {
+    return object : RequestInspectorWebViewClient(webView) {
+        override fun shouldInterceptRequest(
+            view: WebView,
+            webViewRequest: WebViewRequest
+        ): WebResourceResponse? {
+            val url = webViewRequest.url
+            val cookieManager = CookieManager.getInstance()
+            App.cookie.split(";").forEach { a ->
+                cookieManager.setCookie(url, a)
+                cookieManager.setCookie(url, a)
+            }
+            return null
         }
     }
+//    return object : WebViewClient() {
+//        override fun shouldInterceptRequest(
+//            view: WebView?,
+//            request: WebResourceRequest?
+//        ): WebResourceResponse? {
+//            val url = request!!.url.toString()
+//            val cookieManager = CookieManager.getInstance()
+//            App.cookie.split(";").forEach { a ->
+//                cookieManager.setCookie(url, a)
+//                cookieManager.setCookie(url, a)
+//            }
+//            return super.shouldInterceptRequest(view, request)
+//        }
+//    }
 
 }
 
@@ -169,10 +187,8 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
                     "登陆成功~"
                 }
                 App.instance.toast(text)
-                return null
             }
-
-            return super.shouldInterceptRequest(view, webViewRequest)
+            return null
         }
 
     }

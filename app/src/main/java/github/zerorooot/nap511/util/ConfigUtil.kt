@@ -10,8 +10,8 @@ class ConfigUtil {
         const val password = "password"
         const val command = "command"
         const val sentToAria2 = "sentToAria2"
-        const val getSha1 = "getSha1"
         const val autoRotate = "autoRotate"
-
+        const val defaultOfflineCid = "0"
+        const val requestLimitCount = "requestLimitCount"
     }
 }

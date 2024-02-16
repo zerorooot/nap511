@@ -1,6 +1,7 @@
 package github.zerorooot.nap511
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -47,6 +48,7 @@ class MainActivity : ComponentActivity() {
                         return@Surface
                     }
                     Init(cookie)
+
                 }
             }
         }
@@ -70,6 +72,30 @@ class MainActivity : ComponentActivity() {
             )
         }
 
+
+        //处理输入链接
+        if (intent.action == Intent.ACTION_VIEW || intent.action == Intent.ACTION_PROCESS_TEXT) {
+            val urlList = (intent.dataString ?: run {
+                intent.getStringExtra(Intent.EXTRA_PROCESS_TEXT)
+            } ?: run { "" }).split("\n").filter { i ->
+                i.startsWith("http", true) || i.startsWith(
+                    "ftp",
+                    true
+                ) || i.startsWith("magnet", true) || i.startsWith("ed2k", true)
+            }.toList()
+            if (urlList.isNotEmpty()) {
+                offlineFileViewModel.addTask(
+                    urlList,
+                    DataStoreUtil.getData(ConfigUtil.defaultOfflineCid, ""),
+                    true
+                )
+            } else {
+                App.instance.toast("仅支持以http、ftp、magnet、ed2k开头的链接")
+                finishAndRemoveTask()
+            }
+            intent.action = ""
+            return
+        }
         //恢复因MyPhotoScreen而造成的isSystemBarsVisible为false的情况
         var visible by remember {
             mutableStateOf(true)
@@ -101,9 +127,9 @@ class MainActivity : ComponentActivity() {
             R.drawable.baseline_cloud_24 to "我的文件",
             R.drawable.baseline_cloud_download_24 to "离线下载",
             R.drawable.baseline_cloud_done_24 to "离线列表",
+            R.drawable.baseline_web_24 to "网页版",
             R.drawable.ic_baseline_delete_24 to "回收站",
             R.drawable.baseline_settings_24 to "高级设置",
-            R.drawable.baseline_web_24 to "网页版",
         )
 
         ModalNavigationDrawer(gesturesEnabled = App.gesturesEnabled,
@@ -117,6 +143,7 @@ class MainActivity : ComponentActivity() {
                                 painterResource(t), contentDescription = u
                             )
                         }, label = { Text(u) }, selected = u == App.selectedItem, onClick = {
+                            App.gesturesEnabled = true
                             scope.launch { drawerState.close() }
                             App.selectedItem = u
                         }, modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
@@ -128,16 +155,16 @@ class MainActivity : ComponentActivity() {
                 when (App.selectedItem) {
                     "登录" -> Login()
                     "我的文件" -> MyFileScreen(fileViewModel)
-                    "photo" -> {
-                        MyPhotoScreen(fileViewModel)
-                    }
                     "离线下载" -> OfflineDownloadScreen(offlineFileViewModel, fileViewModel)
                     "离线列表" -> OfflineFileScreen(offlineFileViewModel, fileViewModel)
+                    "网页版" -> WebViewScreen()
                     "回收站" -> RecycleScreen(recycleViewModel)
                     "高级设置" -> SettingScreen()
                     "captchaWebView" -> CaptchaWebViewScreen()
-                    "网页版" -> WebViewScreen()
                     "loginWebView" -> LoginWebViewScreen()
+                    "photo" -> {
+                        MyPhotoScreen(fileViewModel)
+                    }
                 }
             })
     }
