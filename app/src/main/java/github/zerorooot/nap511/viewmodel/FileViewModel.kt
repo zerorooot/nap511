@@ -5,6 +5,7 @@ import android.app.Application
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.core.text.isDigitsOnly
@@ -15,11 +16,13 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.*
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.Sha1Service
+import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.lang.NullPointerException
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToInt
@@ -28,8 +31,7 @@ import kotlin.math.roundToInt
 class FileViewModel(private val cookie: String, private val application: Application) :
     ViewModel() {
     var fileBeanList = mutableStateListOf<FileBean>()
-    val myCookie = cookie
-    var selectedItem by mutableStateOf("我的文件")
+//    var selectedItem by mutableStateOf("我的文件")
 
     var appBarTitle by mutableStateOf(application.resources.getString(R.string.app_name))
 
@@ -71,7 +73,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
     val clickMap = mutableStateMapOf<String, Int>()
     private var currentLocation = hashMapOf<String, LocationBean>()
     lateinit var fileScreenListState: LazyListState
-    lateinit var rememberCoroutineScope: CoroutineScope
+
     var orderBean = OrderBean(OrderEnum.name, 1)
     private val fileService: FileService by lazy {
         FileService.getInstance(cookie)
@@ -126,7 +128,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     fun getListLocation(path: String) {
-        rememberCoroutineScope.launch {
+        App.scope.launch {
             val locationBean = currentLocation[path] ?: run {
                 LocationBean(0, 0)
             }
@@ -197,13 +199,21 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 setFileBeanProperty(files.fileBeanList)
                 setFiles(files)
                 _isRefreshing.value = false
-            } catch (e: Exception) {
-                e.printStackTrace()
+            } catch (e: NullPointerException) {
                 Toast.makeText(
                     application,
                     "获取文件列表失败，建议更新您的Cookie",
                     Toast.LENGTH_SHORT
                 ).show()
+//                App.selectedItem = "登录"
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(
+                    application,
+                    "${e.message}，请重试～",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } finally {
                 _isRefreshing.value = false
             }
         }
@@ -470,6 +480,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         }
     }
 
+
     fun startSendAria2Service(index: Int) {
         val fileBean = fileBeanList[index]
         if (fileBean.isFolder) {
@@ -479,7 +490,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         val intent = Intent(application, Sha1Service::class.java)
         intent.putExtra(ConfigUtil.command, ConfigUtil.sentToAria2)
         intent.putExtra("list", Gson().toJson(fileBean))
-        intent.putExtra("cookie", myCookie)
+        intent.putExtra("cookie", cookie)
         application.startService(intent)
     }
 

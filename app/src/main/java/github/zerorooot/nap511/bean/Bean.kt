@@ -9,6 +9,44 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 
 
+data class LoginCookie(
+    @SerializedName("UID")
+    var uID: String? = null,
+    @SerializedName("CID")
+    var cID: String? = null,
+    @SerializedName("SEID")
+    var sEID: String? = null,
+) {
+    override fun toString(): String {
+        return "UID=$uID;CID=$cID;SEID=$sEID"
+    }
+}
+
+
+data class LoginData(
+    var user_id: String = "0",
+    var user_name: String? = null,
+    var email: String? = null,
+    var mobile: String? = null,
+    var country: String? = null,
+    var is_vip: Int = 0,
+    var mark: Int = 0,
+    var alert: String? = null,
+//    var is_chang_passwd: Int = 0,
+//    var is_first_login: Int = 0,
+//    var bind_mobile: Int = 0,
+//    var passwd_reset: Int = 0,
+    var cookie: LoginCookie? = null,
+)
+
+
+data class LoginBean(
+    var state: Int = 0,
+    @SerializedName("data")
+    var data: LoginData = LoginData(),
+    var message: String = ""
+)
+
 data class FilesBean(
     @SerializedName("data") var fileBeanList: ArrayList<FileBean>,
     var cid: String,

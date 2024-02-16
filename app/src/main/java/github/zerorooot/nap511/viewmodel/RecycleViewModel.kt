@@ -24,9 +24,6 @@ import kotlin.collections.ArrayList
 
 class RecycleViewModel(private val cookie: String, private val application: Application) :
     ViewModel() {
-    lateinit var drawerState: DrawerState
-    lateinit var scope: CoroutineScope
-
     private val _isRefreshing = MutableStateFlow(false)
     var isRefreshing = _isRefreshing.asStateFlow()
 
@@ -126,11 +123,6 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
         getRecycleFileList()
     }
 
-    fun openDrawerState() {
-        scope.launch {
-            drawerState.open()
-        }
-    }
 
     private fun setRecycleBean(recycleBeanList: ArrayList<RecycleBean>) {
         recycleBeanList.forEach { recycleBean ->

@@ -114,7 +114,7 @@ fun CookieDialog(enter: (String) -> Unit) {
     }
 
     if (isOpen) {
-        BaseDialog(title = "设置Cookie", label = "请输入Cookie") {
+        BaseDialog(title = "设置Cookie", label = "请输入Cookie", dismissButtonText = "通过网页登陆") {
             enter.invoke(it)
             isOpen = false
         }
@@ -283,7 +283,6 @@ private fun RadioButtonDialog(
 
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BaseDialog(
     title: String,
@@ -291,7 +290,9 @@ private fun BaseDialog(
     context: String = "",
     readOnly: Boolean = false,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
-    enter: (String) -> Unit
+    confirmButtonText: String = "确认",
+    dismissButtonText: String = "取消",
+    enter: (String) -> Unit,
 ) {
     var text by remember {
         mutableStateOf(
@@ -309,16 +310,22 @@ private fun BaseDialog(
             enter.invoke(text.text)
             text = TextFieldValue("")
         }) {
-            Text(text = "确认")
+            Text(text = confirmButtonText)
         }
     }, dismissButton = {
         TextButton(
             onClick = {
-                enter.invoke("")
+                enter.invoke(
+                    if (dismissButtonText == "取消") {
+                        ""
+                    } else {
+                        dismissButtonText
+                    }
+                )
                 text = TextFieldValue("")
             },
         ) {
-            Text(text = "取消")
+            Text(text = dismissButtonText)
         }
     }, title = {
         Text(text = title, style = MaterialTheme.typography.titleMedium)
@@ -363,6 +370,9 @@ private fun BaseDialog(
 @Preview
 fun aa() {
 //    Aria2Dialog()
+    BaseDialog("title", "lable", "context") {
+
+    }
 }
 
 @ExperimentalMaterial3Api

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat.getSystemService
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.screenitem.OfflineCellItem
+import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import java.util.*
@@ -50,7 +51,7 @@ fun OfflineFileScreen(
     val itemOnClick = { i: Int ->
         val offlineTask = offlineList[i]
         val cid = if (offlineTask.fileId == "") offlineTask.wpPathId else offlineTask.fileId
-        fileViewModel.selectedItem = "我的文件"
+        App.selectedItem = "我的文件"
         fileViewModel.getFiles(cid)
     }
     val menuOnClick = { name: String, index: Int ->
@@ -70,7 +71,7 @@ fun OfflineFileScreen(
                 offlineList.forEach { i -> stringJoiner.add(i.url) }
                 copyDownloadUrl(context, stringJoiner.toString())
             }
-            "ModalNavigationDrawerMenu" -> offlineFileViewModel.openDrawerState()
+            "ModalNavigationDrawerMenu" ->  App.instance.openDrawerState()
         }
     }
 

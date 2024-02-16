@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.screenitem.RecycleCellItem
+import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 
 @OptIn(ExperimentalMaterialApi::class, ExperimentalFoundationApi::class)
@@ -41,7 +42,7 @@ fun RecycleScreen(recycleViewModel: RecycleViewModel) {
     val appBarOnClick = { name: String ->
         when (name) {
             "清空所有文件" -> recycleViewModel.deleteAll()
-            "ModalNavigationDrawerMenu" -> recycleViewModel.openDrawerState()
+            "ModalNavigationDrawerMenu" -> App.instance.openDrawerState()
         }
     }
 
@@ -49,7 +50,7 @@ fun RecycleScreen(recycleViewModel: RecycleViewModel) {
         if (it != "") {
             if (deleteIndex == -1) {
                 recycleViewModel.deleteAll()
-            }else{
+            } else {
                 recycleViewModel.delete(deleteIndex, it.subSequence(0, 6).toString(), true)
                 deleteIndex = -1
             }

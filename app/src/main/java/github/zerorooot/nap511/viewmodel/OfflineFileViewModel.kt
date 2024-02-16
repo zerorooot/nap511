@@ -3,10 +3,6 @@ package github.zerorooot.nap511.viewmodel
 
 import android.app.Application
 import android.widget.Toast
-import androidx.compose.material3.DrawerState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import github.zerorooot.nap511.bean.OfflineInfo
@@ -14,9 +10,9 @@ import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.OfflineService
+import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -25,10 +21,6 @@ import java.util.Locale
 
 class OfflineFileViewModel(private val cookie: String, private val application: Application) :
     ViewModel() {
-    val myCookie = cookie
-    lateinit var drawerState: DrawerState
-    lateinit var scope: CoroutineScope
-
     private val _isRefreshing = MutableStateFlow(false)
     var isRefreshing = _isRefreshing.asStateFlow()
 
@@ -53,13 +45,6 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
     private val fileService: FileService by lazy {
         FileService.getInstance(cookie)
     }
-
-    //是否打开网页浏览器
-    private val _isOpenWebView = MutableStateFlow(false)
-    var isOpenWebView = _isOpenWebView.asStateFlow()
-    //网页网址
-    var url by mutableStateOf("")
-
 
     fun getOfflineFileList() {
         if (_offlineFile.value.isNotEmpty()) {
@@ -126,11 +111,6 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
         }
     }
 
-    fun openDrawerState() {
-        scope.launch {
-            drawerState.open()
-        }
-    }
 
     /**
      * savepath:
@@ -163,9 +143,10 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
                 "任务添加成功"
             } else {
                 if (addTask.errorMsg.contains("请验证账号")) {
-                    _isOpenWebView.value = true
-                    url =
+                    App.captchaUrl =
                         "https://captchaapi.115.com/?ac=security_code&type=web&cb=Close911_" + System.currentTimeMillis()
+                    //打开验证页面
+                    App.selectedItem = "captchaWebView"
                 }
                 "任务添加失败，${addTask.errorMsg}"
             }
@@ -180,9 +161,6 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
 
     fun closeOfflineDialog() {
         _isOpenOfflineDialog.value = false
-    }
-    fun closeWebView() {
-        _isOpenWebView.value = false
     }
 
     fun delete(offlineTask: OfflineTask) {

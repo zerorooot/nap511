@@ -51,6 +51,7 @@ import github.zerorooot.nap511.activity.VideoActivity
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.screenitem.FileCellItem
+import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
@@ -82,7 +83,6 @@ fun FileScreen(
     if (!fileViewModel.isFileScreenListState()) {
         fileViewModel.fileScreenListState = rememberLazyListState()
     }
-    fileViewModel.rememberCoroutineScope = rememberCoroutineScope()
 
     val listState = fileViewModel.fileScreenListState
     val refreshing by fileViewModel.isRefreshing.collectAsState()
@@ -90,7 +90,6 @@ fun FileScreen(
     val activity = LocalContext.current as Activity
 
     CreateDialogs(fileViewModel)
-
 
 
     val itemOnLongClick = { i: Int ->
@@ -133,9 +132,6 @@ fun FileScreen(
                     fileViewModel.startSendAria2Service(index)
                 }
             }
-//            "获取SHA1链接" -> {
-//                fileViewModel.get115Sha1(index)
-//            }
         }
     }
 
@@ -157,7 +153,7 @@ fun FileScreen(
             //todo click to remember
             if (fileBean.isVideo == 1) {
                 val intent = Intent(activity, VideoActivity::class.java)
-                intent.putExtra("cookie", fileViewModel.myCookie)
+                intent.putExtra("cookie", App.cookie)
                 intent.putExtra("title", fileBean.name)
                 intent.putExtra("pick_code", fileBean.pickCode)
                 activity.startActivity(intent)
@@ -169,7 +165,7 @@ fun FileScreen(
                 fileViewModel.photoFileBeanList.clear()
                 fileViewModel.photoFileBeanList.addAll(photoFileBeanList)
                 fileViewModel.photoIndexOf = photoFileBeanList.indexOf(fileBean)
-                fileViewModel.selectedItem = "photo"
+                App.selectedItem = "photo"
             }
 
 
@@ -203,7 +199,12 @@ fun FileScreen(
 
     val myAppBarOnClick = { i: String ->
         if (i == "back") {
-            onBack()
+            if (path == "/根目录") {
+                App.instance.openDrawerState()
+            } else {
+                onBack()
+            }
+
         }
         appBarOnClick.invoke(i)
     }
