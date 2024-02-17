@@ -20,16 +20,19 @@ jobs:
         with:
           gradle-version: current
           arguments: assembleRelease
-      - uses: ilharp/sign-android-release@v1
+          
+      - uses: r0adkll/sign-android-release@v1
         id: sign_app
         with:
-          releaseDir: app/build/outputs/apk/release
-          signingKey: ${{ secrets.SIGNING_KEY }}
-          keyAlias: ${{ secrets.ALIAS }}
+          releaseDirectory: app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
+          alias: ${{ secrets.ALIAS }}
           keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
           keyPassword: ${{ secrets.KEY_PASSWORD }}
-          buildToolsVersion: 33.0.0
-          
+         env:
+          # override default build-tools version (29.0.3) -- optional
+          BUILD_TOOLS_VERSION: "30.0.2"
+
       - run: mv ${{steps.sign_app.outputs.signedReleaseFile}} Nap511_$GITHUB_REF_NAME.apk
       - uses: ncipollo/release-action@v1
         with:
