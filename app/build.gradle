@@ -74,7 +74,10 @@ dependencies {
     implementation 'com.github.SmartToolFactory:Compose-Zoom:0.5.0'
 
     implementation "com.google.accompanist:accompanist-systemuicontroller:0.28.0"
-    implementation 'com.github.CarGuo.GSYVideoPlayer:GSYVideoPlayer:v8.3.4-release-jitpack'
+//    implementation 'com.github.CarGuo.GSYVideoPlayer:GSYVideoPlayer:v8.3.4-release-jitpack'
+    implementation 'com.github.CarGuo.GSYVideoPlayer:gsyVideoPlayer-java:v8.3.4-release-jitpack'
+    implementation 'com.github.CarGuo.GSYVideoPlayer:GSYVideoPlayer-exo2:v8.3.4-release-jitpack'
+    implementation 'com.github.CarGuo.GSYVideoPlayer:gsyVideoPlayer-arm64:v8.3.4-release-jitpack'
 
     implementation "io.coil-kt:coil-compose:2.2.2"
     //network

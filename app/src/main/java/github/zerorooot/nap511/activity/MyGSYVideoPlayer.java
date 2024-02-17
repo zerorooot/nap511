@@ -5,7 +5,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
-import android.graphics.Color;
 import android.media.AudioManager;
 import android.os.BatteryManager;
 import android.os.Handler;
@@ -14,7 +13,6 @@ import android.util.AttributeSet;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.widget.TextView;
-import androidx.constraintlayout.widget.Guideline;
 
 import com.shuyu.gsyvideoplayer.utils.CommonUtil;
 import com.shuyu.gsyvideoplayer.utils.GSYVideoType;
@@ -24,8 +22,7 @@ import com.shuyu.gsyvideoplayer.video.StandardGSYVideoPlayer;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.Objects;
 
 import github.zerorooot.nap511.R;
 
@@ -302,10 +299,10 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer{
         getGSYVideoManager().seekTo(mSeekTimePosition);
 
 
-        new Handler(Looper.myLooper()).postDelayed(() -> {
+        new Handler(Objects.requireNonNull(Looper.myLooper())).postDelayed(() -> {
             showProgressDialog(time, seekTime, mSeekTimePosition, totalTime, totalTimeDuration);
         }, 100);
-        new Handler(Looper.myLooper()).postDelayed(this::dismissProgressDialog, 600);
+        new Handler(Objects.requireNonNull(Looper.myLooper())).postDelayed(this::dismissProgressDialog, 600);
     }
 
 
