@@ -16,3 +16,9 @@
 
 不支持**文件的上传与下载**、**两步验证**、**安全密钥**
 
+# 下载
+尝鲜版
+https://github.com/zerorooot/nap511/actions/workflows/generate-apk-release.yml
+
+稳定版
+https://github.com/zerorooot/nap511/releases
