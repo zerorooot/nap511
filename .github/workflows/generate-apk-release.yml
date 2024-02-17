@@ -1,4 +1,4 @@
-name: Android Build
+name: automated build 
 
 env:
   # The name of the main module repository
