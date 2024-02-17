@@ -29,8 +29,7 @@ jobs:
           alias: ${{ secrets.ALIAS }}
           keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
           keyPassword: ${{ secrets.KEY_PASSWORD }}
-         env:
-          # override default build-tools version (29.0.3) -- optional
+        env:
           BUILD_TOOLS_VERSION: "30.0.2"
 
       - run: mv ${{steps.sign_app.outputs.signedReleaseFile}} Nap511_$GITHUB_REF_NAME.apk
