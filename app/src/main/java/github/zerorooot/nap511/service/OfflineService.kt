@@ -3,7 +3,6 @@ package github.zerorooot.nap511.service
 import github.zerorooot.nap511.bean.*
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
-import okhttp3.RequestBody
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*

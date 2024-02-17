@@ -147,7 +147,7 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
             val message = if (addTask.state) {
                 "任务添加成功"
             } else {
-                if (addTask.errorMsg.contains("请验证账号")) {
+                if (addTask.errorMsg.contains("请验证账号") && !close) {
                     App.captchaUrl =
                         "https://captchaapi.115.com/?ac=security_code&type=web&cb=Close911_" + System.currentTimeMillis()
                     //打开验证页面
