@@ -1,6 +1,9 @@
 package github.zerorooot.nap511
 
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.app.AppOpsManager
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -11,11 +14,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.google.gson.Gson
-import com.google.gson.JsonElement
 import github.zerorooot.nap511.bean.LoginBean
 import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.screen.*
@@ -29,6 +32,9 @@ import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.lang.reflect.Field
+import java.lang.reflect.InvocationTargetException
+import java.lang.reflect.Method
 import kotlin.concurrent.thread
 
 
@@ -48,10 +54,68 @@ class MainActivity : ComponentActivity() {
                         return@Surface
                     }
                     Init(cookie)
-
+                    //允许通知， 方便离线下载交互 OfflineTaskActivity
+                    if (!isNotificationEnabled(this)) {
+                        App.instance.toast("检测到未开启通知权限，为保证交互效果，建议开启")
+                        goToNotificationSetting(this)
+                    }
                 }
             }
         }
+    }
+
+    /**
+     * 判断允许通知，是否已经授权
+     * 返回值为true时，通知栏打开，false未打开。
+     * @param context 上下文
+     */
+    private fun isNotificationEnabled(context: Context): Boolean {
+        val CHECK_OP_NO_THROW = "checkOpNoThrow"
+        val OP_POST_NOTIFICATION = "OP_POST_NOTIFICATION"
+        val mAppOps = context.getSystemService(APP_OPS_SERVICE) as AppOpsManager
+        val appInfo = context.applicationInfo
+        val pkg = context.applicationContext.packageName
+        val uid = appInfo.uid
+        var appOpsClass: Class<*>? = null
+        /* Context.APP_OPS_MANAGER */try {
+            appOpsClass = Class.forName(AppOpsManager::class.java.name)
+            val checkOpNoThrowMethod: Method = appOpsClass.getMethod(
+                CHECK_OP_NO_THROW, Integer.TYPE, Integer.TYPE,
+                String::class.java
+            )
+            val opPostNotificationValue: Field = appOpsClass.getDeclaredField(OP_POST_NOTIFICATION)
+            val value = opPostNotificationValue.get(Int::class.java) as Int
+            return checkOpNoThrowMethod.invoke(
+                mAppOps,
+                value,
+                uid,
+                pkg
+            ) as Int == AppOpsManager.MODE_ALLOWED
+        } catch (e: ClassNotFoundException) {
+            e.printStackTrace()
+        } catch (e: NoSuchMethodException) {
+            e.printStackTrace()
+        } catch (e: NoSuchFieldException) {
+            e.printStackTrace()
+        } catch (e: InvocationTargetException) {
+            e.printStackTrace()
+        } catch (e: IllegalAccessException) {
+            e.printStackTrace()
+        }
+        return false
+    }
+
+    /**
+     * 跳转到app的设置界面--开启通知
+     * @param context
+     */
+    private fun goToNotificationSetting(context: Context) {
+        val intent = Intent()
+        // android 8.0引导
+        intent.setAction("android.settings.APP_NOTIFICATION_SETTINGS")
+        intent.putExtra("android.provider.extra.APP_PACKAGE", context.packageName)
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
     }
 
     @Composable
@@ -70,31 +134,6 @@ class MainActivity : ComponentActivity() {
             CookieViewModelFactory(
                 cookie, this.application
             )
-        }
-
-
-        //处理输入链接
-        if (intent.action == Intent.ACTION_VIEW || intent.action == Intent.ACTION_PROCESS_TEXT) {
-            val urlList = (intent.dataString ?: run {
-                intent.getStringExtra(Intent.EXTRA_PROCESS_TEXT)
-            } ?: run { "" }).split("\n").filter { i ->
-                i.startsWith("http", true) || i.startsWith(
-                    "ftp",
-                    true
-                ) || i.startsWith("magnet", true) || i.startsWith("ed2k", true)
-            }.toList()
-            if (urlList.isNotEmpty()) {
-                offlineFileViewModel.addTask(
-                    urlList,
-                    DataStoreUtil.getData(ConfigUtil.defaultOfflineCid, ""),
-                    true
-                )
-            } else {
-                App.instance.toast("仅支持以http、ftp、magnet、ed2k开头的链接")
-                finishAndRemoveTask()
-            }
-            intent.action = ""
-            return
         }
         //恢复因MyPhotoScreen而造成的isSystemBarsVisible为false的情况
         var visible by remember {
@@ -127,9 +166,11 @@ class MainActivity : ComponentActivity() {
             R.drawable.baseline_cloud_24 to "我的文件",
             R.drawable.baseline_cloud_download_24 to "离线下载",
             R.drawable.baseline_cloud_done_24 to "离线列表",
+            R.drawable.baseline_add_moderator_24 to "验证账号",
             R.drawable.baseline_web_24 to "网页版",
             R.drawable.ic_baseline_delete_24 to "回收站",
             R.drawable.baseline_settings_24 to "高级设置",
+            R.drawable.android_exit to "退出应用"
         )
 
         ModalNavigationDrawer(gesturesEnabled = App.gesturesEnabled,
@@ -160,6 +201,13 @@ class MainActivity : ComponentActivity() {
                     "网页版" -> WebViewScreen()
                     "回收站" -> RecycleScreen(recycleViewModel)
                     "高级设置" -> SettingScreen()
+                    "验证账号" -> {
+                        App.captchaUrl =
+                            "https://captchaapi.115.com/?ac=security_code&type=web&cb=Close911_" + System.currentTimeMillis()
+                        CaptchaWebViewScreen()
+                    }
+
+                    "退出应用" -> ExitApp()
                     "captchaWebView" -> CaptchaWebViewScreen()
                     "loginWebView" -> LoginWebViewScreen()
                     "photo" -> {
@@ -168,6 +216,7 @@ class MainActivity : ComponentActivity() {
                 }
             })
     }
+
 
     @SuppressLint("UnrememberedMutableState")
     @Composable

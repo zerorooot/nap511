@@ -1,7 +1,6 @@
 package github.zerorooot.nap511.service
 
 
-
 import android.app.Service
 import android.content.Intent
 import android.os.Build
@@ -39,13 +38,17 @@ class Sha1Service : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val command = intent!!.getStringExtra(ConfigUtil.command)
         val cookie = intent.getStringExtra("cookie")!!
-        val fileBeanList =
-            arrayListOf(Gson().fromJson(intent.getStringExtra("list"), FileBean::class.java))
-
         thread {
-            val downloadUrl = getDownloadUrl(fileBeanList, cookie)
             when (command) {
                 ConfigUtil.sentToAria2 -> {
+                    val fileBeanList =
+                        arrayListOf(
+                            Gson().fromJson(
+                                intent.getStringExtra("list"),
+                                FileBean::class.java
+                            )
+                        )
+                    val downloadUrl = getDownloadUrl(fileBeanList, cookie)
                     sendToAria2(downloadUrl)
                 }
             }

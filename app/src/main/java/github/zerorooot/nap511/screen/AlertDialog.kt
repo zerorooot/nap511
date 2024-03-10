@@ -1,5 +1,7 @@
 package github.zerorooot.nap511.screen
 
+import android.app.Activity
+import android.app.Application
 import androidx.compose.animation.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextRange
@@ -28,11 +31,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.google.gson.JsonObject
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import kotlinx.coroutines.delay
+import kotlin.system.exitProcess
 
 @Composable
 fun CreateFolderDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
@@ -108,13 +113,43 @@ fun RecyclePasswordDialog(
 }
 
 @Composable
+fun ExitApp() {
+    var isOpen by remember {
+        mutableStateOf(true)
+    }
+
+    val activity = LocalContext.current as Activity
+    if (isOpen) {
+        InfoDialog(
+            onDismissRequest = {
+                isOpen = false
+                App.selectedItem = "我的文件"
+            },
+            onConfirmation = {
+                activity.finish()
+            },
+            dialogTitle = "是否离开Nap511?",
+        )
+    }
+
+
+
+
+
+}
+
+@Composable
 fun CookieDialog(enter: (String) -> Unit) {
     var isOpen by remember {
         mutableStateOf(true)
     }
 
     if (isOpen) {
-        BaseDialog(title = "设置Cookie", label = "请输入Cookie", dismissButtonText = "通过网页登陆") {
+        BaseDialog(
+            title = "设置Cookie",
+            label = "请输入Cookie",
+            dismissButtonText = "通过网页登陆"
+        ) {
             enter.invoke(it)
             isOpen = false
         }
@@ -283,6 +318,39 @@ private fun RadioButtonDialog(
 
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun InfoDialog(
+    onDismissRequest: () -> Unit,
+    onConfirmation: () -> Unit,
+    dialogTitle: String,
+) {
+    AlertDialog(
+        title = {
+            Text(text = dialogTitle)
+        },
+        onDismissRequest = {
+            onDismissRequest()
+        },
+        confirmButton = {
+            Button(onClick = {
+                onConfirmation()
+            }) {
+                Text("确定")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = {
+                    onDismissRequest()
+                }
+            ) {
+                Text("取消")
+            }
+        }
+    )
+}
+
 @Composable
 private fun BaseDialog(
     title: String,
@@ -370,10 +438,25 @@ private fun BaseDialog(
 @Preview
 fun aa() {
 //    Aria2Dialog()
-    BaseDialog("title", "lable", "context") {
+    BaseDialog("title", "", "context") {
 
     }
 }
+
+@Composable
+@Preview
+fun ab() {
+//    Aria2Dialog()
+    InfoDialog(
+        onDismissRequest = { },
+        onConfirmation = {
+            println("Confirmation registered") // Add logic here to handle confirmation.
+        },
+        dialogTitle = "Alert dialog example"
+    )
+
+}
+
 
 @ExperimentalMaterial3Api
 @Composable
