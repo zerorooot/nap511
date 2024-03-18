@@ -59,6 +59,10 @@ class MainActivity : ComponentActivity() {
                         App.instance.toast("检测到未开启通知权限，为保证交互效果，建议开启")
                         goToNotificationSetting(this)
                     }
+                    //直接添加磁力，但提示请验证账号;跳转到验证账号界面
+                    if (intent.action == "jump") {
+                        App.selectedItem = "验证账号"
+                    }
                 }
             }
         }
@@ -166,7 +170,7 @@ class MainActivity : ComponentActivity() {
             R.drawable.baseline_cloud_24 to "我的文件",
             R.drawable.baseline_cloud_download_24 to "离线下载",
             R.drawable.baseline_cloud_done_24 to "离线列表",
-            R.drawable.baseline_add_moderator_24 to "验证账号",
+//            R.drawable.baseline_add_moderator_24 to "验证账号",
             R.drawable.baseline_web_24 to "网页版",
             R.drawable.ic_baseline_delete_24 to "回收站",
             R.drawable.baseline_settings_24 to "高级设置",
@@ -206,7 +210,6 @@ class MainActivity : ComponentActivity() {
                             "https://captchaapi.115.com/?ac=security_code&type=web&cb=Close911_" + System.currentTimeMillis()
                         CaptchaWebViewScreen()
                     }
-
                     "退出应用" -> ExitApp()
                     "captchaWebView" -> CaptchaWebViewScreen()
                     "loginWebView" -> LoginWebViewScreen()

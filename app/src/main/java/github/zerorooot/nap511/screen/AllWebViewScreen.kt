@@ -232,7 +232,7 @@ fun captchaWebViewClient(webView: WebView): WebViewClient {
 
                 if (string.contains("{\"state\":true}")) {
                     App.selectedItem = "我的文件"
-                    App.instance.toast("验证账号成功~")
+                    App.instance.toast("验证账号成功~，请重新添加链接")
                 }
             }
             return null

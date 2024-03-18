@@ -5,6 +5,8 @@ import android.app.Activity
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -18,6 +20,7 @@ import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import github.zerorooot.nap511.MainActivity
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.SignBean
@@ -46,6 +49,7 @@ class OfflineTaskActivity : Activity() {
             val list = Gson().toJson(urlList, listType)
             println(list)
             if (urlList.isNotEmpty()) {
+                App.instance.toast("${urlList.size} 个链接添加中......")
                 val data: Data =
                     Data.Builder().putString("cookie", App.cookie).putString("list", list).build()
                 val request: OneTimeWorkRequest =
@@ -93,20 +97,30 @@ class OfflineTaskWorker(
         //创建通知渠道
         notificationManager.createNotificationChannel(
             NotificationChannel(
-                channelId,
-                channelName,
-                importance
+                channelId, channelName, importance
             )
         )
-        val notification = NotificationCompat.Builder(applicationContext, channelId)
-            .apply {
+        val notification = NotificationCompat.Builder(applicationContext, channelId).apply {
                 setSmallIcon(R.mipmap.ic_launcher)
                 setContentTitle("离线下载结果")//标题
                 setAutoCancel(true)
-                setContentText(message)
+//                setContentText(message)
+                setDefaults(Notification.DEFAULT_VIBRATE);
                 setStyle(NotificationCompat.BigTextStyle().bigText(message))
-            }.build()
-        notificationManager.notify(notificationId, notification)
+            }
+        if (message.contains("请验证账号")) {
+            val intent = Intent(this.applicationContext, MainActivity::class.java)
+            intent.action = "jump"
+            val pendingIntent = PendingIntent.getActivity(
+                this.applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE
+            )
+            notification.setContentText("$message。点我跳转验证账号页面")
+            notification.setContentIntent(pendingIntent)
+        }else{
+            notification.setContentText(message)
+        }
+
+        notificationManager.notify(notificationId, notification.build())
     }
 
     private fun addTask(urlList: List<String>, cookie: String): Data {
