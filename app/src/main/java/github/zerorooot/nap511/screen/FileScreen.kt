@@ -97,8 +97,8 @@ fun FileScreen(
 
 
     val itemOnLongClick = { i: Int ->
-        fileViewModel.isLongClick = !fileViewModel.isLongClick
-        if (fileViewModel.isLongClick) {
+        fileViewModel.isLongClickState = !fileViewModel.isLongClickState
+        if (fileViewModel.isLongClickState) {
             fileViewModel.select(i)
         } else {
             fileViewModel.appBarTitle = "nap511"
@@ -140,7 +140,7 @@ fun FileScreen(
     }
 
     val myItemOnClick = { i: Int ->
-        if (fileViewModel.isLongClick) {
+        if (fileViewModel.isLongClickState) {
             fileViewModel.select(i)
         } else {
 //            //记录上级目录当前的位置
@@ -191,24 +191,25 @@ fun FileScreen(
             }
         ).toString()
         //appBar 也调用了这个，所以再判断一次
-        if (path != "/根目录" && !fileViewModel.isLongClick) {
+        if (path != "/根目录" && !fileViewModel.isLongClickState) {
             //当前目录的位置
             fileViewModel.setListLocation(path)
             fileViewModel.getListLocation(parentDirectory)
         }
         fileViewModel.back()
     }
-    BackHandler(path != "/根目录" || fileViewModel.isLongClick, onBack)
-
+    BackHandler(
+        path != "/根目录" || fileViewModel.isLongClickState || fileViewModel.isSearchState,
+        onBack
+    )
 
     val myAppBarOnClick = { i: String ->
         if (i == "back") {
-            if (path == "/根目录") {
+            if (path == "/根目录" && !fileViewModel.isSearchState) {
                 App.instance.openDrawerState()
             } else {
                 onBack()
             }
-
         }
         appBarOnClick.invoke(i)
     }
@@ -217,7 +218,7 @@ fun FileScreen(
 
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
     Column {
-        AnimatedContent(targetState = fileViewModel.isLongClick, transitionSpec = {
+        AnimatedContent(targetState = fileViewModel.isLongClickState, transitionSpec = {
             fadeIn() with fadeOut()
         }, label = "") {
             if (it) {
@@ -251,7 +252,7 @@ fun FileScreen(
         }
 
         Scaffold(floatingActionButton = {
-            AnimatedContent(targetState = fileViewModel.isCut, transitionSpec = {
+            AnimatedContent(targetState = fileViewModel.isCutState, transitionSpec = {
                 fadeIn() with fadeOut()
             }, label = "") {
                 if (it) {
@@ -400,7 +401,7 @@ private fun checkAria2(aria2Url: String, aria2Token: String, context: Context) {
         } else {
             DataStoreUtil.putData(ConfigUtil.aria2Url, aria2Url)
             DataStoreUtil.putData(ConfigUtil.aria2Token, aria2Token)
-            "aria2配置成功"
+            "aria2配置成功，请重新下载文件"
         }
 
     } catch (e: Exception) {

@@ -65,6 +65,7 @@ fun SettingScreen() {
                 key = ConfigUtil.requestLimitCount,
                 title = "每次请求文件数",
                 summary = DataStoreUtil.getData(ConfigUtil.requestLimitCount, "100"),
+                defaultValue = DataStoreUtil.getData(ConfigUtil.requestLimitCount, "100"),
                 dialogTitle = "每次请求文件数",
             )
         }
@@ -80,10 +81,44 @@ fun SettingScreen() {
                 key = ConfigUtil.defaultOfflineCid,
                 title = "默认离线位置",
                 summary = DataStoreUtil.getData(
-                    ConfigUtil.defaultOfflineCid,
-                    "输入文件夹cid,长按目录可复制当前目录cid"
+                    ConfigUtil.defaultOfflineCid, "输入文件夹cid,长按目录可复制当前目录cid"
                 ),
                 dialogTitle = "长按路径可当前目录cid",
+            )
+        }
+        prefsItem {
+            EditTextPref(
+                key = ConfigUtil.defaultOfflineCount,
+                title = "离线任务缓存数",
+                summary = DataStoreUtil.getData(
+                    ConfigUtil.defaultOfflineCount, "5"
+                ),
+                defaultValue = DataStoreUtil.getData(
+                    ConfigUtil.defaultOfflineCount, "5"
+                ),
+                dialogTitle = "集满${
+                    DataStoreUtil.getData(
+                        ConfigUtil.defaultOfflineCount, "5"
+                    )
+                }个链接后统一离线下载",
+            )
+        }
+        prefsItem {
+            EditTextPref(
+                key = ConfigUtil.currentOfflineTask,
+                title = "离线任务缓存",
+                summary = DataStoreUtil.getData(
+                    ConfigUtil.currentOfflineTask, "当前尚未添加离线任务的链接"
+                ),
+                dialogTitle = "尚未离线的任务链接 ${
+                    DataStoreUtil.getData(
+                        ConfigUtil.currentOfflineTask, ""
+                    ).split("\n").filter { i -> i != "" && i != " " }.toSet().size
+                }/${
+                    DataStoreUtil.getData(
+                        ConfigUtil.defaultOfflineCount, "5"
+                    )
+                }",
             )
         }
     }

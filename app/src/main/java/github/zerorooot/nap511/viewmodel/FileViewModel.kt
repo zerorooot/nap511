@@ -5,7 +5,6 @@ import android.app.Application
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.core.text.isDigitsOnly
@@ -18,7 +17,6 @@ import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigUtil
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -57,11 +55,9 @@ class FileViewModel(private val cookie: String, private val application: Applica
     var isOpenFileOrderDialog by mutableStateOf(false)
     var isOpenAria2Dialog by mutableStateOf(false)
     var selectIndex by mutableStateOf(0)
-    var isLongClick: Boolean by mutableStateOf(false)
-    var isCut: Boolean by mutableStateOf(false)
 
-    //搜索
     var isSearch by mutableStateOf(false)
+
 
     //图片浏览相关
     var photoFileBeanList = mutableListOf<FileBean>()
@@ -73,6 +69,11 @@ class FileViewModel(private val cookie: String, private val application: Applica
     val clickMap = mutableStateMapOf<String, Int>()
     private var currentLocation = hashMapOf<String, LocationBean>()
     lateinit var fileScreenListState: LazyListState
+
+    //相关状态
+    var isLongClickState: Boolean by mutableStateOf(false)
+    var isCutState: Boolean by mutableStateOf(false)
+    var isSearchState: Boolean by mutableStateOf(false)
 
     var orderBean = OrderBean(OrderEnum.name, 1)
     private val fileService: FileService by lazy {
@@ -86,15 +87,16 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     fun back() {
-        if ("搜索" == appBarTitle) {
+        if (isSearchState) {
             fileBeanList.clear()
             setFiles(fileListCache[currentCid]!!)
             appBarTitle = application.resources.getString(R.string.app_name)
+            isSearchState = false
             return
         }
 
-        if (isLongClick) {
-            isLongClick = false
+        if (isLongClickState) {
+            isLongClickState = false
             appBarTitle = application.resources.getString(R.string.app_name)
             fileBeanList.map { i -> i.isSelect = false }
             return
@@ -105,8 +107,8 @@ class FileViewModel(private val cookie: String, private val application: Applica
             return
         }
 
-        if (isCut) {
-            isCut = false
+        if (isCutState) {
+            isCutState = false
             return
         }
     }
@@ -328,21 +330,21 @@ class FileViewModel(private val cookie: String, private val application: Applica
             select(index)
             arrayListOf(fileBeanList[index])
         }
-        isCut = true
-        isLongClick = false
+        isCutState = true
+        isLongClickState = false
         appBarTitle = application.resources.getString(R.string.app_name)
         unSelect()
     }
 
     fun cancelCut() {
         unSelect()
-        isCut = false
+        isCutState = false
         cutFileList = emptyList()
     }
 
     fun removeFile() {
         if (cutFileList.isEmpty()) {
-            isCut = false
+            isCutState = false
             return
         }
 
@@ -372,7 +374,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             } else {
                 "移动失败~"
             }
-            isCut = false
+            isCutState = false
             Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
         }
     }
@@ -396,7 +398,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
     fun refresh() {
         fileListCache.remove(currentCid)
         getFiles(currentCid)
-        isLongClick = false
+        isLongClickState = false
         appBarTitle = application.resources.getString(R.string.app_name)
         //图片缓存
         imageBeanCache.remove(currentCid)
@@ -464,13 +466,14 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 "删除 ${filter.size} 个文件失败~"
             }
             Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
-            isLongClick = false
+            isLongClickState = false
             appBarTitle = application.resources.getString(R.string.app_name)
         }
     }
 
     fun search(searchKey: String) {
         viewModelScope.launch {
+            isSearchState = true
             val files = fileService.search(currentCid, searchKey)
             setFileBeanProperty(files.fileBeanList)
             fileBeanList.clear()

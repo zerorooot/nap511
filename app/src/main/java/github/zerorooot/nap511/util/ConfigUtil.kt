@@ -13,5 +13,8 @@ class ConfigUtil {
         const val autoRotate = "autoRotate"
         const val defaultOfflineCid = "0"
         const val requestLimitCount = "requestLimitCount"
+        const val defaultOfflineCount = "defaultOfflineCount"
+        const val currentOfflineTask = ""
+
     }
 }

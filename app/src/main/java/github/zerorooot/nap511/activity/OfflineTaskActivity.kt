@@ -6,6 +6,8 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -13,6 +15,7 @@ import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
@@ -43,22 +46,55 @@ class OfflineTaskActivity : Activity() {
                 i.startsWith("http", true) || i.startsWith(
                     "ftp", true
                 ) || i.startsWith("magnet", true) || i.startsWith("ed2k", true)
-            }.toList()
+            }.toSet()
 //            App.instance.toast(urlList.toString())
-            val listType = object : TypeToken<List<String?>?>() {}.type
-            val list = Gson().toJson(urlList, listType)
-            println(list)
+            println(urlList.toString())
+            //非空列表
             if (urlList.isNotEmpty()) {
-                App.instance.toast("${urlList.size} 个链接添加中......")
-                val data: Data =
-                    Data.Builder().putString("cookie", App.cookie).putString("list", list).build()
-                val request: OneTimeWorkRequest =
-                    OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java).setInputData(data)
-                        .build()
-                WorkManager.getInstance(applicationContext).enqueue(request)
+                //检查离线任务缓存数
+                val offlineCount = try {
+                    DataStoreUtil.getData(ConfigUtil.defaultOfflineCount, "5").toInt()
+                } catch (e: Exception) {
+                    5
+                }
+                val currentOfflineTaskList =
+                    DataStoreUtil.getData(ConfigUtil.currentOfflineTask, "")
+                        .split("\n")
+                        .filter { i -> i != "" && i != " " }
+                        .toSet()
+                        .toMutableList()
+                //添加所有
+                currentOfflineTaskList.addAll(urlList)
+                if (currentOfflineTaskList.size >= offlineCount) {
+                    App.instance.toast("${currentOfflineTaskList.size} 个链接添加中......")
+                    val listType = object : TypeToken<List<String?>?>() {}.type
+                    val list = Gson().toJson(currentOfflineTaskList, listType)
+                    val data: Data =
+                        Data.Builder().putString("cookie", App.cookie).putString("list", list)
+                            .build()
+                    val request: OneTimeWorkRequest =
+                        OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java).setInputData(data)
+                            .build()
+                    WorkManager.getInstance(applicationContext).enqueue(request)
+                } else {
+                    val stringJoiner = StringJoiner("\n")
+                    currentOfflineTaskList.forEach { stringJoiner.add(it) }
+                    //写入缓存
+                    DataStoreUtil.putData(
+                        ConfigUtil.currentOfflineTask,
+                        stringJoiner.toString()
+                    )
+                    App.instance.toast("已添加${currentOfflineTaskList.size}个链接到缓存中，剩余${offlineCount - currentOfflineTaskList.size}个")
+                }
+
             } else {
                 App.instance.toast("仅支持以http、ftp、magnet、ed2k开头的链接")
             }
+        }
+        if (intent.action == "copy") {
+            val clipboard = ContextCompat.getSystemService(this, ClipboardManager::class.java)
+            val clip = ClipData.newPlainText("label", intent.getStringExtra("link"))
+            clipboard?.setPrimaryClip(clip)
         }
         finishAndRemoveTask()
     }
@@ -75,14 +111,21 @@ class OfflineTaskWorker(
         val a: List<String> = Gson().fromJson(inputData.getString("list").toString(), listType)
         val addTaskData = addTask(a, cookie)
         val message = addTaskData.getString("return").toString()
+        if (message.contains("任务添加成功")) {
+            //清空缓存
+            DataStoreUtil.putData(
+                ConfigUtil.currentOfflineTask,
+                ""
+            )
+        }
         println(message)
-        toast(message)
+        toast(message, a)
         return Result.success(addTaskData);
     }
 
 
     @SuppressLint("WrongConstant")
-    private fun toast(message: String) {
+    private fun toast(message: String, urlList: List<String>) {
         //渠道Id
         val channelId = "toast"
         //渠道名
@@ -90,7 +133,7 @@ class OfflineTaskWorker(
         //渠道重要级
         val importance = NotificationManagerCompat.IMPORTANCE_MAX
         //通知Id
-        val notificationId = 1
+        val notificationId = System.currentTimeMillis().toInt()
 
         val notificationManager =
             applicationContext.getSystemService(AppCompatActivity.NOTIFICATION_SERVICE) as NotificationManager
@@ -101,22 +144,36 @@ class OfflineTaskWorker(
             )
         )
         val notification = NotificationCompat.Builder(applicationContext, channelId).apply {
-                setSmallIcon(R.mipmap.ic_launcher)
-                setContentTitle("离线下载结果")//标题
-                setAutoCancel(true)
+            setSmallIcon(R.mipmap.ic_launcher)
+            setContentTitle("离线下载结果")//标题
+            setAutoCancel(true)
 //                setContentText(message)
-                setDefaults(Notification.DEFAULT_VIBRATE);
-                setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            setDefaults(Notification.DEFAULT_VIBRATE);
+            setStyle(NotificationCompat.BigTextStyle().bigText(message))
+        }
+
+        if (message.contains("任务添加失败")) {
+            val pendingIntent = if (message.contains("请验证账号")) {
+                val intent = Intent(this.applicationContext, MainActivity::class.java)
+                intent.action = "jump"
+                notification.setContentText("$message。点我跳转验证账号页面")
+                PendingIntent.getActivity(
+                    this.applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE
+                )
+            } else {
+                val intent = Intent(this.applicationContext, OfflineTaskActivity::class.java)
+                intent.action = "copy"
+                val stringJoiner = StringJoiner("\n")
+                urlList.forEach { stringJoiner.add(it) }
+                intent.putExtra("link", stringJoiner.toString())
+                notification.setContentText("$message。点我复制链接")
+                PendingIntent.getActivity(
+                    this.applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE
+                )
             }
-        if (message.contains("请验证账号")) {
-            val intent = Intent(this.applicationContext, MainActivity::class.java)
-            intent.action = "jump"
-            val pendingIntent = PendingIntent.getActivity(
-                this.applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE
-            )
-            notification.setContentText("$message。点我跳转验证账号页面")
+
             notification.setContentIntent(pendingIntent)
-        }else{
+        } else {
             notification.setContentText(message)
         }
 
@@ -128,7 +185,7 @@ class OfflineTaskWorker(
         val cid = DataStoreUtil.getData(ConfigUtil.defaultOfflineCid, "")
         val downloadPath = setDownloadPath(cid, cookie)
         if (!downloadPath.state) {
-            resultMessage.add("设置离线位置失败，默认保存到\"云下载\"目录")
+            resultMessage.add("设置离线位置失败，默认保存到\"云下载\"目录\n")
         }
         val map = HashMap<String, String>()
         map["savepath"] = ""
