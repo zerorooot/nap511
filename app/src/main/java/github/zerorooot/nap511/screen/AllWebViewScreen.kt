@@ -173,7 +173,7 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
                     a.addHeader(t, u)
                 }
                 val response = httpClient.newCall(a.build()).execute()
-                val body = response.body?.string().toString()
+                val body = response.body.string()
                 val loginBean = Gson().fromJson(body, LoginBean::class.java)
                 val text = if (loginBean.state == 0) {
                     //error
@@ -228,7 +228,7 @@ fun captchaWebViewClient(webView: WebView): WebViewClient {
                     .method("POST", webViewRequest.body.toRequestBody())
                 webViewRequest.headers.forEach { (t, u) -> a.addHeader(t, u) }
                 val response = httpClient.newCall(a.build()).execute()
-                val string = response.body?.string().toString()
+                val string = response.body.string()
 
                 if (string.contains("{\"state\":true}")) {
                     App.selectedItem = "我的文件"

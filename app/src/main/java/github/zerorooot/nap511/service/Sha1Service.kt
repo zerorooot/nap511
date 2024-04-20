@@ -94,7 +94,7 @@ class Sha1Service : Service() {
 
         val response = okHttpClient.newCall(request).execute()
 
-        val returnJson = JsonParser().parse(response.body?.string()).asJsonObject
+        val returnJson = JsonParser().parse(response.body.string()).asJsonObject
         val data = returnJson.get("data").asString
         val m115Decode = sha1Util.m115_decode(data, m115Encode.key)
 
@@ -170,7 +170,7 @@ class Sha1Service : Service() {
             .build()
         val response = okHttpClient.newCall(request).execute()
 
-        val bodyJson = JsonParser().parse(response.body!!.string()).asJsonObject
+        val bodyJson = JsonParser().parse(response.body.string()).asJsonObject
 
         Handler(Looper.getMainLooper()).post {
             if (bodyJson.has("error")) {

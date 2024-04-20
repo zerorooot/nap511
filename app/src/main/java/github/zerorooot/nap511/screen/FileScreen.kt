@@ -12,6 +12,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.with
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -219,7 +220,7 @@ fun FileScreen(
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
     Column {
         AnimatedContent(targetState = fileViewModel.isLongClickState, transitionSpec = {
-            fadeIn() with fadeOut()
+            fadeIn() togetherWith fadeOut()
         }, label = "") {
             if (it) {
                 AppTopBarMultiple(fileViewModel.appBarTitle, myAppBarOnClick)
@@ -253,7 +254,7 @@ fun FileScreen(
 
         Scaffold(floatingActionButton = {
             AnimatedContent(targetState = fileViewModel.isCutState, transitionSpec = {
-                fadeIn() with fadeOut()
+                fadeIn() togetherWith fadeOut()
             }, label = "") {
                 if (it) {
                     Column() {
@@ -393,7 +394,7 @@ private fun checkAria2(aria2Url: String, aria2Token: String, context: Context) {
     ).build()
 
     val message: String = try {
-        val body = okHttpClient.newCall(request).execute().body!!.string()
+        val body = okHttpClient.newCall(request).execute().body.string()
         val bodyJson = JsonParser().parse(body).asJsonObject
 
         if (bodyJson.has("error")) {

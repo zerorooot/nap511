@@ -80,7 +80,7 @@ class MainActivity : ComponentActivity() {
         val appInfo = context.applicationInfo
         val pkg = context.applicationContext.packageName
         val uid = appInfo.uid
-        var appOpsClass: Class<*>? = null
+        val appOpsClass: Class<*>?
         /* Context.APP_OPS_MANAGER */try {
             appOpsClass = Class.forName(AppOpsManager::class.java.name)
             val checkOpNoThrowMethod: Method = appOpsClass.getMethod(
@@ -293,7 +293,7 @@ class MainActivity : ComponentActivity() {
                 "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
             ).get().build()
         val body = okHttpClient.newCall(request).execute().body
-        val uid = if (body != null) {
+        val uid = run {
             val string = body.string()
             try {
                 Gson().fromJson(
@@ -302,8 +302,6 @@ class MainActivity : ComponentActivity() {
             } catch (e: Exception) {
                 ""
             }
-        } else {
-            ""
         }
         return uid
     }

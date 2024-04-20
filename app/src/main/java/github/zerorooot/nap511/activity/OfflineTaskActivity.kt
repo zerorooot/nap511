@@ -220,7 +220,7 @@ class OfflineTaskWorker(
                 ).post(formBody).build()
         val response = okHttpClient.newCall(request).execute()
         return Gson().fromJson(
-            response.body?.string(), BaseReturnMessage::class.java
+            response.body.string(), BaseReturnMessage::class.java
         )
     }
 
@@ -235,7 +235,7 @@ class OfflineTaskWorker(
             ).get().build()
         val response = okHttpClient.newCall(request).execute()
         return Gson().fromJson(
-            response.body?.string(), SignBean::class.java
+            response.body.string(), SignBean::class.java
         )
     }
 
@@ -249,7 +249,7 @@ class OfflineTaskWorker(
             ).post(formBody).build()
         val response = okHttpClient.newCall(request).execute()
         return Gson().fromJson(
-            response.body?.string(), BaseReturnMessage::class.java
+            response.body.string(), BaseReturnMessage::class.java
         )
     }
 }
