@@ -37,7 +37,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
     var currentPath = _currentPath.asStateFlow()
 
     var currentCid: String by mutableStateOf("0")
-    private var count: Int by mutableStateOf(0)
+    private var count: Int by mutableIntStateOf(0)
 
     private var fileListCache = hashMapOf<String, FilesBean>()
     private var pathList = emptyList<PathBean>()
@@ -54,14 +54,14 @@ class FileViewModel(private val cookie: String, private val application: Applica
     var isOpenFileInfoDialog by mutableStateOf(false)
     var isOpenFileOrderDialog by mutableStateOf(false)
     var isOpenAria2Dialog by mutableStateOf(false)
-    var selectIndex by mutableStateOf(0)
+    var selectIndex by mutableIntStateOf(0)
 
     var isSearch by mutableStateOf(false)
 
 
     //图片浏览相关
     var photoFileBeanList = mutableListOf<FileBean>()
-    var photoIndexOf by mutableStateOf(-1)
+    var photoIndexOf by mutableIntStateOf(-1)
     var imageBeanList = mutableStateListOf<ImageBean>()
     private val imageBeanCache = hashMapOf<String, SnapshotStateList<ImageBean>>()
 
@@ -405,23 +405,33 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     fun delete(index: Int) {
-        val fileBean = fileBeanList[index]
         viewModelScope.launch {
+            val fileBean = fileBeanList[index]
+
+            val beforeList = fileBeanList
+            val beforeFileListCache = fileListCache[currentCid]
+            val beforeClickMap = clickMap.getOrDefault(currentCid, 0)
+            val beforeImageBeanCache = imageBeanCache[currentCid]
+
+            //提前删除，优化速度
+            fileBeanList.remove(fileBean)
+            fileListCache[currentCid]!!.fileBeanList.remove(fileBean)
+            clickMap[currentCid] = clickMap.getOrDefault(currentCid, 0) - 1
+            //delete image bean
+            imageBeanCache[currentCid]?.removeIf { i -> i.fileName == fileBean.name }
+
             val fid = fileBean.fileId
             val pid = currentCid
 
             val delete = fileService.delete(pid, fid)
 
             val message = if (delete.state) {
-                fileBeanList.remove(fileBean)
-
-                fileListCache[currentCid]!!.fileBeanList.remove(fileBean)
-                clickMap[currentCid] = clickMap.getOrDefault(currentCid, 0) - 1
-                //delete image bean
-                imageBeanCache[currentCid]?.removeIf { i -> i.fileName == fileBean.name }
-
                 "删除 ${fileBean.name} 成功"
             } else {
+                fileBeanList = beforeList
+                fileListCache[currentCid] = beforeFileListCache!!
+                clickMap[currentCid] = beforeClickMap
+                imageBeanCache[currentCid] = beforeImageBeanCache!!
                 "删除 ${fileBean.name} 失败~"
             }
             Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
@@ -447,6 +457,10 @@ class FileViewModel(private val cookie: String, private val application: Applica
 
     fun deleteMultiple() {
         viewModelScope.launch {
+            val beforeList = fileBeanList
+            val beforeFileListCache = fileListCache[currentCid]
+            val beforeClickMap = clickMap.getOrDefault(currentCid, 0)
+
             val mapOf = hashMapOf<String, String>()
             mapOf["ignore_warn"] = "1"
             mapOf["pid"] = currentCid
@@ -456,18 +470,25 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 //update image cache
                 imageBeanCache[currentCid]?.removeIf { i -> i.fileName == fileBean.name }
             }
+            //提前删除，优化速度
+            fileBeanList.removeAll(filter)
+            fileListCache[currentCid]!!.fileBeanList = ArrayList(fileBeanList)
+            clickMap[currentCid] = clickMap.getOrDefault(currentCid, 0) - filter.size
+
+            isLongClickState = false
+            appBarTitle = application.resources.getString(R.string.app_name)
+
             val deleteMultiple = fileService.deleteMultiple(mapOf)
             val message = if (deleteMultiple.state) {
-                fileBeanList.removeAll(filter)
-                fileListCache[currentCid]!!.fileBeanList = ArrayList(fileBeanList)
-                clickMap[currentCid] = clickMap.getOrDefault(currentCid, 0) - filter.size
                 "成功删除 ${filter.size} 个文件"
             } else {
+                fileBeanList = beforeList
+                fileListCache[currentCid] = beforeFileListCache!!
+                clickMap[currentCid] = beforeClickMap
                 "删除 ${filter.size} 个文件失败~"
             }
             Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
-            isLongClickState = false
-            appBarTitle = application.resources.getString(R.string.app_name)
+
         }
     }
 
