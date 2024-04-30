@@ -361,7 +361,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 val fileBean = cutFileList[0]
                 val cid = if (fileBean.isFolder) fileBean.parentId else fileBean.categoryId
                 //移除之前目录下剪切的文件
-                fileListCache[cid]!!.fileBeanList.removeAll(cutFileList)
+                fileListCache[cid]?.fileBeanList?.removeAll(cutFileList.toSet())
                 //移除被剪切文件夹的缓存，防止路径未更改
                 cutFileList.forEach { i ->
                     if (i.isFolder) {

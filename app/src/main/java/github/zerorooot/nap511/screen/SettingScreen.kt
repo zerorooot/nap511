@@ -1,8 +1,11 @@
 package github.zerorooot.nap511.screen
 
+import androidx.compose.foundation.background
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import com.jamal.composeprefs.ui.PrefsScreen
 import com.jamal.composeprefs.ui.prefs.EditTextPref
@@ -87,6 +90,40 @@ fun SettingScreen() {
             )
         }
         prefsItem {
+            SwitchPref(
+                key = ConfigUtil.offlineMethod,
+                title = "离线任务缓存方式",
+                summary = "true为x分钟后统一下载，false为集满x个后统一下载。更改后需重启",
+                defaultChecked = true
+            )
+        }
+        prefsItem {
+            EditTextPref(
+                key = ConfigUtil.defaultOfflineTime,
+                title = "离线任务延迟时间",
+                summary = DataStoreUtil.getData(
+                    ConfigUtil.defaultOfflineTime, "5"
+                ),
+                defaultValue = DataStoreUtil.getData(
+                    ConfigUtil.defaultOfflineTime, "5"
+                ),
+                dialogTitle = "延迟${
+                    DataStoreUtil.getData(
+                        ConfigUtil.defaultOfflineTime, "5"
+                    )
+                }分钟后统一离线下载",
+                enabled = DataStoreUtil.getData(ConfigUtil.offlineMethod, false),
+                modifier = Modifier.background(
+                    if (DataStoreUtil.getData(
+                            ConfigUtil.offlineMethod,
+                            false
+                        )
+                    ) Color.Transparent else Color.LightGray
+                )
+            )
+        }
+
+        prefsItem {
             EditTextPref(
                 key = ConfigUtil.defaultOfflineCount,
                 title = "离线任务缓存数",
@@ -101,6 +138,14 @@ fun SettingScreen() {
                         ConfigUtil.defaultOfflineCount, "5"
                     )
                 }个链接后统一离线下载",
+                enabled = !DataStoreUtil.getData(ConfigUtil.offlineMethod, false),
+                modifier = Modifier.background(
+                    if (!DataStoreUtil.getData(
+                            ConfigUtil.offlineMethod,
+                            false
+                        )
+                    ) Color.Transparent else Color.LightGray
+                )
             )
         }
         prefsItem {
@@ -110,15 +155,23 @@ fun SettingScreen() {
                 summary = DataStoreUtil.getData(
                     ConfigUtil.currentOfflineTask, "当前尚未添加离线任务的链接"
                 ),
-                dialogTitle = "尚未离线的任务链接 ${
-                    DataStoreUtil.getData(
-                        ConfigUtil.currentOfflineTask, ""
-                    ).split("\n").filter { i -> i != "" && i != " " }.toSet().size
-                }/${
-                    DataStoreUtil.getData(
-                        ConfigUtil.defaultOfflineCount, "5"
+                dialogTitle = if (DataStoreUtil.getData(
+                        ConfigUtil.offlineMethod,
+                        false
                     )
-                }",
+                ) {
+                    "尚未离线的任务链接"
+                } else {
+                    "尚未离线的任务链接 ${
+                        DataStoreUtil.getData(
+                            ConfigUtil.currentOfflineTask, ""
+                        ).split("\n").filter { i -> i != "" && i != " " }.toSet().size
+                    }/${
+                        DataStoreUtil.getData(
+                            ConfigUtil.defaultOfflineCount, "5"
+                        )
+                    }"
+                },
             )
         }
     }

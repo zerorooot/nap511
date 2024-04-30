@@ -17,6 +17,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
 import androidx.work.Worker
@@ -34,9 +35,11 @@ import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.StringJoiner
+import java.util.concurrent.TimeUnit
 
 
 class OfflineTaskActivity : Activity() {
+    @SuppressLint("EnqueueWork")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (intent.action == Intent.ACTION_VIEW || intent.action == Intent.ACTION_PROCESS_TEXT) {
@@ -51,12 +54,6 @@ class OfflineTaskActivity : Activity() {
             println(urlList.toString())
             //非空列表
             if (urlList.isNotEmpty()) {
-                //检查离线任务缓存数
-                val offlineCount = try {
-                    DataStoreUtil.getData(ConfigUtil.defaultOfflineCount, "5").toInt()
-                } catch (e: Exception) {
-                    5
-                }
                 val currentOfflineTaskList =
                     DataStoreUtil.getData(ConfigUtil.currentOfflineTask, "")
                         .split("\n")
@@ -65,28 +62,12 @@ class OfflineTaskActivity : Activity() {
                         .toMutableList()
                 //添加所有
                 currentOfflineTaskList.addAll(urlList)
-                if (currentOfflineTaskList.size >= offlineCount) {
-                    App.instance.toast("${currentOfflineTaskList.size} 个链接添加中......")
-                    val listType = object : TypeToken<List<String?>?>() {}.type
-                    val list = Gson().toJson(currentOfflineTaskList, listType)
-                    val data: Data =
-                        Data.Builder().putString("cookie", App.cookie).putString("list", list)
-                            .build()
-                    val request: OneTimeWorkRequest =
-                        OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java).setInputData(data)
-                            .build()
-                    WorkManager.getInstance(applicationContext).enqueue(request)
+                //离线任务缓存方式,true为x分钟后统一下载，false为集满后统一下载
+                if (DataStoreUtil.getData(ConfigUtil.offlineMethod, true)) {
+                    addOfflineTaskByTime(currentOfflineTaskList)
                 } else {
-                    val stringJoiner = StringJoiner("\n")
-                    currentOfflineTaskList.forEach { stringJoiner.add(it) }
-                    //写入缓存
-                    DataStoreUtil.putData(
-                        ConfigUtil.currentOfflineTask,
-                        stringJoiner.toString()
-                    )
-                    App.instance.toast("已添加${currentOfflineTaskList.size}个链接到缓存中，剩余${offlineCount - currentOfflineTaskList.size}个")
+                    addOfflineTaskByCount(currentOfflineTaskList)
                 }
-
             } else {
                 App.instance.toast("仅支持以http、ftp、magnet、ed2k开头的链接")
             }
@@ -97,6 +78,69 @@ class OfflineTaskActivity : Activity() {
             clipboard?.setPrimaryClip(clip)
         }
         finishAndRemoveTask()
+    }
+
+    @SuppressLint("EnqueueWork")
+    private fun addOfflineTaskByTime(currentOfflineTaskList: List<String>) {
+        //检查离线任务时间
+        val offlineTime = try {
+            DataStoreUtil.getData(ConfigUtil.defaultOfflineTime, "5").toLong()
+        } catch (e: Exception) {
+            5L
+        }
+        val stringJoiner = StringJoiner("\n")
+        currentOfflineTaskList.toSet().forEach { stringJoiner.add(it) }
+        //写入缓存
+        DataStoreUtil.putData(
+            ConfigUtil.currentOfflineTask,
+            stringJoiner.toString()
+        )
+
+        App.instance.toast("已添加 ${currentOfflineTaskList.size} 个链接，${offlineTime}分钟后开始离线下载")
+        val listType = object : TypeToken<List<String?>?>() {}.type
+        val list = Gson().toJson(currentOfflineTaskList, listType)
+        val data: Data =
+            Data.Builder().putString("cookie", App.cookie).putString("list", list)
+                .build()
+        val request: OneTimeWorkRequest =
+            OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java).setInputData(data)
+                .setInitialDelay(offlineTime, TimeUnit.MINUTES)
+                .build()
+        WorkManager.getInstance(applicationContext)
+            .enqueueUniqueWork(
+                "IMAGE_MANIPULATION_WORK_NAME",
+                ExistingWorkPolicy.REPLACE, request
+            )
+    }
+
+    private fun addOfflineTaskByCount(currentOfflineTaskList: List<String>) {
+        //检查离线任务缓存数
+        val offlineCount = try {
+            DataStoreUtil.getData(ConfigUtil.defaultOfflineCount, "5").toInt()
+        } catch (e: Exception) {
+            5
+        }
+        if (currentOfflineTaskList.size >= offlineCount) {
+            App.instance.toast("${currentOfflineTaskList.size} 个链接添加中......")
+            val listType = object : TypeToken<List<String?>?>() {}.type
+            val list = Gson().toJson(currentOfflineTaskList, listType)
+            val data: Data =
+                Data.Builder().putString("cookie", App.cookie).putString("list", list)
+                    .build()
+            val request: OneTimeWorkRequest =
+                OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java).setInputData(data)
+                    .build()
+            WorkManager.getInstance(applicationContext).enqueue(request)
+        } else {
+            val stringJoiner = StringJoiner("\n")
+            currentOfflineTaskList.forEach { stringJoiner.add(it) }
+            //写入缓存
+            DataStoreUtil.putData(
+                ConfigUtil.currentOfflineTask,
+                stringJoiner.toString()
+            )
+            App.instance.toast("已添加${currentOfflineTaskList.size}个链接到缓存中，剩余${offlineCount - currentOfflineTaskList.size}个")
+        }
     }
 }
 

@@ -15,6 +15,8 @@ class ConfigUtil {
         const val requestLimitCount = "requestLimitCount"
         const val defaultOfflineCount = "defaultOfflineCount"
         const val currentOfflineTask = ""
+        const val offlineMethod = "offlineMethod"
+        const val defaultOfflineTime = "defaultOfflineTime"
 
     }
 }
