@@ -75,6 +75,8 @@ class FileViewModel(private val cookie: String, private val application: Applica
     var isCutState: Boolean by mutableStateOf(false)
     var isSearchState: Boolean by mutableStateOf(false)
 
+    var fileInfo by mutableStateOf(FileInfo())
+
     var orderBean = OrderBean(OrderEnum.name, 1)
     private val fileService: FileService by lazy {
         FileService.getInstance(cookie)
@@ -402,6 +404,18 @@ class FileViewModel(private val cookie: String, private val application: Applica
         appBarTitle = application.resources.getString(R.string.app_name)
         //图片缓存
         imageBeanCache.remove(currentCid)
+    }
+
+    fun getFileInfo(index: Int) {
+        viewModelScope.launch {
+            val fileBean = fileBeanList[index]
+            fileInfo = if (fileBean.isFolder) {
+                fileService.getFileInfo(fileBean.categoryId)
+            } else {
+                fileService.getFileInfo(fileBean.fileId)
+            }
+            isOpenFileInfoDialog = true
+        }
     }
 
     fun delete(index: Int) {

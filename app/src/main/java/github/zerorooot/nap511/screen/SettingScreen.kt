@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.screen
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.runtime.Composable
@@ -97,57 +98,49 @@ fun SettingScreen() {
                 defaultChecked = true
             )
         }
-        prefsItem {
-            EditTextPref(
-                key = ConfigUtil.defaultOfflineTime,
-                title = "离线任务延迟时间",
-                summary = DataStoreUtil.getData(
-                    ConfigUtil.defaultOfflineTime, "5"
-                ),
-                defaultValue = DataStoreUtil.getData(
-                    ConfigUtil.defaultOfflineTime, "5"
-                ),
-                dialogTitle = "延迟${
-                    DataStoreUtil.getData(
-                        ConfigUtil.defaultOfflineTime, "5"
-                    )
-                }分钟后统一离线下载",
-                enabled = DataStoreUtil.getData(ConfigUtil.offlineMethod, false),
-                modifier = Modifier.background(
-                    if (DataStoreUtil.getData(
-                            ConfigUtil.offlineMethod,
-                            false
-                        )
-                    ) Color.Transparent else Color.LightGray
-                )
+
+        if (DataStoreUtil.getData(
+                ConfigUtil.offlineMethod,
+                false
             )
+        ) {
+            prefsItem {
+                EditTextPref(
+                    key = ConfigUtil.defaultOfflineTime,
+                    title = "离线任务延迟时间",
+                    summary = DataStoreUtil.getData(
+                        ConfigUtil.defaultOfflineTime, "5"
+                    ),
+                    defaultValue = DataStoreUtil.getData(
+                        ConfigUtil.defaultOfflineTime, "5"
+                    ),
+                    dialogTitle = "延迟${
+                        DataStoreUtil.getData(
+                            ConfigUtil.defaultOfflineTime, "5"
+                        )
+                    }分钟后统一离线下载",
+                )
+            }
+        }else{
+            prefsItem {
+                EditTextPref(
+                    key = ConfigUtil.defaultOfflineCount,
+                    title = "离线任务缓存数",
+                    summary = DataStoreUtil.getData(
+                        ConfigUtil.defaultOfflineCount, "5"
+                    ),
+                    defaultValue = DataStoreUtil.getData(
+                        ConfigUtil.defaultOfflineCount, "5"
+                    ),
+                    dialogTitle = "集满${
+                        DataStoreUtil.getData(
+                            ConfigUtil.defaultOfflineCount, "5"
+                        )
+                    }个链接后统一离线下载",
+                )
+            }
         }
 
-        prefsItem {
-            EditTextPref(
-                key = ConfigUtil.defaultOfflineCount,
-                title = "离线任务缓存数",
-                summary = DataStoreUtil.getData(
-                    ConfigUtil.defaultOfflineCount, "5"
-                ),
-                defaultValue = DataStoreUtil.getData(
-                    ConfigUtil.defaultOfflineCount, "5"
-                ),
-                dialogTitle = "集满${
-                    DataStoreUtil.getData(
-                        ConfigUtil.defaultOfflineCount, "5"
-                    )
-                }个链接后统一离线下载",
-                enabled = !DataStoreUtil.getData(ConfigUtil.offlineMethod, false),
-                modifier = Modifier.background(
-                    if (!DataStoreUtil.getData(
-                            ConfigUtil.offlineMethod,
-                            false
-                        )
-                    ) Color.Transparent else Color.LightGray
-                )
-            )
-        }
         prefsItem {
             EditTextPref(
                 key = ConfigUtil.currentOfflineTask,

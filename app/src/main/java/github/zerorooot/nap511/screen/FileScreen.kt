@@ -125,7 +125,8 @@ fun FileScreen(
 
             "文件信息" -> {
                 fileViewModel.selectIndex = index
-                fileViewModel.isOpenFileInfoDialog = true
+                fileViewModel.getFileInfo(index)
+//                fileViewModel.isOpenFileInfoDialog = true
             }
 
             "通过aria2下载" -> {

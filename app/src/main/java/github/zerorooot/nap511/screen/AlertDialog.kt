@@ -74,7 +74,7 @@ fun FileInfoDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
             title = fileBean.name,
             label = "文件信息",
             readOnly = true,
-            context = fileBean.toString(),
+            context = fileBean.toString() + "\n" + fileViewModel.fileInfo,
             enter = enter
         )
     }
@@ -131,9 +131,6 @@ fun ExitApp() {
             dialogTitle = "是否离开Nap511?",
         )
     }
-
-
-
 
 
 }
