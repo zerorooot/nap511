@@ -1,8 +1,6 @@
 package github.zerorooot.nap511.screen
 
 import android.app.Activity
-import android.app.Application
-import androidx.compose.animation.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
@@ -37,7 +35,6 @@ import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import kotlinx.coroutines.delay
-import kotlin.system.exitProcess
 
 @Composable
 fun CreateFolderDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
@@ -48,7 +45,7 @@ fun CreateFolderDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
 
 @Composable
 fun SearchDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
-    if (fileViewModel.isSearch) {
+    if (fileViewModel.isOpenSearchDialog) {
         BaseDialog("在当前目录下搜索", "关键字", enter = enter)
     }
 }

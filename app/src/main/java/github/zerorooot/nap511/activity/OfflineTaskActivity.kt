@@ -45,7 +45,15 @@ class OfflineTaskActivity : Activity() {
         if (intent.action == Intent.ACTION_VIEW || intent.action == Intent.ACTION_PROCESS_TEXT) {
             val urlList = (intent.dataString ?: run {
                 intent.getStringExtra(Intent.EXTRA_PROCESS_TEXT)
-            } ?: run { "" }).split("\n").filter { i ->
+            } ?: run { "" }).split("\n").map { i ->
+                //支持复制无头磁力链接
+                val a = i.replace(Regex("&dn=.*"), "")
+                if (a.length == 40 && Regex("^[a-z0-9A-Z]+\$").matches(a)) {
+                    "magnet:?xt=urn:btih:$i"
+                } else {
+                    i
+                }
+            }.filter { i ->
                 i.startsWith("http", true) || i.startsWith(
                     "ftp", true
                 ) || i.startsWith("magnet", true) || i.startsWith("ed2k", true)

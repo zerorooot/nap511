@@ -13,7 +13,6 @@ import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.with
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
@@ -370,7 +369,7 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
         if (it != "") {
             fileViewModel.search(it)
         }
-        fileViewModel.isSearch = false
+        fileViewModel.isOpenSearchDialog = false
     }
 }
 

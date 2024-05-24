@@ -56,7 +56,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
     var isOpenAria2Dialog by mutableStateOf(false)
     var selectIndex by mutableIntStateOf(0)
 
-    var isSearch by mutableStateOf(false)
+    var isOpenSearchDialog by mutableStateOf(false)
 
 
     //图片浏览相关
@@ -349,7 +349,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             isCutState = false
             return
         }
-
+        isCutState = false
         viewModelScope.launch {
             val hashMapOf = hashMapOf<String, String>()
             hashMapOf["pid"] = currentCid
@@ -376,7 +376,6 @@ class FileViewModel(private val cookie: String, private val application: Applica
             } else {
                 "移动失败~"
             }
-            isCutState = false
             Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
         }
     }
@@ -513,7 +512,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             setFileBeanProperty(files.fileBeanList)
             fileBeanList.clear()
             fileBeanList.addAll(files.fileBeanList)
-            appBarTitle = "搜索"
+            appBarTitle = "搜索-$searchKey"
         }
     }
 

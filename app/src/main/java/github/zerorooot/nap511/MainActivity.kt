@@ -1,7 +1,6 @@
 package github.zerorooot.nap511
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.app.AppOpsManager
 import android.content.Context
 import android.content.Intent
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
@@ -273,7 +271,7 @@ class MainActivity : ComponentActivity() {
             "selectToDown" -> fileViewModel.selectToDown()
             "cut" -> fileViewModel.cut()
             //具体实现在FileScreen#CreateDialogs()里
-            "search" -> fileViewModel.isSearch = true
+            "search" -> fileViewModel.isOpenSearchDialog = true
             "delete" -> fileViewModel.deleteMultiple()
             "selectAll" -> fileViewModel.selectAll()
             "selectReverse" -> fileViewModel.selectReverse()
