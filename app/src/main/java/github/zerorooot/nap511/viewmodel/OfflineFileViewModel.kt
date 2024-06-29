@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.util.StringJoiner
 import kotlin.system.exitProcess
 
 class OfflineFileViewModel(private val cookie: String, private val application: Application) :
@@ -153,6 +154,21 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
                     //打开验证页面
                     App.selectedItem = "captchaWebView"
                 }
+                //把失败的离线链接保存起来
+                val currentOfflineTaskList =
+                    DataStoreUtil.getData(ConfigUtil.currentOfflineTask, "")
+                        .split("\n")
+                        .filter { i -> i != "" && i != " " }
+                        .toSet()
+                        .toMutableList()
+                currentOfflineTaskList.addAll(list)
+                val stringJoiner = StringJoiner("\n")
+                currentOfflineTaskList.toSet().forEach { stringJoiner.add(it) }
+                //写入缓存
+                DataStoreUtil.putData(
+                    ConfigUtil.currentOfflineTask,
+                    stringJoiner.toString()
+                )
                 "任务添加失败，${addTask.errorMsg}"
             }
             Toast.makeText(application, message, Toast.LENGTH_SHORT).show()

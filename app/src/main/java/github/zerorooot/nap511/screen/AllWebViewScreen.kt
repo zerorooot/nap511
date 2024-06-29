@@ -2,7 +2,6 @@ package github.zerorooot.nap511.screen
 
 import android.annotation.SuppressLint
 import android.webkit.CookieManager
-import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -21,10 +20,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.work.Data
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkManager
 import com.acsbendi.requestinspectorwebview.RequestInspectorWebViewClient
 import com.acsbendi.requestinspectorwebview.WebViewRequest
 import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.activity.OfflineTaskWorker
 import github.zerorooot.nap511.bean.LoginBean
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
@@ -227,16 +231,37 @@ fun captchaWebViewClient(webView: WebView): WebViewClient {
                     .url("https://webapi.115.com/user/captcha")
                     .method("POST", webViewRequest.body.toRequestBody())
                 webViewRequest.headers.forEach { (t, u) -> a.addHeader(t, u) }
+                //移除web添加的cookie
+                a.removeHeader("cookie")
+                a.addHeader("cookie",App.cookie)
+
                 val response = httpClient.newCall(a.build()).execute()
                 val string = response.body.string()
-
                 if (string.contains("{\"state\":true}")) {
                     App.selectedItem = "我的文件"
-                    App.instance.toast("验证账号成功~，请重新添加链接")
+                    addTask()
+                    App.instance.toast("验证账号成功~，重新添加链接中.......")
                 }
             }
             return null
         }
     }
+}
 
+private fun addTask() {
+    val currentOfflineTaskList =
+        DataStoreUtil.getData(ConfigUtil.currentOfflineTask, "")
+            .split("\n")
+            .filter { i -> i != "" && i != " " }
+            .toSet()
+            .toMutableList()
+    val listType = object : TypeToken<List<String?>?>() {}.type
+    val list = Gson().toJson(currentOfflineTaskList, listType)
+    val data: Data =
+        Data.Builder().putString("cookie", App.cookie).putString("list", list)
+            .build()
+    val request: OneTimeWorkRequest =
+        OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java).setInputData(data)
+            .build()
+    WorkManager.getInstance(App.instance.applicationContext).enqueue(request)
 }
