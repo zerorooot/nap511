@@ -18,7 +18,8 @@
 
 # 下载
 尝鲜版
-https://github.com/zerorooot/nap511/actions/workflows/generate-apk-release.yml
+需登录github账户：https://github.com/zerorooot/nap511/actions/workflows/generate-apk-release.yml
+无需登录：https://nightly.link/zerorooot/nap511/workflows/generate-apk-release/main?preview
 
 稳定版
 https://github.com/zerorooot/nap511/releases

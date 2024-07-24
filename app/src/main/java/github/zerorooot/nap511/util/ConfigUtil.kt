@@ -17,6 +17,7 @@ class ConfigUtil {
         const val currentOfflineTask = ""
         const val offlineMethod = "offlineMethod"
         const val defaultOfflineTime = "defaultOfflineTime"
+        const val errorDownloadCid = "errorDownloadCid"
 
     }
 }

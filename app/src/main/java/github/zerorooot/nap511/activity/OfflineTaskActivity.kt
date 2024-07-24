@@ -234,7 +234,12 @@ class OfflineTaskWorker(
 
     private fun addTask(urlList: List<String>, cookie: String): Data {
         val resultMessage = StringJoiner("\n")
-        val cid = DataStoreUtil.getData(ConfigUtil.defaultOfflineCid, "")
+        val errorDownloadCid = DataStoreUtil.getData(ConfigUtil.errorDownloadCid, "")
+        val cid = if (errorDownloadCid == "") {
+            DataStoreUtil.getData(ConfigUtil.defaultOfflineCid, "")
+        } else {
+            errorDownloadCid
+        }
         val downloadPath = setDownloadPath(cid, cookie)
         if (!downloadPath.state) {
             resultMessage.add("设置离线位置失败，默认保存到\"云下载\"目录\n")
@@ -250,6 +255,8 @@ class OfflineTaskWorker(
         }
         val addTask = addTask(cookie, map)
         val message = if (addTask.state) {
+            //清除下载失败的cid
+            DataStoreUtil.putData(ConfigUtil.errorDownloadCid, "")
             "任务添加成功"
         } else {
             "任务添加失败，${addTask.errorMsg}"

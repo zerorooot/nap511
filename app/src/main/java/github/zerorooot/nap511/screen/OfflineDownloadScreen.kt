@@ -120,6 +120,7 @@ fun OfflineDownloadScreen(
                     Button(onClick = {
                         clickFun.invoke("offline", urlText)
                         urlText = ""
+                        urlCount = "链接"
                     }) {
                         Text(text = "开始离线下载")
                     }

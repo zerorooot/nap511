@@ -169,6 +169,11 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
                     ConfigUtil.currentOfflineTask,
                     stringJoiner.toString()
                 )
+                //记录当前失败的cid
+                DataStoreUtil.putData(
+                    ConfigUtil.errorDownloadCid,
+                    currentCid
+                )
                 "任务添加失败，${addTask.errorMsg}"
             }
             Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
