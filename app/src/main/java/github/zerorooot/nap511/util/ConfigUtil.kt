@@ -18,6 +18,7 @@ class ConfigUtil {
         const val offlineMethod = "offlineMethod"
         const val defaultOfflineTime = "defaultOfflineTime"
         const val errorDownloadCid = "errorDownloadCid"
+        const val earlyLoading="EarlyLoading"
 
     }
 }

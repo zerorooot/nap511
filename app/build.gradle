@@ -12,8 +12,8 @@ android {
         applicationId "github.zerorooot.nap511"
         minSdk 26
         targetSdk 34
-        versionCode 3
-        versionName "1.1.1"
+        versionCode 4
+        versionName "1.1.2"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -56,7 +56,7 @@ dependencies {
     //setting screen
 //    implementation "com.github.JamalMulla:ComposePrefs3:1.0.3"
     implementation "com.github.JamalMulla:ComposePrefs:1.0.6"
-    implementation "androidx.datastore:datastore-preferences:1.1.0"
+    implementation "androidx.datastore:datastore-preferences:1.1.1"
 
 //    implementation 'androidx.browser:browser:1.5.0'
 //    implementation 'com.android.support:customtabs:24.1.1'
@@ -89,15 +89,15 @@ dependencies {
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
 
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation "androidx.compose.material:material-icons-extended:$compose_version"
 //    implementation "com.google.accompanist:accompanist-swiperefresh:0.29.1-alpha"
 //    implementation 'androidx.window:window-core:'
     implementation "androidx.navigation:navigation-compose:2.7.7"
 
-    def lifecycle_version = "2.7.0"
+    def lifecycle_version = "2.8.4"
     // ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version")
     // ViewModel utilities for Compose
@@ -105,11 +105,11 @@ dependencies {
     // LiveData
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:$lifecycle_version")
     
-    implementation 'androidx.work:work-runtime-ktx:2.9.0'
+    implementation 'androidx.work:work-runtime-ktx:2.9.1'
 
-    implementation 'androidx.core:core-ktx:1.13.0'
-    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
-    implementation 'androidx.activity:activity-compose:1.9.0'
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.4'
+    implementation 'androidx.activity:activity-compose:1.9.1'
     implementation "androidx.compose.ui:ui:$compose_version"
     implementation "androidx.compose.ui:ui-util:$compose_version"
     implementation "androidx.compose.ui:ui-tooling-preview:$compose_version"
@@ -120,8 +120,8 @@ dependencies {
     testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3"
     testImplementation "org.mockito:mockito-core:1.9.5"
 
-    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
     androidTestImplementation "androidx.compose.ui:ui-test-junit4:$compose_version"
     debugImplementation "androidx.compose.ui:ui-tooling:$compose_version"
     debugImplementation "androidx.compose.ui:ui-test-manifest:$compose_version"

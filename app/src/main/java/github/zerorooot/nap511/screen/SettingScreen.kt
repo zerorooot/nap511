@@ -81,6 +81,13 @@ fun SettingScreen() {
             )
         }
         prefsItem {
+            SwitchPref(
+                key = ConfigUtil.earlyLoading,
+                title = "提前加载",
+                summary = "进入下级目录时，提前加载当前文件夹上下两个文件夹内的文件",
+            )
+        }
+        prefsItem {
             EditTextPref(
                 key = ConfigUtil.defaultOfflineCid,
                 title = "默认离线位置",

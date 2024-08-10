@@ -180,8 +180,13 @@ class FileViewModel(private val cookie: String, private val application: Applica
         imageBeanCache[currentCid] = imageBeanList
     }
 
-    private fun updateFileCache(cid: String) {
+        fun updateFileCache(cid: String) {
         viewModelScope.launch {
+            _isRefreshing.value = true
+            if (fileListCache.containsKey(cid)) {
+                _isRefreshing.value = false
+                return@launch
+            }
             fileService.order(
                 hashMapOf(
                     "user_order" to orderBean.type,
@@ -195,6 +200,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             setFileBeanProperty(files.fileBeanList)
 //            setFiles(files)
             fileListCache[cid] = files
+            _isRefreshing.value = false
         }
     }
 

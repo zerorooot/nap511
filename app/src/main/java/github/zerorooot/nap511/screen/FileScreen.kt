@@ -65,6 +65,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import kotlin.concurrent.thread
+import kotlin.math.log
 
 @SuppressLint(
     "UnusedMaterial3ScaffoldPaddingParameter",
@@ -146,16 +147,28 @@ fun FileScreen(
         } else {
 //            //记录上级目录当前的位置
             fileViewModel.setListLocationAndClickCache(i)
-
-            val currentFileBean = fileBeanList[i]
-            val currentPath = path
-
             //进入下一级
-            val fileBean = fileViewModel.fileBeanList[i]
+            val fileBean = fileBeanList[i]
             if (fileBean.isFolder) {
+                //提前加载上下两个文件夹
+                if (DataStoreUtil.getData(ConfigUtil.earlyLoading, false)) {
+                    val before = i - 1
+                    val after = i + 1
+                    if (before >= 0 && fileBeanList[before].isFolder) {
+                        fileViewModel.updateFileCache(fileBeanList[before].categoryId)
+                    }
+                    if (after < fileBeanList.size && fileBeanList[after].isFolder) {
+                        fileViewModel.updateFileCache(fileBeanList[after].categoryId)
+                    }
+//                    try {
+//                        println("fileBean ${fileBean.name} before ${fileBeanList[before].name}  after ${fileBeanList[after].name} ")
+//                    } catch (_: Exception) {
+//                    }
+                }
+                //加载文件
                 fileViewModel.getFiles(fileBean.categoryId)
             }
-            //todo click to remember
+
             if (fileBean.isVideo == 1) {
                 val intent = Intent(activity, VideoActivity::class.java)
                 intent.putExtra("cookie", App.cookie)
@@ -175,9 +188,9 @@ fun FileScreen(
 
 
             //滚动到当前目录
-            if (currentFileBean.isFolder) {
+            if (fileBean.isFolder) {
                 fileViewModel.getListLocation(
-                    currentPath + "/${currentFileBean.name}"
+                    path + "/${fileBean.name}"
                 )
             }
         }
