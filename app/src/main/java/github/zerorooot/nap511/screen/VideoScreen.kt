@@ -93,7 +93,7 @@ fun MyVideoScreen(
                 //设置返回按键功能
                 backButton.setOnClickListener {
                     back()
-                    activity.onBackPressed()
+                    activity.onBackPressedDispatcher.onBackPressed()
                 }
                
 
@@ -112,7 +112,7 @@ fun MyVideoScreen(
                         super.onPlayError(url, objects)
                         Toast.makeText(context, "播放失败~", Toast.LENGTH_SHORT).show()
                         back()
-                        activity.onBackPressed()
+                        activity.onBackPressedDispatcher.onBackPressed()
                     }
                 })
             }

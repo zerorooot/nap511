@@ -180,6 +180,24 @@ class FileViewModel(private val cookie: String, private val application: Applica
         imageBeanCache[currentCid] = imageBeanList
     }
 
+    private fun updateFileCache(cid: String) {
+        viewModelScope.launch {
+            fileService.order(
+                hashMapOf(
+                    "user_order" to orderBean.type,
+                    "user_asc" to orderBean.asc.toString(),
+                    "file_id" to currentCid,
+                    "fc_mix" to "0"
+                )
+            )
+            val files =
+                fileService.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
+            setFileBeanProperty(files.fileBeanList)
+//            setFiles(files)
+            fileListCache[cid] = files
+        }
+    }
+
     fun getFiles(cid: String) {
         viewModelScope.launch {
             _isRefreshing.value = true
@@ -293,7 +311,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         viewModelScope.launch {
             val order = fileService.order(map)
             if (order.state) {
-                refresh()
+                refresh(currentCid)
             } else {
                 Toast.makeText(application, "排序失败", Toast.LENGTH_SHORT).show()
             }
@@ -349,6 +367,8 @@ class FileViewModel(private val cookie: String, private val application: Applica
             isCutState = false
             return
         }
+        //提前保存cid,防止进入其他文件夹后刷新当前目录
+        val tempCid = currentCid
         isCutState = false
         viewModelScope.launch {
             val hashMapOf = hashMapOf<String, String>()
@@ -371,7 +391,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
                     }
                 }
 
-                refresh()
+                refresh(tempCid)
                 "移动${cutFileList.size}个文件成功"
             } else {
                 "移动失败~"
@@ -383,9 +403,11 @@ class FileViewModel(private val cookie: String, private val application: Applica
 
     fun createFolder(folderName: String) {
         viewModelScope.launch {
-            val createFolder = fileService.createFolder(currentCid, folderName)
+            //提前保存cid,防止进入其他文件夹后刷新当前目录
+            val cid = currentCid
+            val createFolder = fileService.createFolder(cid, folderName)
             val message = if (createFolder.state) {
-                refresh()
+                refresh(cid)
                 "创建文件夹 $folderName 成功"
             } else {
                 "创建失败"
@@ -397,12 +419,20 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     fun refresh() {
-        fileListCache.remove(currentCid)
-        getFiles(currentCid)
+        refresh(currentCid)
+    }
+
+    private fun refresh(cid: String) {
         isLongClickState = false
         appBarTitle = application.resources.getString(R.string.app_name)
+        fileListCache.remove(cid)
+        if (cid == currentCid) {
+            getFiles(currentCid)
+        } else {
+            updateFileCache(cid)
+        }
         //图片缓存
-        imageBeanCache.remove(currentCid)
+        imageBeanCache.remove(cid)
     }
 
     fun getFileInfo(index: Int) {
@@ -591,6 +621,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         }
     }
 
+    @SuppressLint("DefaultLocale")
     private fun generateTime(totalSeconds: Long): String {
         val seconds = totalSeconds % 60
         val minutes = totalSeconds / 60 % 60
