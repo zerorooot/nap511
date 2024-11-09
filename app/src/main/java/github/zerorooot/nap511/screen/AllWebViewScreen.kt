@@ -159,8 +159,7 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
             webViewRequest: WebViewRequest
         ): WebResourceResponse? {
             val loginUrlVip = "https://passportapi.115.com/app/1.0/web/1.0/login/vip"
-            val loginUrl = "https://passportapi.115.com/app/1.0/web/1.0/login/login"
-            if (loginUrlVip == webViewRequest.url || loginUrl == webViewRequest.url) {
+            if (loginUrlVip == webViewRequest.url) {
                 val httpClient = OkHttpClient()
                 val a = Request.Builder()
                     .url(loginUrlVip)
@@ -188,7 +187,7 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
                     DataStoreUtil.putData(ConfigUtil.uid, loginBean.data.user_id)
                     App.cookie = cookie
                     App.gesturesEnabled = true
-                    "登陆成功~"
+                    "登陆成功~,请重启应用!"
                 }
                 App.instance.toast(text)
             }

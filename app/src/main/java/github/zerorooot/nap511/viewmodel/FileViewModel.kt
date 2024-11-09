@@ -180,7 +180,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         imageBeanCache[currentCid] = imageBeanList
     }
 
-        fun updateFileCache(cid: String) {
+    fun updateFileCache(cid: String) {
         viewModelScope.launch {
             _isRefreshing.value = true
             if (fileListCache.containsKey(cid)) {
@@ -488,15 +488,21 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     fun rename(name: String) {
-        val fileBean = fileBeanList[selectIndex]
         viewModelScope.launch {
+            val cid = currentCid
+            val fileBean = fileBeanList[selectIndex]
+            val beforeList = fileBeanList
+            val beforeFileListCache = fileListCache[cid]
+            //提前重命名，提升相应速度
+            fileBeanList[selectIndex] = fileBean.copy(name = name)
+            fileListCache[cid]!!.fileBeanList[selectIndex] = fileBean.copy(name = name)
+            fileListCache[fileBean.categoryId]?.let { it.path.last().name = name }
             val rename = fileService.rename(RenameBean(fileBean.fileId, name).toRequestBody())
             val message = if (rename.state) {
-                fileBeanList[selectIndex] = fileBean.copy(name = name)
-                fileListCache[currentCid]!!.fileBeanList[selectIndex] = fileBean.copy(name = name)
-                fileListCache[fileBean.categoryId]?.let { it.path.last().name = name }
                 "重命名成功"
             } else {
+                fileBeanList = beforeList
+                fileListCache[cid] = beforeFileListCache!!
                 "重命名失败"
             }
             Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
@@ -506,23 +512,24 @@ class FileViewModel(private val cookie: String, private val application: Applica
 
     fun deleteMultiple() {
         viewModelScope.launch {
+            val cid = currentCid
             val beforeList = fileBeanList
-            val beforeFileListCache = fileListCache[currentCid]
-            val beforeClickMap = clickMap.getOrDefault(currentCid, 0)
+            val beforeFileListCache = fileListCache[cid]
+            val beforeClickMap = clickMap.getOrDefault(cid, 0)
 
             val mapOf = hashMapOf<String, String>()
             mapOf["ignore_warn"] = "1"
-            mapOf["pid"] = currentCid
+            mapOf["pid"] = cid
             val filter = fileBeanList.filter { i -> i.isSelect }
             filter.forEachIndexed { index: Int, fileBean: FileBean ->
                 mapOf["fid[$index]"] = fileBean.fileId
                 //update image cache
-                imageBeanCache[currentCid]?.removeIf { i -> i.fileName == fileBean.name }
+                imageBeanCache[cid]?.removeIf { i -> i.fileName == fileBean.name }
             }
             //提前删除，优化速度
             fileBeanList.removeAll(filter)
-            fileListCache[currentCid]!!.fileBeanList = ArrayList(fileBeanList)
-            clickMap[currentCid] = clickMap.getOrDefault(currentCid, 0) - filter.size
+            fileListCache[cid]!!.fileBeanList = ArrayList(fileBeanList)
+            clickMap[cid] = clickMap.getOrDefault(cid, 0) - filter.size
 
             isLongClickState = false
             appBarTitle = application.resources.getString(R.string.app_name)
@@ -532,8 +539,8 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 "成功删除 ${filter.size} 个文件"
             } else {
                 fileBeanList = beforeList
-                fileListCache[currentCid] = beforeFileListCache!!
-                clickMap[currentCid] = beforeClickMap
+                fileListCache[cid] = beforeFileListCache!!
+                clickMap[cid] = beforeClickMap
                 "删除 ${filter.size} 个文件失败~"
             }
             Toast.makeText(application, message, Toast.LENGTH_SHORT).show()

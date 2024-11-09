@@ -15,8 +15,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkManager
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import github.zerorooot.nap511.activity.OfflineTaskWorker
 import github.zerorooot.nap511.bean.LoginBean
 import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.screen.*
@@ -150,6 +156,52 @@ class MainActivity : ComponentActivity() {
         }
 
         MyNavigationDrawer(fileViewModel, offlineFileViewModel, recycleViewModel)
+
+        checkOfflineTask(cookie)
+
+    }
+
+    /**
+     * 检测添加的离线链接。防止因为种种原因，app添加离线链接，但链接没有上传到115
+     * 后台添加离线链接的代码在OfflineTaskActivity
+     */
+    private fun checkOfflineTask(cookie: String) {
+        val size =
+            WorkManager.getInstance(applicationContext).getWorkInfosByTag("addOfflineTaskByTime")
+                .get().size + WorkManager.getInstance(applicationContext)
+                .getWorkInfosByTag("addOfflineTaskByCount").get().size
+        println("checkOfflineTask workManager size $size")
+        if (size != 0) {
+            return
+        }
+        //size等于0,证明后台没有正在添加离线链接
+        val currentOfflineTask = DataStoreUtil.getData(ConfigUtil.currentOfflineTask, "")
+            .split("\n")
+            .filter { i -> i != "" && i != " " }
+            .toSet()
+            .toMutableList()
+        println("checkOfflineTask currentOfflineTask size ${currentOfflineTask.size}")
+        //currentOfflineTask等于0,证明没有离线链接缓存
+        if (currentOfflineTask.size == 0) {
+            return
+        }
+        //添加离线链接
+        val listType = object : TypeToken<List<String?>?>() {}.type
+        val list = Gson().toJson(currentOfflineTask, listType)
+        val data: Data =
+            Data.Builder().putString("cookie", cookie).putString("list", list)
+                .build()
+        val request: OneTimeWorkRequest =
+            OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java).setInputData(data)
+                .build()
+//            WorkManager.getInstance(applicationContext).enqueue(request)
+        WorkManager.getInstance(applicationContext)
+            .enqueueUniqueWork(
+                "addOfflineTaskByCount",
+                ExistingWorkPolicy.APPEND,
+                request
+            )
+
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -208,6 +260,7 @@ class MainActivity : ComponentActivity() {
                             "https://captchaapi.115.com/?ac=security_code&type=web&cb=Close911_" + System.currentTimeMillis()
                         CaptchaWebViewScreen()
                     }
+
                     "退出应用" -> ExitApp()
                     "captchaWebView" -> CaptchaWebViewScreen()
                     "loginWebView" -> LoginWebViewScreen()
@@ -244,7 +297,7 @@ class MainActivity : ComponentActivity() {
                         DataStoreUtil.putData(ConfigUtil.uid, checkLogin)
                         App.cookie = replace
 //                        App.isInit = true
-                        "登陆成功!!"
+                        "登陆成功,请重启应用！"
                     }
                     App.instance.toast(message)
                 }

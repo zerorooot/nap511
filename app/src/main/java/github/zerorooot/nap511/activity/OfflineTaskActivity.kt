@@ -116,8 +116,9 @@ class OfflineTaskActivity : Activity() {
                 .build()
         WorkManager.getInstance(applicationContext)
             .enqueueUniqueWork(
-                "IMAGE_MANIPULATION_WORK_NAME",
-                ExistingWorkPolicy.REPLACE, request
+                "addOfflineTaskByTime",
+                ExistingWorkPolicy.REPLACE,
+                request
             )
     }
 
@@ -138,7 +139,13 @@ class OfflineTaskActivity : Activity() {
             val request: OneTimeWorkRequest =
                 OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java).setInputData(data)
                     .build()
-            WorkManager.getInstance(applicationContext).enqueue(request)
+//            WorkManager.getInstance(applicationContext).enqueue(request)
+            WorkManager.getInstance(applicationContext)
+                .enqueueUniqueWork(
+                    "addOfflineTaskByCount",
+                    ExistingWorkPolicy.APPEND,
+                    request
+                )
         } else {
             val stringJoiner = StringJoiner("\n")
             currentOfflineTaskList.forEach { stringJoiner.add(it) }
