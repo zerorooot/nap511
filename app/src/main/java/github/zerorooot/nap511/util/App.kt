@@ -8,8 +8,12 @@ import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.google.gson.Gson
+import github.zerorooot.nap511.bean.LoginBean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+import okhttp3.Request
 
 class App : Application() {
     companion object {
@@ -53,6 +57,28 @@ class App : Application() {
             }
         }
 
+    }
+    fun checkLogin(cookie: String): String {
+        val url =
+            "https://passportapi.115.com/app/1.0/web/1.0/check/sso?_${System.currentTimeMillis() / 1000}"
+        val okHttpClient = OkHttpClient()
+        val request: Request = Request.Builder().url(url).addHeader("cookie", cookie)
+            .addHeader("Content-Type", "application/json; Charset=UTF-8").addHeader(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
+            ).get().build()
+        val body = okHttpClient.newCall(request).execute().body
+        val uid = run {
+            val string = body.string()
+            try {
+                Gson().fromJson(
+                    string, LoginBean::class.java
+                ).data.user_id
+            } catch (e: Exception) {
+                "0"
+            }
+        }
+        return uid
     }
 
     fun closeDrawerState() {

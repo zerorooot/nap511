@@ -220,7 +220,7 @@ class MainActivity : ComponentActivity() {
             R.drawable.baseline_cloud_24 to "我的文件",
             R.drawable.baseline_cloud_download_24 to "离线下载",
             R.drawable.baseline_cloud_done_24 to "离线列表",
-//            R.drawable.baseline_add_moderator_24 to "验证账号",
+//            R.drawable.baseline_add_moderator_24 to "验证video账号",
             R.drawable.baseline_web_24 to "网页版",
             R.drawable.ic_baseline_delete_24 to "回收站",
             R.drawable.baseline_settings_24 to "高级设置",
@@ -260,6 +260,9 @@ class MainActivity : ComponentActivity() {
                             "https://captchaapi.115.com/?ac=security_code&type=web&cb=Close911_" + System.currentTimeMillis()
                         CaptchaWebViewScreen()
                     }
+                    "验证video账号" -> {
+                        CaptchaVideoWebViewScreen()
+                    }
 
                     "退出应用" -> ExitApp()
                     "captchaWebView" -> CaptchaWebViewScreen()
@@ -289,8 +292,8 @@ class MainActivity : ComponentActivity() {
             if (it != "") {
                 val replace = it.replace(" ", "").replace("[\r\n]".toRegex(), "");
                 thread {
-                    val checkLogin = checkLogin(replace)
-                    val message = if (checkLogin == "") {
+                    val checkLogin = App().checkLogin(replace)
+                    val message = if (checkLogin == "0") {
                         "登录失败~，请重试"
                     } else {
                         DataStoreUtil.putData(ConfigUtil.cookie, replace)
@@ -332,29 +335,6 @@ class MainActivity : ComponentActivity() {
             "文件排序" -> fileViewModel.isOpenFileOrderDialog = true
             "刷新文件" -> fileViewModel.refresh()
         }
-    }
-
-    private fun checkLogin(cookie: String): String {
-        val url =
-            "https://passportapi.115.com/app/1.0/web/1.0/check/sso?_${System.currentTimeMillis() / 1000}"
-        val okHttpClient = OkHttpClient()
-        val request: Request = Request.Builder().url(url).addHeader("cookie", cookie)
-            .addHeader("Content-Type", "application/json; Charset=UTF-8").addHeader(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
-            ).get().build()
-        val body = okHttpClient.newCall(request).execute().body
-        val uid = run {
-            val string = body.string()
-            try {
-                Gson().fromJson(
-                    string, LoginBean::class.java
-                ).data.user_id
-            } catch (e: Exception) {
-                ""
-            }
-        }
-        return uid
     }
 }
 

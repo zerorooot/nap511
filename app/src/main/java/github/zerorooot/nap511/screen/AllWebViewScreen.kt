@@ -1,7 +1,9 @@
 package github.zerorooot.nap511.screen
 
 import android.annotation.SuppressLint
+import android.net.UrlQuerySanitizer
 import android.webkit.CookieManager
+import android.webkit.URLUtil
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -27,6 +29,7 @@ import com.acsbendi.requestinspectorwebview.RequestInspectorWebViewClient
 import com.acsbendi.requestinspectorwebview.WebViewRequest
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import github.zerorooot.nap511.MainActivity
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.OfflineTaskWorker
 import github.zerorooot.nap511.bean.LoginBean
@@ -37,6 +40,9 @@ import github.zerorooot.nap511.util.DataStoreUtil
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.InputStreamReader
+import java.io.StringBufferInputStream
+import kotlin.concurrent.thread
 
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -158,42 +164,34 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
             view: WebView,
             webViewRequest: WebViewRequest
         ): WebResourceResponse? {
-            val loginUrlVip = "https://passportapi.115.com/app/1.0/web/1.0/login/vip"
-            if (loginUrlVip == webViewRequest.url) {
-                val httpClient = OkHttpClient()
-                val a = Request.Builder()
-                    .url(loginUrlVip)
-                    .method("POST", webViewRequest.body.toRequestBody())
-                val headerMap = mapOf(
-                    "sec-ch-ua-platform" to "\"Linux\"",
-                    "sec-ch-ua" to "\"Not A(Brand\";v=\"99\", \"Google Chrome\";v=\"121\", \"Chromium\";v=\"121\"",
-                    "sec-ch-ua-mobile" to "?0",
-                    "user-agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
-                )
-                webViewRequest.headers.forEach { (t, u) -> a.addHeader(t, u) }
-                headerMap.forEach { (t, u) ->
-                    a.removeHeader(t)
-                    a.addHeader(t, u)
+            val url = webViewRequest.url
+            if (url.startsWith("https://webapi.115.com/label/list")) {
+                var message = "登录失败~，请重试"
+                var cookie = webViewRequest.headers["cookie"]
+                if (cookie == null) {
+                    App.instance.toast(message)
+                    return super.shouldInterceptRequest(view, webViewRequest)
                 }
-                val response = httpClient.newCall(a.build()).execute()
-                val body = response.body.string()
-                val loginBean = Gson().fromJson(body, LoginBean::class.java)
-                val text = if (loginBean.state == 0) {
-                    //error
-                    loginBean.message
-                } else {
-                    val cookie = loginBean.data.cookie.toString()
-                    DataStoreUtil.putData(ConfigUtil.cookie, cookie)
-                    DataStoreUtil.putData(ConfigUtil.uid, loginBean.data.user_id)
-                    App.cookie = cookie
-                    App.gesturesEnabled = true
-                    "登陆成功~,请重启应用!"
-                }
-                App.instance.toast(text)
-            }
-            return null
-        }
+                //USERSESSIONID=xx; UID=xx; CID=xx; SEID=xx; PHPSESSID=xx; acw_tc=xx; UID=xx; CID=xx; SEID=xx
+                val regex = Regex("(UID=\\w+; CID=\\w+; SEID=\\w+)")
+                val matches = regex.findAll(cookie).map { it.value }.toList()
+//                thread {
+//                    val c1 = App().checkLogin(matches[0].replace(" ", ""))
+//                    val c2 = App().checkLogin(matches[1].replace(" ", ""))
+//                    println()
+//                }
+                message = "登陆成功,请重启应用！"
 
+                cookie = matches[1].replace(" ", "")
+                val uid = UrlQuerySanitizer(url).getValue("user_id")
+                DataStoreUtil.putData(ConfigUtil.cookie, cookie)
+                DataStoreUtil.putData(ConfigUtil.uid, uid)
+                App.cookie = cookie
+                App.gesturesEnabled = true
+                App.instance.toast(message)
+            }
+            return super.shouldInterceptRequest(view, webViewRequest)
+        }
     }
 
 }
@@ -204,6 +202,7 @@ fun CaptchaWebViewScreen() {
     App.cookie.split(";").forEach { a ->
         cookieManager.setCookie("https://captchaapi.115.com", a)
         cookieManager.setCookie("https://webapi.115.com", a)
+        cookieManager.setCookie("https://webapi.115.com/user/captcha", a)
     }
     cookieManager.flush()
     BaseWebViewScreen(
@@ -217,6 +216,24 @@ fun CaptchaWebViewScreen() {
 
 }
 
+@Composable
+fun CaptchaVideoWebViewScreen() {
+    val cookieManager = CookieManager.getInstance()
+    App.cookie.split(";").forEach { a ->
+        cookieManager.setCookie("https://v.anxia.com/captchaapi/", a)
+        cookieManager.setCookie("https://v.anxia.com/webapi/user/captcha", a)
+    }
+    cookieManager.flush()
+    BaseWebViewScreen(
+        titleText = "验证码",
+        topAppBarActionButtonOnClick = {
+            App.instance.openDrawerState()
+        },
+        webViewClient = { captchaWebViewClient(it) },
+        loadUrl = "https://v.anxia.com/captchaapi/?ac=security_code&client=web&type=web&ctype=web&cb=Close911_" + System.currentTimeMillis()
+    )
+
+}
 
 fun captchaWebViewClient(webView: WebView): WebViewClient {
     return object : RequestInspectorWebViewClient(webView) {
@@ -232,7 +249,7 @@ fun captchaWebViewClient(webView: WebView): WebViewClient {
                 webViewRequest.headers.forEach { (t, u) -> a.addHeader(t, u) }
                 //移除web添加的cookie
                 a.removeHeader("cookie")
-                a.addHeader("cookie",App.cookie)
+                a.addHeader("cookie", App.cookie)
 
                 val response = httpClient.newCall(a.build()).execute()
                 val string = response.body.string()
@@ -242,7 +259,11 @@ fun captchaWebViewClient(webView: WebView): WebViewClient {
                     App.instance.toast("验证账号成功~，重新添加链接中.......")
                 }
             }
-            return null
+
+            if (webViewRequest.url.startsWith("https://v.anxia.com/webapi/user/captcha")) {
+                return super.shouldInterceptRequest(view, webViewRequest)
+            }
+            return super.shouldInterceptRequest(view, webViewRequest)
         }
     }
 }

@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.screenitem.RecycleCellItem
 import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.ConfigUtil
+import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 
 @OptIn(ExperimentalMaterialApi::class, ExperimentalFoundationApi::class)
@@ -24,7 +26,7 @@ import github.zerorooot.nap511.viewmodel.RecycleViewModel
 fun RecycleScreen(recycleViewModel: RecycleViewModel) {
     recycleViewModel.getRecycleFileList()
     var deleteIndex by remember {
-        mutableStateOf(-1)
+        mutableIntStateOf(-1)
     }
     val refreshing by recycleViewModel.isRefreshing.collectAsState()
     val recycleFileList = recycleViewModel.recycleFileList
@@ -48,6 +50,8 @@ fun RecycleScreen(recycleViewModel: RecycleViewModel) {
 
     RecyclePasswordDialog(recycleViewModel) {
         if (it != "") {
+            DataStoreUtil.putData(ConfigUtil.password, it)
+
             if (deleteIndex == -1) {
                 recycleViewModel.deleteAll()
             } else {
