@@ -221,7 +221,7 @@ class MainActivity : ComponentActivity() {
             R.drawable.baseline_cloud_download_24 to "离线下载",
             R.drawable.baseline_cloud_done_24 to "离线列表",
 //            R.drawable.baseline_add_moderator_24 to "验证video账号",
-            R.drawable.baseline_web_24 to "网页版",
+//            R.drawable.baseline_web_24 to "网页版",
             R.drawable.ic_baseline_delete_24 to "回收站",
             R.drawable.baseline_settings_24 to "高级设置",
             R.drawable.android_exit to "退出应用"

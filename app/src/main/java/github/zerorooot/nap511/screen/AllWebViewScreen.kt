@@ -3,7 +3,6 @@ package github.zerorooot.nap511.screen
 import android.annotation.SuppressLint
 import android.net.UrlQuerySanitizer
 import android.webkit.CookieManager
-import android.webkit.URLUtil
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -29,10 +28,8 @@ import com.acsbendi.requestinspectorwebview.RequestInspectorWebViewClient
 import com.acsbendi.requestinspectorwebview.WebViewRequest
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import github.zerorooot.nap511.MainActivity
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.OfflineTaskWorker
-import github.zerorooot.nap511.bean.LoginBean
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigUtil
@@ -40,9 +37,6 @@ import github.zerorooot.nap511.util.DataStoreUtil
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.InputStreamReader
-import java.io.StringBufferInputStream
-import kotlin.concurrent.thread
 
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -85,6 +79,8 @@ fun BaseWebViewScreen(
                         settings.databaseEnabled = true;
                         settings.domStorageEnabled = true;//开启DOM缓存，关闭的话H5自身的一些操作是无效的
                         settings.cacheMode = WebSettings.LOAD_DEFAULT;
+                        // Allow mixed content for WebSocket connections (optional, if needed)
+                        settings.mixedContentMode= WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                         settings.userAgentString =
                             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
                     }
@@ -121,11 +117,8 @@ fun webViewClient(webView: WebView): WebViewClient {
         ): WebResourceResponse? {
             val url = webViewRequest.url
             val cookieManager = CookieManager.getInstance()
-            App.cookie.split(";").forEach { a ->
-                cookieManager.setCookie(url, a)
-                cookieManager.setCookie(url, a)
-            }
-            return null
+            cookieManager.setCookie(url, App.cookie)
+            return super.shouldInterceptRequest(view, webViewRequest)
         }
     }
 //    return object : WebViewClient() {

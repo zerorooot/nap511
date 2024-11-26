@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace 'github.zerorooot.nap511'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "github.zerorooot.nap511"
         minSdk 26
-        targetSdk 34
+        targetSdk 35
         versionCode 4
         versionName "1.1.2"
 
@@ -91,13 +91,13 @@ dependencies {
 
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'com.google.android.material:material:1.12.0'
-    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.0'
     implementation "androidx.compose.material:material-icons-extended:$compose_version"
 //    implementation "com.google.accompanist:accompanist-swiperefresh:0.29.1-alpha"
 //    implementation 'androidx.window:window-core:'
-    implementation "androidx.navigation:navigation-compose:2.7.7"
+    implementation "androidx.navigation:navigation-compose:2.8.3"
 
-    def lifecycle_version = "2.8.4"
+    def lifecycle_version = "2.8.7"
     // ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version")
     // ViewModel utilities for Compose
@@ -105,15 +105,15 @@ dependencies {
     // LiveData
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:$lifecycle_version")
     
-    implementation 'androidx.work:work-runtime-ktx:2.9.1'
+    implementation 'androidx.work:work-runtime-ktx:2.10.0'
 
-    implementation 'androidx.core:core-ktx:1.13.1'
-    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.4'
-    implementation 'androidx.activity:activity-compose:1.9.1'
+    implementation 'androidx.core:core-ktx:1.15.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
+    implementation 'androidx.activity:activity-compose:1.9.3'
     implementation "androidx.compose.ui:ui:$compose_version"
     implementation "androidx.compose.ui:ui-util:$compose_version"
     implementation "androidx.compose.ui:ui-tooling-preview:$compose_version"
-    implementation 'androidx.compose.material3:material3:1.2.1'
+    implementation 'androidx.compose.material3:material3:1.3.1'
 //    implementation "androidx.compose.material3:material3:1.0.1"
 
     testImplementation 'junit:junit:4.13.2'

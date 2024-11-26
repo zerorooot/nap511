@@ -2,6 +2,7 @@ package github.zerorooot.nap511.util
 
 class ConfigUtil {
     companion object {
+        //aria2秘钥
         const val aria2Token = "aria2Token"
         const val aria2Url = "aria2Url"
         const val aria2UrldefValue = "http://127.0.0.1:6800/jsonrpc"
@@ -11,6 +12,7 @@ class ConfigUtil {
         const val command = "command"
         const val sentToAria2 = "sentToAria2"
         const val autoRotate = "autoRotate"
+        //默认离线位置
         const val defaultOfflineCid = "0"
         const val requestLimitCount = "requestLimitCount"
         const val defaultOfflineCount = "defaultOfflineCount"
@@ -18,6 +20,7 @@ class ConfigUtil {
         const val offlineMethod = "offlineMethod"
         const val defaultOfflineTime = "defaultOfflineTime"
         const val errorDownloadCid = "errorDownloadCid"
+        //提前加载上下两个文件夹
         const val earlyLoading="EarlyLoading"
 
     }

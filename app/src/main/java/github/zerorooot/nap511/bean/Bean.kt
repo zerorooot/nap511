@@ -194,6 +194,7 @@ data class BaseReturnMessage(
     @SerializedName("state") var state: Boolean = false,
     @SerializedName("error") var error: String = "",
     @SerializedName("errno") var errno: String = "",
+    var message: String = "",
     @SerializedName("error_msg") var errorMsg: String = ""
 )
 
@@ -276,4 +277,15 @@ data class RecycleBean(
     var modifiedTimeString: String = "",
     var fileSizeString: String = "",
     var fileIco: Int = R.drawable.other
+)
+
+data class InitUploadBean(
+    @SerializedName("object")
+    val key: String,
+    @SerializedName("accessid")
+    val oSSAccessKeyId: String,
+    val host: String,
+    val policy: String,
+    val signature: String,
+    val callback: String
 )
