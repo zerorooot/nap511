@@ -32,7 +32,7 @@ class TorrentTaskActivity : Activity() {
         super.onCreate(savedInstanceState)
         if (intent.action == Intent.ACTION_VIEW && intent.data != null) {
             val torrentFile = fileFromContentUri(this, intent.data!!)
-            val uid = DataStoreUtil.getData(ConfigUtil.uid, "0")
+            val uid = App.uid
             val defaultOfflineCid = DataStoreUtil.getData(ConfigUtil.defaultOfflineCid, "0")
             initUpload(torrentFile, App.cookie, uid, defaultOfflineCid)
         }

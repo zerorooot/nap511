@@ -2,15 +2,42 @@ package github.zerorooot.nap511.screen
 
 import android.app.Activity
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.outlined.CheckBox
+import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -26,9 +53,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import com.google.gson.Gson
 import com.google.gson.JsonObject
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.bean.TorrentFileBean
+import github.zerorooot.nap511.bean.TorrentFileListWeb
+import github.zerorooot.nap511.screenitem.AutoSizableTextField
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
@@ -40,6 +72,17 @@ import kotlinx.coroutines.delay
 fun CreateFolderDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
     if (fileViewModel.isOpenCreateFolderDialog) {
         BaseDialog("请输入新建文件名", "文件名", enter = enter)
+    }
+}
+
+@Composable
+fun CreateSelectTorrentFileDialog(
+    offlineFileViewModel: OfflineFileViewModel,
+    enter: (TorrentFileBean, Map<Int, TorrentFileListWeb>) -> Unit
+) {
+    if (offlineFileViewModel.isOpenCreateSelectTorrentFileDialog) {
+        val torrentBean by offlineFileViewModel.torrentBean.collectAsState()
+        SelectTorrentFileDialog(torrentBean, enter)
     }
 }
 
@@ -160,7 +203,7 @@ fun FileOrderDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+
 @Composable
 fun Aria2Dialog(fileViewModel: FileViewModel, context: String, enter: (String) -> Unit) {
     if (!fileViewModel.isOpenAria2Dialog) {
@@ -312,7 +355,149 @@ private fun RadioButtonDialog(
 
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SelectTorrentFileDialog(
+    torrentFileBean: TorrentFileBean,
+    enter: (torrentFileBean: TorrentFileBean, Map<Int, TorrentFileListWeb>) -> Unit
+) {
+    val listState = rememberLazyListState()
+    val selectMap = remember { mutableStateMapOf<Int, TorrentFileListWeb>() }
+    var sumSize: Long = 0
+    val isSelectedItem: (Int) -> Boolean = { selectMap.containsKey(it) }
+    val onChangeState: (Int, TorrentFileListWeb) -> Unit = { i: Int, s: TorrentFileListWeb ->
+        sumSize = 0
+        if (selectMap.containsKey(i)) {
+            selectMap.remove(i)
+        } else {
+            selectMap[i] = s
+        }
+        selectMap.values.forEach { b -> sumSize += b.size }
+    }
+
+    AlertDialog(
+        onDismissRequest = {
+            selectMap.clear()
+            enter.invoke(torrentFileBean, selectMap)
+        },
+        confirmButton = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.offset(y = (-20).dp)
+            ) {
+                TextButton(
+                    onClick = {
+                        enter.invoke(torrentFileBean, selectMap)
+                    },
+                ) {
+                    Text(text = "下载")
+                }
+                TextButton(
+                    onClick = {
+                        selectMap.clear()
+                        torrentFileBean.torrentFileListWeb.forEachIndexed { index, torrentFileListWeb ->
+                            if (torrentFileListWeb.wanted == 1) {
+                                selectMap[index] = torrentFileListWeb
+                            }
+                        }
+                        sumSize = 0
+                        selectMap.values.forEach { b -> sumSize += b.size }
+                    },
+                ) {
+                    Text(text = "全选")
+                }
+                TextButton(
+                    onClick = {
+                        torrentFileBean.torrentFileListWeb.forEachIndexed { index, torrentFileListWeb ->
+                            if (torrentFileListWeb.wanted == 1) {
+                                if (selectMap.containsKey(index)) {
+                                    selectMap.remove(index)
+                                } else {
+                                    selectMap[index] = torrentFileListWeb
+                                }
+                            }
+                        }
+                        sumSize = 0
+                        selectMap.values.forEach { b -> sumSize += b.size }
+                    },
+                ) {
+                    Text(text = "反选")
+                }
+                TextButton(
+                    onClick = {
+                        selectMap.clear()
+                        enter.invoke(torrentFileBean, selectMap)
+                    },
+                ) {
+                    Text(text = "取消")
+                }
+            }
+        }, title = { Text(text = "选择要下载的文件") }, text = {
+            Column() {
+                AutoSizableTextField(
+                    value = "已经选择${selectMap.size}/${torrentFileBean.fileCount}个，总计：${
+                        android.text.format.Formatter.formatFileSize(App.instance, sumSize)
+                    }\n" + "共${torrentFileBean.fileCount}个文件，总计：${torrentFileBean.fileSizeString}",
+                    minFontSize = 30.sp,
+                    maxLines = 2
+                )
+                LazyColumn(modifier = Modifier.padding(8.dp), state = listState) {
+                    itemsIndexed(items = torrentFileBean.torrentFileListWeb, key = { _, item ->
+                        item.hashCode()
+                    }) { index, item ->
+                        if (item.wanted == 1) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .selectable(
+                                        selected = isSelectedItem(index), onClick = {
+                                            onChangeState(index, item)
+//                                            println("select $selectMap")
+                                        }, role = Role.RadioButton
+                                    )
+                                    .padding(8.dp)
+                            ) {
+                                Icon(
+                                    modifier = Modifier.padding(end = 16.dp),
+                                    imageVector = if (isSelectedItem(index)) {
+                                        Icons.Outlined.CheckBox
+                                    } else {
+                                        Icons.Outlined.CheckBoxOutlineBlank
+                                    },
+                                    contentDescription = null,
+                                    tint = Color.Magenta
+                                )
+                                AutoSizableTextField(
+                                    value = item.path,
+                                    modifier = Modifier.weight(1f),
+                                    minFontSize = 30.sp,
+                                    maxLines = 2
+                                )
+                                Text(
+                                    text = item.sizeString, modifier = Modifier.weight(0.5f),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        })
+
+}
+
+@Composable
+@Preview
+fun SelectTorrentFileDialogPreview() {
+    val torrentFileBean = Gson().fromJson(
+        "{\"state\":true,\"errno\":0,\"fileSizeString\":123G,\"errtype\":\"suc\",\"errcode\":0,\"file_size\":70966705837,\"torrent_name\":\"name\",\"file_count\":28,\"info_hash\":\"hash\",\"torrent_filelist_web\":[{\"size\":12312,\"path\":\"预览图/0.JPG\",\"wanted\":1},{\"size\":123443242,\"path\":\"预览图/123123132132131312313123123/1.JPG\",\"wanted\":1},{\"size\":3902418,\"path\":\"预览图/2.JPG\",\"wanted\":1},{\"size\":321231321,\"path\":\"预览图/3.JPG\",\"wanted\":1},{\"size\":312321321,\"path\":\"预览图/4.JPG\",\"wanted\":-1}]}",
+        TorrentFileBean::class.java
+    )
+
+    SelectTorrentFileDialog(torrentFileBean) { a: TorrentFileBean, m: Map<Int, TorrentFileListWeb> ->
+
+    }
+
+}
+
 @Composable
 fun InfoDialog(
     onDismissRequest: () -> Unit,

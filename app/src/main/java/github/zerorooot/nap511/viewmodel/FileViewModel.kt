@@ -296,6 +296,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 "jpg" -> fileBean.fileIco = R.drawable.png
                 "mp3" -> fileBean.fileIco = R.drawable.mp3
                 "txt" -> fileBean.fileIco = R.drawable.txt
+                "torrent" -> fileBean.fileIco = R.drawable.torrent
             }
         }
     }

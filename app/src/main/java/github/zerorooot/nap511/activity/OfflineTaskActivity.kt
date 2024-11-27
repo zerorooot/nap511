@@ -67,14 +67,14 @@ class OfflineTaskActivity : Activity() {
                         .split("\n")
                         .filter { i -> i != "" && i != " " }
                         .toSet()
-                        .toMutableList()
+                        .toMutableSet()
                 //添加所有
                 currentOfflineTaskList.addAll(urlList)
                 //离线任务缓存方式,true为x分钟后统一下载，false为集满后统一下载
                 if (DataStoreUtil.getData(ConfigUtil.offlineMethod, true)) {
-                    addOfflineTaskByTime(currentOfflineTaskList)
+                    addOfflineTaskByTime(currentOfflineTaskList.toList())
                 } else {
-                    addOfflineTaskByCount(currentOfflineTaskList)
+                    addOfflineTaskByCount(currentOfflineTaskList.toList())
                 }
             } else {
                 App.instance.toast("仅支持以http、ftp、magnet、ed2k开头的链接")
@@ -177,7 +177,7 @@ class OfflineTaskWorker(
                 ""
             )
         }
-        println(message)
+//        println(message)
         toast(message, a)
         return Result.success(addTaskData);
     }

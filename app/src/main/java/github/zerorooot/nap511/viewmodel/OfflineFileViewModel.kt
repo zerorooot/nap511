@@ -4,11 +4,15 @@ package github.zerorooot.nap511.viewmodel
 import android.app.Activity
 import android.app.Application
 import android.widget.Toast
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import github.zerorooot.nap511.bean.OfflineInfo
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.QuotaBean
+import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.OfflineService
 import github.zerorooot.nap511.util.App
@@ -41,6 +45,12 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
 
     lateinit var offlineTask: OfflineTask
 
+    private val _torrentBean = MutableStateFlow(TorrentFileBean())
+    var torrentBean = _torrentBean.asStateFlow()
+
+    //打开对话框相关
+    var isOpenCreateSelectTorrentFileDialog by mutableStateOf(false)
+
     private val offlineService: OfflineService by lazy {
         OfflineService.getInstance(cookie)
     }
@@ -56,12 +66,48 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
         viewModelScope.launch {
             _isRefreshing.value = true
 //            val uid = sharedPreferencesUtil.get(ConfigUtil.uid)!!
-            val uid = DataStoreUtil.getData(ConfigUtil.uid, "")
+            val uid = App.uid
             val sign = offlineService.getSign().sign
             _offlineInfo.value = offlineService.taskList(uid, sign)
             setTaskInfo(_offlineInfo.value.tasks)
             _offlineFile.value = _offlineInfo.value.tasks
             _isRefreshing.value = false
+        }
+    }
+
+    fun getTorrentTask(sha1: String) {
+        viewModelScope.launch {
+            val sign = offlineService.getSign().sign
+            val torrentTask = offlineService.getTorrentTaskList(sha1, App.uid, sign)
+            torrentTask.fileSizeString = android.text.format.Formatter.formatFileSize(
+                application, torrentTask.fileSize
+            ) + " "
+//            torrentTask.torrentFileListWeb.removeIf { i -> i.wanted == -1 }
+            torrentTask.torrentFileListWeb.forEach { b ->
+                b.sizeString = android.text.format.Formatter.formatFileSize(
+                    application, b.size
+                ) + " "
+            }
+            _torrentBean.value = torrentTask
+        }
+    }
+
+    fun addTorrentTask(torrentFileBean: TorrentFileBean, wanted: String) {
+        viewModelScope.launch {
+            val sign = offlineService.getSign().sign
+            val addTorrentTask = offlineService.addTorrentTask(
+                torrentFileBean.infoHash,
+                wanted,
+                torrentFileBean.torrentName,
+                App.uid,
+                sign
+            )
+            val message = if (addTorrentTask.state) {
+                "任务添加成功，文件已保存至 /云下载/${torrentFileBean.torrentName}"
+            } else {
+                "任务添加失败，${addTorrentTask.errorMsg}"
+            }
+            App.instance.toast(message)
         }
     }
 
@@ -138,7 +184,7 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
             val map = HashMap<String, String>()
             map["savepath"] = ""
             map["wp_path_id"] = currentCid
-            map["uid"] = DataStoreUtil.getData(ConfigUtil.uid, "")
+            map["uid"] = App.uid
             map["sign"] = offlineService.getSign().sign
             map["time"] = (System.currentTimeMillis() / 1000).toString()
             list.forEachIndexed { index, s ->

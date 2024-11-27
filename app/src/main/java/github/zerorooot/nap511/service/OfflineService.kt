@@ -52,6 +52,29 @@ interface OfflineService {
         @Field("time") time: Long = System.currentTimeMillis() / 1000
     ): OfflineInfo
 
+    @FormUrlEncoded
+    @POST("web/lixian/?ct=lixian&ac=torrent")
+    suspend fun getTorrentTaskList(
+        @Field("sha1") sha1: String = "",
+        @Field("sign") sign: String = "",
+        @Field("uid") uid: String = "",
+        @Field("time") time: Long = System.currentTimeMillis() / 1000
+    ): TorrentFileBean
+
+    @FormUrlEncoded
+    @POST("web/lixian/?ct=lixian&ac=add_task_bt")
+    suspend fun addTorrentTask(
+        @Field("info_hash") infoHash: String = "",
+        //0,4,6
+        @Field("wanted") wanted: String = "",
+        //torrent name
+        @Field("savepath") savePath: String = "",
+        @Field("uid") uid: String = "",
+        @Field("sign") sign: String = "",
+        @Field("time") time: Long = System.currentTimeMillis() / 1000
+    ): BaseReturnMessage
+
+
     /**
      * hash[0]:xxxxxxx
      * uid
@@ -66,8 +89,9 @@ interface OfflineService {
 
     @FormUrlEncoded
     @POST("web/lixian/?ct=lixian&ac=task_clear")
-    suspend fun clearFinish(@Field("flag") flag: String = "0"):BaseReturnMessage
+    suspend fun clearFinish(@Field("flag") flag: String = "0"): BaseReturnMessage
+
     @FormUrlEncoded
     @POST("web/lixian/?ct=lixian&ac=task_clear")
-    suspend fun clearError(@Field("flag") flag: String = "2"):BaseReturnMessage
+    suspend fun clearError(@Field("flag") flag: String = "2"): BaseReturnMessage
 }

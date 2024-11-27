@@ -1,9 +1,6 @@
 package github.zerorooot.nap511
 
 import android.annotation.SuppressLint
-import android.app.AppOpsManager
-import android.content.Context
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -18,12 +15,15 @@ import androidx.compose.ui.unit.dp
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import androidx.work.WorkQuery
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.activity.OfflineTaskWorker
-import github.zerorooot.nap511.bean.LoginBean
+import github.zerorooot.nap511.bean.TorrentFileBean
+import github.zerorooot.nap511.bean.TorrentFileListWeb
 import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.screen.*
 import github.zerorooot.nap511.ui.theme.Nap511Theme
@@ -34,11 +34,6 @@ import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import java.lang.reflect.Field
-import java.lang.reflect.InvocationTargetException
-import java.lang.reflect.Method
 import kotlin.concurrent.thread
 
 
@@ -57,11 +52,12 @@ class MainActivity : ComponentActivity() {
                         Login()
                         return@Surface
                     }
+                    //初始化
                     Init(cookie)
                     //允许通知， 方便离线下载交互 OfflineTaskActivity
-                    if (!isNotificationEnabled(this)) {
+                    if (!App.instance.isNotificationEnabled(this)) {
                         App.instance.toast("检测到未开启通知权限，为保证交互效果，建议开启")
-                        goToNotificationSetting(this)
+                        App.instance.goToNotificationSetting(this)
                     }
                     //直接添加磁力，但提示请验证账号;跳转到验证账号界面
                     if (intent.action == "jump") {
@@ -70,60 +66,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
-
-    /**
-     * 判断允许通知，是否已经授权
-     * 返回值为true时，通知栏打开，false未打开。
-     * @param context 上下文
-     */
-    private fun isNotificationEnabled(context: Context): Boolean {
-        val CHECK_OP_NO_THROW = "checkOpNoThrow"
-        val OP_POST_NOTIFICATION = "OP_POST_NOTIFICATION"
-        val mAppOps = context.getSystemService(APP_OPS_SERVICE) as AppOpsManager
-        val appInfo = context.applicationInfo
-        val pkg = context.applicationContext.packageName
-        val uid = appInfo.uid
-        val appOpsClass: Class<*>?
-        /* Context.APP_OPS_MANAGER */try {
-            appOpsClass = Class.forName(AppOpsManager::class.java.name)
-            val checkOpNoThrowMethod: Method = appOpsClass.getMethod(
-                CHECK_OP_NO_THROW, Integer.TYPE, Integer.TYPE,
-                String::class.java
-            )
-            val opPostNotificationValue: Field = appOpsClass.getDeclaredField(OP_POST_NOTIFICATION)
-            val value = opPostNotificationValue.get(Int::class.java) as Int
-            return checkOpNoThrowMethod.invoke(
-                mAppOps,
-                value,
-                uid,
-                pkg
-            ) as Int == AppOpsManager.MODE_ALLOWED
-        } catch (e: ClassNotFoundException) {
-            e.printStackTrace()
-        } catch (e: NoSuchMethodException) {
-            e.printStackTrace()
-        } catch (e: NoSuchFieldException) {
-            e.printStackTrace()
-        } catch (e: InvocationTargetException) {
-            e.printStackTrace()
-        } catch (e: IllegalAccessException) {
-            e.printStackTrace()
-        }
-        return false
-    }
-
-    /**
-     * 跳转到app的设置界面--开启通知
-     * @param context
-     */
-    private fun goToNotificationSetting(context: Context) {
-        val intent = Intent()
-        // android 8.0引导
-        intent.setAction("android.settings.APP_NOTIFICATION_SETTINGS")
-        intent.putExtra("android.provider.extra.APP_PACKAGE", context.packageName)
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(intent)
     }
 
     @Composable
@@ -164,13 +106,23 @@ class MainActivity : ComponentActivity() {
     /**
      * 检测添加的离线链接。防止因为种种原因，app添加离线链接，但链接没有上传到115
      * 后台添加离线链接的代码在OfflineTaskActivity
+     *
      */
     private fun checkOfflineTask(cookie: String) {
-        val size =
-            WorkManager.getInstance(applicationContext).getWorkInfosByTag("addOfflineTaskByTime")
-                .get().size + WorkManager.getInstance(applicationContext)
-                .getWorkInfosByTag("addOfflineTaskByCount").get().size
-        println("checkOfflineTask workManager size $size")
+        val workQuery = WorkQuery.Builder.fromStates(
+            listOf(
+                WorkInfo.State.ENQUEUED,
+                WorkInfo.State.RUNNING,
+                WorkInfo.State.SUCCEEDED,
+                WorkInfo.State.FAILED,
+                WorkInfo.State.BLOCKED,
+                WorkInfo.State.CANCELLED
+            )
+        ).build()
+        val workInfos: List<WorkInfo> =
+            WorkManager.getInstance(applicationContext).getWorkInfos(workQuery).get()
+        val size = workInfos.size
+        println("checkOfflineTask workManager size $size workInfos $workInfos")
         if (size != 0) {
             return
         }
@@ -249,7 +201,7 @@ class MainActivity : ComponentActivity() {
             content = {
                 when (App.selectedItem) {
                     "登录" -> Login()
-                    "我的文件" -> MyFileScreen(fileViewModel)
+                    "我的文件" -> MyFileScreen(offlineFileViewModel, fileViewModel)
                     "离线下载" -> OfflineDownloadScreen(offlineFileViewModel, fileViewModel)
                     "离线列表" -> OfflineFileScreen(offlineFileViewModel, fileViewModel)
                     "网页版" -> WebViewScreen()
@@ -260,6 +212,7 @@ class MainActivity : ComponentActivity() {
                             "https://captchaapi.115.com/?ac=security_code&type=web&cb=Close911_" + System.currentTimeMillis()
                         CaptchaWebViewScreen()
                     }
+
                     "验证video账号" -> {
                         CaptchaVideoWebViewScreen()
                     }
@@ -311,11 +264,15 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun MyFileScreen(fileViewModel: FileViewModel) {
+    private fun MyFileScreen(
+        offlineFileViewModel: OfflineFileViewModel,
+        fileViewModel: FileViewModel
+    ) {
         fileViewModel.init()
 
         FileScreen(
             fileViewModel,
+            offlineFileViewModel,
             appBarClick(fileViewModel),
         )
     }

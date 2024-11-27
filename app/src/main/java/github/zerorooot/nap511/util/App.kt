@@ -1,6 +1,9 @@
 package github.zerorooot.nap511.util
 
+import android.app.AppOpsManager
 import android.app.Application
+import android.content.Context
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
@@ -14,11 +17,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.lang.reflect.Field
+import java.lang.reflect.InvocationTargetException
+import java.lang.reflect.Method
 
 class App : Application() {
     companion object {
         lateinit var instance: App
         var cookie by mutableStateOf("")
+        var uid by mutableStateOf("0")
 
         //页面导航
         var selectedItem by mutableStateOf("我的文件")
@@ -41,6 +48,7 @@ class App : Application() {
         super.onCreate()
         instance = this
         cookie = DataStoreUtil.getData(ConfigUtil.cookie, "")
+        uid = DataStoreUtil.getData(ConfigUtil.uid, "0")
         requestLimitCount = DataStoreUtil.getData(ConfigUtil.requestLimitCount, "100").toInt()
     }
 
@@ -58,6 +66,7 @@ class App : Application() {
         }
 
     }
+
     fun checkLogin(cookie: String): String {
         val url =
             "https://passportapi.115.com/app/1.0/web/1.0/check/sso?_${System.currentTimeMillis() / 1000}"
@@ -79,6 +88,60 @@ class App : Application() {
             }
         }
         return uid
+    }
+
+    /**
+     * 判断允许通知，是否已经授权
+     * 返回值为true时，通知栏打开，false未打开。
+     * @param context 上下文
+     */
+    fun isNotificationEnabled(context: Context): Boolean {
+        val CHECK_OP_NO_THROW = "checkOpNoThrow"
+        val OP_POST_NOTIFICATION = "OP_POST_NOTIFICATION"
+        val mAppOps = context.getSystemService(APP_OPS_SERVICE) as AppOpsManager
+        val appInfo = context.applicationInfo
+        val pkg = context.applicationContext.packageName
+        val uid = appInfo.uid
+        val appOpsClass: Class<*>?
+        /* Context.APP_OPS_MANAGER */try {
+            appOpsClass = Class.forName(AppOpsManager::class.java.name)
+            val checkOpNoThrowMethod: Method = appOpsClass.getMethod(
+                CHECK_OP_NO_THROW, Integer.TYPE, Integer.TYPE,
+                String::class.java
+            )
+            val opPostNotificationValue: Field = appOpsClass.getDeclaredField(OP_POST_NOTIFICATION)
+            val value = opPostNotificationValue.get(Int::class.java) as Int
+            return checkOpNoThrowMethod.invoke(
+                mAppOps,
+                value,
+                uid,
+                pkg
+            ) as Int == AppOpsManager.MODE_ALLOWED
+        } catch (e: ClassNotFoundException) {
+            e.printStackTrace()
+        } catch (e: NoSuchMethodException) {
+            e.printStackTrace()
+        } catch (e: NoSuchFieldException) {
+            e.printStackTrace()
+        } catch (e: InvocationTargetException) {
+            e.printStackTrace()
+        } catch (e: IllegalAccessException) {
+            e.printStackTrace()
+        }
+        return false
+    }
+
+    /**
+     * 跳转到app的设置界面--开启通知
+     * @param context
+     */
+    fun goToNotificationSetting(context: Context) {
+        val intent = Intent()
+        // android 8.0引导
+        intent.setAction("android.settings.APP_NOTIFICATION_SETTINGS")
+        intent.putExtra("android.provider.extra.APP_PACKAGE", context.packageName)
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
     }
 
     fun closeDrawerState() {

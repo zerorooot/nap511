@@ -289,3 +289,47 @@ data class InitUploadBean(
     val signature: String,
     val callback: String
 )
+
+/**
+ * {
+ *      "state": true,
+ *      "errno": 0,
+ *      "errtype": "suc",
+ *      "errcode": 0,
+ *      "file_size": 70966705837,
+ *      "torrent_name": "name",
+ *      "file_count": 28,
+ *      "info_hash": "hash",
+ *      "torrent_filelist_web": [
+ *           {
+ *                "size": 3902418,
+ *                "path": "预览图/2021_04_24_07_37_IMG_1379.JPG",
+ *                "wanted": 1
+ *           }
+ *      ]
+ * }
+ */
+data class TorrentFileBean(
+    var state: Boolean = false,
+    var errno: Long = 0,
+    var errtype: String = "suc",
+    var errcode: Long = 0,
+    @SerializedName("file_size")
+    var fileSize: Long = 0,
+    var fileSizeString: String = "",
+    @SerializedName("torrent_name")
+    var torrentName: String = "",
+    @SerializedName("file_count")
+    var fileCount: Int = 0,
+    @SerializedName("info_hash")
+    var infoHash: String = "",
+    @SerializedName("torrent_filelist_web")
+    var torrentFileListWeb: ArrayList<TorrentFileListWeb> = arrayListOf(),
+)
+
+data class TorrentFileListWeb(
+    var size: Long = 0,
+    var sizeString: String = "",
+    var path: String = "",
+    val wanted: Int = -1,
+)

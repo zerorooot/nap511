@@ -60,6 +60,7 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
+import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -73,14 +74,15 @@ import kotlin.math.log
     "UnrememberedMutableState"
 )
 @OptIn(
-    ExperimentalAnimationApi::class,
     ExperimentalFoundationApi::class,
     ExperimentalMaterial3Api::class,
     ExperimentalMaterialApi::class
 )
 @Composable
 fun FileScreen(
-    fileViewModel: FileViewModel, appBarOnClick: (String) -> Unit
+    fileViewModel: FileViewModel,
+    offlineFileViewModel: OfflineFileViewModel,
+    appBarOnClick: (String) -> Unit
 ) {
     val fileBeanList = fileViewModel.fileBeanList
     val path by fileViewModel.currentPath.collectAsState()
@@ -94,7 +96,7 @@ fun FileScreen(
 
     val activity = LocalContext.current as Activity
 
-    CreateDialogs(fileViewModel)
+    CreateDialogs(fileViewModel, offlineFileViewModel)
 
 
     val itemOnLongClick = { i: Int ->
@@ -168,7 +170,7 @@ fun FileScreen(
                 //加载文件
                 fileViewModel.getFiles(fileBean.categoryId)
             }
-
+            //打开视频
             if (fileBean.isVideo == 1) {
                 val intent = Intent(activity, VideoActivity::class.java)
                 intent.putExtra("cookie", App.cookie)
@@ -176,6 +178,7 @@ fun FileScreen(
                 intent.putExtra("pick_code", fileBean.pickCode)
                 activity.startActivity(intent)
             }
+            //打开图片
             if (fileBean.photoThumb != "") {
                 //具体实现在MainActivity#MyNavigationDrawer()
                 val photoFileBeanList =
@@ -184,6 +187,11 @@ fun FileScreen(
                 fileViewModel.photoFileBeanList.addAll(photoFileBeanList)
                 fileViewModel.photoIndexOf = photoFileBeanList.indexOf(fileBean)
                 App.selectedItem = "photo"
+            }
+            // 打开种子文件
+            if (fileBean.fileIco == R.drawable.torrent) {
+                offlineFileViewModel.isOpenCreateSelectTorrentFileDialog = true
+                offlineFileViewModel.getTorrentTask(fileBean.sha1)
             }
 
 
@@ -306,7 +314,7 @@ fun FileScreen(
                             item,
                             index,
                             fileViewModel.clickMap.getOrDefault(path, -1),
-                            Modifier.animateItemPlacement(),
+                            Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null),
                             myItemOnClick,
                             itemOnLongClick,
                             menuOnClick
@@ -324,23 +332,27 @@ fun FileScreen(
 
 @ExperimentalMaterial3Api
 @Composable
-fun CreateDialogs(fileViewModel: FileViewModel) {
+fun CreateDialogs(fileViewModel: FileViewModel, offlineFileViewModel: OfflineFileViewModel) {
     val context = LocalContext.current
+    //新建文件夹
     CreateFolderDialog(fileViewModel) {
         if (it != "") {
             fileViewModel.createFolder(it)
         }
         fileViewModel.isOpenCreateFolderDialog = false
     }
+    //重命名
     RenameFileDialog(fileViewModel) {
         if (it != "") {
             fileViewModel.rename(it)
         }
         fileViewModel.isOpenRenameFileDialog = false
     }
+    //文件信息
     FileInfoDialog(fileViewModel) {
         fileViewModel.isOpenFileInfoDialog = false
     }
+    //文件排序
     FileOrderDialog(fileViewModel = fileViewModel) {
         fileViewModel.isOpenFileOrderDialog = false
         if (it.contains("视频时间")) {
@@ -363,7 +375,7 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
 
         }
     }
-
+//aria2
     Aria2Dialog(
         fileViewModel = fileViewModel, context = DataStoreUtil.getData(
             ConfigUtil.aria2Url, ConfigUtil.aria2UrldefValue
@@ -377,13 +389,21 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
             thread { checkAria2(aria2Url, aria2Token, context) }
         }
     }
-
+//搜索
     SearchDialog(fileViewModel) {
         if (it != "") {
             fileViewModel.search(it)
         }
         fileViewModel.isOpenSearchDialog = false
     }
+    CreateSelectTorrentFileDialog(offlineFileViewModel) { torrentFileBean, map ->
+        offlineFileViewModel.isOpenCreateSelectTorrentFileDialog = false
+        if (map.isEmpty()) {
+            return@CreateSelectTorrentFileDialog
+        }
+        offlineFileViewModel.addTorrentTask(torrentFileBean, map.keys.joinToString(separator = ","))
+    }
+
 }
 
 /**
