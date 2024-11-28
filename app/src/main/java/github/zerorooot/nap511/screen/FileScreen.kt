@@ -48,6 +48,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
@@ -80,10 +81,11 @@ import kotlin.math.log
 )
 @Composable
 fun FileScreen(
-    fileViewModel: FileViewModel,
-    offlineFileViewModel: OfflineFileViewModel,
     appBarOnClick: (String) -> Unit
 ) {
+    val fileViewModel= viewModel<FileViewModel>()
+    val offlineFileViewModel = viewModel<OfflineFileViewModel>()
+
     val fileBeanList = fileViewModel.fileBeanList
     val path by fileViewModel.currentPath.collectAsState()
 
@@ -96,7 +98,7 @@ fun FileScreen(
 
     val activity = LocalContext.current as Activity
 
-    CreateDialogs(fileViewModel, offlineFileViewModel)
+    CreateDialogs(fileViewModel)
 
 
     val itemOnLongClick = { i: Int ->
@@ -190,6 +192,7 @@ fun FileScreen(
             }
             // 打开种子文件
             if (fileBean.fileIco == R.drawable.torrent) {
+                fileViewModel.setRefreshingStatus(true)
                 offlineFileViewModel.isOpenCreateSelectTorrentFileDialog = true
                 offlineFileViewModel.getTorrentTask(fileBean.sha1)
             }
@@ -332,7 +335,7 @@ fun FileScreen(
 
 @ExperimentalMaterial3Api
 @Composable
-fun CreateDialogs(fileViewModel: FileViewModel, offlineFileViewModel: OfflineFileViewModel) {
+fun CreateDialogs(fileViewModel: FileViewModel) {
     val context = LocalContext.current
     //新建文件夹
     CreateFolderDialog(fileViewModel) {
@@ -396,7 +399,9 @@ fun CreateDialogs(fileViewModel: FileViewModel, offlineFileViewModel: OfflineFil
         }
         fileViewModel.isOpenSearchDialog = false
     }
-    CreateSelectTorrentFileDialog(offlineFileViewModel) { torrentFileBean, map ->
+    //查看种子文件内容
+    val offlineFileViewModel = viewModel<OfflineFileViewModel>()
+    CreateSelectTorrentFileDialog() { torrentFileBean, map ->
         offlineFileViewModel.isOpenCreateSelectTorrentFileDialog = false
         if (map.isEmpty()) {
             return@CreateSelectTorrentFileDialog

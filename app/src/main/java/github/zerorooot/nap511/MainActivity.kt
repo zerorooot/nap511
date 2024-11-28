@@ -113,7 +113,7 @@ class MainActivity : ComponentActivity() {
             listOf(
                 WorkInfo.State.ENQUEUED,
                 WorkInfo.State.RUNNING,
-                WorkInfo.State.SUCCEEDED,
+//                WorkInfo.State.SUCCEEDED,
                 WorkInfo.State.FAILED,
                 WorkInfo.State.BLOCKED,
                 WorkInfo.State.CANCELLED
@@ -201,7 +201,7 @@ class MainActivity : ComponentActivity() {
             content = {
                 when (App.selectedItem) {
                     "登录" -> Login()
-                    "我的文件" -> MyFileScreen(offlineFileViewModel, fileViewModel)
+                    "我的文件" -> MyFileScreen(fileViewModel)
                     "离线下载" -> OfflineDownloadScreen(offlineFileViewModel, fileViewModel)
                     "离线列表" -> OfflineFileScreen(offlineFileViewModel, fileViewModel)
                     "网页版" -> WebViewScreen()
@@ -265,14 +265,11 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun MyFileScreen(
-        offlineFileViewModel: OfflineFileViewModel,
         fileViewModel: FileViewModel
     ) {
         fileViewModel.init()
 
         FileScreen(
-            fileViewModel,
-            offlineFileViewModel,
             appBarClick(fileViewModel),
         )
     }

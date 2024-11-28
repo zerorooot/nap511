@@ -45,8 +45,8 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
 
     lateinit var offlineTask: OfflineTask
 
-    private val _torrentBean = MutableStateFlow(TorrentFileBean())
-    var torrentBean = _torrentBean.asStateFlow()
+
+    var torrentBean by mutableStateOf(TorrentFileBean())
 
     //打开对话框相关
     var isOpenCreateSelectTorrentFileDialog by mutableStateOf(false)
@@ -77,6 +77,8 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
 
     fun getTorrentTask(sha1: String) {
         viewModelScope.launch {
+            //clear torrent bean
+            torrentBean = TorrentFileBean()
             val sign = offlineService.getSign().sign
             val torrentTask = offlineService.getTorrentTaskList(sha1, App.uid, sign)
             torrentTask.fileSizeString = android.text.format.Formatter.formatFileSize(
@@ -88,7 +90,7 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
                     application, b.size
                 ) + " "
             }
-            _torrentBean.value = torrentTask
+            torrentBean = torrentTask
         }
     }
 
@@ -105,6 +107,12 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
             val message = if (addTorrentTask.state) {
                 "任务添加成功，文件已保存至 /云下载/${torrentFileBean.torrentName}"
             } else {
+                if (addTorrentTask.errorMsg.contains("请验证账号")) {
+                    App.captchaUrl =
+                        "https://captchaapi.115.com/?ac=security_code&type=web&cb=Close911_" + System.currentTimeMillis()
+                    //打开验证页面
+                    App.selectedItem = "captchaWebView"
+                }
                 "任务添加失败，${addTorrentTask.errorMsg}"
             }
             App.instance.toast(message)

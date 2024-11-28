@@ -204,6 +204,10 @@ class FileViewModel(private val cookie: String, private val application: Applica
         }
     }
 
+    fun setRefreshingStatus(status: Boolean) {
+        _isRefreshing.value = status
+    }
+
     fun getFiles(cid: String) {
         viewModelScope.launch {
             _isRefreshing.value = true

@@ -15,12 +15,16 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,6 +60,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import github.zerorooot.nap511.R
@@ -67,22 +73,12 @@ import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import kotlinx.coroutines.delay
+import java.io.File
 
 @Composable
 fun CreateFolderDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
     if (fileViewModel.isOpenCreateFolderDialog) {
         BaseDialog("请输入新建文件名", "文件名", enter = enter)
-    }
-}
-
-@Composable
-fun CreateSelectTorrentFileDialog(
-    offlineFileViewModel: OfflineFileViewModel,
-    enter: (TorrentFileBean, Map<Int, TorrentFileListWeb>) -> Unit
-) {
-    if (offlineFileViewModel.isOpenCreateSelectTorrentFileDialog) {
-        val torrentBean by offlineFileViewModel.torrentBean.collectAsState()
-        SelectTorrentFileDialog(torrentBean, enter)
     }
 }
 
@@ -356,24 +352,43 @@ private fun RadioButtonDialog(
 }
 
 @Composable
+fun CreateSelectTorrentFileDialog(
+    enter: (TorrentFileBean, Map<Int, TorrentFileListWeb>) -> Unit
+) {
+    val offlineFileViewModel = viewModel<OfflineFileViewModel>()
+    if (offlineFileViewModel.isOpenCreateSelectTorrentFileDialog) {
+        val torrentBean = offlineFileViewModel.torrentBean
+        if (!torrentBean.state) {
+            return
+        }
+        viewModel<FileViewModel>().setRefreshingStatus(false)
+        SelectTorrentFileDialog(torrentBean, enter)
+    }
+}
+
+@Composable
 private fun SelectTorrentFileDialog(
     torrentFileBean: TorrentFileBean,
     enter: (torrentFileBean: TorrentFileBean, Map<Int, TorrentFileListWeb>) -> Unit
 ) {
-    val listState = rememberLazyListState()
-    val selectMap = remember { mutableStateMapOf<Int, TorrentFileListWeb>() }
-    var sumSize: Long = 0
+    //select all
+    val selectMap = remember {
+        mutableStateMapOf<Int, TorrentFileListWeb>().apply {
+            torrentFileBean.torrentFileListWeb.forEachIndexed { index, torrentFileListWeb ->
+                if (torrentFileListWeb.wanted == 1) {
+                    this[index] = torrentFileListWeb
+                }
+            }
+        }
+    }
     val isSelectedItem: (Int) -> Boolean = { selectMap.containsKey(it) }
     val onChangeState: (Int, TorrentFileListWeb) -> Unit = { i: Int, s: TorrentFileListWeb ->
-        sumSize = 0
         if (selectMap.containsKey(i)) {
             selectMap.remove(i)
         } else {
             selectMap[i] = s
         }
-        selectMap.values.forEach { b -> sumSize += b.size }
     }
-
     AlertDialog(
         onDismissRequest = {
             selectMap.clear()
@@ -399,8 +414,6 @@ private fun SelectTorrentFileDialog(
                                 selectMap[index] = torrentFileListWeb
                             }
                         }
-                        sumSize = 0
-                        selectMap.values.forEach { b -> sumSize += b.size }
                     },
                 ) {
                     Text(text = "全选")
@@ -416,8 +429,6 @@ private fun SelectTorrentFileDialog(
                                 }
                             }
                         }
-                        sumSize = 0
-                        selectMap.values.forEach { b -> sumSize += b.size }
                     },
                 ) {
                     Text(text = "反选")
@@ -435,12 +446,14 @@ private fun SelectTorrentFileDialog(
             Column() {
                 AutoSizableTextField(
                     value = "已经选择${selectMap.size}/${torrentFileBean.fileCount}个，总计：${
-                        android.text.format.Formatter.formatFileSize(App.instance, sumSize)
+                        android.text.format.Formatter.formatFileSize(
+                            App.instance,
+                            selectMap.values.sumOf { it.size })
                     }\n" + "共${torrentFileBean.fileCount}个文件，总计：${torrentFileBean.fileSizeString}",
                     minFontSize = 30.sp,
                     maxLines = 2
                 )
-                LazyColumn(modifier = Modifier.padding(8.dp), state = listState) {
+                LazyColumn(modifier = Modifier.padding(8.dp)) {
                     itemsIndexed(items = torrentFileBean.torrentFileListWeb, key = { _, item ->
                         item.hashCode()
                     }) { index, item ->
