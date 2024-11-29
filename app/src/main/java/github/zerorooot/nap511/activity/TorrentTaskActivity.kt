@@ -36,6 +36,7 @@ class TorrentTaskActivity : Activity() {
             val defaultOfflineCid = DataStoreUtil.getData(ConfigUtil.defaultOfflineCid, "0")
             initUpload(torrentFile, App.cookie, uid, defaultOfflineCid)
         }
+        moveTaskToBack(true);
         finishAndRemoveTask()
     }
 

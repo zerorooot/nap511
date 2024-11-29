@@ -108,7 +108,7 @@ fun SettingScreen() {
 
         if (DataStoreUtil.getData(
                 ConfigUtil.offlineMethod,
-                false
+                true
             )
         ) {
             prefsItem {

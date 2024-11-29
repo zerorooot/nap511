@@ -28,13 +28,10 @@ class App : Application() {
         var uid by mutableStateOf("0")
 
         //页面导航
-        var selectedItem by mutableStateOf("我的文件")
+        var selectedItem by mutableStateOf(ConfigUtil.MY_FILE)
 
         //页面手势
         var gesturesEnabled by mutableStateOf(true)
-
-        //验证账号网址
-        var captchaUrl by mutableStateOf("")
 
         //每次请求文件数
         var requestLimitCount: Int = 100
@@ -72,7 +69,8 @@ class App : Application() {
             "https://passportapi.115.com/app/1.0/web/1.0/check/sso?_${System.currentTimeMillis() / 1000}"
         val okHttpClient = OkHttpClient()
         val request: Request = Request.Builder().url(url).addHeader("cookie", cookie)
-            .addHeader("Content-Type", "application/json; Charset=UTF-8").addHeader(
+            .addHeader("Content-Type", "application/json; Charset=UTF-8")
+            .addHeader(
                 "User-Agent",
                 "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
             ).get().build()

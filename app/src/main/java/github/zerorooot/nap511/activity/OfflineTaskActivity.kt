@@ -36,6 +36,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.StringJoiner
 import java.util.concurrent.TimeUnit
+import kotlin.system.exitProcess
 
 
 class OfflineTaskActivity : Activity() {
@@ -85,6 +86,7 @@ class OfflineTaskActivity : Activity() {
             val clip = ClipData.newPlainText("label", intent.getStringExtra("link"))
             clipboard?.setPrimaryClip(clip)
         }
+        moveTaskToBack(true);
         finishAndRemoveTask()
     }
 
@@ -211,10 +213,11 @@ class OfflineTaskWorker(
             setStyle(NotificationCompat.BigTextStyle().bigText(message))
         }
 
+        val pendingIntent: PendingIntent
         if (message.contains("任务添加失败")) {
-            val pendingIntent = if (message.contains("请验证账号")) {
+             pendingIntent = if (message.contains("请验证账号")) {
                 val intent = Intent(this.applicationContext, MainActivity::class.java)
-                intent.action = "jump"
+                intent.action = "check"
                 notification.setContentText("$message。点我跳转验证账号页面")
                 PendingIntent.getActivity(
                     this.applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE
@@ -230,12 +233,16 @@ class OfflineTaskWorker(
                     this.applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE
                 )
             }
-
-            notification.setContentIntent(pendingIntent)
         } else {
+            val intent = Intent(this.applicationContext, MainActivity::class.java)
+            intent.action = "jump"
             notification.setContentText(message)
+            pendingIntent = PendingIntent.getActivity(
+                this.applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE
+            )
         }
 
+        notification.setContentIntent(pendingIntent)
         notificationManager.notify(notificationId, notification.build())
     }
 

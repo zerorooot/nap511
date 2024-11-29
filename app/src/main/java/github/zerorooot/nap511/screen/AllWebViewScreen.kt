@@ -28,6 +28,7 @@ import com.acsbendi.requestinspectorwebview.RequestInspectorWebViewClient
 import com.acsbendi.requestinspectorwebview.WebViewRequest
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.OfflineTaskWorker
 import github.zerorooot.nap511.ui.theme.Purple80
@@ -80,7 +81,7 @@ fun BaseWebViewScreen(
                         settings.domStorageEnabled = true;//开启DOM缓存，关闭的话H5自身的一些操作是无效的
                         settings.cacheMode = WebSettings.LOAD_DEFAULT;
                         // Allow mixed content for WebSocket connections (optional, if needed)
-                        settings.mixedContentMode= WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                        settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                         settings.userAgentString =
                             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
                     }
@@ -173,7 +174,7 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
 //                    val c2 = App().checkLogin(matches[1].replace(" ", ""))
 //                    println()
 //                }
-                message = "登陆成功,请重启应用！"
+                message = "登陆成功,请重启中～"
 
                 cookie = matches[1].replace(" ", "")
                 val uid = UrlQuerySanitizer(url).getValue("user_id")
@@ -182,6 +183,8 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
                 App.cookie = cookie
                 App.gesturesEnabled = true
                 App.instance.toast(message)
+                //restart
+                ProcessPhoenix.triggerRebirth(App.instance);
             }
             return super.shouldInterceptRequest(view, webViewRequest)
         }
@@ -199,12 +202,12 @@ fun CaptchaWebViewScreen() {
     }
     cookieManager.flush()
     BaseWebViewScreen(
-        titleText = "验证码",
+        titleText = "磁力链接验证码",
         topAppBarActionButtonOnClick = {
             App.instance.openDrawerState()
         },
         webViewClient = { captchaWebViewClient(it) },
-        loadUrl = App.captchaUrl
+        loadUrl = "https://captchaapi.115.com/?ac=security_code&type=web&cb=Close911_" + System.currentTimeMillis()
     )
 
 }
@@ -218,7 +221,7 @@ fun CaptchaVideoWebViewScreen() {
     }
     cookieManager.flush()
     BaseWebViewScreen(
-        titleText = "验证码",
+        titleText = "视频播放验证码",
         topAppBarActionButtonOnClick = {
             App.instance.openDrawerState()
         },
@@ -247,7 +250,7 @@ fun captchaWebViewClient(webView: WebView): WebViewClient {
                 val response = httpClient.newCall(a.build()).execute()
                 val string = response.body.string()
                 if (string.contains("{\"state\":true}")) {
-                    App.selectedItem = "我的文件"
+                    App.selectedItem = ConfigUtil.MY_FILE
                     addTask()
                     App.instance.toast("验证账号成功~，重新添加链接中.......")
                 }

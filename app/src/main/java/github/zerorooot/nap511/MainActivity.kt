@@ -1,31 +1,79 @@
 package github.zerorooot.nap511
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.LinearProgressIndicator
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.IntentCompat
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkQuery
+import coil.compose.rememberAsyncImagePainter
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.google.gson.Gson
+import com.google.gson.JsonObject
 import com.google.gson.reflect.TypeToken
+import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.activity.OfflineTaskWorker
-import github.zerorooot.nap511.bean.TorrentFileBean
-import github.zerorooot.nap511.bean.TorrentFileListWeb
+import github.zerorooot.nap511.bean.AvatarBean
+import github.zerorooot.nap511.bean.InfoBean
 import github.zerorooot.nap511.factory.CookieViewModelFactory
-import github.zerorooot.nap511.screen.*
+import github.zerorooot.nap511.screen.CaptchaVideoWebViewScreen
+import github.zerorooot.nap511.screen.CaptchaWebViewScreen
+import github.zerorooot.nap511.screen.CookieDialog
+import github.zerorooot.nap511.screen.ExitApp
+import github.zerorooot.nap511.screen.FileScreen
+import github.zerorooot.nap511.screen.LoginWebViewScreen
+import github.zerorooot.nap511.screen.MyPhotoScreen
+import github.zerorooot.nap511.screen.OfflineDownloadScreen
+import github.zerorooot.nap511.screen.OfflineFileScreen
+import github.zerorooot.nap511.screen.RecycleScreen
+import github.zerorooot.nap511.screen.SettingScreen
+import github.zerorooot.nap511.screen.WebViewScreen
 import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigUtil
@@ -34,6 +82,12 @@ import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import kotlinx.coroutines.launch
+import okhttp3.Call
+import okhttp3.Interceptor
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import okio.IOException
 import kotlin.concurrent.thread
 
 
@@ -60,9 +114,20 @@ class MainActivity : ComponentActivity() {
                         App.instance.goToNotificationSetting(this)
                     }
                     //直接添加磁力，但提示请验证账号;跳转到验证账号界面
-                    if (intent.action == "jump") {
-                        App.selectedItem = "验证账号"
+                    if (intent.action == "check") {
+                        App.selectedItem = ConfigUtil.VERIFY_MAGNET_LINK_ACCOUNT
                     }
+                    //跳转到默认下载目录
+                    if (intent.action == "jump") {
+                        viewModels<FileViewModel>().value.getFiles(
+                            DataStoreUtil.getData(
+                                ConfigUtil.defaultOfflineCid,
+                                "0"
+                            )
+                        )
+                    }
+                    //检测未上传的磁力链接
+                    checkOfflineTask(cookie)
                 }
             }
         }
@@ -92,15 +157,12 @@ class MainActivity : ComponentActivity() {
         rememberSystemUiController().apply {
             isSystemBarsVisible = visible
         }
-        BackHandler(App.selectedItem == "photo" || App.selectedItem == "webView") {
-            App.selectedItem = "我的文件"
+        BackHandler(App.selectedItem == ConfigUtil.PHOTO || App.selectedItem == ConfigUtil.WEB) {
+            App.selectedItem = ConfigUtil.MY_FILE
             visible = true
         }
 
         MyNavigationDrawer(fileViewModel, offlineFileViewModel, recycleViewModel)
-
-        checkOfflineTask(cookie)
-
     }
 
     /**
@@ -146,7 +208,6 @@ class MainActivity : ComponentActivity() {
         val request: OneTimeWorkRequest =
             OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java).setInputData(data)
                 .build()
-//            WorkManager.getInstance(applicationContext).enqueue(request)
         WorkManager.getInstance(applicationContext)
             .enqueueUniqueWork(
                 "addOfflineTaskByCount",
@@ -168,22 +229,26 @@ class MainActivity : ComponentActivity() {
         App.drawerState = drawerState
         App.scope = scope
         val itemMap = linkedMapOf(
-            R.drawable.baseline_login_24 to "登录",
-            R.drawable.baseline_cloud_24 to "我的文件",
-            R.drawable.baseline_cloud_download_24 to "离线下载",
-            R.drawable.baseline_cloud_done_24 to "离线列表",
-//            R.drawable.baseline_add_moderator_24 to "验证video账号",
-//            R.drawable.baseline_web_24 to "网页版",
-            R.drawable.ic_baseline_delete_24 to "回收站",
-            R.drawable.baseline_settings_24 to "高级设置",
-            R.drawable.android_exit to "退出应用"
+            R.drawable.baseline_login_24 to ConfigUtil.LOGIN,
+            R.drawable.baseline_cloud_24 to ConfigUtil.MY_FILE,
+            R.drawable.baseline_cloud_download_24 to ConfigUtil.OFFLINE_DOWNLOAD,
+            R.drawable.baseline_cloud_done_24 to ConfigUtil.OFFLINE_LIST,
+            R.drawable.baseline_video_moderator_24 to ConfigUtil.VERIFY_VIDEO_ACCOUNT,
+            R.drawable.baseline_magent_moderator_24 to ConfigUtil.VERIFY_MAGNET_LINK_ACCOUNT,
+//            R.drawable.baseline_web_24 to "ConfigUtil.WEB",
+            R.drawable.ic_baseline_delete_24 to ConfigUtil.RECYCLE_BIN,
+            R.drawable.baseline_settings_24 to ConfigUtil.ADVANCED_SETTINGS,
+            R.drawable.android_exit to ConfigUtil.EXIT_APPLICATION
         )
-
         ModalNavigationDrawer(gesturesEnabled = App.gesturesEnabled,
             drawerState = drawerState,
             drawerContent = {
                 ModalDrawerSheet {
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(6.dp))
+                    //头像
+                    Avatar()
+                    //菜单栏
+                    Spacer(Modifier.height(6.dp))
                     itemMap.forEach { (t, u) ->
                         NavigationDrawerItem(icon = {
                             Icon(
@@ -200,31 +265,153 @@ class MainActivity : ComponentActivity() {
             },
             content = {
                 when (App.selectedItem) {
-                    "登录" -> Login()
-                    "我的文件" -> MyFileScreen(fileViewModel)
-                    "离线下载" -> OfflineDownloadScreen(offlineFileViewModel, fileViewModel)
-                    "离线列表" -> OfflineFileScreen(offlineFileViewModel, fileViewModel)
-                    "网页版" -> WebViewScreen()
-                    "回收站" -> RecycleScreen(recycleViewModel)
-                    "高级设置" -> SettingScreen()
-                    "验证账号" -> {
-                        App.captchaUrl =
-                            "https://captchaapi.115.com/?ac=security_code&type=web&cb=Close911_" + System.currentTimeMillis()
+                    ConfigUtil.LOGIN -> Login()
+                    ConfigUtil.MY_FILE -> MyFileScreen(fileViewModel)
+                    ConfigUtil.OFFLINE_DOWNLOAD -> OfflineDownloadScreen(
+                        offlineFileViewModel,
+                        fileViewModel
+                    )
+
+                    ConfigUtil.OFFLINE_LIST -> OfflineFileScreen(
+                        offlineFileViewModel,
+                        fileViewModel
+                    )
+
+                    ConfigUtil.WEB -> WebViewScreen()
+                    ConfigUtil.RECYCLE_BIN -> RecycleScreen(recycleViewModel)
+                    ConfigUtil.ADVANCED_SETTINGS -> SettingScreen()
+                    ConfigUtil.VERIFY_MAGNET_LINK_ACCOUNT -> {
                         CaptchaWebViewScreen()
                     }
 
-                    "验证video账号" -> {
+                    ConfigUtil.VERIFY_VIDEO_ACCOUNT -> {
                         CaptchaVideoWebViewScreen()
                     }
 
-                    "退出应用" -> ExitApp()
-                    "captchaWebView" -> CaptchaWebViewScreen()
-                    "loginWebView" -> LoginWebViewScreen()
-                    "photo" -> {
+                    ConfigUtil.EXIT_APPLICATION -> ExitApp()
+                    ConfigUtil.PHOTO -> {
                         MyPhotoScreen(fileViewModel)
                     }
                 }
             })
+    }
+
+    /**
+     * 头像、网名、uid、已用空间
+     */
+    @Composable
+    private fun Avatar() {
+        val avatarBean = remember { mutableStateOf(AvatarBean()) }
+        val avatarUrl = "https://my.115.com/proapi/3.0/index.php?method=user_info&uid=${App.uid}"
+        val okHttpClient = OkHttpClient().newBuilder()
+            .addInterceptor(Interceptor { chain ->
+                chain.proceed(
+                    chain.request().newBuilder()
+                        .addHeader("Cookie", App.cookie)
+                        .addHeader(
+                            "User-Agent",
+                            "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
+                        )
+                        .build()
+                );
+            }).build()
+
+        val infoUrl = "https://webapi.115.com/files/index_info?count_space_nums=1"
+
+        val avatarRequest: Request = Request.Builder().url(avatarUrl).get().build()
+        okHttpClient.newCall(avatarRequest).enqueue(object : okhttp3.Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                App.instance.toast(e.message + "")
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                val body = response.body.string()
+                //{"state":true,"data":{"space_info":{"all_total":{"size":11111,"size_format":"1TB"},"all_remain":{"size":1111,"size_format":"1TB"},"all_use":{"size":1111,"size_format":"1TB"}}},"error":"","code":0}
+//                println(body)
+                avatarBean.value = Gson().fromJson(body, AvatarBean::class.java)
+            }
+        })
+
+        val infoBean = remember { mutableStateOf(InfoBean()) }
+        val infoRequest: Request = Request.Builder().url(infoUrl).get().build()
+        okHttpClient.newCall(infoRequest).enqueue(object : okhttp3.Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                App.instance.toast(e.message + "")
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                val body = response.body.string()
+                val spaceInfo =
+                    Gson().fromJson(body, JsonObject::class.java).getAsJsonObject("data")
+                        .getAsJsonObject("space_info")
+                val allUse = spaceInfo.getAsJsonObject("all_use").get("size").asLong
+                val allUseString = spaceInfo.getAsJsonObject("all_use").get("size_format").asString
+                val allTotal = spaceInfo.getAsJsonObject("all_total").get("size").asLong
+                val allTotalString =
+                    spaceInfo.getAsJsonObject("all_total").get("size_format").asString
+                val allRemain = spaceInfo.getAsJsonObject("all_remain").get("size").asLong
+                val allRemainString =
+                    spaceInfo.getAsJsonObject("all_remain").get("size_format").asString
+
+                infoBean.value = InfoBean(
+                    allRemain,
+                    allRemainString,
+                    allTotal,
+                    allTotalString,
+                    allUse,
+                    allUseString
+                )
+            }
+        })
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally, // 水平居中
+        ) {
+            //头像
+            Image(
+                painter = rememberAsyncImagePainter(
+                    ImageRequest.Builder(LocalContext.current)
+                        .data(avatarBean.value.data.user_face)
+                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .networkCachePolicy(CachePolicy.ENABLED)
+                        .apply(block = fun ImageRequest.Builder.() {
+                            scale(coil.size.Scale.FILL)
+                            placeholder(R.drawable.avatar)
+                        }).build()
+                ),
+                modifier = Modifier
+                    .height(100.dp)
+                    .width(100.dp)
+                    //圆形裁剪
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop,
+                contentDescription = "",
+            )
+            Spacer(Modifier.height(6.dp))
+            //用户名
+            Text(
+                text = avatarBean.value.data.user_name,
+                style = MaterialTheme.typography.titleMedium
+            )
+            //uid
+            Text(text = App.uid)
+            Spacer(Modifier.height(6.dp))
+            //已用空间
+            Text(
+                text = "总计${infoBean.value.allTotalString}，已用${infoBean.value.allUseString}，剩余${infoBean.value.allRemainString}",
+                style = MaterialTheme.typography.titleSmall
+            )
+            //进度条
+            LinearProgressIndicator(
+                progress = (infoBean.value.allUse.toDouble() / infoBean.value.allTotal).toFloat(),
+                color = Color.Cyan,
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .clip(shape = RoundedCornerShape(100.dp))
+            )
+        }
     }
 
 
@@ -252,8 +439,8 @@ class MainActivity : ComponentActivity() {
                         DataStoreUtil.putData(ConfigUtil.cookie, replace)
                         DataStoreUtil.putData(ConfigUtil.uid, checkLogin)
                         App.cookie = replace
-//                        App.isInit = true
-                        "登陆成功,请重启应用！"
+                        ProcessPhoenix.triggerRebirth(applicationContext);
+                        "登陆成功,重启中～"
                     }
                     App.instance.toast(message)
                 }

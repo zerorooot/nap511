@@ -25,17 +25,8 @@ data class LoginCookie(
 
 data class LoginData(
     var user_id: String = "0",
-    var user_name: String? = null,
-    var email: String? = null,
-    var mobile: String? = null,
-    var country: String? = null,
-    var is_vip: Int = 0,
-    var mark: Int = 0,
-    var alert: String? = null,
-//    var is_chang_passwd: Int = 0,
-//    var is_first_login: Int = 0,
-//    var bind_mobile: Int = 0,
-//    var passwd_reset: Int = 0,
+    var user_name: String = "TestTest",
+    var user_face: String = "",
     var cookie: LoginCookie? = null,
 )
 
@@ -46,6 +37,23 @@ data class LoginBean(
     var data: LoginData = LoginData(),
     var message: String = ""
 )
+
+data class AvatarBean(
+    var state: Boolean = false,
+    @SerializedName("data")
+    var data: LoginData = LoginData(),
+    var message: String = ""
+)
+
+data class InfoBean(
+    var allRemain: Long = 1L,
+    var allRemainString: String = "",
+    var allTotal: Long = 1L,
+    var allTotalString: String = "",
+    var allUse: Long = 1L,
+    var allUseString: String = "",
+)
+
 
 data class FilesBean(
     @SerializedName("data") var fileBeanList: ArrayList<FileBean>,

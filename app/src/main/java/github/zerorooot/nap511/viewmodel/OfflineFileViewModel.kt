@@ -1,7 +1,6 @@
 package github.zerorooot.nap511.viewmodel
 
 
-import android.app.Activity
 import android.app.Application
 import android.widget.Toast
 import androidx.compose.runtime.getValue
@@ -108,10 +107,8 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
                 "任务添加成功，文件已保存至 /云下载/${torrentFileBean.torrentName}"
             } else {
                 if (addTorrentTask.errorMsg.contains("请验证账号")) {
-                    App.captchaUrl =
-                        "https://captchaapi.115.com/?ac=security_code&type=web&cb=Close911_" + System.currentTimeMillis()
                     //打开验证页面
-                    App.selectedItem = "captchaWebView"
+                    App.selectedItem = ConfigUtil.VERIFY_MAGNET_LINK_ACCOUNT
                 }
                 "任务添加失败，${addTorrentTask.errorMsg}"
             }
@@ -203,10 +200,7 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
                 "任务添加成功"
             } else {
                 if (addTask.errorMsg.contains("请验证账号") && !close) {
-                    App.captchaUrl =
-                        "https://captchaapi.115.com/?ac=security_code&type=web&cb=Close911_" + System.currentTimeMillis()
-                    //打开验证页面
-                    App.selectedItem = "captchaWebView"
+                    App.selectedItem = ConfigUtil.VERIFY_MAGNET_LINK_ACCOUNT
                 }
                 //把失败的离线链接保存起来
                 val currentOfflineTaskList =

@@ -188,7 +188,7 @@ fun FileScreen(
                 fileViewModel.photoFileBeanList.clear()
                 fileViewModel.photoFileBeanList.addAll(photoFileBeanList)
                 fileViewModel.photoIndexOf = photoFileBeanList.indexOf(fileBean)
-                App.selectedItem = "photo"
+                App.selectedItem = ConfigUtil.PHOTO
             }
             // 打开种子文件
             if (fileBean.fileIco == R.drawable.torrent) {
