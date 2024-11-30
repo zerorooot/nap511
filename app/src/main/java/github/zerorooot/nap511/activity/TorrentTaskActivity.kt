@@ -9,7 +9,7 @@ import com.google.gson.Gson
 import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.InitUploadBean
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.ConfigUtil
+import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import okhttp3.Call
 import okhttp3.Callback
@@ -33,7 +33,7 @@ class TorrentTaskActivity : Activity() {
         if (intent.action == Intent.ACTION_VIEW && intent.data != null) {
             val torrentFile = fileFromContentUri(this, intent.data!!)
             val uid = App.uid
-            val defaultOfflineCid = DataStoreUtil.getData(ConfigUtil.defaultOfflineCid, "0")
+            val defaultOfflineCid = DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "0")
             initUpload(torrentFile, App.cookie, uid, defaultOfflineCid)
         }
         moveTaskToBack(true);

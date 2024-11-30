@@ -9,7 +9,6 @@ import android.os.Looper
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -58,7 +57,7 @@ import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.screenitem.FileCellItem
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.ConfigUtil
+import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
@@ -67,7 +66,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import kotlin.concurrent.thread
-import kotlin.math.log
 
 @SuppressLint(
     "UnusedMaterial3ScaffoldPaddingParameter",
@@ -135,7 +133,7 @@ fun FileScreen(
 
             "通过aria2下载" -> {
 //                val aria2Url = SharedPreferencesUtil(activity).get(ConfigUtil.aria2Url)
-                val aria2Url = DataStoreUtil.getData(ConfigUtil.aria2Url, "")
+                val aria2Url = DataStoreUtil.getData(ConfigKeyUtil.ARIA2_URL, "")
                 if (aria2Url == "") {
                     fileViewModel.isOpenAria2Dialog = true
                 } else {
@@ -155,7 +153,7 @@ fun FileScreen(
             val fileBean = fileBeanList[i]
             if (fileBean.isFolder) {
                 //提前加载上下两个文件夹
-                if (DataStoreUtil.getData(ConfigUtil.earlyLoading, false)) {
+                if (DataStoreUtil.getData(ConfigKeyUtil.EARLY_LOADING, false)) {
                     val before = i - 1
                     val after = i + 1
                     if (before >= 0 && fileBeanList[before].isFolder) {
@@ -188,7 +186,7 @@ fun FileScreen(
                 fileViewModel.photoFileBeanList.clear()
                 fileViewModel.photoFileBeanList.addAll(photoFileBeanList)
                 fileViewModel.photoIndexOf = photoFileBeanList.indexOf(fileBean)
-                App.selectedItem = ConfigUtil.PHOTO
+                App.selectedItem = ConfigKeyUtil.PHOTO
             }
             // 打开种子文件
             if (fileBean.fileIco == R.drawable.torrent) {
@@ -381,14 +379,14 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
 //aria2
     Aria2Dialog(
         fileViewModel = fileViewModel, context = DataStoreUtil.getData(
-            ConfigUtil.aria2Url, ConfigUtil.aria2UrldefValue
+            ConfigKeyUtil.ARIA2_URL, ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
         )
     ) {
         fileViewModel.isOpenAria2Dialog = false
         if (it != "") {
             val jsonObject = JsonParser().parse(it).asJsonObject
-            val aria2Url = jsonObject.get(ConfigUtil.aria2Url).asString
-            val aria2Token = jsonObject.get(ConfigUtil.aria2Token).asString
+            val aria2Url = jsonObject.get(ConfigKeyUtil.ARIA2_URL).asString
+            val aria2Token = jsonObject.get(ConfigKeyUtil.ARIA2_TOKEN).asString
             thread { checkAria2(aria2Url, aria2Token, context) }
         }
     }
@@ -438,8 +436,8 @@ private fun checkAria2(aria2Url: String, aria2Token: String, context: Context) {
         if (bodyJson.has("error")) {
             "aria2配置失败," + bodyJson.getAsJsonObject("error").get("message").asString
         } else {
-            DataStoreUtil.putData(ConfigUtil.aria2Url, aria2Url)
-            DataStoreUtil.putData(ConfigUtil.aria2Token, aria2Token)
+            DataStoreUtil.putData(ConfigKeyUtil.ARIA2_URL, aria2Url)
+            DataStoreUtil.putData(ConfigKeyUtil.ARIA2_TOKEN, aria2Token)
             "aria2配置成功，请重新下载文件"
         }
 

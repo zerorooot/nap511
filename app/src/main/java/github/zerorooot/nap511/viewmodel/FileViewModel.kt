@@ -16,7 +16,7 @@ import github.zerorooot.nap511.bean.*
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.ConfigUtil
+import github.zerorooot.nap511.util.ConfigKeyUtil
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -572,7 +572,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             return
         }
         val intent = Intent(application, Sha1Service::class.java)
-        intent.putExtra(ConfigUtil.command, ConfigUtil.sentToAria2)
+        intent.putExtra(ConfigKeyUtil.COMMAND, ConfigKeyUtil.SENT_TO_ARIA2)
         intent.putExtra("list", Gson().toJson(fileBean))
         intent.putExtra("cookie", cookie)
         application.startService(intent)

@@ -9,49 +9,23 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 
 
-data class LoginCookie(
-    @SerializedName("UID")
-    var uID: String? = null,
-    @SerializedName("CID")
-    var cID: String? = null,
-    @SerializedName("SEID")
-    var sEID: String? = null,
-) {
-    override fun toString(): String {
-        return "UID=$uID;CID=$cID;SEID=$sEID"
-    }
-}
-
-
-data class LoginData(
-    var user_id: String = "0",
-    var user_name: String = "TestTest",
-    var user_face: String = "",
-    var cookie: LoginCookie? = null,
-)
-
-
-data class LoginBean(
-    var state: Int = 0,
-    @SerializedName("data")
-    var data: LoginData = LoginData(),
-    var message: String = ""
-)
-
 data class AvatarBean(
-    var state: Boolean = false,
-    @SerializedName("data")
-    var data: LoginData = LoginData(),
-    var message: String = ""
+    var expire: Long = 1L,
+    var expireString: String = "1970-01-01 08:00:00",
+    @SerializedName("user_name")
+    var userName: String = "Test",
+    var face: String = "https://my.115.com/static/2014v1.0/personal/head/80/male/male034.png",
+    @SerializedName("user_id")
+    var userId: String = "0"
 )
 
-data class InfoBean(
+data class RemainingSpaceBean(
     var allRemain: Long = 1L,
-    var allRemainString: String = "",
+    var allRemainString: String = "1T",
     var allTotal: Long = 1L,
-    var allTotalString: String = "",
+    var allTotalString: String = "1T",
     var allUse: Long = 1L,
-    var allUseString: String = "",
+    var allUseString: String = "1T",
 )
 
 

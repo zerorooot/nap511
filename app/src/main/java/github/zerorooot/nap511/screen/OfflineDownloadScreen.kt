@@ -15,6 +15,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.R
@@ -48,6 +49,8 @@ fun OfflineDownloadScreen(
         }
     }
 
+    val minHeightPercentage = 0.5f // 最小高度百分比
+    val maxHeightPercentage = 0.65f // 最大高度百分比
 
     var urlText by remember {
         mutableStateOf("")
@@ -98,8 +101,11 @@ fun OfflineDownloadScreen(
                         }
                     },
                     modifier = Modifier
-                        .width(280.dp)
-                        .heightIn(380.dp, 600.dp),
+                        .width((maxHeightPercentage * LocalConfiguration.current.screenWidthDp).dp)
+                        .heightIn(
+                            min = (minHeightPercentage * LocalConfiguration.current.screenHeightDp).dp,
+                            max = (maxHeightPercentage * LocalConfiguration.current.screenHeightDp).dp
+                        )
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(text = "本月配额：剩${quotaBean.surplus}/总${quotaBean.count}个")
@@ -110,7 +116,7 @@ fun OfflineDownloadScreen(
                     label = { Text(text = "离线位置") },
                     readOnly = true,
                     onValueChange = { },
-                    modifier = Modifier.width(280.dp)
+                    modifier = Modifier.width((maxHeightPercentage * LocalConfiguration.current.screenWidthDp).dp)
                 )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

@@ -8,7 +8,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -29,14 +28,13 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.SignBean
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.ConfigUtil
+import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.StringJoiner
 import java.util.concurrent.TimeUnit
-import kotlin.system.exitProcess
 
 
 class OfflineTaskActivity : Activity() {
@@ -64,7 +62,7 @@ class OfflineTaskActivity : Activity() {
             //非空列表
             if (urlList.isNotEmpty()) {
                 val currentOfflineTaskList =
-                    DataStoreUtil.getData(ConfigUtil.currentOfflineTask, "")
+                    DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
                         .split("\n")
                         .filter { i -> i != "" && i != " " }
                         .toSet()
@@ -72,7 +70,7 @@ class OfflineTaskActivity : Activity() {
                 //添加所有
                 currentOfflineTaskList.addAll(urlList)
                 //离线任务缓存方式,true为x分钟后统一下载，false为集满后统一下载
-                if (DataStoreUtil.getData(ConfigUtil.offlineMethod, true)) {
+                if (DataStoreUtil.getData(ConfigKeyUtil.OFFLINE_METHOD, true)) {
                     addOfflineTaskByTime(currentOfflineTaskList.toList())
                 } else {
                     addOfflineTaskByCount(currentOfflineTaskList.toList())
@@ -86,7 +84,11 @@ class OfflineTaskActivity : Activity() {
             val clip = ClipData.newPlainText("label", intent.getStringExtra("link"))
             clipboard?.setPrimaryClip(clip)
         }
-        moveTaskToBack(true);
+        //通过ACTION_PROCESS_TEXT添加磁力链接时，如果moveTaskToBack(true)，当前应用会回到桌面
+        if (intent.action != Intent.ACTION_PROCESS_TEXT){
+            moveTaskToBack(true);
+        }
+
         finishAndRemoveTask()
     }
 
@@ -94,7 +96,7 @@ class OfflineTaskActivity : Activity() {
     private fun addOfflineTaskByTime(currentOfflineTaskList: List<String>) {
         //检查离线任务时间
         val offlineTime = try {
-            DataStoreUtil.getData(ConfigUtil.defaultOfflineTime, "5").toLong()
+            DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_TIME, "5").toLong()
         } catch (e: Exception) {
             5L
         }
@@ -102,7 +104,7 @@ class OfflineTaskActivity : Activity() {
         currentOfflineTaskList.toSet().forEach { stringJoiner.add(it) }
         //写入缓存
         DataStoreUtil.putData(
-            ConfigUtil.currentOfflineTask,
+            ConfigKeyUtil.CURRENT_OFFLINE_TASK,
             stringJoiner.toString()
         )
 
@@ -127,7 +129,7 @@ class OfflineTaskActivity : Activity() {
     private fun addOfflineTaskByCount(currentOfflineTaskList: List<String>) {
         //检查离线任务缓存数
         val offlineCount = try {
-            DataStoreUtil.getData(ConfigUtil.defaultOfflineCount, "5").toInt()
+            DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_COUNT, "5").toInt()
         } catch (e: Exception) {
             5
         }
@@ -153,7 +155,7 @@ class OfflineTaskActivity : Activity() {
             currentOfflineTaskList.forEach { stringJoiner.add(it) }
             //写入缓存
             DataStoreUtil.putData(
-                ConfigUtil.currentOfflineTask,
+                ConfigKeyUtil.CURRENT_OFFLINE_TASK,
                 stringJoiner.toString()
             )
             App.instance.toast("已添加${currentOfflineTaskList.size}个链接到缓存中，剩余${offlineCount - currentOfflineTaskList.size}个")
@@ -175,7 +177,7 @@ class OfflineTaskWorker(
         if (message.contains("任务添加成功")) {
             //清空缓存
             DataStoreUtil.putData(
-                ConfigUtil.currentOfflineTask,
+                ConfigKeyUtil.CURRENT_OFFLINE_TASK,
                 ""
             )
         }
@@ -248,9 +250,9 @@ class OfflineTaskWorker(
 
     private fun addTask(urlList: List<String>, cookie: String): Data {
         val resultMessage = StringJoiner("\n")
-        val errorDownloadCid = DataStoreUtil.getData(ConfigUtil.errorDownloadCid, "")
+        val errorDownloadCid = DataStoreUtil.getData(ConfigKeyUtil.ERROR_DOWNLOAD_CID, "")
         val cid = if (errorDownloadCid == "") {
-            DataStoreUtil.getData(ConfigUtil.defaultOfflineCid, "")
+            DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
         } else {
             errorDownloadCid
         }
@@ -261,7 +263,7 @@ class OfflineTaskWorker(
         val map = HashMap<String, String>()
         map["savepath"] = ""
         map["wp_path_id"] = cid
-        map["uid"] = DataStoreUtil.getData(ConfigUtil.uid, "")
+        map["uid"] = DataStoreUtil.getData(ConfigKeyUtil.UID, "")
         map["sign"] = getSign(cookie).sign
         map["time"] = (System.currentTimeMillis() / 1000).toString()
         urlList.forEachIndexed { index, s ->
@@ -270,7 +272,7 @@ class OfflineTaskWorker(
         val addTask = addTask(cookie, map)
         val message = if (addTask.state) {
             //清除下载失败的cid
-            DataStoreUtil.putData(ConfigUtil.errorDownloadCid, "")
+            DataStoreUtil.putData(ConfigKeyUtil.ERROR_DOWNLOAD_CID, "")
             "任务添加成功"
         } else {
             "任务添加失败，${addTask.errorMsg}"

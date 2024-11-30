@@ -27,7 +27,7 @@ import androidx.core.content.ContextCompat.getSystemService
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.screenitem.OfflineCellItem
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.ConfigUtil
+import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import java.util.*
@@ -52,7 +52,7 @@ fun OfflineFileScreen(
     val itemOnClick = { i: Int ->
         val offlineTask = offlineList[i]
         val cid = if (offlineTask.fileId == "") offlineTask.wpPathId else offlineTask.fileId
-        App.selectedItem = ConfigUtil.MY_FILE
+        App.selectedItem = ConfigKeyUtil.MY_FILE
         fileViewModel.getFiles(cid)
     }
     val menuOnClick = { name: String, index: Int ->

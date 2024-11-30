@@ -1,9 +1,7 @@
 package github.zerorooot.nap511.viewmodel
 
 import android.app.Application
-import android.database.DatabaseUtils
 import android.widget.Toast
-import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -11,10 +9,9 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.service.FileService
-import github.zerorooot.nap511.util.ConfigUtil
+import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 //import github.zerorooot.nap511.util.SharedPreferencesUtil
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -58,7 +55,7 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
     }
 
     fun delete(index: Int) {
-        val password = DataStoreUtil.getData(ConfigUtil.password, "")
+        val password = DataStoreUtil.getData(ConfigKeyUtil.PASSWORD, "")
         if (password == "") {
             _isOpenPasswordDialog.value = true
             return
@@ -72,11 +69,11 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
             val message = if (revert.state) {
                 recycleFileList.removeAt(index)
                 if (save) {
-                    DataStoreUtil.putData(ConfigUtil.password, password)
+                    DataStoreUtil.putData(ConfigKeyUtil.PASSWORD, password)
                 }
                 "删除成功"
             } else {
-                DataStoreUtil.putData(ConfigUtil.password, "")
+                DataStoreUtil.putData(ConfigKeyUtil.PASSWORD, "")
                 "删除失败，${revert.errorMsg}"
             }
             Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
@@ -84,7 +81,7 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
     }
 
     fun deleteAll() {
-        val password = DataStoreUtil.getData(ConfigUtil.password, "")
+        val password = DataStoreUtil.getData(ConfigKeyUtil.PASSWORD, "")
         if (password == "") {
             _isOpenPasswordDialog.value = true
             return

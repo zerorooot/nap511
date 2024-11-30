@@ -1,7 +1,6 @@
 package github.zerorooot.nap511.screen
 
 import android.annotation.SuppressLint
-import android.net.UrlQuerySanitizer
 import android.webkit.CookieManager
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -33,11 +32,12 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.OfflineTaskWorker
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.ConfigUtil
+import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import kotlin.concurrent.thread
 
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -160,31 +160,38 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
         ): WebResourceResponse? {
             val url = webViewRequest.url
             if (url.startsWith("https://webapi.115.com/label/list")) {
-                var message = "登录失败~，请重试"
-                var cookie = webViewRequest.headers["cookie"]
+                val message = "登录失败~，请重试"
+                val cookie = webViewRequest.headers["cookie"]
                 if (cookie == null) {
                     App.instance.toast(message)
                     return super.shouldInterceptRequest(view, webViewRequest)
                 }
                 //USERSESSIONID=xx; UID=xx; CID=xx; SEID=xx; PHPSESSID=xx; acw_tc=xx; UID=xx; CID=xx; SEID=xx
-                val regex = Regex("(UID=\\w+; CID=\\w+; SEID=\\w+)")
-                val matches = regex.findAll(cookie).map { it.value }.toList()
-//                thread {
-//                    val c1 = App().checkLogin(matches[0].replace(" ", ""))
-//                    val c2 = App().checkLogin(matches[1].replace(" ", ""))
-//                    println()
-//                }
-                message = "登陆成功,请重启中～"
+                val uidRegex = Regex("UID=\\w+")
+                val cidRegex = Regex("CID=\\w+")
+                val seidRegex = Regex("SEID=\\w+")
 
-                cookie = matches[1].replace(" ", "")
-                val uid = UrlQuerySanitizer(url).getValue("user_id")
-                DataStoreUtil.putData(ConfigUtil.cookie, cookie)
-                DataStoreUtil.putData(ConfigUtil.uid, uid)
-                App.cookie = cookie
-                App.gesturesEnabled = true
-                App.instance.toast(message)
-                //restart
-                ProcessPhoenix.triggerRebirth(App.instance);
+                val uidMatches = uidRegex.findAll(cookie).map { it.value }.toList()
+                val cidMatches = cidRegex.findAll(cookie).map { it.value }.toList()
+                val seidMatches = seidRegex.findAll(cookie).map { it.value }.toList()
+
+                thread {
+                    val c1 = uidMatches[0] + ";" + cidMatches[0] + ";" + seidMatches[0]
+                    val c2 = uidMatches[1] + ";" + cidMatches[1] + ";" + seidMatches[1]
+                    var checkLogin = App.instance.checkLogin(c2)
+                    //c2登陆失败，再用c1登陆一次
+                    if (!checkLogin.first) {
+                        checkLogin = App.instance.checkLogin(c1)
+                    }
+                    //两次都登陆失败，不执行后续操作
+                    if (!checkLogin.first) {
+                        App.instance.toast(message)
+                        return@thread
+                    }
+                    App.instance.toast(checkLogin.second)
+                    //restart
+                    ProcessPhoenix.triggerRebirth(App.instance);
+                }
             }
             return super.shouldInterceptRequest(view, webViewRequest)
         }
@@ -250,7 +257,7 @@ fun captchaWebViewClient(webView: WebView): WebViewClient {
                 val response = httpClient.newCall(a.build()).execute()
                 val string = response.body.string()
                 if (string.contains("{\"state\":true}")) {
-                    App.selectedItem = ConfigUtil.MY_FILE
+                    App.selectedItem = ConfigKeyUtil.MY_FILE
                     addTask()
                     App.instance.toast("验证账号成功~，重新添加链接中.......")
                 }
@@ -266,7 +273,7 @@ fun captchaWebViewClient(webView: WebView): WebViewClient {
 
 private fun addTask() {
     val currentOfflineTaskList =
-        DataStoreUtil.getData(ConfigUtil.currentOfflineTask, "")
+        DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
             .split("\n")
             .filter { i -> i != "" && i != " " }
             .toSet()

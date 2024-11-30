@@ -1,8 +1,8 @@
 package github.zerorooot.nap511
 
 import android.annotation.SuppressLint
-import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.LinearProgressIndicator
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -38,12 +36,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.core.content.IntentCompat
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
@@ -55,12 +51,11 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.google.gson.Gson
-import com.google.gson.JsonObject
 import com.google.gson.reflect.TypeToken
 import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.activity.OfflineTaskWorker
 import github.zerorooot.nap511.bean.AvatarBean
-import github.zerorooot.nap511.bean.InfoBean
+import github.zerorooot.nap511.bean.RemainingSpaceBean
 import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.screen.CaptchaVideoWebViewScreen
 import github.zerorooot.nap511.screen.CaptchaWebViewScreen
@@ -76,18 +71,12 @@ import github.zerorooot.nap511.screen.SettingScreen
 import github.zerorooot.nap511.screen.WebViewScreen
 import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.ConfigUtil
+import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import kotlinx.coroutines.launch
-import okhttp3.Call
-import okhttp3.Interceptor
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
-import okio.IOException
 import kotlin.concurrent.thread
 
 
@@ -115,16 +104,19 @@ class MainActivity : ComponentActivity() {
                     }
                     //直接添加磁力，但提示请验证账号;跳转到验证账号界面
                     if (intent.action == "check") {
-                        App.selectedItem = ConfigUtil.VERIFY_MAGNET_LINK_ACCOUNT
+                        App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
+                        intent.action = ""
                     }
                     //跳转到默认下载目录
                     if (intent.action == "jump") {
                         viewModels<FileViewModel>().value.getFiles(
                             DataStoreUtil.getData(
-                                ConfigUtil.defaultOfflineCid,
+                                ConfigKeyUtil.DEFAULT_OFFLINE_CID,
                                 "0"
                             )
                         )
+                        //清除action,不然会一直跳转到默认下载目录
+                        intent.action = ""
                     }
                     //检测未上传的磁力链接
                     checkOfflineTask(cookie)
@@ -157,8 +149,8 @@ class MainActivity : ComponentActivity() {
         rememberSystemUiController().apply {
             isSystemBarsVisible = visible
         }
-        BackHandler(App.selectedItem == ConfigUtil.PHOTO || App.selectedItem == ConfigUtil.WEB) {
-            App.selectedItem = ConfigUtil.MY_FILE
+        BackHandler(App.selectedItem != ConfigKeyUtil.MY_FILE) {
+            App.selectedItem = ConfigKeyUtil.MY_FILE
             visible = true
         }
 
@@ -184,17 +176,24 @@ class MainActivity : ComponentActivity() {
         val workInfos: List<WorkInfo> =
             WorkManager.getInstance(applicationContext).getWorkInfos(workQuery).get()
         val size = workInfos.size
-        println("checkOfflineTask workManager size $size workInfos $workInfos")
+        Log.d(
+            "nap511 main activity",
+            "checkOfflineTask workManager size $size workInfos $workInfos"
+        )
         if (size != 0) {
             return
         }
         //size等于0,证明后台没有正在添加离线链接
-        val currentOfflineTask = DataStoreUtil.getData(ConfigUtil.currentOfflineTask, "")
+        val currentOfflineTask = DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
             .split("\n")
             .filter { i -> i != "" && i != " " }
             .toSet()
             .toMutableList()
-        println("checkOfflineTask currentOfflineTask size ${currentOfflineTask.size}")
+        Log.d(
+            "nap511 main activity",
+            "checkOfflineTask currentOfflineTask size ${currentOfflineTask.size}"
+        )
+
         //currentOfflineTask等于0,证明没有离线链接缓存
         if (currentOfflineTask.size == 0) {
             return
@@ -229,16 +228,16 @@ class MainActivity : ComponentActivity() {
         App.drawerState = drawerState
         App.scope = scope
         val itemMap = linkedMapOf(
-            R.drawable.baseline_login_24 to ConfigUtil.LOGIN,
-            R.drawable.baseline_cloud_24 to ConfigUtil.MY_FILE,
-            R.drawable.baseline_cloud_download_24 to ConfigUtil.OFFLINE_DOWNLOAD,
-            R.drawable.baseline_cloud_done_24 to ConfigUtil.OFFLINE_LIST,
-            R.drawable.baseline_video_moderator_24 to ConfigUtil.VERIFY_VIDEO_ACCOUNT,
-            R.drawable.baseline_magent_moderator_24 to ConfigUtil.VERIFY_MAGNET_LINK_ACCOUNT,
+            R.drawable.baseline_login_24 to ConfigKeyUtil.LOGIN,
+            R.drawable.baseline_cloud_24 to ConfigKeyUtil.MY_FILE,
+            R.drawable.baseline_cloud_download_24 to ConfigKeyUtil.OFFLINE_DOWNLOAD,
+            R.drawable.baseline_cloud_done_24 to ConfigKeyUtil.OFFLINE_LIST,
+            R.drawable.baseline_video_moderator_24 to ConfigKeyUtil.VERIFY_VIDEO_ACCOUNT,
+            R.drawable.baseline_magent_moderator_24 to ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT,
 //            R.drawable.baseline_web_24 to "ConfigUtil.WEB",
-            R.drawable.ic_baseline_delete_24 to ConfigUtil.RECYCLE_BIN,
-            R.drawable.baseline_settings_24 to ConfigUtil.ADVANCED_SETTINGS,
-            R.drawable.android_exit to ConfigUtil.EXIT_APPLICATION
+            R.drawable.ic_baseline_delete_24 to ConfigKeyUtil.RECYCLE_BIN,
+            R.drawable.baseline_settings_24 to ConfigKeyUtil.ADVANCED_SETTINGS,
+            R.drawable.android_exit to ConfigKeyUtil.EXIT_APPLICATION
         )
         ModalNavigationDrawer(gesturesEnabled = App.gesturesEnabled,
             drawerState = drawerState,
@@ -265,31 +264,31 @@ class MainActivity : ComponentActivity() {
             },
             content = {
                 when (App.selectedItem) {
-                    ConfigUtil.LOGIN -> Login()
-                    ConfigUtil.MY_FILE -> MyFileScreen(fileViewModel)
-                    ConfigUtil.OFFLINE_DOWNLOAD -> OfflineDownloadScreen(
+                    ConfigKeyUtil.LOGIN -> Login()
+                    ConfigKeyUtil.MY_FILE -> MyFileScreen(fileViewModel)
+                    ConfigKeyUtil.OFFLINE_DOWNLOAD -> OfflineDownloadScreen(
                         offlineFileViewModel,
                         fileViewModel
                     )
 
-                    ConfigUtil.OFFLINE_LIST -> OfflineFileScreen(
+                    ConfigKeyUtil.OFFLINE_LIST -> OfflineFileScreen(
                         offlineFileViewModel,
                         fileViewModel
                     )
 
-                    ConfigUtil.WEB -> WebViewScreen()
-                    ConfigUtil.RECYCLE_BIN -> RecycleScreen(recycleViewModel)
-                    ConfigUtil.ADVANCED_SETTINGS -> SettingScreen()
-                    ConfigUtil.VERIFY_MAGNET_LINK_ACCOUNT -> {
+                    ConfigKeyUtil.WEB -> WebViewScreen()
+                    ConfigKeyUtil.RECYCLE_BIN -> RecycleScreen(recycleViewModel)
+                    ConfigKeyUtil.ADVANCED_SETTINGS -> SettingScreen()
+                    ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT -> {
                         CaptchaWebViewScreen()
                     }
 
-                    ConfigUtil.VERIFY_VIDEO_ACCOUNT -> {
+                    ConfigKeyUtil.VERIFY_VIDEO_ACCOUNT -> {
                         CaptchaVideoWebViewScreen()
                     }
 
-                    ConfigUtil.EXIT_APPLICATION -> ExitApp()
-                    ConfigUtil.PHOTO -> {
+                    ConfigKeyUtil.EXIT_APPLICATION -> ExitApp()
+                    ConfigKeyUtil.PHOTO -> {
                         MyPhotoScreen(fileViewModel)
                     }
                 }
@@ -301,69 +300,26 @@ class MainActivity : ComponentActivity() {
      */
     @Composable
     private fun Avatar() {
-        val avatarBean = remember { mutableStateOf(AvatarBean()) }
-        val avatarUrl = "https://my.115.com/proapi/3.0/index.php?method=user_info&uid=${App.uid}"
-        val okHttpClient = OkHttpClient().newBuilder()
-            .addInterceptor(Interceptor { chain ->
-                chain.proceed(
-                    chain.request().newBuilder()
-                        .addHeader("Cookie", App.cookie)
-                        .addHeader(
-                            "User-Agent",
-                            "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
-                        )
-                        .build()
-                );
-            }).build()
-
-        val infoUrl = "https://webapi.115.com/files/index_info?count_space_nums=1"
-
-        val avatarRequest: Request = Request.Builder().url(avatarUrl).get().build()
-        okHttpClient.newCall(avatarRequest).enqueue(object : okhttp3.Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                App.instance.toast(e.message + "")
-            }
-
-            override fun onResponse(call: Call, response: Response) {
-                val body = response.body.string()
-                //{"state":true,"data":{"space_info":{"all_total":{"size":11111,"size_format":"1TB"},"all_remain":{"size":1111,"size_format":"1TB"},"all_use":{"size":1111,"size_format":"1TB"}}},"error":"","code":0}
-//                println(body)
-                avatarBean.value = Gson().fromJson(body, AvatarBean::class.java)
-            }
-        })
-
-        val infoBean = remember { mutableStateOf(InfoBean()) }
-        val infoRequest: Request = Request.Builder().url(infoUrl).get().build()
-        okHttpClient.newCall(infoRequest).enqueue(object : okhttp3.Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                App.instance.toast(e.message + "")
-            }
-
-            override fun onResponse(call: Call, response: Response) {
-                val body = response.body.string()
-                val spaceInfo =
-                    Gson().fromJson(body, JsonObject::class.java).getAsJsonObject("data")
-                        .getAsJsonObject("space_info")
-                val allUse = spaceInfo.getAsJsonObject("all_use").get("size").asLong
-                val allUseString = spaceInfo.getAsJsonObject("all_use").get("size_format").asString
-                val allTotal = spaceInfo.getAsJsonObject("all_total").get("size").asLong
-                val allTotalString =
-                    spaceInfo.getAsJsonObject("all_total").get("size_format").asString
-                val allRemain = spaceInfo.getAsJsonObject("all_remain").get("size").asLong
-                val allRemainString =
-                    spaceInfo.getAsJsonObject("all_remain").get("size_format").asString
-
-                infoBean.value = InfoBean(
-                    allRemain,
-                    allRemainString,
-                    allTotal,
-                    allTotalString,
-                    allUse,
-                    allUseString
+        val remainingSpaceBean = remember {
+            mutableStateOf(
+                Gson().fromJson(
+                    DataStoreUtil.getData(
+                        ConfigKeyUtil.REMAINING_SPACE,
+                        "{}"
+                    ), RemainingSpaceBean::class.java
                 )
-            }
-        })
-
+            )
+        }
+        val avatarBean = remember {
+            mutableStateOf(
+                Gson().fromJson(
+                    DataStoreUtil.getData(
+                        ConfigKeyUtil.AVATAR_BEAN,
+                        "{}"
+                    ), AvatarBean::class.java
+                )
+            )
+        }
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally, // 水平居中
@@ -372,7 +328,7 @@ class MainActivity : ComponentActivity() {
             Image(
                 painter = rememberAsyncImagePainter(
                     ImageRequest.Builder(LocalContext.current)
-                        .data(avatarBean.value.data.user_face)
+                        .data(avatarBean.value.face)
                         .memoryCachePolicy(CachePolicy.ENABLED)
                         .diskCachePolicy(CachePolicy.ENABLED)
                         .networkCachePolicy(CachePolicy.ENABLED)
@@ -392,25 +348,31 @@ class MainActivity : ComponentActivity() {
             Spacer(Modifier.height(6.dp))
             //用户名
             Text(
-                text = avatarBean.value.data.user_name,
+                text = avatarBean.value.userName,
                 style = MaterialTheme.typography.titleMedium
             )
             //uid
             Text(text = App.uid)
-            Spacer(Modifier.height(6.dp))
+            //会员到期时间
+            Text(
+                text = "会员到期时间：${
+                    avatarBean.value.expireString
+                }", style = MaterialTheme.typography.titleSmall
+            )
+//            Spacer(Modifier.height(6.dp))
             //已用空间
             Text(
-                text = "总计${infoBean.value.allTotalString}，已用${infoBean.value.allUseString}，剩余${infoBean.value.allRemainString}",
+                text = "总计${remainingSpaceBean.value.allTotalString}，已用${remainingSpaceBean.value.allUseString}，剩余${remainingSpaceBean.value.allRemainString}",
                 style = MaterialTheme.typography.titleSmall
             )
-            //进度条
-            LinearProgressIndicator(
-                progress = (infoBean.value.allUse.toDouble() / infoBean.value.allTotal).toFloat(),
-                color = Color.Cyan,
-                modifier = Modifier
-                    .fillMaxWidth(0.7f)
-                    .clip(shape = RoundedCornerShape(100.dp))
-            )
+//            //进度条
+//            LinearProgressIndicator(
+//                progress = (remainingSpaceBean.value.allUse.toDouble() / remainingSpaceBean.value.allTotal).toFloat(),
+//                color = Color.Cyan,
+//                modifier = Modifier
+//                    .fillMaxWidth(0.7f)
+//                    .clip(shape = RoundedCornerShape(100.dp))
+//            )
         }
     }
 
@@ -432,17 +394,11 @@ class MainActivity : ComponentActivity() {
             if (it != "") {
                 val replace = it.replace(" ", "").replace("[\r\n]".toRegex(), "");
                 thread {
-                    val checkLogin = App().checkLogin(replace)
-                    val message = if (checkLogin == "0") {
-                        "登录失败~，请重试"
-                    } else {
-                        DataStoreUtil.putData(ConfigUtil.cookie, replace)
-                        DataStoreUtil.putData(ConfigUtil.uid, checkLogin)
-                        App.cookie = replace
+                    val pair = App().checkLogin(replace)
+                    if (pair.first) {
                         ProcessPhoenix.triggerRebirth(applicationContext);
-                        "登陆成功,重启中～"
                     }
-                    App.instance.toast(message)
+                    App.instance.toast(pair.second)
                 }
             } else {
                 App.instance.toast("请输入cookie")

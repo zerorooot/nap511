@@ -14,7 +14,7 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.util.ConfigUtil
+import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.Sha1Util
 import okhttp3.FormBody
@@ -36,11 +36,11 @@ class Sha1Service : Service() {
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val command = intent!!.getStringExtra(ConfigUtil.command)
+        val command = intent!!.getStringExtra(ConfigKeyUtil.COMMAND)
         val cookie = intent.getStringExtra("cookie")!!
         thread {
             when (command) {
-                ConfigUtil.sentToAria2 -> {
+                ConfigKeyUtil.SENT_TO_ARIA2 -> {
                     val fileBeanList =
                         arrayListOf(
                             Gson().fromJson(
@@ -129,10 +129,10 @@ class Sha1Service : Service() {
 //            ConfigUtil.aria2Url,
 //            ConfigUtil.aria2UrldefValue
 //        ) + "?tm=${System.currentTimeMillis()}"
-        val aria2Token = DataStoreUtil.getData(ConfigUtil.aria2Token, "")
+        val aria2Token = DataStoreUtil.getData(ConfigKeyUtil.ARIA2_TOKEN, "")
         val aria2Url = DataStoreUtil.getData(
-            ConfigUtil.aria2Url,
-            ConfigUtil.aria2UrldefValue
+            ConfigKeyUtil.ARIA2_URL,
+            ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
         ) + "?tm=${System.currentTimeMillis()}"
 
         val paramsJsonArray = JsonArray()

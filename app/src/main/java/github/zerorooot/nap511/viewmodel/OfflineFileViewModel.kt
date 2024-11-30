@@ -15,7 +15,7 @@ import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.OfflineService
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.ConfigUtil
+import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -108,7 +108,7 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
             } else {
                 if (addTorrentTask.errorMsg.contains("请验证账号")) {
                     //打开验证页面
-                    App.selectedItem = ConfigUtil.VERIFY_MAGNET_LINK_ACCOUNT
+                    App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
                 }
                 "任务添加失败，${addTorrentTask.errorMsg}"
             }
@@ -200,11 +200,11 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
                 "任务添加成功"
             } else {
                 if (addTask.errorMsg.contains("请验证账号") && !close) {
-                    App.selectedItem = ConfigUtil.VERIFY_MAGNET_LINK_ACCOUNT
+                    App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
                 }
                 //把失败的离线链接保存起来
                 val currentOfflineTaskList =
-                    DataStoreUtil.getData(ConfigUtil.currentOfflineTask, "")
+                    DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
                         .split("\n")
                         .filter { i -> i != "" && i != " " }
                         .toSet()
@@ -214,12 +214,12 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
                 currentOfflineTaskList.toSet().forEach { stringJoiner.add(it) }
                 //写入缓存
                 DataStoreUtil.putData(
-                    ConfigUtil.currentOfflineTask,
+                    ConfigKeyUtil.CURRENT_OFFLINE_TASK,
                     stringJoiner.toString()
                 )
                 //记录当前失败的cid
                 DataStoreUtil.putData(
-                    ConfigUtil.errorDownloadCid,
+                    ConfigKeyUtil.ERROR_DOWNLOAD_CID,
                     currentCid
                 )
                 "任务添加失败，${addTask.errorMsg}"
@@ -244,7 +244,7 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
         viewModelScope.launch {
             val map = hashMapOf("hash[0]" to offlineTask.infoHash)
 //            map["uid"] = sharedPreferencesUtil.get(ConfigUtil.uid)!!
-            map["uid"] = DataStoreUtil.getData(ConfigUtil.uid, "")
+            map["uid"] = DataStoreUtil.getData(ConfigKeyUtil.UID, "")
             map["sign"] = offlineService.getSign().sign
             map["time"] = (System.currentTimeMillis() / 1000).toString()
             val deleteTask = offlineService.deleteTask(map)
