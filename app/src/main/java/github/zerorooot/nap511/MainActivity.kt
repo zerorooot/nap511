@@ -1,6 +1,10 @@
 package github.zerorooot.nap511
 
 import android.annotation.SuppressLint
+import android.app.ComponentCaller
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -40,8 +44,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.work.Data
-import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -55,7 +60,6 @@ import com.google.gson.reflect.TypeToken
 import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.activity.OfflineTaskWorker
 import github.zerorooot.nap511.bean.AvatarBean
-import github.zerorooot.nap511.bean.RemainingSpaceBean
 import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.screen.CaptchaVideoWebViewScreen
 import github.zerorooot.nap511.screen.CaptchaWebViewScreen
@@ -102,28 +106,16 @@ class MainActivity : ComponentActivity() {
                         App.instance.toast("检测到未开启通知权限，为保证交互效果，建议开启")
                         App.instance.goToNotificationSetting(this)
                     }
-                    //直接添加磁力，但提示请验证账号;跳转到验证账号界面
-                    if (intent.action == "check") {
-                        App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
-                        intent.action = ""
-                    }
-                    //跳转到默认下载目录
-                    if (intent.action == "jump") {
-                        viewModels<FileViewModel>().value.getFiles(
-                            DataStoreUtil.getData(
-                                ConfigKeyUtil.DEFAULT_OFFLINE_CID,
-                                "0"
-                            )
-                        )
-                        //清除action,不然会一直跳转到默认下载目录
-                        intent.action = ""
-                    }
+
+                    handleIntent(intent)
+
                     //检测未上传的磁力链接
                     checkOfflineTask(cookie)
                 }
             }
         }
     }
+
 
     @Composable
     private fun Init(cookie: String) {
@@ -152,9 +144,45 @@ class MainActivity : ComponentActivity() {
         BackHandler(App.selectedItem != ConfigKeyUtil.MY_FILE) {
             App.selectedItem = ConfigKeyUtil.MY_FILE
             visible = true
+            if (!App.gesturesEnabled) {
+                App.gesturesEnabled = true
+            }
         }
 
         MyNavigationDrawer(fileViewModel, offlineFileViewModel, recycleViewModel)
+    }
+
+    override fun onNewIntent(intent: Intent, caller: ComponentCaller) {
+        super.onNewIntent(intent, caller)
+        handleIntent(intent)
+    }
+
+    /**
+     * 处理验证磁力账号、跳转默认下载目录、复制失败的磁力链接的intent
+     */
+    private fun handleIntent(intent: Intent) {
+        //直接添加磁力，但提示请验证账号;跳转到验证账号界面
+        if (intent.action == "check") {
+            App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
+            intent.action = ""
+        }
+        //跳转到默认下载目录
+        if (intent.action == "jump") {
+            viewModels<FileViewModel>().value.getFiles(
+                DataStoreUtil.getData(
+                    ConfigKeyUtil.DEFAULT_OFFLINE_CID,
+                    "0"
+                )
+            )
+            //清除action,不然会一直跳转到默认下载目录
+            intent.action = ""
+        }
+        if (intent.action == "copy") {
+            val clipboard = ContextCompat.getSystemService(this, ClipboardManager::class.java)
+            val clip = ClipData.newPlainText("label", intent.getStringExtra("link"))
+            clipboard?.setPrimaryClip(clip)
+            intent.action = ""
+        }
     }
 
     /**
@@ -168,7 +196,7 @@ class MainActivity : ComponentActivity() {
                 WorkInfo.State.ENQUEUED,
                 WorkInfo.State.RUNNING,
 //                WorkInfo.State.SUCCEEDED,
-                WorkInfo.State.FAILED,
+//                WorkInfo.State.FAILED,
                 WorkInfo.State.BLOCKED,
                 WorkInfo.State.CANCELLED
             )
@@ -195,7 +223,7 @@ class MainActivity : ComponentActivity() {
         )
 
         //currentOfflineTask等于0,证明没有离线链接缓存
-        if (currentOfflineTask.size == 0) {
+        if (currentOfflineTask.isEmpty()) {
             return
         }
         //添加离线链接
@@ -207,13 +235,7 @@ class MainActivity : ComponentActivity() {
         val request: OneTimeWorkRequest =
             OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java).setInputData(data)
                 .build()
-        WorkManager.getInstance(applicationContext)
-            .enqueueUniqueWork(
-                "addOfflineTaskByCount",
-                ExistingWorkPolicy.APPEND,
-                request
-            )
-
+        WorkManager.getInstance(App.instance.applicationContext).enqueue(request)
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -249,15 +271,20 @@ class MainActivity : ComponentActivity() {
                     //菜单栏
                     Spacer(Modifier.height(6.dp))
                     itemMap.forEach { (t, u) ->
-                        NavigationDrawerItem(icon = {
-                            Icon(
-                                painterResource(t), contentDescription = u
-                            )
-                        }, label = { Text(u) }, selected = u == App.selectedItem, onClick = {
-                            App.gesturesEnabled = true
-                            scope.launch { drawerState.close() }
-                            App.selectedItem = u
-                        }, modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        NavigationDrawerItem(
+                            icon = {
+                                Icon(
+                                    painterResource(t), contentDescription = u
+                                )
+                            },
+                            label = { Text(u) },
+                            selected = u == App.selectedItem,
+                            onClick = {
+                                App.gesturesEnabled = true
+                                scope.launch { drawerState.close() }
+                                App.selectedItem = u
+                            },
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                         )
                     }
                 }
@@ -300,16 +327,10 @@ class MainActivity : ComponentActivity() {
      */
     @Composable
     private fun Avatar() {
-        val remainingSpaceBean = remember {
-            mutableStateOf(
-                Gson().fromJson(
-                    DataStoreUtil.getData(
-                        ConfigKeyUtil.REMAINING_SPACE,
-                        "{}"
-                    ), RemainingSpaceBean::class.java
-                )
-            )
-        }
+        val fileViewModel = viewModel<FileViewModel>()
+        fileViewModel.getRemainingSpace()
+        val remainingSpaceBean = fileViewModel.remainingSpace
+
         val avatarBean = remember {
             mutableStateOf(
                 Gson().fromJson(
@@ -362,7 +383,7 @@ class MainActivity : ComponentActivity() {
 //            Spacer(Modifier.height(6.dp))
             //已用空间
             Text(
-                text = "总计${remainingSpaceBean.value.allTotalString}，已用${remainingSpaceBean.value.allUseString}，剩余${remainingSpaceBean.value.allRemainString}",
+                text = "总计${remainingSpaceBean.allTotalString}，已用${remainingSpaceBean.allUseString}，剩余${remainingSpaceBean.allRemainString}",
                 style = MaterialTheme.typography.titleSmall
             )
 //            //进度条

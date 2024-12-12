@@ -12,10 +12,13 @@ import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import github.zerorooot.nap511.bean.AvatarBean
-import github.zerorooot.nap511.bean.RemainingSpaceBean
+import github.zerorooot.nap511.factory.CookieViewModelFactory
+import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import okhttp3.Interceptor
@@ -46,6 +49,11 @@ class App : Application() {
         lateinit var scope: CoroutineScope
         private fun isScopeInitialized() = ::scope.isInitialized
 
+        /**
+         * 用于OfflineTaskActivity中
+         */
+        lateinit var offlineFileViewModel: OfflineFileViewModel
+
     }
 
     override fun onCreate() {
@@ -54,6 +62,14 @@ class App : Application() {
         cookie = DataStoreUtil.getData(ConfigKeyUtil.COOKIE, "")
         uid = DataStoreUtil.getData(ConfigKeyUtil.UID, "0")
         requestLimitCount = DataStoreUtil.getData(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "100").toInt()
+
+        val cookieViewModelFactory = CookieViewModelFactory(
+            cookie, this
+        )
+        offlineFileViewModel = ViewModelProvider(
+            ViewModelStore(),
+            cookieViewModelFactory
+        )[OfflineFileViewModel::class.java]
     }
 
     fun toast(text: String) {
@@ -106,43 +122,6 @@ class App : Application() {
         if (avatarBean == null) {
             return Pair(false, "验证失败，请重试")
         }
-
-        val remainingSpaceUrl = "https://webapi.115.com/files/index_info?count_space_nums=1"
-        val remainingSpaceUrlRequest: Request =
-            Request.Builder().url(remainingSpaceUrl).get().build()
-        val remainingSpaceUrlRespBody =
-            okHttpClient.newCall(remainingSpaceUrlRequest).execute().body.string()
-        Log.d("nap511 checkLogin remainingSpaceBean", remainingSpaceUrlRespBody)
-        val remainingSpaceBean = run {
-            try {
-                //{"state":true,"data":{"space_info":{"all_total":{"size":11111,"size_format":"1TB"},"all_remain":{"size":1111,"size_format":"1TB"},"all_use":{"size":1111,"size_format":"1TB"}}},"error":"","code":0}
-                val spaceInfo =
-                    gson.fromJson(remainingSpaceUrlRespBody, JsonObject::class.java)
-                        .getAsJsonObject("data")
-                        .getAsJsonObject("space_info")
-                val allUse = spaceInfo.getAsJsonObject("all_use").get("size").asLong
-                val allUseString = spaceInfo.getAsJsonObject("all_use").get("size_format").asString
-                val allTotal = spaceInfo.getAsJsonObject("all_total").get("size").asLong
-                val allTotalString =
-                    spaceInfo.getAsJsonObject("all_total").get("size_format").asString
-                val allRemain = spaceInfo.getAsJsonObject("all_remain").get("size").asLong
-                val allRemainString =
-                    spaceInfo.getAsJsonObject("all_remain").get("size_format").asString
-                RemainingSpaceBean(
-                    allRemain,
-                    allRemainString,
-                    allTotal,
-                    allTotalString,
-                    allUse,
-                    allUseString
-                )
-            } catch (e: Exception) {
-                e.printStackTrace()
-                RemainingSpaceBean()
-            }
-        }
-
-        DataStoreUtil.putData(ConfigKeyUtil.REMAINING_SPACE, gson.toJson(remainingSpaceBean))
 
         avatarBean.expireString = Instant.ofEpochSecond(avatarBean.expire)
             .atZone(ZoneId.systemDefault())

@@ -1,16 +1,29 @@
 package github.zerorooot.nap511.screen
 
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.CheckBox
@@ -29,7 +42,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +54,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextRange
@@ -57,12 +74,15 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.TorrentFileListWeb
 import github.zerorooot.nap511.screenitem.AutoSizableTextField
+import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import kotlinx.coroutines.delay
+import my.nanihadesuka.compose.LazyColumnScrollbar
+import my.nanihadesuka.compose.ScrollbarSettings
 import kotlin.system.exitProcess
 
 @Composable
@@ -361,6 +381,7 @@ private fun SelectTorrentFileDialog(
     torrentFileBean: TorrentFileBean,
     enter: (torrentFileBean: TorrentFileBean, Map<Int, TorrentFileListWeb>) -> Unit
 ) {
+    val listState = rememberLazyListState()
     //select all
     val selectMap = remember {
         mutableStateMapOf<Int, TorrentFileListWeb>().apply {
@@ -443,41 +464,46 @@ private fun SelectTorrentFileDialog(
                     minFontSize = 30.sp,
                     maxLines = 2
                 )
-                LazyColumn(modifier = Modifier.padding(8.dp)) {
-                    itemsIndexed(items = torrentFileBean.torrentFileListWeb, key = { _, item ->
-                        item.hashCode()
-                    }) { index, item ->
-                        if (item.wanted == 1) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .selectable(
-                                        selected = isSelectedItem(index), onClick = {
-                                            onChangeState(index, item)
+                LazyColumnScrollbar(
+                    state = listState,
+                    settings = ScrollbarSettings.Default.copy(
+                        thumbUnselectedColor = Purple80
+                    )
+                ) {
+                    LazyColumn(modifier = Modifier.padding(8.dp), state = listState) {
+                        itemsIndexed(items = torrentFileBean.torrentFileListWeb, key = { _, item ->
+                            item.hashCode()
+                        }) { index, item ->
+                            if (item.wanted == 1) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .selectable(
+                                            selected = isSelectedItem(index), onClick = {
+                                                onChangeState(index, item)
 //                                            println("select $selectMap")
-                                        }, role = Role.RadioButton
+                                            }, role = Role.RadioButton
+                                        )
+                                        .padding(8.dp)
+                                ) {
+                                    Icon(
+                                        modifier = Modifier.padding(end = 16.dp),
+                                        imageVector = if (isSelectedItem(index)) {
+                                            Icons.Outlined.CheckBox
+                                        } else {
+                                            Icons.Outlined.CheckBoxOutlineBlank
+                                        },
+                                        contentDescription = null,
+                                        tint = Color.Magenta
                                     )
-                                    .padding(8.dp)
-                            ) {
-                                Icon(
-                                    modifier = Modifier.padding(end = 16.dp),
-                                    imageVector = if (isSelectedItem(index)) {
-                                        Icons.Outlined.CheckBox
-                                    } else {
-                                        Icons.Outlined.CheckBoxOutlineBlank
-                                    },
-                                    contentDescription = null,
-                                    tint = Color.Magenta
-                                )
-                                AutoSizableTextField(
-                                    value = item.path,
-                                    modifier = Modifier.weight(1f),
-                                    minFontSize = 30.sp,
-                                    maxLines = 2
-                                )
-                                Text(
-                                    text = item.sizeString, modifier = Modifier.weight(0.5f),
-                                )
+                                    DynamicEllipsizedTextView(
+                                        text = item.path,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Text(
+                                        text = item.sizeString, modifier = Modifier.weight(0.5f),
+                                    )
+                                }
                             }
                         }
                     }
@@ -490,15 +516,44 @@ private fun SelectTorrentFileDialog(
 @Composable
 @Preview
 fun SelectTorrentFileDialogPreview() {
-    val torrentFileBean = Gson().fromJson(
-        "{\"state\":true,\"errno\":0,\"fileSizeString\":123G,\"errtype\":\"suc\",\"errcode\":0,\"file_size\":70966705837,\"torrent_name\":\"name\",\"file_count\":28,\"info_hash\":\"hash\",\"torrent_filelist_web\":[{\"size\":12312,\"path\":\"预览图/0.JPG\",\"wanted\":1},{\"size\":123443242,\"path\":\"预览图/123123132132131312313123123/1.JPG\",\"wanted\":1},{\"size\":3902418,\"path\":\"预览图/2.JPG\",\"wanted\":1},{\"size\":321231321,\"path\":\"预览图/3.JPG\",\"wanted\":1},{\"size\":312321321,\"path\":\"预览图/4.JPG\",\"wanted\":-1}]}",
-        TorrentFileBean::class.java
-    )
+//    val torrentFileBean = Gson().fromJson(
+//        "{\"state\":true,\"errno\":0,\"fileSizeString\":123G,\"errtype\":\"suc\",\"errcode\":0,\"file_size\":70966705837,\"torrent_name\":\"name\",\"file_count\":28,\"info_hash\":\"hash\",\"torrent_filelist_web\":[{\"size\":12312,\"path\":\"预览图/0.JPG\",\"wanted\":1},{\"size\":123443242,\"path\":\"预览图/123123132132131312313123123/1.JPG\",\"wanted\":1},{\"size\":3902418,\"path\":\"预览图/2.JPG\",\"wanted\":1},{\"size\":321231321,\"path\":\"预览图/3.JPG\",\"wanted\":1},{\"size\":312321321,\"path\":\"预览图/4.JPG\",\"wanted\":-1}]}",
+//        TorrentFileBean::class.java
+//    )
+//
+//    SelectTorrentFileDialog(torrentFileBean) { a: TorrentFileBean, m: Map<Int, TorrentFileListWeb> ->
+//
+//    }
 
-    SelectTorrentFileDialog(torrentFileBean) { a: TorrentFileBean, m: Map<Int, TorrentFileListWeb> ->
+}
 
+
+@Composable
+fun DynamicEllipsizedTextView(text: String, modifier: Modifier = Modifier) {
+    val density = LocalDensity.current
+    val textWidth = remember { mutableIntStateOf(0) }
+
+    Box(modifier = modifier.onSizeChanged { textWidth.intValue = it.width }) {
+        val maxChars = textWidth.intValue / with(density) { 12.toDp().toPx().toInt() } // 假设每字符占12px
+        val halfChars = maxChars / 2
+        EllipsizedTextView(text, maxStartChars = halfChars, maxEndChars = halfChars)
+    }
+}
+
+@Composable
+fun EllipsizedTextView(
+    text: String,
+    maxStartChars: Int = 10, // 开头显示的字符数
+    maxEndChars: Int = 10,   // 结尾显示的字符数
+    ellipsis: String = "..."
+) {
+    val displayText = if (text.length > maxStartChars + maxEndChars) {
+        text.take(maxStartChars) + ellipsis + text.takeLast(maxEndChars)
+    } else {
+        text // 如果文本长度小于或等于限制，直接显示
     }
 
+    Text(text = displayText)
 }
 
 @Composable

@@ -56,11 +56,15 @@ import github.zerorooot.nap511.activity.VideoActivity
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.screenitem.FileCellItem
+import github.zerorooot.nap511.ui.theme.Purple40
+import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
+import my.nanihadesuka.compose.LazyColumnScrollbar
+import my.nanihadesuka.compose.ScrollbarSettings
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -81,7 +85,7 @@ import kotlin.concurrent.thread
 fun FileScreen(
     appBarOnClick: (String) -> Unit
 ) {
-    val fileViewModel= viewModel<FileViewModel>()
+    val fileViewModel = viewModel<FileViewModel>()
     val offlineFileViewModel = viewModel<OfflineFileViewModel>()
 
     val fileBeanList = fileViewModel.fileBeanList
@@ -305,21 +309,28 @@ fun FileScreen(
             }
         }) {
             Box(Modifier.pullRefresh(pullRefreshState)) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(), state = listState
+                LazyColumnScrollbar(
+                    state = listState,
+                    settings = ScrollbarSettings.Default.copy(
+                        thumbUnselectedColor = Purple80
+                    )
                 ) {
-                    itemsIndexed(items = fileBeanList, key = { _, item ->
-                        item.hashCode()
-                    }) { index, item ->
-                        FileCellItem(
-                            item,
-                            index,
-                            fileViewModel.clickMap.getOrDefault(path, -1),
-                            Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null),
-                            myItemOnClick,
-                            itemOnLongClick,
-                            menuOnClick
-                        )
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(), state = listState
+                    ) {
+                        itemsIndexed(items = fileBeanList, key = { _, item ->
+                            item.hashCode()
+                        }) { index, item ->
+                            FileCellItem(
+                                item,
+                                index,
+                                fileViewModel.clickMap.getOrDefault(path, -1),
+                                Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null),
+                                myItemOnClick,
+                                itemOnLongClick,
+                                menuOnClick
+                            )
+                        }
                     }
                 }
                 PullRefreshIndicator(

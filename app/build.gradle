@@ -51,6 +51,7 @@ android {
 }
 
 dependencies {
+    implementation 'com.github.nanihadesuka:LazyColumnScrollbar:2.2.0'
     //restart app
     implementation 'com.jakewharton:process-phoenix:3.0.0'
 //    implementation 'org.java-websocket:Java-WebSocket:1.5.6'

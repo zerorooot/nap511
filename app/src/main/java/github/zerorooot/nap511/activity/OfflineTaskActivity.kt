@@ -1,20 +1,18 @@
 package github.zerorooot.nap511.activity
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
@@ -27,17 +25,20 @@ import github.zerorooot.nap511.MainActivity
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.SignBean
+import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.StringJoiner
 import java.util.concurrent.TimeUnit
+import kotlin.getValue
 
 
-class OfflineTaskActivity : Activity() {
+class OfflineTaskActivity : ComponentActivity() {
     @SuppressLint("EnqueueWork")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,13 +80,8 @@ class OfflineTaskActivity : Activity() {
                 App.instance.toast("仅支持以http、ftp、magnet、ed2k开头的链接")
             }
         }
-        if (intent.action == "copy") {
-            val clipboard = ContextCompat.getSystemService(this, ClipboardManager::class.java)
-            val clip = ClipData.newPlainText("label", intent.getStringExtra("link"))
-            clipboard?.setPrimaryClip(clip)
-        }
         //通过ACTION_PROCESS_TEXT添加磁力链接时，如果moveTaskToBack(true)，当前应用会回到桌面
-        if (intent.action != Intent.ACTION_PROCESS_TEXT){
+        if (intent.action != Intent.ACTION_PROCESS_TEXT) {
             moveTaskToBack(true);
         }
 
@@ -169,21 +165,58 @@ class OfflineTaskWorker(
 ) : Worker(appContext, workerParams) {
     private val okHttpClient = OkHttpClient()
     override fun doWork(): Result {
-        val cookie: String = inputData.getString("cookie").toString()
+//        val cookie: String = inputData.getString("cookie").toString()
         val listType = object : TypeToken<List<String?>?>() {}.type
         val a: List<String> = Gson().fromJson(inputData.getString("list").toString(), listType)
-        val addTaskData = addTask(a, cookie)
-        val message = addTaskData.getString("return").toString()
-        if (message.contains("任务添加成功")) {
+        val errorDownloadCid = DataStoreUtil.getData(ConfigKeyUtil.ERROR_DOWNLOAD_CID, "")
+        val cid = if (errorDownloadCid == "") {
+            DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
+        } else {
+            errorDownloadCid
+        }
+
+
+        App.offlineFileViewModel.addTask(a, cid)
+        Thread.sleep(5000)
+        val state = App.offlineFileViewModel.addTaskReturn.first
+        val message = App.offlineFileViewModel.addTaskReturn.second
+        if (state) {
             //清空缓存
             DataStoreUtil.putData(
                 ConfigKeyUtil.CURRENT_OFFLINE_TASK,
                 ""
             )
         }
-//        println(message)
+        println("checkOfflineTask $message")
         toast(message, a)
-        return Result.success(addTaskData);
+        val addTaskData = Data.Builder()
+            .putBoolean("state", state)
+            .putString("return", message)
+            .build()
+        return if (state) {
+            Result.success(addTaskData);
+        } else {
+            Result.failure(addTaskData)
+        }
+
+
+//        val addTaskData = addTask(a, cookie)
+//        val state = addTaskData.getBoolean("state", false)
+//        val message = addTaskData.getString("return").toString()
+//        if (message.contains("任务添加成功")) {
+//            //清空缓存
+//            DataStoreUtil.putData(
+//                ConfigKeyUtil.CURRENT_OFFLINE_TASK,
+//                ""
+//            )
+//        }
+//        println("checkOfflineTask $message")
+//        toast(message, a)
+//        return if (state) {
+//            Result.success(addTaskData);
+//        } else {
+//            Result.failure(addTaskData)
+//        }
     }
 
 
@@ -215,31 +248,25 @@ class OfflineTaskWorker(
             setStyle(NotificationCompat.BigTextStyle().bigText(message))
         }
 
-        val pendingIntent: PendingIntent
-        if (message.contains("任务添加失败")) {
-             pendingIntent = if (message.contains("请验证账号")) {
-                val intent = Intent(this.applicationContext, MainActivity::class.java)
+        val intent = Intent(this.applicationContext, MainActivity::class.java)
+        val pendingIntent = if (message.contains("任务添加失败")) {
+            if (message.contains("请验证账号")) {
                 intent.action = "check"
                 notification.setContentText("$message。点我跳转验证账号页面")
-                PendingIntent.getActivity(
-                    this.applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE
-                )
             } else {
-                val intent = Intent(this.applicationContext, OfflineTaskActivity::class.java)
                 intent.action = "copy"
                 val stringJoiner = StringJoiner("\n")
                 urlList.forEach { stringJoiner.add(it) }
                 intent.putExtra("link", stringJoiner.toString())
                 notification.setContentText("$message。点我复制链接")
-                PendingIntent.getActivity(
-                    this.applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE
-                )
             }
+            PendingIntent.getActivity(
+                this.applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE
+            )
         } else {
-            val intent = Intent(this.applicationContext, MainActivity::class.java)
             intent.action = "jump"
             notification.setContentText(message)
-            pendingIntent = PendingIntent.getActivity(
+            PendingIntent.getActivity(
                 this.applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE
             )
         }
@@ -278,7 +305,10 @@ class OfflineTaskWorker(
             "任务添加失败，${addTask.errorMsg}"
         }
         resultMessage.add(message)
-        return Data.Builder().putString("return", resultMessage.toString()).build()
+        return Data.Builder()
+            .putBoolean("state", addTask.state)
+            .putString("return", resultMessage.toString())
+            .build()
     }
 
     private fun addTask(cookie: String, map: HashMap<String, String>): BaseReturnMessage {

@@ -44,6 +44,10 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
 
     lateinit var offlineTask: OfflineTask
 
+    //    val addTaskReturn = MutableLiveData<Pair<Boolean, String>>()
+    var addTaskReturn by mutableStateOf(Pair<Boolean, String>(false, "通知信息未初始化，添加失败～"))
+
+
 
     var torrentBean by mutableStateOf(TorrentFileBean())
 
@@ -175,7 +179,7 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
     sign:xxxxxxx
     time:1675155957
      */
-    fun addTask(list: List<String>, currentCid: String, close: Boolean = false) {
+    fun addTask(list: List<String>, currentCid: String) {
         viewModelScope.launch {
             val downloadPath = fileService.setDownloadPath(currentCid)
             if (!downloadPath.state) {
@@ -199,7 +203,7 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
             val message = if (addTask.state) {
                 "任务添加成功"
             } else {
-                if (addTask.errorMsg.contains("请验证账号") && !close) {
+                if (addTask.errorMsg.contains("请验证账号")) {
                     App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
                 }
                 //把失败的离线链接保存起来
@@ -224,10 +228,8 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
                 )
                 "任务添加失败，${addTask.errorMsg}"
             }
+            addTaskReturn = Pair<Boolean, String>(addTask.state, message)
             Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
-            if (close && message == "任务添加成功") {
-                exitProcess(0);
-            }
         }
     }
 

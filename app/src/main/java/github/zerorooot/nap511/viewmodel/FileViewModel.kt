@@ -11,6 +11,7 @@ import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
+import com.google.gson.JsonObject
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.*
 import github.zerorooot.nap511.service.FileService
@@ -29,7 +30,8 @@ import kotlin.math.roundToInt
 class FileViewModel(private val cookie: String, private val application: Application) :
     ViewModel() {
     var fileBeanList = mutableStateListOf<FileBean>()
-//    var selectedItem by mutableStateOf("我的文件")
+
+    var remainingSpace by mutableStateOf(RemainingSpaceBean())
 
     var appBarTitle by mutableStateOf(application.resources.getString(R.string.app_name))
 
@@ -206,6 +208,32 @@ class FileViewModel(private val cookie: String, private val application: Applica
 
     fun setRefreshingStatus(status: Boolean) {
         _isRefreshing.value = status
+    }
+
+    /**
+     * 获取剩余空间
+     */
+    fun getRemainingSpace() {
+        viewModelScope.launch {
+            val gson = fileService.remainingSpace()
+            val spaceInfo = gson.getAsJsonObject("data").getAsJsonObject("space_info")
+            val allUse = spaceInfo.getAsJsonObject("all_use").get("size").asLong
+            val allUseString = spaceInfo.getAsJsonObject("all_use").get("size_format").asString
+            val allTotal = spaceInfo.getAsJsonObject("all_total").get("size").asLong
+            val allTotalString =
+                spaceInfo.getAsJsonObject("all_total").get("size_format").asString
+            val allRemain = spaceInfo.getAsJsonObject("all_remain").get("size").asLong
+            val allRemainString =
+                spaceInfo.getAsJsonObject("all_remain").get("size_format").asString
+            remainingSpace = RemainingSpaceBean(
+                allRemain,
+                allRemainString,
+                allTotal,
+                allTotalString,
+                allUse,
+                allUseString
+            )
+        }
     }
 
     fun getFiles(cid: String) {

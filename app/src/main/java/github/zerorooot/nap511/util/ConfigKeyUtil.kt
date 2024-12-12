@@ -51,12 +51,6 @@ class ConfigKeyUtil {
         const val AUTO_ROTATE = "autoRotate"
 
         /**
-         * 115网盘剩余空间bean
-         * @see github.zerorooot.nap511.bean.RemainingSpaceBean
-         */
-        const val REMAINING_SPACE = "REMAINING_SPACE"
-
-        /**
          * 头像信息bean的json信息,包含头像url、过期时间、用户名、过期时间等
          * @see github.zerorooot.nap511.bean.AvatarBean
          */

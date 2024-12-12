@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.service
 
+import com.google.gson.JsonObject
 import github.zerorooot.nap511.bean.*
 import github.zerorooot.nap511.util.App
 import okhttp3.Interceptor
@@ -159,5 +160,11 @@ interface FileService {
     @POST("offine/downpath")
     suspend fun setDownloadPath(@Field("file_id") cid: String): BaseReturnMessage
 
+
+    /**
+     * 获取剩余空间
+     */
+    @GET("files/index_info")
+    suspend fun remainingSpace(@Query("count_space_nums") countSpaceNum: Int=1): JsonObject
 }
 
