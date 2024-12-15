@@ -51,11 +51,12 @@ android {
 }
 
 dependencies {
+    //log
+    implementation 'com.elvishew:xlog:1.11.1'
+
     implementation 'com.github.nanihadesuka:LazyColumnScrollbar:2.2.0'
     //restart app
     implementation 'com.jakewharton:process-phoenix:3.0.0'
-//    implementation 'org.java-websocket:Java-WebSocket:1.5.6'
-//    implementation 'com.pusher:pusher-java-client:0.3.1'
     //setting screen
 //    implementation "com.github.JamalMulla:ComposePrefs3:1.0.3"
     implementation "com.github.JamalMulla:ComposePrefs:1.0.6"
@@ -107,7 +108,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycle_version")
     // LiveData
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:$lifecycle_version")
-    
+
     implementation 'androidx.work:work-runtime-ktx:2.10.0'
 
     implementation 'androidx.core:core-ktx:1.15.0'

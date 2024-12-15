@@ -6,7 +6,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -54,6 +53,7 @@ import androidx.work.WorkQuery
 import coil.compose.rememberAsyncImagePainter
 import coil.request.CachePolicy
 import coil.request.ImageRequest
+import com.elvishew.xlog.XLog
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -66,6 +66,7 @@ import github.zerorooot.nap511.screen.CaptchaWebViewScreen
 import github.zerorooot.nap511.screen.CookieDialog
 import github.zerorooot.nap511.screen.ExitApp
 import github.zerorooot.nap511.screen.FileScreen
+import github.zerorooot.nap511.screen.LogScreen
 import github.zerorooot.nap511.screen.LoginWebViewScreen
 import github.zerorooot.nap511.screen.MyPhotoScreen
 import github.zerorooot.nap511.screen.OfflineDownloadScreen
@@ -165,10 +166,12 @@ class MainActivity : ComponentActivity() {
         if (intent.action == "check") {
             App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
             intent.action = ""
+            XLog.d("handleIntent check $intent")
         }
         //跳转到默认下载目录
         if (intent.action == "jump") {
-            viewModels<FileViewModel>().value.getFiles(
+            val fileViewModel: FileViewModel by viewModels()
+            fileViewModel.getFiles(
                 DataStoreUtil.getData(
                     ConfigKeyUtil.DEFAULT_OFFLINE_CID,
                     "0"
@@ -176,13 +179,16 @@ class MainActivity : ComponentActivity() {
             )
             //清除action,不然会一直跳转到默认下载目录
             intent.action = ""
+            XLog.d("handleIntent jump $intent $fileViewModel ${fileViewModel.remainingSpace}")
         }
         if (intent.action == "copy") {
             val clipboard = ContextCompat.getSystemService(this, ClipboardManager::class.java)
             val clip = ClipData.newPlainText("label", intent.getStringExtra("link"))
             clipboard?.setPrimaryClip(clip)
             intent.action = ""
+            XLog.d("handleIntent copy $intent")
         }
+
     }
 
     /**
@@ -204,10 +210,6 @@ class MainActivity : ComponentActivity() {
         val workInfos: List<WorkInfo> =
             WorkManager.getInstance(applicationContext).getWorkInfos(workQuery).get()
         val size = workInfos.size
-        Log.d(
-            "nap511 main activity",
-            "checkOfflineTask workManager size $size workInfos $workInfos"
-        )
         if (size != 0) {
             return
         }
@@ -217,15 +219,13 @@ class MainActivity : ComponentActivity() {
             .filter { i -> i != "" && i != " " }
             .toSet()
             .toMutableList()
-        Log.d(
-            "nap511 main activity",
-            "checkOfflineTask currentOfflineTask size ${currentOfflineTask.size}"
-        )
-
         //currentOfflineTask等于0,证明没有离线链接缓存
         if (currentOfflineTask.isEmpty()) {
             return
         }
+        XLog.d(
+            "checkOfflineTask workManager workInfos $workInfos currentOfflineTask size ${currentOfflineTask.size}"
+        )
         //添加离线链接
         val listType = object : TypeToken<List<String?>?>() {}.type
         val list = Gson().toJson(currentOfflineTask, listType)
@@ -259,6 +259,7 @@ class MainActivity : ComponentActivity() {
 //            R.drawable.baseline_web_24 to "ConfigUtil.WEB",
             R.drawable.ic_baseline_delete_24 to ConfigKeyUtil.RECYCLE_BIN,
             R.drawable.baseline_settings_24 to ConfigKeyUtil.ADVANCED_SETTINGS,
+            R.drawable.baseline_log_24 to ConfigKeyUtil.LOG_SCREEN,
             R.drawable.android_exit to ConfigKeyUtil.EXIT_APPLICATION
         )
         ModalNavigationDrawer(gesturesEnabled = App.gesturesEnabled,
@@ -314,7 +315,9 @@ class MainActivity : ComponentActivity() {
                         CaptchaVideoWebViewScreen()
                     }
 
+                    ConfigKeyUtil.LOG_SCREEN -> LogScreen()
                     ConfigKeyUtil.EXIT_APPLICATION -> ExitApp()
+
                     ConfigKeyUtil.PHOTO -> {
                         MyPhotoScreen(fileViewModel)
                     }

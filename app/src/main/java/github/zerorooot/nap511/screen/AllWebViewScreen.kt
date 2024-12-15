@@ -25,6 +25,7 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
 import com.acsbendi.requestinspectorwebview.RequestInspectorWebViewClient
 import com.acsbendi.requestinspectorwebview.WebViewRequest
+import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.jakewharton.processphoenix.ProcessPhoenix
@@ -163,11 +164,12 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
             if (url.startsWith("https://webapi.115.com/label/list") || url.startsWith("https://115.com/?cid=0&offset=0&mode=wangpan")) {
                 val message = "登录失败~，请重试"
                 val cookie = webViewRequest.headers["cookie"]
+                XLog.d("loginWebViewClient $cookie")
                 if (cookie == null) {
                     App.instance.toast(message)
                     return super.shouldInterceptRequest(view, webViewRequest)
                 }
-                println(cookie)
+
                 //USERSESSIONID=xx; UID=xx; CID=xx; SEID=xx; PHPSESSID=xx; acw_tc=xx; UID=xx; CID=xx; SEID=xx
                 val uidRegex = Regex("UID=\\w+")
                 val cidRegex = Regex("CID=\\w+")

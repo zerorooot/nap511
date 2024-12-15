@@ -4,6 +4,12 @@
         <item>文件排序</item>
         <item>刷新文件</item>
     </array>
+    <array name="logScreenAppBarMenu">
+        <item>滚动顶部</item>
+        <item>滚动底部</item>
+        <item>清空日志</item>
+        <item>导出日志</item>
+    </array>
     <array name="offlineFileAppBarMenu">
         <item>刷新文件</item>
         <item>复制所有下载链接</item>

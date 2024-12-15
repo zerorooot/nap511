@@ -112,7 +112,12 @@ fun OfflineFileAppTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
     val listOf = stringArrayResource(id = R.array.offlineFileAppBarMenu).toList()
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }
-
+@Composable
+fun LogScreenTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
+    val listOf = stringArrayResource(id = R.array.logScreenAppBarMenu).toList()
+//    val listOf = listOf("滚动顶部", "滚动底部", "清空日志","导出日志")
+    BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
+}
 @Composable
 fun RecycleAppTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
     val listOf = listOf("清空所有文件")

@@ -150,5 +150,10 @@ class ConfigKeyUtil {
          */
         const val PHOTO = "照片模式"
 
+        /**
+         * 日志页面
+         */
+        const val LOG_SCREEN="日志页面"
+
     }
 }

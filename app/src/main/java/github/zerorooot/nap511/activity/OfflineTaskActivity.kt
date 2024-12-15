@@ -9,7 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -25,17 +24,14 @@ import github.zerorooot.nap511.MainActivity
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.SignBean
-import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.StringJoiner
 import java.util.concurrent.TimeUnit
-import kotlin.getValue
 
 
 class OfflineTaskActivity : ComponentActivity() {

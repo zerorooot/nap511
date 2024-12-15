@@ -132,6 +132,30 @@ fun AppTopBarOfflineFile(title: String, onClick: (name: String) -> Unit) {
         }
     )
 }
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AppTopBarLogScreen(title: String, onClick: (name: String) -> Unit) {
+//    val contextForToast = LocalContext.current.applicationContext
+    TopAppBar(
+        title = {
+            Text(text = title)
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
+        navigationIcon = {
+            TopAppBarActionButton(
+                imageVector = Icons.Rounded.Menu,
+                description = "navigationIcon"
+            ) {
+                onClick.invoke("ModalNavigationDrawerMenu")
+            }
+        },
+        actions = {
+            LogScreenTopBarDropdownMenu(onClick = { itemValue, _ ->
+                onClick.invoke(itemValue)
+            })
+        }
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
