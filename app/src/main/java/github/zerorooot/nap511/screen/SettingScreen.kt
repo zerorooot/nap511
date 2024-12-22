@@ -16,13 +16,12 @@ import github.zerorooot.nap511.util.DataStoreUtil.dataStore
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterialApi::class)
 @Composable
 fun SettingScreen() {
-
     PrefsScreen(dataStore = App.instance.dataStore) {
         prefsItem {
             EditTextPref(
                 key = ConfigKeyUtil.UID,
                 title = "用户id",
-                summary = DataStoreUtil.getData(ConfigKeyUtil.UID, "xxxxxxxxxx"),
+                summary = DataStoreUtil.getData(ConfigKeyUtil.UID, "0"),
                 enabled = false
             )
         }
@@ -48,7 +47,10 @@ fun SettingScreen() {
             EditTextPref(
                 key = ConfigKeyUtil.ARIA2_URL,
                 title = "aria2地址",
-                summary = DataStoreUtil.getData(ConfigKeyUtil.ARIA2_URL, ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE),
+                summary = DataStoreUtil.getData(
+                    ConfigKeyUtil.ARIA2_URL,
+                    ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
+                ),
                 dialogTitle = "请输入新的aria2地址",
             )
         }
@@ -70,6 +72,23 @@ fun SettingScreen() {
             )
         }
         prefsItem {
+            EditTextPref(
+                key = ConfigKeyUtil.DEFAULT_OFFLINE_CID,
+                title = "默认离线位置",
+                summary = DataStoreUtil.getData(
+                    ConfigKeyUtil.DEFAULT_OFFLINE_CID, "输入文件夹cid,长按目录可复制当前目录cid"
+                ),
+                dialogTitle = "长按路径可当前目录cid",
+            )
+        }
+        prefsItem {
+            SwitchPref(
+                key = ConfigKeyUtil.LOG_SCREEN,
+                title = "日志记录",
+                summary = "输出程序中部分关键节点内容，方便调试",
+            )
+        }
+        prefsItem {
             SwitchPref(
                 key = ConfigKeyUtil.AUTO_ROTATE,
                 title = "屏幕自动旋转",
@@ -78,19 +97,16 @@ fun SettingScreen() {
         }
         prefsItem {
             SwitchPref(
-                key = ConfigKeyUtil.EARLY_LOADING,
-                title = "提前加载",
-                summary = "进入下级目录时，提前加载当前文件夹上下两个文件夹内的文件",
+                key = ConfigKeyUtil.HIDE_LOADING_VIEW,
+                title = "隐藏视频加载提示",
+                summary = "当视频正在加载时，隐藏加载提示",
             )
         }
         prefsItem {
-            EditTextPref(
-                key = ConfigKeyUtil.DEFAULT_OFFLINE_CID,
-                title = "默认离线位置",
-                summary = DataStoreUtil.getData(
-                    ConfigKeyUtil.DEFAULT_OFFLINE_CID, "输入文件夹cid,长按目录可复制当前目录cid"
-                ),
-                dialogTitle = "长按路径可当前目录cid",
+            SwitchPref(
+                key = ConfigKeyUtil.EARLY_LOADING,
+                title = "提前加载",
+                summary = "进入下级目录时，提前加载当前文件夹上下两个文件夹内的文件",
             )
         }
         prefsItem {
@@ -124,7 +140,7 @@ fun SettingScreen() {
                     }分钟后统一离线下载",
                 )
             }
-        }else{
+        } else {
             prefsItem {
                 EditTextPref(
                     key = ConfigKeyUtil.DEFAULT_OFFLINE_COUNT,
@@ -171,10 +187,4 @@ fun SettingScreen() {
             )
         }
     }
-}
-
-@Preview
-@Composable
-fun a() {
-    SettingScreen()
 }

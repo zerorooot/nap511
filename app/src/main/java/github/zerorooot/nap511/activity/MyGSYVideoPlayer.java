@@ -14,6 +14,7 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.widget.TextView;
 
+import com.elvishew.xlog.XLog;
 import com.shuyu.gsyvideoplayer.utils.CommonUtil;
 import com.shuyu.gsyvideoplayer.utils.GSYVideoType;
 import com.shuyu.gsyvideoplayer.utils.OrientationUtils;
@@ -25,8 +26,10 @@ import java.util.Locale;
 import java.util.Objects;
 
 import github.zerorooot.nap511.R;
+import github.zerorooot.nap511.util.ConfigKeyUtil;
+import github.zerorooot.nap511.util.DataStoreUtil;
 
-public class MyGSYVideoPlayer extends StandardGSYVideoPlayer{
+public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     private TextView mMoreScale;
     private TextView switchSpeed;
     //记住切换数据源类型
@@ -60,6 +63,11 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer{
     private void initView() {
         batteryTextView = findViewById(R.id.batteryTextView);
         timeTextView = findViewById(R.id.timeTextView);
+
+        if (DataStoreUtil.INSTANCE.getData(ConfigKeyUtil.HIDE_LOADING_VIEW, false)) {
+            XLog.d("MyGSYVideoPlayer hide video start view");
+            findViewById(R.id.startAndLoadLayout).setVisibility(GONE);
+        }
 
         mMoreScale = findViewById(R.id.moreScale);
         switchSpeed = findViewById(R.id.switchSpeed);
@@ -139,11 +147,10 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer{
         if (mChangePosition) {
             long totalTimeDuration = getDuration();
             mSeekTimePosition = (int) (mDownPosition + (deltaX * totalTimeDuration / curWidth) / mSeekRatio);
-            if(mSeekTimePosition < 0) {
+            if (mSeekTimePosition < 0) {
                 mSeekTimePosition = 0;
             }
-            if (mSeekTimePosition > totalTimeDuration)
-                mSeekTimePosition = totalTimeDuration;
+            if (mSeekTimePosition > totalTimeDuration) mSeekTimePosition = totalTimeDuration;
             String seekTime = CommonUtil.stringForTime(mSeekTimePosition);
             String totalTime = CommonUtil.stringForTime(totalTimeDuration);
             showProgressDialog(deltaX, seekTime, mSeekTimePosition, totalTime, totalTimeDuration);
@@ -216,10 +223,9 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer{
         batteryTextView.setText(batteryPct + "%");
         //isCharging
         int status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
-        boolean isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
-                status == BatteryManager.BATTERY_STATUS_FULL;
+        boolean isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL;
         if (isCharging) {
-            batteryTextView.setText(batteryTextView.getText()+"  ⚡︎");
+            batteryTextView.setText(batteryTextView.getText() + "  ⚡︎");
         }
 
         //时间
@@ -255,8 +261,7 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer{
             GSYVideoType.setShowType(GSYVideoType.SCREEN_TYPE_DEFAULT);
         }
         changeTextureViewShowType();
-        if (mTextureView != null)
-            mTextureView.requestLayout();
+        if (mTextureView != null) mTextureView.requestLayout();
     }
 
     @Override

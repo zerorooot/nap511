@@ -18,18 +18,14 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
+import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.MainActivity
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.bean.BaseReturnMessage
-import github.zerorooot.nap511.bean.SignBean
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import okhttp3.FormBody
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import java.util.StringJoiner
 import java.util.concurrent.TimeUnit
 
@@ -159,19 +155,12 @@ class OfflineTaskActivity : ComponentActivity() {
 class OfflineTaskWorker(
     appContext: Context, workerParams: WorkerParameters
 ) : Worker(appContext, workerParams) {
-    private val okHttpClient = OkHttpClient()
     override fun doWork(): Result {
-//        val cookie: String = inputData.getString("cookie").toString()
         val listType = object : TypeToken<List<String?>?>() {}.type
         val a: List<String> = Gson().fromJson(inputData.getString("list").toString(), listType)
-        val errorDownloadCid = DataStoreUtil.getData(ConfigKeyUtil.ERROR_DOWNLOAD_CID, "")
-        val cid = if (errorDownloadCid == "") {
-            DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
-        } else {
-            errorDownloadCid
-        }
+        val cid = DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
 
-
+        XLog.d("OfflineTaskWorker cid $cid")
         App.offlineFileViewModel.addTask(a, cid)
         Thread.sleep(5000)
         val state = App.offlineFileViewModel.addTaskReturn.first
@@ -194,25 +183,6 @@ class OfflineTaskWorker(
         } else {
             Result.failure(addTaskData)
         }
-
-
-//        val addTaskData = addTask(a, cookie)
-//        val state = addTaskData.getBoolean("state", false)
-//        val message = addTaskData.getString("return").toString()
-//        if (message.contains("任务添加成功")) {
-//            //清空缓存
-//            DataStoreUtil.putData(
-//                ConfigKeyUtil.CURRENT_OFFLINE_TASK,
-//                ""
-//            )
-//        }
-//        println("checkOfflineTask $message")
-//        toast(message, a)
-//        return if (state) {
-//            Result.success(addTaskData);
-//        } else {
-//            Result.failure(addTaskData)
-//        }
     }
 
 
@@ -245,6 +215,7 @@ class OfflineTaskWorker(
         }
 
         val intent = Intent(this.applicationContext, MainActivity::class.java)
+ //       intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
         val pendingIntent = if (message.contains("任务添加失败")) {
             if (message.contains("请验证账号")) {
                 intent.action = "check"
@@ -269,88 +240,5 @@ class OfflineTaskWorker(
 
         notification.setContentIntent(pendingIntent)
         notificationManager.notify(notificationId, notification.build())
-    }
-
-    private fun addTask(urlList: List<String>, cookie: String): Data {
-        val resultMessage = StringJoiner("\n")
-        val errorDownloadCid = DataStoreUtil.getData(ConfigKeyUtil.ERROR_DOWNLOAD_CID, "")
-        val cid = if (errorDownloadCid == "") {
-            DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
-        } else {
-            errorDownloadCid
-        }
-        val downloadPath = setDownloadPath(cid, cookie)
-        if (!downloadPath.state) {
-            resultMessage.add("设置离线位置失败，默认保存到\"云下载\"目录\n")
-        }
-        val map = HashMap<String, String>()
-        map["savepath"] = ""
-        map["wp_path_id"] = cid
-        map["uid"] = DataStoreUtil.getData(ConfigKeyUtil.UID, "")
-        map["sign"] = getSign(cookie).sign
-        map["time"] = (System.currentTimeMillis() / 1000).toString()
-        urlList.forEachIndexed { index, s ->
-            map["url[$index]"] = s
-        }
-        val addTask = addTask(cookie, map)
-        val message = if (addTask.state) {
-            //清除下载失败的cid
-            DataStoreUtil.putData(ConfigKeyUtil.ERROR_DOWNLOAD_CID, "")
-            "任务添加成功"
-        } else {
-            "任务添加失败，${addTask.errorMsg}"
-        }
-        resultMessage.add(message)
-        return Data.Builder()
-            .putBoolean("state", addTask.state)
-            .putString("return", resultMessage.toString())
-            .build()
-    }
-
-    private fun addTask(cookie: String, map: HashMap<String, String>): BaseReturnMessage {
-        val builder = FormBody.Builder()
-        map.forEach { (t, u) -> builder.add(t, u) }
-        val formBody = builder.build()
-
-        val request: Request =
-            Request.Builder().url("https://115.com/web/lixian/?ct=lixian&ac=add_task_urls")
-                .addHeader("cookie", cookie)
-                .addHeader("Content-Type", "application/x-www-form-urlencoded").addHeader(
-                    "User-Agent",
-                    "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
-                ).post(formBody).build()
-        val response = okHttpClient.newCall(request).execute()
-        return Gson().fromJson(
-            response.body.string(), BaseReturnMessage::class.java
-        )
-    }
-
-    private fun getSign(cookie: String): SignBean {
-        val request: Request = Request.Builder()
-            .url("https://115.com?ct=offline&ac=space&_=${System.currentTimeMillis() / 1000}")
-            .addHeader("cookie", cookie)
-//            .addHeader("Content-Type", "application/x-www-form-urlencoded")
-            .addHeader(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
-            ).get().build()
-        val response = okHttpClient.newCall(request).execute()
-        return Gson().fromJson(
-            response.body.string(), SignBean::class.java
-        )
-    }
-
-    private fun setDownloadPath(cid: String, cookie: String): BaseReturnMessage {
-        val formBody = FormBody.Builder().add("file_id", cid).build()
-        val request: Request = Request.Builder().url("https://webapi.115.com/offine/downpath")
-            .addHeader("cookie", cookie)
-            .addHeader("Content-Type", "application/x-www-form-urlencoded").addHeader(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
-            ).post(formBody).build()
-        val response = okHttpClient.newCall(request).execute()
-        return Gson().fromJson(
-            response.body.string(), BaseReturnMessage::class.java
-        )
     }
 }

@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.OfflineInfo
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.QuotaBean
@@ -182,6 +183,7 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
     fun addTask(list: List<String>, currentCid: String) {
         viewModelScope.launch {
             val downloadPath = fileService.setDownloadPath(currentCid)
+            XLog.d("add task $downloadPath")
             if (!downloadPath.state) {
                 Toast.makeText(
                     application,
@@ -220,11 +222,6 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
                 DataStoreUtil.putData(
                     ConfigKeyUtil.CURRENT_OFFLINE_TASK,
                     stringJoiner.toString()
-                )
-                //记录当前失败的cid
-                DataStoreUtil.putData(
-                    ConfigKeyUtil.ERROR_DOWNLOAD_CID,
-                    currentCid
                 )
                 "任务添加失败，${addTask.errorMsg}"
             }

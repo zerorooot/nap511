@@ -4,12 +4,10 @@ import android.app.AppOpsManager
 import android.app.Application
 import android.content.Context
 import android.content.Intent
-import android.os.Debug
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.widget.Toast
-import androidx.compose.animation.scaleOut
 import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,7 +19,6 @@ import com.elvishew.xlog.LogItem
 import com.elvishew.xlog.XLog
 import com.elvishew.xlog.flattener.ClassicFlattener
 import com.elvishew.xlog.interceptor.AbstractFilterInterceptor
-import com.elvishew.xlog.printer.AndroidPrinter
 import com.elvishew.xlog.printer.ConsolePrinter
 import com.elvishew.xlog.printer.file.FilePrinter
 import com.elvishew.xlog.printer.file.clean.FileLastModifiedCleanStrategy
@@ -35,7 +32,6 @@ import kotlinx.coroutines.launch
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.lang.Thread.UncaughtExceptionHandler
 import java.lang.reflect.Field
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
@@ -86,7 +82,7 @@ class App : Application() {
         //log
         val build = LogConfiguration.Builder().addInterceptor(object : AbstractFilterInterceptor() {
             override fun reject(log: LogItem?): Boolean {
-                return Debug.isDebuggerConnected()
+                return !DataStoreUtil.getData(ConfigKeyUtil.LOG_SCREEN, true)
             }
         }).build()
         val print = FilePrinter
@@ -95,7 +91,7 @@ class App : Application() {
             .flattener(ClassicFlattener())
             .build()
         XLog.init(build, ConsolePrinter(), print);
-
+        XLog.d("-----------------------init-----------------------------------")
         val handler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, e ->
             XLog.enableStackTrace(50).e("程序崩溃退出", e)

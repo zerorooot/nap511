@@ -120,21 +120,11 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun Init(cookie: String) {
-        val fileViewModel by viewModels<FileViewModel> {
-            CookieViewModelFactory(
-                cookie, this.application
-            )
-        }
-        val offlineFileViewModel by viewModels<OfflineFileViewModel> {
-            CookieViewModelFactory(
-                cookie, this.application
-            )
-        }
-        val recycleViewModel by viewModels<RecycleViewModel> {
-            CookieViewModelFactory(
-                cookie, this.application
-            )
-        }
+        val cookieViewModelFactory = CookieViewModelFactory(cookie, this.application)
+        val fileViewModel by viewModels<FileViewModel> { cookieViewModelFactory }
+        val offlineFileViewModel by viewModels<OfflineFileViewModel> { cookieViewModelFactory }
+        val recycleViewModel by viewModels<RecycleViewModel> { cookieViewModelFactory }
+
         //恢复因MyPhotoScreen而造成的isSystemBarsVisible为false的情况
         var visible by remember {
             mutableStateOf(true)
@@ -155,6 +145,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent, caller: ComponentCaller) {
         super.onNewIntent(intent, caller)
+        XLog.d("onNewIntent $intent")
         handleIntent(intent)
     }
 
@@ -165,8 +156,8 @@ class MainActivity : ComponentActivity() {
         //直接添加磁力，但提示请验证账号;跳转到验证账号界面
         if (intent.action == "check") {
             App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
-            intent.action = ""
             XLog.d("handleIntent check $intent")
+            intent.action = ""
         }
         //跳转到默认下载目录
         if (intent.action == "jump") {
@@ -177,16 +168,16 @@ class MainActivity : ComponentActivity() {
                     "0"
                 )
             )
+            XLog.d("handleIntent jump $intent $fileViewModel")
             //清除action,不然会一直跳转到默认下载目录
             intent.action = ""
-            XLog.d("handleIntent jump $intent $fileViewModel ${fileViewModel.remainingSpace}")
         }
         if (intent.action == "copy") {
             val clipboard = ContextCompat.getSystemService(this, ClipboardManager::class.java)
             val clip = ClipData.newPlainText("label", intent.getStringExtra("link"))
             clipboard?.setPrimaryClip(clip)
-            intent.action = ""
             XLog.d("handleIntent copy $intent")
+            intent.action = ""
         }
 
     }
@@ -259,10 +250,13 @@ class MainActivity : ComponentActivity() {
 //            R.drawable.baseline_web_24 to "ConfigUtil.WEB",
             R.drawable.ic_baseline_delete_24 to ConfigKeyUtil.RECYCLE_BIN,
             R.drawable.baseline_settings_24 to ConfigKeyUtil.ADVANCED_SETTINGS,
-            R.drawable.baseline_log_24 to ConfigKeyUtil.LOG_SCREEN,
-            R.drawable.android_exit to ConfigKeyUtil.EXIT_APPLICATION
         )
-        ModalNavigationDrawer(gesturesEnabled = App.gesturesEnabled,
+        if (DataStoreUtil.getData(ConfigKeyUtil.LOG_SCREEN, false)) {
+            itemMap.put(R.drawable.baseline_log_24, ConfigKeyUtil.LOG_SCREEN)
+        }
+        itemMap.put(R.drawable.android_exit, ConfigKeyUtil.EXIT_APPLICATION)
+        ModalNavigationDrawer(
+            gesturesEnabled = App.gesturesEnabled,
             drawerState = drawerState,
             drawerContent = {
                 ModalDrawerSheet {

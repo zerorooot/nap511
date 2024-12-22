@@ -86,9 +86,9 @@ class ConfigKeyUtil {
         const val DEFAULT_OFFLINE_TIME = "defaultOfflineTime"
 
         /**
-         * 记录当前失败离线磁力链接的cid，等下次添加磁力链接时再用这个cid
+         * 当视频正在加载时，隐藏loadingView
          */
-        const val ERROR_DOWNLOAD_CID = "errorDownloadCid"
+        const val HIDE_LOADING_VIEW="hideLoadingView"
 
         /**
          * 提前加载上下两个文件夹，具体在设置中设置
