@@ -315,3 +315,29 @@ data class TorrentFileListWeb(
     var path: String = "",
     val wanted: Int = -1,
 )
+
+data class ZipBeanList(
+    var list: ArrayList<ZipBean> = arrayListOf(),
+    @SerializedName("has_file")
+    var hasFile: Boolean = false,
+    @SerializedName("next_marker")
+    var nextMarker: String = "",
+    var pathString: String = ""
+)
+
+data class ZipBean(
+    @SerializedName("file_name")
+    var fileName: String = "",
+    @SerializedName("ico")
+    var icoString: String = "",
+    var fileIco: Int = R.drawable.other,
+    var size: Long = 0,
+    var sizeString: String = "",
+    /**
+     * 1 is file, 0 is folder
+     */
+    @SerializedName("file_category")
+    var fileCategory: Int = 1,
+    var time: String = "",
+    var timeString: String = ""
+)

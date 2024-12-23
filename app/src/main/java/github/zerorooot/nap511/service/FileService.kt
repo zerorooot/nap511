@@ -140,6 +140,7 @@ interface FileService {
     suspend fun recycleCleanAll(
         @Field("password") password: String
     ): BaseReturnMessage
+
     /**
      * cid 当前目录的cid
      */
@@ -165,6 +166,52 @@ interface FileService {
      * 获取剩余空间
      */
     @GET("files/index_info")
-    suspend fun remainingSpace(@Query("count_space_nums") countSpaceNum: Int=1): JsonObject
+    suspend fun remainingSpace(@Query("count_space_nums") countSpaceNum: Int = 1): JsonObject
+
+    @GET("files/extract_info")
+    suspend fun getZipListFile(
+        @Query("pick_code") pickCode: String,
+        @Query("file_name") fileName: String = "",
+        @Query("paths") paths: String = "文件",
+        @Query("page_count") pageCount: String = "999",
+    ): JsonObject
+
+
+    @FormUrlEncoded
+    @POST("files/push_extract")
+    suspend fun decryptZip(
+        @Field("pick_code") pickCode: String,
+        @Field("secret") secret: String
+    ): JsonObject
+
+
+    @GET("files/push_extract")
+    suspend fun getDecryptZipProcess(
+        @Query("pick_code") pickCode: String
+    ): JsonObject
+
+    /**
+     * map extract_file[] -> xxxx
+     * extract_file[] -> xxxx
+     * extract_dir[] -> xxx
+     * extract_dir[] -> xxx
+     */
+    @FormUrlEncoded
+    @POST("files/add_extract_file")
+    suspend fun unzipFile(
+        @Field("pick_code") pickCode: String,
+        @Field("to_pid") pid: String,
+        @Field("extract_file[]") files: List<String>?,
+        @Field("extract_dir[]") dirs: List<String>?,
+        @Field("paths") paths: String = "文件"
+    ): JsonObject
+
+    /**
+     * {"state":true,"message":"","code":"","data":{"extract_id":"id","to_pid":"pid","percent":100}}
+     */
+    @GET("files/add_extract_file")
+    suspend fun unzipFileProcess(
+        @Query("extract_id") extractId: Long,
+    ): JsonObject
 }
 

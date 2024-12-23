@@ -32,6 +32,7 @@ import kotlinx.coroutines.launch
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.lang.Thread.UncaughtExceptionHandler
 import java.lang.reflect.Field
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
@@ -71,14 +72,16 @@ class App : Application() {
         uid = DataStoreUtil.getData(ConfigKeyUtil.UID, "0")
         requestLimitCount = DataStoreUtil.getData(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "100").toInt()
 
-        val cookieViewModelFactory = CookieViewModelFactory(
-            cookie, this
-        )
+
         offlineFileViewModel = ViewModelProvider(
             ViewModelStore(),
-            cookieViewModelFactory
+            CookieViewModelFactory(cookie, this)
         )[OfflineFileViewModel::class.java]
 
+        initLog()
+    }
+
+    fun initLog() {
         //log
         val build = LogConfiguration.Builder().addInterceptor(object : AbstractFilterInterceptor() {
             override fun reject(log: LogItem?): Boolean {
@@ -96,6 +99,14 @@ class App : Application() {
         Thread.setDefaultUncaughtExceptionHandler { thread, e ->
             XLog.enableStackTrace(50).e("程序崩溃退出", e)
             handler?.uncaughtException(thread, e)
+        }
+
+        val uncaughtExceptionHandler = Thread.currentThread().uncaughtExceptionHandler
+        Thread.currentThread().uncaughtExceptionHandler = object : UncaughtExceptionHandler {
+            override fun uncaughtException(t: Thread, e: Throwable) {
+                XLog.enableStackTrace(50).e("程序崩溃退出", e)
+                uncaughtExceptionHandler?.uncaughtException(t, e)
+            }
         }
     }
 

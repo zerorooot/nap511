@@ -1,35 +1,33 @@
 package github.zerorooot.nap511.screen
 
-import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,8 +39,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -54,8 +52,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextRange
@@ -68,11 +68,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.TorrentFileListWeb
+import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.screenitem.AutoSizableTextField
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
@@ -83,6 +85,10 @@ import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import kotlinx.coroutines.delay
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.stream.Collectors
+import kotlin.collections.set
 import kotlin.system.exitProcess
 
 @Composable
@@ -177,7 +183,206 @@ fun ExitApp() {
             dialogTitle = "是否离开Nap511?",
         )
     }
+}
 
+@Composable
+fun UnzipDialog(fileViewModel: FileViewModel) {
+    if (fileViewModel.isOpenUnzipPasswordDialog) {
+        val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
+        fileViewModel.setRefreshingStatus(false)
+        BaseDialog(
+            title = "云解压-${fileBean.name}", label = "请输入密码", dismissButtonText = "取消"
+        ) {
+            XLog.d("云解压 ${fileBean.name} password $it")
+            if (it != "") {
+                fileViewModel.decryptZip(it)
+            } else {
+                fileViewModel.isOpenUnzipPasswordDialog = false
+            }
+        }
+    }
+
+    if (fileViewModel.isOpenUnzipDialog) {
+        val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
+        val zipBeanList by fileViewModel.unzipBeanList
+        fileViewModel.setRefreshingStatus(false)
+        UnzipScreen(zipBeanList, fileBean.name) {
+            //Pair true is command,false is click event
+            if (it.first) {
+                when (it.second) {
+                    "exit" -> {
+                        fileViewModel.isOpenUnzipDialog = false
+                    }
+                    "up" -> {
+                        val path = zipBeanList.pathString.split("/")
+                        var fileName = ""
+                        var paths = ""
+                        try {
+                            fileName = path[path.size - 2]
+                            paths = path.subList(0, path.size - 2).joinToString(separator = "/")
+                        } catch (e: Exception) {
+                        }
+                        fileViewModel.getZipListFile(fileName, paths)
+                    }
+
+                    "unzipAll" -> {
+                        val dirs =
+                            zipBeanList.list.stream().filter { i -> i.fileIco == R.drawable.folder }
+                                .map { a -> a.fileName }.collect(Collectors.toList()).takeIf {
+                                    it.isNotEmpty()
+                                }
+                        val files =
+                            zipBeanList.list.stream().filter { i -> i.fileIco != R.drawable.folder }
+                                .map { a -> a.fileName }.collect(Collectors.toList()).takeIf {
+                                    it.isNotEmpty()
+                                }
+                        fileViewModel.unzipFile(files, dirs)
+                        fileViewModel.isOpenUnzipDialog = false
+                    }
+                }
+            } else {
+                //go to next folder
+                fileViewModel.getZipListFile(
+                    it.second,
+                    paths = zipBeanList.pathString
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterialApi::class)
+@Composable
+fun UnzipScreen(
+    zipBeanList: ZipBeanList,
+    fileName: String,
+    enter: (Pair<Boolean, String>) -> Unit
+) {
+    //Pair true is command,false is click event
+    AlertDialog(onDismissRequest = {
+        enter.invoke(Pair(true, "exit"))
+    }, confirmButton = {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.offset(y = (-20).dp)
+        ) {
+            TextButton(
+                onClick = {
+                    enter.invoke(Pair(true, "exit"))
+                },
+            ) {
+                Text(text = "关闭")
+            }
+            TextButton(
+                onClick = {
+                    enter.invoke(Pair(true, "up"))
+                },
+            ) {
+                Text(text = "上一级")
+            }
+            TextButton(onClick = {
+                enter.invoke(Pair(true, "unzipAll"))
+            }) {
+                Text(text = "解压到当前文件夹")
+            }
+
+        }
+    }, title = { Text(text = "云解压-${fileName}") }, text = {
+        Column() {
+            AutoSizableTextField(
+                value = zipBeanList.pathString, minFontSize = 30.sp, maxLines = 2
+            )
+
+            LazyColumn {
+                itemsIndexed(items = zipBeanList.list, key = { _, item ->
+                    item.hashCode()
+                }) { index, item ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .fillMaxSize()
+                            .combinedClickable(onClick = {
+//                                XLog.d("click $index item $item")
+                                if (item.fileIco == R.drawable.folder) {
+                                    enter.invoke(Pair(false, item.fileName))
+                                }
+                            })
+                    ) {
+                        Image(
+                            painter = painterResource(item.fileIco),
+                            modifier = Modifier
+                                .height(30.dp)
+                                .width(30.dp),
+                            contentScale = ContentScale.Fit,
+                            contentDescription = "",
+                        )
+                        if (item.fileIco == R.drawable.folder) {
+                            Text(
+                                text = item.fileName,
+                                modifier = Modifier
+                                    .padding(start = 8.dp)
+                            )
+                        } else {
+                            Column(
+                                modifier = Modifier
+                                    .padding(start = 8.dp)
+                            ) {
+                                Text(
+                                    text = item.fileName,
+                                )
+                                Row {
+                                    Text(
+                                        text = item.sizeString,
+                                    )
+                                    Text(
+                                        text = item.timeString,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+    })
+}
+
+@Preview
+@Composable
+fun tt() {
+    var enter: (String) -> Unit = {}
+    val zipBeanList = Gson().fromJson(
+        "{\"list\":[{\"file_name\":\"123\",\"size\":0,\"time\":\"\",\"ico\":\"\",\"file_category\":0},{\"file_name\":\"tt\",\"size\":0,\"time\":\"\",\"ico\":\"\",\"file_category\":0},{\"file_name\":\"sizes\",\"size\":0,\"time\":\"\",\"ico\":\"\",\"file_category\":0},{\"file_name\":\"application\",\"ico\":\"properties\",\"size\":46,\"file_category\":1,\"time\":1732623206}],\"has_file\":\"false\",\"next_marker\":\"\",\"paths\":[{\"file_name\":\"文件\"}]}",
+        ZipBeanList::class.java
+    )
+    zipBeanList.pathString = "文件/123/nihao/hello"
+    zipBeanList.list.forEach { i ->
+        if (i.fileCategory == 0) {
+            i.fileIco = R.drawable.folder
+        } else {
+            i.timeString = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
+                i.time.toLong() * 1000
+            )
+            when (i.icoString) {
+                "apk" -> i.fileIco = R.drawable.apk
+                "iso" -> i.fileIco = R.drawable.iso
+                "zip" -> i.fileIco = R.drawable.zip
+                "7z" -> i.fileIco = R.drawable.zip
+                "rar" -> i.fileIco = R.drawable.zip
+                "png" -> i.fileIco = R.drawable.png
+                "jpg" -> i.fileIco = R.drawable.png
+                "mp3" -> i.fileIco = R.drawable.mp3
+                "txt" -> i.fileIco = R.drawable.txt
+                "torrent" -> i.fileIco = R.drawable.torrent
+            }
+        }
+    }
+
+    UnzipScreen(zipBeanList, "FileBean") {
+
+    }
 
 }
 
@@ -189,9 +394,7 @@ fun CookieDialog(enter: (String) -> Unit) {
 
     if (isOpen) {
         BaseDialog(
-            title = "设置Cookie",
-            label = "请输入Cookie",
-            dismissButtonText = "通过网页登陆"
+            title = "设置Cookie", label = "请输入Cookie", dismissButtonText = "通过网页登陆"
         ) {
             enter.invoke(it)
             isOpen = false
@@ -261,8 +464,7 @@ fun Aria2Dialog(fileViewModel: FileViewModel, context: String, enter: (String) -
         Column(Modifier.padding(8.dp)) {
             OutlinedTextField(
                 value = urlText,
-                modifier = Modifier
-                    .focusRequester(focusRequester),
+                modifier = Modifier.focusRequester(focusRequester),
                 textStyle = LocalTextStyle.current,
                 label = { Text(text = "aria2网址") },
                 placeholder = { Text(text = "http://x.x.x.x:6800/jsonrpc") },
@@ -330,8 +532,7 @@ private fun RadioButtonDialog(
         Column(Modifier.padding(8.dp)) {
             items.forEach { item ->
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
+                    verticalAlignment = Alignment.CenterVertically, modifier = Modifier
                         .selectable(
                             selected = isSelectedItem(item), onClick = {
                                 onChangeState(item)
@@ -514,7 +715,7 @@ private fun SelectTorrentFileDialog(
 }
 
 @Composable
-@Preview
+//@Preview
 fun SelectTorrentFileDialogPreview() {
 //    val torrentFileBean = Gson().fromJson(
 //        "{\"state\":true,\"errno\":0,\"fileSizeString\":123G,\"errtype\":\"suc\",\"errcode\":0,\"file_size\":70966705837,\"torrent_name\":\"name\",\"file_count\":28,\"info_hash\":\"hash\",\"torrent_filelist_web\":[{\"size\":12312,\"path\":\"预览图/0.JPG\",\"wanted\":1},{\"size\":123443242,\"path\":\"预览图/123123132132131312313123123/1.JPG\",\"wanted\":1},{\"size\":3902418,\"path\":\"预览图/2.JPG\",\"wanted\":1},{\"size\":321231321,\"path\":\"预览图/3.JPG\",\"wanted\":1},{\"size\":312321321,\"path\":\"预览图/4.JPG\",\"wanted\":-1}]}",
@@ -542,8 +743,7 @@ fun DynamicEllipsizedTextView(text: String, modifier: Modifier = Modifier) {
 
 @Composable
 fun EllipsizedTextView(
-    text: String,
-    maxStartChars: Int = 10, // 开头显示的字符数
+    text: String, maxStartChars: Int = 10, // 开头显示的字符数
     maxEndChars: Int = 10,   // 结尾显示的字符数
     ellipsis: String = "..."
 ) {
@@ -562,30 +762,23 @@ fun InfoDialog(
     onConfirmation: () -> Unit,
     dialogTitle: String,
 ) {
-    AlertDialog(
-        title = {
-            Text(text = dialogTitle)
-        },
-        onDismissRequest = {
-            onDismissRequest()
-        },
-        confirmButton = {
-            Button(onClick = {
-                onConfirmation()
-            }) {
-                Text("确定")
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = {
-                    onDismissRequest()
-                }
-            ) {
-                Text("取消")
-            }
+    AlertDialog(title = {
+        Text(text = dialogTitle)
+    }, onDismissRequest = {
+        onDismissRequest()
+    }, confirmButton = {
+        Button(onClick = {
+            onConfirmation()
+        }) {
+            Text("确定")
         }
-    )
+    }, dismissButton = {
+        TextButton(onClick = {
+            onDismissRequest()
+        }) {
+            Text("取消")
+        }
+    })
 }
 
 @Composable
@@ -684,12 +877,9 @@ fun aa() {
 @Preview
 fun ab() {
 //    Aria2Dialog()
-    InfoDialog(
-        onDismissRequest = { },
-        onConfirmation = {
-            println("Confirmation registered") // Add logic here to handle confirmation.
-        },
-        dialogTitle = "Alert dialog example"
+    InfoDialog(onDismissRequest = { }, onConfirmation = {
+        println("Confirmation registered") // Add logic here to handle confirmation.
+    }, dialogTitle = "Alert dialog example"
     )
 
 }

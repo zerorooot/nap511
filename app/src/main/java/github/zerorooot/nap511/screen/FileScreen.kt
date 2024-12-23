@@ -56,7 +56,6 @@ import github.zerorooot.nap511.activity.VideoActivity
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.screenitem.FileCellItem
-import github.zerorooot.nap511.ui.theme.Purple40
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -166,10 +165,6 @@ fun FileScreen(
                     if (after < fileBeanList.size && fileBeanList[after].isFolder) {
                         fileViewModel.updateFileCache(fileBeanList[after].categoryId)
                     }
-//                    try {
-//                        println("fileBean ${fileBean.name} before ${fileBeanList[before].name}  after ${fileBeanList[after].name} ")
-//                    } catch (_: Exception) {
-//                    }
                 }
                 //加载文件
                 fileViewModel.getFiles(fileBean.categoryId)
@@ -197,6 +192,12 @@ fun FileScreen(
                 fileViewModel.setRefreshingStatus(true)
                 offlineFileViewModel.isOpenCreateSelectTorrentFileDialog = true
                 offlineFileViewModel.getTorrentTask(fileBean.sha1)
+            }
+            //打开压缩文件
+            if (fileBean.fileIco == R.drawable.zip) {
+                fileViewModel.setRefreshingStatus(true)
+                fileViewModel.selectIndex = i
+                fileViewModel.getZipListFile()
             }
 
 
@@ -417,6 +418,8 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
         }
         offlineFileViewModel.addTorrentTask(torrentFileBean, map.keys.joinToString(separator = ","))
     }
+    //解压文件
+    UnzipDialog(fileViewModel)
 
 }
 

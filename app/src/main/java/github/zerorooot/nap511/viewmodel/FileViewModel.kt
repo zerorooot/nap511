@@ -10,8 +10,8 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.elvishew.xlog.XLog
 import com.google.gson.Gson
-import com.google.gson.JsonObject
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.*
 import github.zerorooot.nap511.service.FileService
@@ -30,7 +30,7 @@ import kotlin.math.roundToInt
 class FileViewModel(private val cookie: String, private val application: Application) :
     ViewModel() {
     var fileBeanList = mutableStateListOf<FileBean>()
-
+    var unzipBeanList = mutableStateOf(ZipBeanList())
     var remainingSpace by mutableStateOf(RemainingSpaceBean())
 
     var appBarTitle by mutableStateOf(application.resources.getString(R.string.app_name))
@@ -39,6 +39,8 @@ class FileViewModel(private val cookie: String, private val application: Applica
     var currentPath = _currentPath.asStateFlow()
 
     var currentCid: String by mutableStateOf("0")
+
+    //当前cid下的文件数量
     private var count: Int by mutableIntStateOf(0)
 
     private var fileListCache = hashMapOf<String, FilesBean>()
@@ -57,9 +59,9 @@ class FileViewModel(private val cookie: String, private val application: Applica
     var isOpenFileOrderDialog by mutableStateOf(false)
     var isOpenAria2Dialog by mutableStateOf(false)
     var selectIndex by mutableIntStateOf(0)
-
     var isOpenSearchDialog by mutableStateOf(false)
-
+    var isOpenUnzipDialog by mutableStateOf(false)
+    var isOpenUnzipPasswordDialog by mutableStateOf(false)
 
     //图片浏览相关
     var photoFileBeanList = mutableListOf<FileBean>()
@@ -465,6 +467,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         isLongClickState = false
         appBarTitle = application.resources.getString(R.string.app_name)
         fileListCache.remove(cid)
+        XLog.d("cid $cid, currentCid $currentCid")
         if (cid == currentCid) {
             getFiles(currentCid)
         } else {
@@ -592,6 +595,135 @@ class FileViewModel(private val cookie: String, private val application: Applica
         }
     }
 
+    fun getZipListFile(
+        fileName: String = "",
+        paths: String = "文件",
+        isCheck: Boolean = true
+    ) {
+        viewModelScope.launch {
+            val fileBean = fileBeanList[selectIndex]
+            if (isCheck) {
+                //首次打开
+                if (!isOpenUnzipDialog && paths == "文件") {
+                    val json = fileService.getDecryptZipProcess(fileBean.pickCode)
+                    //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
+                    XLog.d("checkIsEncryptionZip $json")
+                    val unzipStatus = json.getAsJsonObject("data").getAsJsonObject("extract_status")
+                        .get("unzip_status").asInt
+                    //1 is encryption zip file
+                    if (unzipStatus != 4) {
+                        XLog.d("${fileBean.name} is encryption zip file")
+                        isOpenUnzipPasswordDialog = true
+                        return@launch
+                    }
+                }
+            }
+
+            val data =
+                fileService.getZipListFile(fileBean.pickCode, fileName, paths)
+                    .getAsJsonObject("data")
+            XLog.d(data)
+            val zipBeanList = Gson().fromJson<ZipBeanList>(data, ZipBeanList::class.java)
+            val sj = StringJoiner("/")
+            data.getAsJsonArray("paths")
+                .forEach { sj.add(it.asJsonObject.get("file_name").asString) }
+            zipBeanList.pathString = sj.toString()
+            zipBeanList.list.forEach { i ->
+                if (i.fileCategory == 0) {
+                    i.fileIco = R.drawable.folder
+                } else {
+                    i.timeString = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
+                        i.time.toLong() * 1000
+                    )
+                    i.sizeString = android.text.format.Formatter.formatFileSize(
+                        application, i.size.toLong()
+                    ) + "  "
+                    when (i.icoString) {
+                        "apk" -> i.fileIco = R.drawable.apk
+                        "iso" -> i.fileIco = R.drawable.iso
+                        "zip" -> i.fileIco = R.drawable.zip
+                        "7z" -> i.fileIco = R.drawable.zip
+                        "rar" -> i.fileIco = R.drawable.zip
+                        "png" -> i.fileIco = R.drawable.png
+                        "jpg" -> i.fileIco = R.drawable.png
+                        "mp3" -> i.fileIco = R.drawable.mp3
+                        "txt" -> i.fileIco = R.drawable.txt
+                        "torrent" -> i.fileIco = R.drawable.torrent
+                    }
+                }
+            }
+            unzipBeanList.value = zipBeanList
+            isOpenUnzipDialog = true
+        }
+    }
+
+    fun unzipFile(files: List<String>?, dirs: List<String>?) {
+        viewModelScope.launch {
+            val refreshCid = currentCid
+            val fileBean = fileBeanList[selectIndex]
+            val pickCode = fileBean.pickCode
+            val createFolderMessage =
+                fileService.createFolder(currentCid, fileBean.name.replace(Regex("\\..*"), ""))
+            XLog.d(createFolderMessage)
+            val zipFileCid = createFolderMessage.let { if (it.cid == "") currentCid else it.cid }
+            val jsonObject = fileService.unzipFile(pickCode, zipFileCid, files, dirs)
+            XLog.d(jsonObject)
+            val extractId = jsonObject.getAsJsonObject("data").get("extract_id").asLong
+            val message = if (jsonObject.get("state").asBoolean) {
+                "后台解压中～"
+            } else {
+                "解压失败～${jsonObject.get("message").asString}"
+            }
+            App.instance.toast(message)
+
+            // {"state":true,"message":"","code":"","data":{"extract_id":"id","to_pid":"pid","percent":100}}
+            var error = true
+            for (i in 1..10) {
+                val json = fileService.unzipFileProcess(extractId)
+                val process = json.getAsJsonObject("data")
+                    .get("percent").asInt
+                XLog.d("$i $json")
+                if (process == 100) {
+                    error = false
+                    break
+                }
+                Thread.sleep(1000)
+            }
+            if (error) {
+                App.instance.toast("后台解压失败～")
+            } else {
+                refresh(refreshCid)
+            }
+        }
+    }
+
+    fun decryptZip(secret: String) {
+        viewModelScope.launch {
+            val fileBean = fileBeanList[selectIndex]
+            val pickCode = fileBean.pickCode
+            //{"state":true,"message":"","code":"","data":{"unzip_status":4}}
+            val asInt = fileService.decryptZip(pickCode, secret).getAsJsonObject("data")
+                .get("unzip_status").asInt
+            isOpenUnzipPasswordDialog = false
+            //4 is success ,6 is decrypt error
+            if (asInt != 4) {
+                App.instance.toast("密码错误～")
+                return@launch
+            }
+            //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
+            for (i in 1..10) {
+                val json = fileService.getDecryptZipProcess(pickCode)
+                val process = json.getAsJsonObject("data").getAsJsonObject("extract_status")
+                    .get("progress").asInt
+                XLog.d("$i $json")
+                if (process == 100) {
+                    getZipListFile(isCheck = false)
+                    break
+                }
+                Thread.sleep(1000)
+            }
+        }
+    }
 
     fun startSendAria2Service(index: Int) {
         val fileBean = fileBeanList[index]
