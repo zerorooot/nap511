@@ -85,6 +85,11 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
             torrentBean = TorrentFileBean()
             val sign = offlineService.getSign().sign
             val torrentTask = offlineService.getTorrentTaskList(sha1, App.uid, sign)
+            XLog.d("getTorrentTask $torrentTask")
+            if (!torrentTask.state) {
+                App.instance.toast(torrentTask.errorMessage)
+                return@launch
+            }
             torrentTask.fileSizeString = android.text.format.Formatter.formatFileSize(
                 application, torrentTask.fileSize
             ) + " "

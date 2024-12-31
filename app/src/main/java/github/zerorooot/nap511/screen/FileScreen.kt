@@ -199,6 +199,12 @@ fun FileScreen(
                 fileViewModel.selectIndex = i
                 fileViewModel.getZipListFile()
             }
+            //打开小文本文件 100kb以下的文件
+            if (fileBean.fileIco == R.drawable.txt && fileBean.size.toLong() < 1 * 1024 * 100) {
+                fileViewModel.setRefreshingStatus(true)
+                fileViewModel.selectIndex = i
+                fileViewModel.downloadText(fileBean)
+            }
 
 
             //滚动到当前目录
@@ -420,6 +426,9 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
     }
     //解压文件
     UnzipDialog(fileViewModel)
+    //小文本文件
+    TextBodyDialog(fileViewModel)
+
 
 }
 

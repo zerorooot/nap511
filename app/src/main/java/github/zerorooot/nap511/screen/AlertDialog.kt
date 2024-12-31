@@ -7,6 +7,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -85,11 +86,14 @@ import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import kotlinx.coroutines.delay
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
+import java.io.ByteArrayOutputStream
+import java.nio.charset.Charset
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.stream.Collectors
 import kotlin.collections.set
 import kotlin.system.exitProcess
+import kotlin.text.toByteArray
 
 @Composable
 fun CreateFolderDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
@@ -186,6 +190,104 @@ fun ExitApp() {
 }
 
 @Composable
+fun TextBodyDialog(fileViewModel: FileViewModel) {
+    if (fileViewModel.isOpenTextBodyDialog && fileViewModel.textBodyByteArray != null) {
+        val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
+        TextBodyDialogScreen(fileBean.name, fileViewModel.textBodyByteArray!!) {
+            if (it == "") {
+                fileViewModel.textBodyByteArray = null
+                fileViewModel.isOpenTextBodyDialog = false
+            }
+        }
+    }
+}
+
+@Preview
+@Composable
+fun TextBodyDialogPreview() {
+    TextBodyDialogScreen("", "dasfasdfasfdsafs".toByteArray()) { }
+}
+
+@Preview
+@Composable
+fun TextBodyDialogScreen(title: String, context: ByteArray, enter: (String) -> Unit) {
+    var charsetText by remember {
+        mutableStateOf(
+            TextFieldValue(
+                text = "UTF-8"
+            )
+        )
+    }
+    var contentText by remember {
+        mutableStateOf(
+            TextFieldValue(
+                text = context.toString(Charset.forName(charsetText.text))
+            )
+        )
+    }
+
+
+    AlertDialog(onDismissRequest = {
+        enter.invoke("")
+    }, confirmButton = {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.offset(y = (-20).dp)
+        ) {
+            TextButton(
+                onClick = {
+                    val charset = try {
+                        Charset.forName(charsetText.text)
+                    } catch (e: Exception) {
+                        App.instance.toast("编码失败~${e.message}，使用默认编码")
+                        Charset.defaultCharset()
+                    }
+                    contentText =
+                        TextFieldValue(context.toString(charset))
+                },
+            ) {
+                Text(text = "更改编码")
+            }
+            TextButton(
+                onClick = {
+                    enter.invoke("")
+                },
+            ) {
+                Text(text = "关闭")
+            }
+
+
+        }
+    }, title = { Text(text = title) }, text = {
+        Column {
+            OutlinedTextField(
+                value = charsetText,
+                trailingIcon = {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        "clear",
+                        modifier = Modifier.clickable(onClick = {
+                            charsetText = TextFieldValue("")
+                        })
+                    )
+                },
+                label = { Text(text = "文件编码") },
+                onValueChange = {
+                    charsetText = it
+                },
+            )
+            OutlinedTextField(
+                value = contentText,
+                label = { Text(text = "文件内容") },
+                onValueChange = {
+                    contentText = it
+                },
+            )
+        }
+    })
+}
+
+@Composable
 fun UnzipDialog(fileViewModel: FileViewModel) {
     if (fileViewModel.isOpenUnzipPasswordDialog) {
         val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
@@ -213,6 +315,7 @@ fun UnzipDialog(fileViewModel: FileViewModel) {
                     "exit" -> {
                         fileViewModel.isOpenUnzipDialog = false
                     }
+
                     "up" -> {
                         val path = zipBeanList.pathString.split("/")
                         var fileName = ""

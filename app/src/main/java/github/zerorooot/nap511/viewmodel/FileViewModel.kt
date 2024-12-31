@@ -12,18 +12,37 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
+import com.google.gson.JsonParser
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.*
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.Sha1Util
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import okhttp3.Call
+import okhttp3.FormBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import java.io.BufferedOutputStream
+import java.io.BufferedReader
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.io.InputStreamReader
+import java.io.OutputStream
 import java.lang.NullPointerException
+import java.nio.charset.Charset
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.concurrent.thread
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 import kotlin.math.roundToInt
 
 @SuppressLint("MutableCollectionMutableState")
@@ -32,6 +51,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
     var fileBeanList = mutableStateListOf<FileBean>()
     var unzipBeanList = mutableStateOf(ZipBeanList())
     var remainingSpace by mutableStateOf(RemainingSpaceBean())
+    var textBodyByteArray: ByteArray? = null
 
     var appBarTitle by mutableStateOf(application.resources.getString(R.string.app_name))
 
@@ -62,6 +82,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
     var isOpenSearchDialog by mutableStateOf(false)
     var isOpenUnzipDialog by mutableStateOf(false)
     var isOpenUnzipPasswordDialog by mutableStateOf(false)
+    var isOpenTextBodyDialog by mutableStateOf(false)
 
     //图片浏览相关
     var photoFileBeanList = mutableListOf<FileBean>()
@@ -663,7 +684,10 @@ class FileViewModel(private val cookie: String, private val application: Applica
             val fileBean = fileBeanList[selectIndex]
             val pickCode = fileBean.pickCode
             val createFolderMessage =
-                fileService.createFolder(currentCid, fileBean.name.replace(Regex("\\..*"), ""))
+                fileService.createFolder(
+                    currentCid,
+                    fileBean.name.substring(0, fileBean.name.length - 4)
+                )
             XLog.d(createFolderMessage)
             val zipFileCid = createFolderMessage.let { if (it.cid == "") currentCid else it.cid }
             val jsonObject = fileService.unzipFile(pickCode, zipFileCid, files, dirs)
@@ -702,7 +726,9 @@ class FileViewModel(private val cookie: String, private val application: Applica
             val fileBean = fileBeanList[selectIndex]
             val pickCode = fileBean.pickCode
             //{"state":true,"message":"","code":"","data":{"unzip_status":4}}
-            val asInt = fileService.decryptZip(pickCode, secret).getAsJsonObject("data")
+            val json = fileService.decryptZip(pickCode, secret)
+            XLog.d("decryptZip $json")
+            val asInt = json.getAsJsonObject("data")
                 .get("unzip_status").asInt
             isOpenUnzipPasswordDialog = false
             //4 is success ,6 is decrypt error
@@ -724,6 +750,16 @@ class FileViewModel(private val cookie: String, private val application: Applica
             }
         }
     }
+
+    fun downloadText(fileBean: FileBean) {
+        thread {
+            val input = getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
+            textBodyByteArray = input.readBytes()
+            isOpenTextBodyDialog = true
+            setRefreshingStatus(false)
+        }
+    }
+
 
     fun startSendAria2Service(index: Int) {
         val fileBean = fileBeanList[index]
@@ -811,4 +847,56 @@ class FileViewModel(private val cookie: String, private val application: Applica
             seconds
         ) else String.format("%02d:%02d", minutes, seconds)
     }
+
+    private fun getDownloadInputStream(
+        pickCode: String,
+        fileId: String
+    ): InputStream {
+        val sha1Util = Sha1Util()
+        val okHttpClient = OkHttpClient()
+        val tm = System.currentTimeMillis() / 1000
+        val m115Encode = sha1Util.m115_encode(pickCode, tm)
+        val map = FormBody.Builder().add("data", m115Encode.data).build()
+
+        val request: Request = Request
+            .Builder()
+            .url("https://proapi.115.com/app/chrome/downurl?t=$tm")
+            .addHeader("cookie", cookie)
+            .addHeader("Content-Type", "application/x-www-form-urlencoded")
+            .addHeader(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
+            )
+            .post(map)
+            .build()
+
+        val response = okHttpClient.newCall(request).execute()
+
+        val returnJson = JsonParser().parse(response.body.string()).asJsonObject
+        val data = returnJson.get("data").asString
+        val m115Decode = sha1Util.m115_decode(data, m115Encode.key)
+
+
+        //{"fileId":{"file_name":"a","file_size":"0","pick_code":"pick_code","url":false}}
+        val downloadUrl = JsonParser().parse(m115Decode).asJsonObject.getAsJsonObject(fileId)
+            .getAsJsonObject("url").get("url").asString
+        XLog.d("downloadUrl $downloadUrl")
+
+
+        val requestDownload: Request = Request
+            .Builder()
+            .url(downloadUrl)
+            .addHeader("cookie", cookie)
+            .addHeader("Content-Type", "application/x-www-form-urlencoded")
+            .addHeader(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
+            )
+            .get()
+            .build()
+        val responseDownload = okHttpClient.newCall(requestDownload).execute();
+        val body = responseDownload.body.byteStream()
+        return body
+    }
+
 }
