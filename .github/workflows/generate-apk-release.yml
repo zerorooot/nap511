@@ -38,7 +38,7 @@ jobs:
           keyAlias: ${{ secrets.ANDROID_KEY_ALIAS }}
           keyStorePassword: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          buildToolsVersion: 33.0.0
+          buildToolsVersion: 35.0.0
 
 
       # Noted For Output [main_project_module]/build/outputs/apk/release/
