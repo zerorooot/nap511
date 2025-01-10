@@ -239,6 +239,10 @@ class FileViewModel(private val cookie: String, private val application: Applica
     fun getRemainingSpace() {
         viewModelScope.launch {
             val gson = fileService.remainingSpace()
+            if (!gson.get("state").asBoolean) {
+                //{"state":false,"error":"登录超时，请重新登录。","errNo":990001,"request":"/files/index_info?count_space_nums=1"}
+                return@launch
+            }
             val spaceInfo = gson.getAsJsonObject("data").getAsJsonObject("space_info")
             val allUse = spaceInfo.getAsJsonObject("all_use").get("size").asLong
             val allUseString = spaceInfo.getAsJsonObject("all_use").get("size_format").asString

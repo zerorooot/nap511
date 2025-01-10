@@ -162,7 +162,7 @@ class OfflineTaskWorker(
 
         XLog.d("OfflineTaskWorker cid $cid")
         App.offlineFileViewModel.addTask(a, cid)
-        Thread.sleep(5000)
+        Thread.sleep(3000)
         val state = App.offlineFileViewModel.addTaskReturn.first
         val message = App.offlineFileViewModel.addTaskReturn.second
         if (state) {

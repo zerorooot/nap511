@@ -2,6 +2,8 @@ package github.zerorooot.nap511.screen
 
 import android.annotation.SuppressLint
 import android.webkit.CookieManager
+import android.webkit.ValueCallback
+import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -38,7 +40,9 @@ import github.zerorooot.nap511.util.DataStoreUtil
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.StringJoiner
 import kotlin.concurrent.thread
+import kotlin.text.startsWith
 
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -100,6 +104,12 @@ fun BaseWebViewScreen(
 @Composable
 fun WebViewScreen() {
     App.gesturesEnabled = false
+    CookieManager.getInstance().removeAllCookies(object : ValueCallback<Boolean> {
+        override fun onReceiveValue(value: Boolean?) {
+            XLog.d("removeAllCookies $value")
+        }
+
+    })
     BaseWebViewScreen(
         titleText = "网页版",
         topAppBarActionButtonOnClick = {
@@ -109,7 +119,21 @@ fun WebViewScreen() {
         loadUrl = "https://115.com/"
     )
 }
-
+fun webViewClient(): WebViewClient {
+    return object : WebViewClient() {
+        override fun shouldInterceptRequest(
+            view: WebView?,
+            request: WebResourceRequest
+        ): WebResourceResponse? {
+            val url = request.url.toString()
+            val cookieManager = CookieManager.getInstance()
+            App.cookie.split(";").forEach { a ->
+                cookieManager.setCookie(url, a)
+            }
+            return super.shouldInterceptRequest(view, request)
+        }
+    }
+}
 @SuppressLint("JavascriptInterface")
 fun webViewClient(webView: WebView): WebViewClient {
     return object : RequestInspectorWebViewClient(webView) {
@@ -119,7 +143,9 @@ fun webViewClient(webView: WebView): WebViewClient {
         ): WebResourceResponse? {
             val url = webViewRequest.url
             val cookieManager = CookieManager.getInstance()
-            cookieManager.setCookie(url, App.cookie)
+            App.cookie.split(";").forEach { a ->
+                cookieManager.setCookie(url, a)
+            }
             return super.shouldInterceptRequest(view, webViewRequest)
         }
     }
@@ -159,44 +185,41 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
             view: WebView,
             webViewRequest: WebViewRequest
         ): WebResourceResponse? {
-            //todo 重写登陆逻辑
-            val url = webViewRequest.url
-            if (url.startsWith("https://webapi.115.com/label/list") || url.startsWith("https://115.com/?cid=0&offset=0&mode=wangpan")) {
-                val message = "登录失败~，请重试"
-                val cookie = webViewRequest.headers["cookie"]
-                XLog.d("loginWebViewClient $cookie")
-                if (cookie == null) {
-                    App.instance.toast(message)
-                    return super.shouldInterceptRequest(view, webViewRequest)
+            val loginUrlVip = "https://passportapi.115.com/app/1.0/web/1.0/login/vip"
+            if (loginUrlVip == webViewRequest.url) {
+                val httpClient = OkHttpClient()
+                val a = Request.Builder()
+                    .url(loginUrlVip)
+                    .method("POST", webViewRequest.body.toRequestBody())
+                val headerMap = mapOf(
+                    "sec-ch-ua-platform" to "\"Linux\"",
+                    "sec-ch-ua" to "\"Not A(Brand\";v=\"99\", \"Google Chrome\";v=\"121\", \"Chromium\";v=\"121\"",
+                    "sec-ch-ua-mobile" to "?0",
+                    "user-agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+                )
+                webViewRequest.headers.forEach { (t, u) -> a.addHeader(t, u) }
+                headerMap.forEach { (t, u) ->
+                    a.removeHeader(t)
+                    a.addHeader(t, u)
                 }
-
-                //USERSESSIONID=xx; UID=xx; CID=xx; SEID=xx; PHPSESSID=xx; acw_tc=xx; UID=xx; CID=xx; SEID=xx
-                val uidRegex = Regex("UID=\\w+")
-                val cidRegex = Regex("CID=\\w+")
-                val seidRegex = Regex("SEID=\\w+")
-
-                val uidMatches = uidRegex.findAll(cookie).map { it.value }.toList()
-                val cidMatches = cidRegex.findAll(cookie).map { it.value }.toList()
-                val seidMatches = seidRegex.findAll(cookie).map { it.value }.toList()
-
-                thread {
-                    val c1 = uidMatches[0] + ";" + cidMatches[0] + ";" + seidMatches[0]
-                    val c2 = uidMatches[1] + ";" + cidMatches[1] + ";" + seidMatches[1]
-                    var checkLogin = App.instance.checkLogin(c2)
-                    //c2登陆失败，再用c1登陆一次
-                    if (!checkLogin.first) {
-                        checkLogin = App.instance.checkLogin(c1)
-                    }
-                    //两次都登陆失败，不执行后续操作
-                    if (!checkLogin.first) {
-                        App.instance.toast(message)
-                        return@thread
-                    }
-                    App.instance.toast(checkLogin.second)
-                    //restart
-                    ProcessPhoenix.triggerRebirth(App.instance);
+                val response = httpClient.newCall(a.build()).execute()
+                val headers = response.headers("set-cookie")
+                XLog.d("headers $headers")
+                val sj = StringJoiner(";")
+                headers.forEach { i ->
+                    sj.add(i.split(";")[0])
                 }
+                XLog.d("cookie $sj")
+                val checkLogin = App.instance.checkLogin(sj.toString())
+
+                App.instance.toast(checkLogin.second)
+                if (!checkLogin.first) {
+                    return null
+                }
+                //restart
+                ProcessPhoenix.triggerRebirth(App.instance);
             }
+
             return super.shouldInterceptRequest(view, webViewRequest)
         }
     }
