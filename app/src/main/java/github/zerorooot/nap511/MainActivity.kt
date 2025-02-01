@@ -108,10 +108,12 @@ class MainActivity : ComponentActivity() {
                         App.instance.goToNotificationSetting(this)
                     }
 
-                    handleIntent(intent)
+                    val isHandle = handleIntent(intent)
+                    //仅没处理intent时才检测未上传的磁力链接
+                    if (!isHandle) {
+                        checkOfflineTask(cookie)
+                    }
 
-                    //检测未上传的磁力链接
-                    checkOfflineTask(cookie)
                 }
             }
         }
@@ -152,33 +154,43 @@ class MainActivity : ComponentActivity() {
     /**
      * 处理验证磁力账号、跳转默认下载目录、复制失败的磁力链接的intent
      */
-    private fun handleIntent(intent: Intent) {
-        //直接添加磁力，但提示请验证账号;跳转到验证账号界面
-        if (intent.action == "check") {
-            App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
-            XLog.d("handleIntent check $intent")
-            intent.action = ""
-        }
-        //跳转到默认下载目录
-        if (intent.action == "jump") {
-            val fileViewModel: FileViewModel by viewModels()
-            fileViewModel.getFiles(
-                DataStoreUtil.getData(
-                    ConfigKeyUtil.DEFAULT_OFFLINE_CID,
-                    "0"
+    private fun handleIntent(intent: Intent): Boolean {
+        var isHandle = false
+
+        val action = intent.action
+        when (action) {
+            //直接添加磁力，但提示请验证账号;跳转到验证账号界面
+            "check" -> {
+                App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
+                XLog.d("handleIntent check $intent")
+                intent.action = ""
+                isHandle = true
+            }
+            //跳转到默认下载目录
+            "jump" -> {
+                val fileViewModel: FileViewModel by viewModels()
+                fileViewModel.getFiles(
+                    DataStoreUtil.getData(
+                        ConfigKeyUtil.DEFAULT_OFFLINE_CID,
+                        "0"
+                    )
                 )
-            )
-            XLog.d("handleIntent jump $intent $fileViewModel")
-            //清除action,不然会一直跳转到默认下载目录
-            intent.action = ""
+                XLog.d("handleIntent jump $intent $fileViewModel")
+                //清除action,不然会一直跳转到默认下载目录
+                intent.action = ""
+                isHandle = true
+            }
+
+            "copy" -> {
+                val clipboard = ContextCompat.getSystemService(this, ClipboardManager::class.java)
+                val clip = ClipData.newPlainText("label", intent.getStringExtra("link"))
+                clipboard?.setPrimaryClip(clip)
+                XLog.d("handleIntent copy $intent")
+                intent.action = ""
+                isHandle = true
+            }
         }
-        if (intent.action == "copy") {
-            val clipboard = ContextCompat.getSystemService(this, ClipboardManager::class.java)
-            val clip = ClipData.newPlainText("label", intent.getStringExtra("link"))
-            clipboard?.setPrimaryClip(clip)
-            XLog.d("handleIntent copy $intent")
-            intent.action = ""
-        }
+        return isHandle
 
     }
 
