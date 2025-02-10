@@ -39,7 +39,7 @@ interface VideoService {
     builder.add("category", "1")
     builder.add("share_id", "0")
      */
-    suspend fun history(@FieldMap body: HashMap<String, String>): BaseReturnMessage
+//    suspend fun history(@FieldMap body: HashMap<String, String>): BaseReturnMessage
 
 
     @GET("video")

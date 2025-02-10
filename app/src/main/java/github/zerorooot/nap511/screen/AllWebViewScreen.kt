@@ -41,7 +41,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.StringJoiner
-import kotlin.concurrent.thread
 import kotlin.text.startsWith
 
 
@@ -115,10 +114,11 @@ fun WebViewScreen() {
         topAppBarActionButtonOnClick = {
             App.instance.openDrawerState()
         },
-        webViewClient = { webViewClient(it) },
+        webViewClient = { webViewClient() },
         loadUrl = "https://115.com/"
     )
 }
+
 fun webViewClient(): WebViewClient {
     return object : WebViewClient() {
         override fun shouldInterceptRequest(
@@ -134,6 +134,7 @@ fun webViewClient(): WebViewClient {
         }
     }
 }
+
 @SuppressLint("JavascriptInterface")
 fun webViewClient(webView: WebView): WebViewClient {
     return object : RequestInspectorWebViewClient(webView) {

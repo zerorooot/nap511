@@ -117,7 +117,7 @@ class VideoActivity : AppCompatActivity() {
             map["category"] = "1"
             map["share_id"] = "0"
             map["time"] = (videoPlayer.currentPositionWhenPlaying / 1000).toString()
-            videoService.history(map)
+//            videoService.history(map)
         }
     }
 
