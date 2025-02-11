@@ -15,22 +15,26 @@ import github.zerorooot.nap511.service.VideoService
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import kotlinx.coroutines.launch
+import okhttp3.FormBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
+import kotlin.concurrent.thread
 
 
 class VideoActivity : AppCompatActivity() {
     private var orientationUtils: OrientationUtils? = null
     private lateinit var videoPlayer: MyGSYVideoPlayer
-
     private lateinit var videoService: VideoService
-
+    private lateinit var cookie: String
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_video)
         val pickCode = intent.getStringExtra("pick_code")!!
         val address = "http://115.com/api/video/m3u8/${pickCode}.m3u8"
         val title = intent.getStringExtra("title")
-        val cookie = intent.getStringExtra("cookie")!!
+        cookie = intent.getStringExtra("cookie")!!
         videoService = VideoService.getInstance(cookie)
 
         videoPlayer = findViewById(R.id.pre_video_player)
@@ -65,7 +69,7 @@ class VideoActivity : AppCompatActivity() {
 
         videoPlayer.startPlayLogic()
 
-        if (DataStoreUtil.getData(ConfigKeyUtil.AUTO_ROTATE, false)){
+        if (DataStoreUtil.getData(ConfigKeyUtil.AUTO_ROTATE, false)) {
             //设置竖屏
             lifecycleScope.launch {
                 val videoInfo = videoService.videoInfo(pickCode)
@@ -86,7 +90,7 @@ class VideoActivity : AppCompatActivity() {
             }
         })
 
-        onBackPressedDispatcher.addCallback(this){
+        onBackPressedDispatcher.addCallback(this) {
             back()
         }
     }
@@ -109,15 +113,24 @@ class VideoActivity : AppCompatActivity() {
     }
 
     private fun updateTime() {
-        lifecycleScope.launch {
-            val map = hashMapOf<String, String>()
-            map["op"] = "update"
-            map["pick_code"] = intent.getStringExtra("pick_code")!!
-            map["definition"] = "0"
-            map["category"] = "1"
-            map["share_id"] = "0"
-            map["time"] = (videoPlayer.currentPositionWhenPlaying / 1000).toString()
-//            videoService.history(map)
+        thread {
+            val formBody = FormBody.Builder()
+            formBody.add("op", "update")
+            formBody.add("pick_code", intent.getStringExtra("pick_code")!!)
+            formBody.add("definition", "0")
+            formBody.add("category", "1")
+            formBody.add("share_id", "0")
+            formBody.add("time", (videoPlayer.currentPositionWhenPlaying / 1000).toString())
+            val url = "https://115vod.com/webapi/files/history"
+            val okHttpClient = OkHttpClient()
+            val request: Request = Request.Builder().url(url)
+                .addHeader("cookie", cookie)
+                .addHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+                .addHeader(
+                    "User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
+                ).post(formBody.build()).build()
+            okHttpClient.newCall(request).execute()
         }
     }
 

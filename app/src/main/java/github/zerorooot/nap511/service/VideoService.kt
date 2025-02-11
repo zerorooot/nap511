@@ -30,8 +30,8 @@ interface VideoService {
         }
     }
 
-    @FormUrlEncoded
-    @POST("history")
+//    @FormUrlEncoded
+//    @POST("history")
     /**
     builder.add("op", "update")
     builder.add("pick_code", intent.getStringExtra("pick_code")!!)
