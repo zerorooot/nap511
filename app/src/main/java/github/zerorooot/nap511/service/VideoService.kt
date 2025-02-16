@@ -15,7 +15,7 @@ interface VideoService {
             if (videoService == null) {
                 videoService = Retrofit
                     .Builder()
-                    .baseUrl("https://v.anxia.com/webapi/files/")
+                    .baseUrl("https://115vod.com/webapi/files/")
                     .addConverterFactory(GsonConverterFactory.create())
                     //add cookie
                     .client(OkHttpClient().newBuilder().addInterceptor(Interceptor { chain ->
@@ -30,8 +30,8 @@ interface VideoService {
         }
     }
 
-//    @FormUrlEncoded
-//    @POST("history")
+    @FormUrlEncoded
+    @POST("history")
     /**
     builder.add("op", "update")
     builder.add("pick_code", intent.getStringExtra("pick_code")!!)
@@ -39,8 +39,7 @@ interface VideoService {
     builder.add("category", "1")
     builder.add("share_id", "0")
      */
-//    suspend fun history(@FieldMap body: HashMap<String, String>): BaseReturnMessage
-
+    suspend fun history(@FieldMap body: HashMap<String, String>): BaseReturnMessage
 
     @GET("video")
     suspend fun videoInfo(

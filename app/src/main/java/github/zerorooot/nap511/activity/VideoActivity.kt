@@ -113,24 +113,15 @@ class VideoActivity : AppCompatActivity() {
     }
 
     private fun updateTime() {
-        thread {
-            val formBody = FormBody.Builder()
-            formBody.add("op", "update")
-            formBody.add("pick_code", intent.getStringExtra("pick_code")!!)
-            formBody.add("definition", "0")
-            formBody.add("category", "1")
-            formBody.add("share_id", "0")
-            formBody.add("time", (videoPlayer.currentPositionWhenPlaying / 1000).toString())
-            val url = "https://115vod.com/webapi/files/history"
-            val okHttpClient = OkHttpClient()
-            val request: Request = Request.Builder().url(url)
-                .addHeader("cookie", cookie)
-                .addHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-                .addHeader(
-                    "User-Agent",
-                    "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
-                ).post(formBody.build()).build()
-            okHttpClient.newCall(request).execute()
+        lifecycleScope.launch {
+            val map = hashMapOf<String, String>()
+            map["op"] = "update"
+            map["pick_code"] = intent.getStringExtra("pick_code")!!
+            map["definition"] = "0"
+            map["category"] = "1"
+            map["share_id"] = "0"
+            map["time"] = (videoPlayer.currentPositionWhenPlaying / 1000).toString()
+            videoService.history(map)
         }
     }
 

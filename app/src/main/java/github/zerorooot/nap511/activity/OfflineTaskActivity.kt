@@ -159,12 +159,13 @@ class OfflineTaskWorker(
         val listType = object : TypeToken<List<String?>?>() {}.type
         val a: List<String> = Gson().fromJson(inputData.getString("list").toString(), listType)
         val cid = DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
-
+        val offlineFileViewModel = App.offlineFileViewModel
         XLog.d("OfflineTaskWorker cid $cid")
-        App.offlineFileViewModel.addTask(a, cid)
-        Thread.sleep(3000)
-        val state = App.offlineFileViewModel.addTaskReturn.first
-        val message = App.offlineFileViewModel.addTaskReturn.second
+        offlineFileViewModel.addTask(a, cid)
+        Thread.sleep(5000)
+        val addTaskReturn = offlineFileViewModel.addTaskReturn
+        val state = addTaskReturn.first
+        val message = addTaskReturn.second
         if (state) {
             //清空缓存
             DataStoreUtil.putData(
@@ -215,7 +216,7 @@ class OfflineTaskWorker(
         }
 
         val intent = Intent(this.applicationContext, MainActivity::class.java)
- //       intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+        //       intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
         val pendingIntent = if (message.contains("任务添加失败")) {
             if (message.contains("请验证账号")) {
                 intent.action = "check"
