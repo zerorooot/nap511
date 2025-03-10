@@ -6,7 +6,6 @@ import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elvishew.xlog.XLog
@@ -25,7 +24,6 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.StringJoiner
-import kotlin.system.exitProcess
 
 class OfflineFileViewModel(private val cookie: String, private val application: Application) :
     ViewModel() {
@@ -48,7 +46,6 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
 
     //    val addTaskReturn = MutableLiveData<Pair<Boolean, String>>()
     var addTaskReturn by mutableStateOf(Pair<Boolean, String>(false, "通知信息未初始化，添加失败～"))
-
 
 
     var torrentBean by mutableStateOf(TorrentFileBean())
@@ -188,52 +185,55 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
      */
     fun addTask(list: List<String>, currentCid: String) {
         viewModelScope.launch {
-            val downloadPath = fileService.setDownloadPath(currentCid)
-            XLog.d("add task $downloadPath")
-            if (!downloadPath.state) {
-                Toast.makeText(
-                    application,
-                    "设置离线位置失败，默认保存到\"云下载\"目录",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-
-            val map = HashMap<String, String>()
-            map["savepath"] = ""
-            map["wp_path_id"] = currentCid
-            map["uid"] = App.uid
-            map["sign"] = offlineService.getSign().sign
-            map["time"] = (System.currentTimeMillis() / 1000).toString()
-            list.forEachIndexed { index, s ->
-                map["url[$index]"] = s
-            }
-            val addTask = offlineService.addTask(map)
-            val message = if (addTask.state) {
-                "任务添加成功"
-            } else {
-                if (addTask.errorMsg.contains("请验证账号")) {
-                    App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
-                }
-                //把失败的离线链接保存起来
-                val currentOfflineTaskList =
-                    DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
-                        .split("\n")
-                        .filter { i -> i != "" && i != " " }
-                        .toSet()
-                        .toMutableList()
-                currentOfflineTaskList.addAll(list)
-                val stringJoiner = StringJoiner("\n")
-                currentOfflineTaskList.toSet().forEach { stringJoiner.add(it) }
-                //写入缓存
-                DataStoreUtil.putData(
-                    ConfigKeyUtil.CURRENT_OFFLINE_TASK,
-                    stringJoiner.toString()
-                )
-                "任务添加失败，${addTask.errorMsg}"
-            }
-            addTaskReturn = Pair<Boolean, String>(addTask.state, message)
-            Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
+            addTaskSuspend(list, currentCid)
         }
+    }
+    suspend fun addTaskSuspend(list: List<String>, currentCid: String) {
+        val downloadPath = fileService.setDownloadPath(currentCid)
+        XLog.d("add task $downloadPath")
+        if (!downloadPath.state) {
+            Toast.makeText(
+                application,
+                "设置离线位置失败，默认保存到\"云下载\"目录",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+
+        val map = HashMap<String, String>()
+        map["savepath"] = ""
+        map["wp_path_id"] = currentCid
+        map["uid"] = App.uid
+        map["sign"] = offlineService.getSign().sign
+        map["time"] = (System.currentTimeMillis() / 1000).toString()
+        list.forEachIndexed { index, s ->
+            map["url[$index]"] = s
+        }
+        val addTask = offlineService.addTask(map)
+        val message = if (addTask.state) {
+            "任务添加成功"
+        } else {
+            if (addTask.errorMsg.contains("请验证账号")) {
+                App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
+            }
+            //把失败的离线链接保存起来
+            val currentOfflineTaskList =
+                DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
+                    .split("\n")
+                    .filter { i -> i != "" && i != " " }
+                    .toSet()
+                    .toMutableList()
+            currentOfflineTaskList.addAll(list)
+            val stringJoiner = StringJoiner("\n")
+            currentOfflineTaskList.toSet().forEach { stringJoiner.add(it) }
+            //写入缓存
+            DataStoreUtil.putData(
+                ConfigKeyUtil.CURRENT_OFFLINE_TASK,
+                stringJoiner.toString()
+            )
+            "任务添加失败，${addTask.errorMsg}"
+        }
+        addTaskReturn = Pair<Boolean, String>(addTask.state, message)
+        Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
     }
 
     fun openOfflineDialog(index: Int) {

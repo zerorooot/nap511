@@ -12,8 +12,8 @@ android {
         applicationId "github.zerorooot.nap511"
         minSdk 26
         targetSdk 35
-        versionCode 5
-        versionName "1.2.1"
+        versionCode 6
+        versionName "1.2.2"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -51,6 +51,8 @@ android {
 }
 
 dependencies {
+    // Kotlin
+    implementation("androidx.concurrent:concurrent-futures-ktx:1.2.0")
     //log
     implementation 'com.elvishew:xlog:1.11.1'
 

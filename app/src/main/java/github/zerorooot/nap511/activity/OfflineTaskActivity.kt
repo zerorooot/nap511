@@ -12,11 +12,11 @@ import androidx.activity.ComponentActivity
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
-import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
@@ -154,15 +154,14 @@ class OfflineTaskActivity : ComponentActivity() {
 
 class OfflineTaskWorker(
     appContext: Context, workerParams: WorkerParameters
-) : Worker(appContext, workerParams) {
-    override fun doWork(): Result {
+) : CoroutineWorker(appContext, workerParams) {
+    override suspend fun doWork(): Result {
         val listType = object : TypeToken<List<String?>?>() {}.type
         val a: List<String> = Gson().fromJson(inputData.getString("list").toString(), listType)
         val cid = DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
         val offlineFileViewModel = App.offlineFileViewModel
         XLog.d("OfflineTaskWorker cid $cid")
-        offlineFileViewModel.addTask(a, cid)
-        Thread.sleep(5000)
+        offlineFileViewModel.addTaskSuspend(a, cid)
         val addTaskReturn = offlineFileViewModel.addTaskReturn
         val state = addTaskReturn.first
         val message = addTaskReturn.second
@@ -242,4 +241,7 @@ class OfflineTaskWorker(
         notification.setContentIntent(pendingIntent)
         notificationManager.notify(notificationId, notification.build())
     }
+
+
+
 }

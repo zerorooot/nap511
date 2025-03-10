@@ -687,17 +687,25 @@ class FileViewModel(private val cookie: String, private val application: Applica
             val refreshCid = currentCid
             val fileBean = fileBeanList[selectIndex]
             val pickCode = fileBean.pickCode
-            val createFolderMessage =
-                fileService.createFolder(
-                    currentCid,
-                    fileBean.name.substring(0, fileBean.name.length - 4)
-                )
-            XLog.d(createFolderMessage)
-            val zipFileCid = createFolderMessage.let { if (it.cid == "") currentCid else it.cid }
+            val unzipFolderName = fileBean.name.substring(0, fileBean.name.length - 4)
+            //确定当前目录下是否存在同名文件，如果不存在，则新建一个
+            val currentUnzipFolderNameList =
+                fileBeanList.filter { i -> i.isFolder && i.name == unzipFolderName }
+            var zipFileCid = currentCid
+            if (currentUnzipFolderNameList.isEmpty()) {
+                val createFolderMessage =
+                    fileService.createFolder(
+                        currentCid,
+                        unzipFolderName
+                    )
+                XLog.d(createFolderMessage)
+                zipFileCid = createFolderMessage.cid
+            }
+
             val jsonObject = fileService.unzipFile(pickCode, zipFileCid, files, dirs)
             XLog.d(jsonObject)
             val extractId = jsonObject.getAsJsonObject("data").get("extract_id").asLong
-            val message = if (jsonObject.get("state").asBoolean) {
+            var message = if (jsonObject.get("state").asBoolean) {
                 "后台解压中～"
             } else {
                 "解压失败～${jsonObject.get("message").asString}"
@@ -708,20 +716,25 @@ class FileViewModel(private val cookie: String, private val application: Applica
             var error = true
             for (i in 1..10) {
                 val json = fileService.unzipFileProcess(extractId)
+                if (!json.get("state").asBoolean) {
+                    message = json.get("message").asString
+                    break
+                }
+                XLog.d("unzipFile process $i $json")
                 val process = json.getAsJsonObject("data")
                     .get("percent").asInt
-                XLog.d("$i $json")
                 if (process == 100) {
                     error = false
+                    message = "后台解压完成～"
                     break
                 }
                 Thread.sleep(1000)
             }
-            if (error) {
-                App.instance.toast("后台解压失败～")
-            } else {
+            if (!error) {
                 refresh(refreshCid)
             }
+
+            App.instance.toast(message)
         }
     }
 
