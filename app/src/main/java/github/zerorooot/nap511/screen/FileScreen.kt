@@ -352,7 +352,7 @@ fun FileScreen(
 @ExperimentalMaterial3Api
 @Composable
 fun CreateDialogs(fileViewModel: FileViewModel) {
-    val context = LocalContext.current
+//    val context = LocalContext.current
     //新建文件夹
     CreateFolderDialog(fileViewModel) {
         if (it != "") {
@@ -405,10 +405,10 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
             val jsonObject = JsonParser().parse(it).asJsonObject
             val aria2Url = jsonObject.get(ConfigKeyUtil.ARIA2_URL).asString
             val aria2Token = jsonObject.get(ConfigKeyUtil.ARIA2_TOKEN).asString
-            thread { checkAria2(aria2Url, aria2Token, context) }
+            thread { checkAria2(aria2Url, aria2Token) }
         }
     }
-//搜索
+    //搜索
     SearchDialog(fileViewModel) {
         if (it != "") {
             fileViewModel.search(it)
@@ -428,14 +428,15 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
     UnzipDialog(fileViewModel)
     //小文本文件
     TextBodyDialog(fileViewModel)
-
+    //
+    UnzipAllFile(fileViewModel)
 
 }
 
 /**
  * {"jsonrpc":"2.0","id":"nap511","method":"aria2.getVersion","params":["token:11"]}
  */
-private fun checkAria2(aria2Url: String, aria2Token: String, context: Context) {
+private fun checkAria2(aria2Url: String, aria2Token: String) {
     val okHttpClient = OkHttpClient()
     val jsonObject = JsonObject()
     jsonObject.addProperty("jsonrpc", "2.0")
@@ -467,7 +468,5 @@ private fun checkAria2(aria2Url: String, aria2Token: String, context: Context) {
     } catch (e: Exception) {
         "aria2配置失败," + e.message.toString()
     }
-    Handler(Looper.getMainLooper()).post {
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-    }
+    App.instance.toast(message)
 }

@@ -104,6 +104,7 @@ class OfflineTaskActivity : ComponentActivity() {
                 .build()
         val request: OneTimeWorkRequest =
             OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java).setInputData(data)
+                .addTag(ConfigKeyUtil.OFFLINE_TASK_WORKER)
                 .setInitialDelay(offlineTime, TimeUnit.MINUTES)
                 .build()
         WorkManager.getInstance(applicationContext)
@@ -129,7 +130,8 @@ class OfflineTaskActivity : ComponentActivity() {
                 Data.Builder().putString("cookie", App.cookie).putString("list", list)
                     .build()
             val request: OneTimeWorkRequest =
-                OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java).setInputData(data)
+                OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java)
+                    .addTag(ConfigKeyUtil.OFFLINE_TASK_WORKER).setInputData(data)
                     .build()
 //            WorkManager.getInstance(applicationContext).enqueue(request)
             WorkManager.getInstance(applicationContext)
@@ -173,7 +175,7 @@ class OfflineTaskWorker(
             )
         }
         println("checkOfflineTask $message")
-        toast(message, a)
+        toast(message, a, cid)
         val addTaskData = Data.Builder()
             .putBoolean("state", state)
             .putString("return", message)
@@ -187,7 +189,7 @@ class OfflineTaskWorker(
 
 
     @SuppressLint("WrongConstant")
-    private fun toast(message: String, urlList: List<String>) {
+    private fun toast(message: String, urlList: List<String>, cid: String) {
         //渠道Id
         val channelId = "toast"
         //渠道名
@@ -232,6 +234,7 @@ class OfflineTaskWorker(
             )
         } else {
             intent.action = "jump"
+            intent.putExtra("cid", cid)
             notification.setContentText(message)
             PendingIntent.getActivity(
                 this.applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE
@@ -241,7 +244,6 @@ class OfflineTaskWorker(
         notification.setContentIntent(pendingIntent)
         notificationManager.notify(notificationId, notification.build())
     }
-
 
 
 }

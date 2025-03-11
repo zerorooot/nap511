@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.service
 
+import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import github.zerorooot.nap511.bean.*
 import github.zerorooot.nap511.util.App
@@ -12,6 +13,7 @@ import retrofit2.http.*
 
 interface FileService {
     companion object {
+        @Volatile
         private var fileService: FileService? = null
         fun getInstance(cookie: String): FileService {
             if (fileService == null) {
@@ -184,10 +186,21 @@ interface FileService {
         @Field("secret") secret: String
     ): JsonObject
 
-
+    /**
+     * {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
+     */
     @GET("files/push_extract")
     suspend fun getDecryptZipProcess(
         @Query("pick_code") pickCode: String
+    ): JsonObject
+
+    /**
+     * {"state":true,"message":"","code":"","data":{"unzip_status":1}}
+     */
+    @FormUrlEncoded
+    @POST("files/push_extract")
+    suspend fun checkDecryptZip(
+        @Field("pick_code") pickCode: String
     ): JsonObject
 
     /**
@@ -204,7 +217,7 @@ interface FileService {
         @Field("extract_file[]") files: List<String>?,
         @Field("extract_dir[]") dirs: List<String>?,
         @Field("paths") paths: String = "文件"
-    ): JsonObject
+    ): JsonElement
 
     /**
      * {"state":true,"message":"","code":"","data":{"extract_id":"id","to_pid":"pid","percent":100}}

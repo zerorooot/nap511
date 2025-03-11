@@ -169,13 +169,17 @@ class MainActivity : ComponentActivity() {
             //跳转到默认下载目录
             "jump" -> {
                 val fileViewModel: FileViewModel by viewModels()
-                fileViewModel.getFiles(
-                    DataStoreUtil.getData(
-                        ConfigKeyUtil.DEFAULT_OFFLINE_CID,
-                        "0"
-                    )
-                )
-                XLog.d("handleIntent jump $intent $fileViewModel")
+                val cid = intent.getStringExtra("cid").let {
+                    if (it == null) {
+                        DataStoreUtil.getData(
+                            ConfigKeyUtil.DEFAULT_OFFLINE_CID,
+                            "0"
+                        )
+                    } else it
+                }
+                fileViewModel.getFiles(cid)
+
+                XLog.d("handleIntent jump $intent $cid $fileViewModel")
                 //清除action,不然会一直跳转到默认下载目录
                 intent.action = ""
                 isHandle = true
@@ -186,6 +190,14 @@ class MainActivity : ComponentActivity() {
                 val clip = ClipData.newPlainText("label", intent.getStringExtra("link"))
                 clipboard?.setPrimaryClip(clip)
                 XLog.d("handleIntent copy $intent")
+                intent.action = ""
+                isHandle = true
+                App.instance.toast("复制磁力链接成功!")
+            }
+
+            "unzipError" -> {
+                val message = intent.getStringExtra("message")
+                XLog.d("handleIntent unzipError $intent $message")
                 intent.action = ""
                 isHandle = true
             }
@@ -200,18 +212,22 @@ class MainActivity : ComponentActivity() {
      *
      */
     private fun checkOfflineTask(cookie: String) {
-        val workQuery = WorkQuery.Builder.fromStates(
-            listOf(
-                WorkInfo.State.ENQUEUED,
-                WorkInfo.State.RUNNING,
-//                WorkInfo.State.SUCCEEDED,
-//                WorkInfo.State.FAILED,
-                WorkInfo.State.BLOCKED,
-                WorkInfo.State.CANCELLED
-            )
-        ).build()
+//        val workQuery = WorkQuery.Builder.fromStates(
+//            listOf(
+//                WorkInfo.State.ENQUEUED,
+//                WorkInfo.State.RUNNING,
+////                WorkInfo.State.SUCCEEDED,
+////                WorkInfo.State.FAILED,
+//                WorkInfo.State.BLOCKED,
+//                WorkInfo.State.CANCELLED
+//            )
+//        ).build()
+//        val workInfos: List<WorkInfo> =
+//            WorkManager.getInstance(applicationContext).getWorkInfos(workQuery).get()
+        //todo 检测是否与解压文件相冲突
         val workInfos: List<WorkInfo> =
-            WorkManager.getInstance(applicationContext).getWorkInfos(workQuery).get()
+            WorkManager.getInstance(applicationContext)
+                .getWorkInfosByTag(ConfigKeyUtil.OFFLINE_TASK_WORKER).get()
         val size = workInfos.size
         if (size != 0) {
             return
@@ -236,7 +252,9 @@ class MainActivity : ComponentActivity() {
             Data.Builder().putString("cookie", cookie).putString("list", list)
                 .build()
         val request: OneTimeWorkRequest =
-            OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java).setInputData(data)
+            OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java)
+                .addTag(ConfigKeyUtil.OFFLINE_TASK_WORKER)
+                .setInputData(data)
                 .build()
         WorkManager.getInstance(App.instance.applicationContext).enqueue(request)
     }
@@ -451,6 +469,8 @@ class MainActivity : ComponentActivity() {
     private fun appBarClick(fileViewModel: FileViewModel) = fun(name: String) {
         when (name) {
 //                "back"->{FileScreen里}
+            //具体实现在AlertDialog#UnzipAllFile()里
+            "unzipAllFile" -> fileViewModel.isOpenUnzipAllFileDialog = true
             "selectToUp" -> fileViewModel.selectToUp()
             "selectToDown" -> fileViewModel.selectToDown()
             "cut" -> fileViewModel.cut()

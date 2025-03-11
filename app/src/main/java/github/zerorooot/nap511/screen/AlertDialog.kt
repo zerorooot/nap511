@@ -43,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +56,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringArrayResource
@@ -69,10 +71,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.work.Data
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.activity.OfflineTaskWorker
+import github.zerorooot.nap511.activity.UnzipAllFileWorker
+import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.TorrentFileListWeb
 import github.zerorooot.nap511.bean.ZipBeanList
@@ -231,8 +241,7 @@ fun TextBodyDialogScreen(title: String, context: ByteArray, enter: (String) -> U
         enter.invoke("")
     }, confirmButton = {
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.offset(y = (-20).dp)
+            verticalAlignment = Alignment.CenterVertically, modifier = Modifier.offset(y = (-20).dp)
         ) {
             TextButton(
                 onClick = {
@@ -242,8 +251,7 @@ fun TextBodyDialogScreen(title: String, context: ByteArray, enter: (String) -> U
                         App.instance.toast("编码失败~${e.message}，使用默认编码")
                         Charset.defaultCharset()
                     }
-                    contentText =
-                        TextFieldValue(context.toString(charset))
+                    contentText = TextFieldValue(context.toString(charset))
                 },
             ) {
                 Text(text = "更改编码")
@@ -287,6 +295,9 @@ fun TextBodyDialogScreen(title: String, context: ByteArray, enter: (String) -> U
     })
 }
 
+/**
+ * 解压文件
+ */
 @Composable
 fun UnzipDialog(fileViewModel: FileViewModel) {
     if (fileViewModel.isOpenUnzipPasswordDialog) {
@@ -346,28 +357,79 @@ fun UnzipDialog(fileViewModel: FileViewModel) {
             } else {
                 //go to next folder
                 fileViewModel.getZipListFile(
-                    it.second,
-                    paths = zipBeanList.pathString
+                    it.second, paths = zipBeanList.pathString
                 )
             }
         }
     }
 }
 
+@Composable
+fun UnzipAllFile(
+    fileViewModel: FileViewModel
+) {
+    //todo 取消时还是会解压
+    if (fileViewModel.isOpenUnzipAllFileDialog) {
+//        BaseDialog("请输入解压密码", "如无加密，为空即可") {}
+        fileViewModel.isOpenUnzipAllFileDialog = false
+        App.instance.toast("后台解压中......")
+        val dataBuilder: Data.Builder = Data.Builder()
+        val filter =
+            fileViewModel.fileBeanList.filter { i -> i.isSelect && i.fileIco == R.drawable.zip }
+                .map { a -> Pair<String, String>(a.name, a.pickCode) }.toList()
+        val listType = object : TypeToken<List<Pair<String, String>>?>() {}.type
+        val list = Gson().toJson(filter, listType)
+//todo 支持批量解压带密码的压缩文件
+//        if (it != "") {
+//            dataBuilder.putString("pwd", it)
+//        }
+        dataBuilder.putString("list", list)
+        dataBuilder.putString("cid", fileViewModel.currentCid)
+
+        val request: OneTimeWorkRequest = OneTimeWorkRequest
+            .Builder(UnzipAllFileWorker::class.java)
+            .addTag("UnzipAllFileWorker")
+            .setInputData(dataBuilder.build()).build()
+        val workManager = WorkManager.getInstance(App.instance.applicationContext)
+        workManager.enqueue(request)
+        fileViewModel.recoverFromLongPress()
+        fileViewModel.unSelect()
+
+        Thread.sleep(100)
+        val workInfo by workManager.getWorkInfoByIdLiveData(request.id).observeAsState()
+        if (workInfo != null) {
+            when (workInfo?.state) {
+                WorkInfo.State.SUCCEEDED -> {
+                    fileViewModel.refresh()
+                }
+                WorkInfo.State.FAILED -> {
+                    fileViewModel.refresh()
+                }
+                WorkInfo.State.CANCELLED -> {}
+                WorkInfo.State.ENQUEUED -> {}
+                WorkInfo.State.RUNNING -> {}
+                WorkInfo.State.BLOCKED -> {}
+                null -> {
+
+                }
+            }
+        }
+
+
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterialApi::class)
 @Composable
 fun UnzipScreen(
-    zipBeanList: ZipBeanList,
-    fileName: String,
-    enter: (Pair<Boolean, String>) -> Unit
+    zipBeanList: ZipBeanList, fileName: String, enter: (Pair<Boolean, String>) -> Unit
 ) {
     //Pair true is command,false is click event
     AlertDialog(onDismissRequest = {
         enter.invoke(Pair(true, "exit"))
     }, confirmButton = {
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.offset(y = (-20).dp)
+            verticalAlignment = Alignment.CenterVertically, modifier = Modifier.offset(y = (-20).dp)
         ) {
             TextButton(
                 onClick = {
@@ -422,14 +484,11 @@ fun UnzipScreen(
                         )
                         if (item.fileIco == R.drawable.folder) {
                             Text(
-                                text = item.fileName,
-                                modifier = Modifier
-                                    .padding(start = 8.dp)
+                                text = item.fileName, modifier = Modifier.padding(start = 8.dp)
                             )
                         } else {
                             Column(
-                                modifier = Modifier
-                                    .padding(start = 8.dp)
+                                modifier = Modifier.padding(start = 8.dp)
                             ) {
                                 Text(
                                     text = item.fileName,
@@ -704,116 +763,112 @@ private fun SelectTorrentFileDialog(
             selectMap[i] = s
         }
     }
-    AlertDialog(
-        onDismissRequest = {
-            selectMap.clear()
-            enter.invoke(torrentFileBean, selectMap)
-        },
-        confirmButton = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.offset(y = (-20).dp)
+    AlertDialog(onDismissRequest = {
+        selectMap.clear()
+        enter.invoke(torrentFileBean, selectMap)
+    }, confirmButton = {
+        Row(
+            verticalAlignment = Alignment.CenterVertically, modifier = Modifier.offset(y = (-20).dp)
+        ) {
+            TextButton(
+                onClick = {
+                    enter.invoke(torrentFileBean, selectMap)
+                },
             ) {
-                TextButton(
-                    onClick = {
-                        enter.invoke(torrentFileBean, selectMap)
-                    },
-                ) {
-                    Text(text = "下载")
-                }
-                TextButton(
-                    onClick = {
-                        selectMap.clear()
-                        torrentFileBean.torrentFileListWeb.forEachIndexed { index, torrentFileListWeb ->
-                            if (torrentFileListWeb.wanted == 1) {
+                Text(text = "下载")
+            }
+            TextButton(
+                onClick = {
+                    selectMap.clear()
+                    torrentFileBean.torrentFileListWeb.forEachIndexed { index, torrentFileListWeb ->
+                        if (torrentFileListWeb.wanted == 1) {
+                            selectMap[index] = torrentFileListWeb
+                        }
+                    }
+                },
+            ) {
+                Text(text = "全选")
+            }
+            TextButton(
+                onClick = {
+                    torrentFileBean.torrentFileListWeb.forEachIndexed { index, torrentFileListWeb ->
+                        if (torrentFileListWeb.wanted == 1) {
+                            if (selectMap.containsKey(index)) {
+                                selectMap.remove(index)
+                            } else {
                                 selectMap[index] = torrentFileListWeb
                             }
                         }
-                    },
-                ) {
-                    Text(text = "全选")
-                }
-                TextButton(
-                    onClick = {
-                        torrentFileBean.torrentFileListWeb.forEachIndexed { index, torrentFileListWeb ->
-                            if (torrentFileListWeb.wanted == 1) {
-                                if (selectMap.containsKey(index)) {
-                                    selectMap.remove(index)
-                                } else {
-                                    selectMap[index] = torrentFileListWeb
-                                }
-                            }
-                        }
-                    },
-                ) {
-                    Text(text = "反选")
-                }
-                TextButton(
-                    onClick = {
-                        selectMap.clear()
-                        enter.invoke(torrentFileBean, selectMap)
-                    },
-                ) {
-                    Text(text = "取消")
-                }
+                    }
+                },
+            ) {
+                Text(text = "反选")
             }
-        }, title = { Text(text = "选择要下载的文件") }, text = {
-            Column() {
-                AutoSizableTextField(
-                    value = "已经选择${selectMap.size}/${torrentFileBean.fileCount}个，总计：${
-                        android.text.format.Formatter.formatFileSize(
-                            App.instance,
-                            selectMap.values.sumOf { it.size })
-                    }\n" + "共${torrentFileBean.fileCount}个文件，总计：${torrentFileBean.fileSizeString}",
-                    minFontSize = 30.sp,
-                    maxLines = 2
+            TextButton(
+                onClick = {
+                    selectMap.clear()
+                    enter.invoke(torrentFileBean, selectMap)
+                },
+            ) {
+                Text(text = "取消")
+            }
+        }
+    }, title = { Text(text = "选择要下载的文件") }, text = {
+        Column() {
+            AutoSizableTextField(
+                value = "已经选择${selectMap.size}/${torrentFileBean.fileCount}个，总计：${
+                    android.text.format.Formatter.formatFileSize(
+                        App.instance,
+                        selectMap.values.sumOf { it.size })
+                }\n" + "共${torrentFileBean.fileCount}个文件，总计：${torrentFileBean.fileSizeString}",
+                minFontSize = 30.sp,
+                maxLines = 2
+            )
+            LazyColumnScrollbar(
+                state = listState, settings = ScrollbarSettings.Default.copy(
+                    thumbUnselectedColor = Purple80
                 )
-                LazyColumnScrollbar(
-                    state = listState,
-                    settings = ScrollbarSettings.Default.copy(
-                        thumbUnselectedColor = Purple80
-                    )
-                ) {
-                    LazyColumn(modifier = Modifier.padding(8.dp), state = listState) {
-                        itemsIndexed(items = torrentFileBean.torrentFileListWeb, key = { _, item ->
-                            item.hashCode()
-                        }) { index, item ->
-                            if (item.wanted == 1) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier
-                                        .selectable(
-                                            selected = isSelectedItem(index), onClick = {
-                                                onChangeState(index, item)
+            ) {
+                LazyColumn(modifier = Modifier.padding(8.dp), state = listState) {
+                    itemsIndexed(items = torrentFileBean.torrentFileListWeb, key = { _, item ->
+                        item.hashCode()
+                    }) { index, item ->
+                        if (item.wanted == 1) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .selectable(
+                                        selected = isSelectedItem(index), onClick = {
+                                            onChangeState(index, item)
 //                                            println("select $selectMap")
-                                            }, role = Role.RadioButton
-                                        )
-                                        .padding(8.dp)
-                                ) {
-                                    Icon(
-                                        modifier = Modifier.padding(end = 16.dp),
-                                        imageVector = if (isSelectedItem(index)) {
-                                            Icons.Outlined.CheckBox
-                                        } else {
-                                            Icons.Outlined.CheckBoxOutlineBlank
-                                        },
-                                        contentDescription = null,
-                                        tint = Color.Magenta
+                                        }, role = Role.RadioButton
                                     )
-                                    DynamicEllipsizedTextView(
-                                        text = item.path,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    Text(
-                                        text = item.sizeString, modifier = Modifier.weight(0.5f),
-                                    )
-                                }
+                                    .padding(8.dp)
+                            ) {
+                                Icon(
+                                    modifier = Modifier.padding(end = 16.dp),
+                                    imageVector = if (isSelectedItem(index)) {
+                                        Icons.Outlined.CheckBox
+                                    } else {
+                                        Icons.Outlined.CheckBoxOutlineBlank
+                                    },
+                                    contentDescription = null,
+                                    tint = Color.Magenta
+                                )
+                                DynamicEllipsizedTextView(
+                                    text = item.path,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Text(
+                                    text = item.sizeString, modifier = Modifier.weight(0.5f),
+                                )
                             }
                         }
                     }
                 }
             }
-        })
+        }
+    })
 
 }
 
@@ -971,7 +1026,7 @@ private fun BaseDialog(
 @Preview
 fun aa() {
 //    Aria2Dialog()
-    BaseDialog("title", "", "context") {
+    BaseDialog("title", "context") {
 
     }
 }

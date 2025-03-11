@@ -155,5 +155,9 @@ class ConfigKeyUtil {
          */
         const val LOG_SCREEN="日志页面"
 
+        /**
+         * 离线task的标签
+         */
+        const val OFFLINE_TASK_WORKER = "OfflineTaskWorker"
     }
 }

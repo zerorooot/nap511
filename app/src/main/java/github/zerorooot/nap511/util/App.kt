@@ -16,9 +16,15 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import com.elvishew.xlog.LogConfiguration
 import com.elvishew.xlog.LogItem
+import com.elvishew.xlog.LogLevel
 import com.elvishew.xlog.XLog
 import com.elvishew.xlog.flattener.ClassicFlattener
+import com.elvishew.xlog.flattener.DefaultFlattener
+import com.elvishew.xlog.flattener.Flattener2
+import com.elvishew.xlog.flattener.PatternFlattener
 import com.elvishew.xlog.interceptor.AbstractFilterInterceptor
+import com.elvishew.xlog.internal.DefaultsFactory
+import com.elvishew.xlog.printer.AndroidPrinter
 import com.elvishew.xlog.printer.ConsolePrinter
 import com.elvishew.xlog.printer.file.FilePrinter
 import com.elvishew.xlog.printer.file.clean.FileLastModifiedCleanStrategy
@@ -83,17 +89,23 @@ class App : Application() {
 
     fun initLog() {
         //log
-        val build = LogConfiguration.Builder().addInterceptor(object : AbstractFilterInterceptor() {
+        val build = LogConfiguration.Builder().tag("XLOG").addInterceptor(object : AbstractFilterInterceptor() {
             override fun reject(log: LogItem?): Boolean {
                 return !DataStoreUtil.getData(ConfigKeyUtil.LOG_SCREEN, true)
             }
         }).build()
+        //todo  日志输出代码位置
+        /**
+         *     val stackTrace = Throwable().stackTrace
+         *                     val caller = stackTrace[1] // 获取调用者信息
+         *                     val logTag = "${caller.fileName}:${caller.lineNumber}" // 显示文件名和行号
+         */
         val print = FilePrinter
             .Builder(this.cacheDir.absolutePath)
             .cleanStrategy(FileLastModifiedCleanStrategy(7 * 24 * 60 * 60 * 1000))
             .flattener(ClassicFlattener())
             .build()
-        XLog.init(build, ConsolePrinter(), print);
+        XLog.init(build, AndroidPrinter(true), print);
         XLog.d("-----------------------init-----------------------------------")
         val handler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, e ->

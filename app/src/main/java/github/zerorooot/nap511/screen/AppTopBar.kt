@@ -91,12 +91,18 @@ fun AppTopBarMultiple(title: String, onClick: (String) -> Unit) {
             ) {
                 onClick.invoke("selectAll")
             }
-
             TopAppBarActionButton(
                 painter = painterResource(id = R.drawable.ic_baseline_select_reverse_24),
                 description = "ic_baseline_select_reverse_24"
             ) {
                 onClick.invoke("selectReverse")
+            }
+            //R.drawable.baseline_cloud_download_24
+            TopAppBarActionButton(
+                painter = painterResource(id = R.drawable.baseline_cloud_24),
+                description = "unzip file"
+            ) {
+                onClick.invoke("unzipAllFile")
             }
 //            TopAppBarActionButton(
 //                painter = painterResource(id = R.drawable.baseline_close_24),

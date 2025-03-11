@@ -15,6 +15,7 @@ import com.google.gson.Gson
 import com.google.gson.JsonParser
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.*
+import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.App
@@ -43,6 +44,8 @@ import java.util.*
 import kotlin.concurrent.thread
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import kotlin.math.log10
+import kotlin.math.pow
 import kotlin.math.roundToInt
 
 @SuppressLint("MutableCollectionMutableState")
@@ -73,16 +76,61 @@ class FileViewModel(private val cookie: String, private val application: Applica
     var isRefreshing = _isRefreshing.asStateFlow()
 
     //打开对话框相关
+    //todo 单独创建一个类记录
+    /**
+     * 新建文件夹
+     */
     var isOpenCreateFolderDialog by mutableStateOf(false)
+
+    /**
+     * 重命名
+     */
     var isOpenRenameFileDialog by mutableStateOf(false)
+
+    /**
+     *文件信息
+     */
     var isOpenFileInfoDialog by mutableStateOf(false)
+
+    /**
+     *文件排序
+     */
     var isOpenFileOrderDialog by mutableStateOf(false)
+
+    /**
+     *aria2
+     */
     var isOpenAria2Dialog by mutableStateOf(false)
+
+    /**
+     *所选中的文件/文件夹
+     */
     var selectIndex by mutableIntStateOf(0)
+
+    /**
+     *搜索
+     */
     var isOpenSearchDialog by mutableStateOf(false)
+
+    /**
+     * 解压对话框
+     */
     var isOpenUnzipDialog by mutableStateOf(false)
+
+    /**
+     *解压密码
+     */
     var isOpenUnzipPasswordDialog by mutableStateOf(false)
+
+    /**
+     *小文本文件
+     */
     var isOpenTextBodyDialog by mutableStateOf(false)
+
+    /**
+     *解压所有压缩包，提前输入密码，没有为空即可
+     */
+    var isOpenUnzipAllFileDialog by mutableStateOf(false)
 
     //图片浏览相关
     var photoFileBeanList = mutableListOf<FileBean>()
@@ -107,6 +155,10 @@ class FileViewModel(private val cookie: String, private val application: Applica
         FileService.getInstance(cookie)
     }
 
+    private val fileRepository: FileRepository by lazy {
+        FileRepository.getInstance(cookie)
+    }
+
     fun isFileScreenListState() = ::fileScreenListState.isInitialized
 
     fun init() {
@@ -123,8 +175,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         }
 
         if (isLongClickState) {
-            isLongClickState = false
-            appBarTitle = application.resources.getString(R.string.app_name)
+            recoverFromLongPress()
             fileBeanList.map { i -> i.isSelect = false }
             return
         }
@@ -220,8 +271,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
                     "fc_mix" to "0"
                 )
             )
-            val files =
-                fileService.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
+            val files = fileService.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
             setFileBeanProperty(files.fileBeanList)
 //            setFiles(files)
             fileListCache[cid] = files
@@ -247,18 +297,12 @@ class FileViewModel(private val cookie: String, private val application: Applica
             val allUse = spaceInfo.getAsJsonObject("all_use").get("size").asLong
             val allUseString = spaceInfo.getAsJsonObject("all_use").get("size_format").asString
             val allTotal = spaceInfo.getAsJsonObject("all_total").get("size").asLong
-            val allTotalString =
-                spaceInfo.getAsJsonObject("all_total").get("size_format").asString
+            val allTotalString = spaceInfo.getAsJsonObject("all_total").get("size_format").asString
             val allRemain = spaceInfo.getAsJsonObject("all_remain").get("size").asLong
             val allRemainString =
                 spaceInfo.getAsJsonObject("all_remain").get("size_format").asString
             remainingSpace = RemainingSpaceBean(
-                allRemain,
-                allRemainString,
-                allTotal,
-                allTotalString,
-                allUse,
-                allUseString
+                allRemain, allRemainString, allTotal, allTotalString, allUse, allUseString
             )
         }
     }
@@ -287,18 +331,10 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 setFiles(files)
                 _isRefreshing.value = false
             } catch (e: NullPointerException) {
-                Toast.makeText(
-                    application,
-                    "获取文件列表失败，建议更新您的Cookie",
-                    Toast.LENGTH_SHORT
-                ).show()
+                App.instance.toast("获取文件列表失败，建议更新您的Cookie")
             } catch (e: Exception) {
                 e.printStackTrace()
-                Toast.makeText(
-                    application,
-                    "${e.message}，请重试～",
-                    Toast.LENGTH_SHORT
-                ).show()
+                App.instance.toast("${e.message}，请重试～")
             } finally {
                 _isRefreshing.value = false
             }
@@ -324,9 +360,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
                         fileBean.modifiedTime.toLong() * 1000
                     )
             } else {
-                fileBean.sizeString = android.text.format.Formatter.formatFileSize(
-                    application, fileBean.size.toLong()
-                ) + " "
+                fileBean.sizeString = fileRepository.formatFileSize(fileBean.size.toLong()) + " "
                 fileBean.modifiedTimeString = fileBean.modifiedTime
                 if (fileBean.modifiedTime.isDigitsOnly()) {
                     fileBean.modifiedTime =
@@ -379,7 +413,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             if (order.state) {
                 refresh(currentCid)
             } else {
-                Toast.makeText(application, "排序失败", Toast.LENGTH_SHORT).show()
+                App.instance.toast("排序失败")
             }
 
         }
@@ -392,7 +426,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 select(i)
             }
         } catch (_: Exception) {
-            Toast.makeText(application, "????????", Toast.LENGTH_SHORT).show()
+            App.instance.toast("????????")
         }
 
     }
@@ -404,7 +438,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 select(i)
             }
         } catch (_: Exception) {
-            Toast.makeText(application, "????????", Toast.LENGTH_SHORT).show()
+            App.instance.toast("????????")
         }
 
     }
@@ -417,8 +451,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             arrayListOf(fileBeanList[index])
         }
         isCutState = true
-        isLongClickState = false
-        appBarTitle = application.resources.getString(R.string.app_name)
+        recoverFromLongPress()
         unSelect()
     }
 
@@ -462,7 +495,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             } else {
                 "移动失败~"
             }
-            Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
+            App.instance.toast(message)
         }
     }
 
@@ -478,7 +511,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             } else {
                 "创建失败"
             }
-            Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
+            App.instance.toast(message)
 
         }
 
@@ -489,10 +522,9 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     private fun refresh(cid: String) {
-        isLongClickState = false
-        appBarTitle = application.resources.getString(R.string.app_name)
+        recoverFromLongPress()
         fileListCache.remove(cid)
-        XLog.d("cid $cid, currentCid $currentCid")
+        // XLog.d("fileViewModel.refresh cid $cid, currentCid $currentCid")
         if (cid == currentCid) {
             getFiles(currentCid)
         } else {
@@ -506,9 +538,9 @@ class FileViewModel(private val cookie: String, private val application: Applica
         viewModelScope.launch {
             val fileBean = fileBeanList[index]
             fileInfo = if (fileBean.isFolder) {
-                fileService.getFileInfo(fileBean.categoryId)
+                fileRepository.getFileInfo(fileBean.categoryId)
             } else {
-                fileService.getFileInfo(fileBean.fileId)
+                fileRepository.getFileInfo(fileBean.fileId)
             }
             isOpenFileInfoDialog = true
         }
@@ -533,7 +565,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             val fid = fileBean.fileId
             val pid = currentCid
 
-            val delete = fileService.delete(pid, fid)
+            val delete = fileRepository.delete(pid, fid)
 
             val message = if (delete.state) {
                 "删除 ${fileBean.name} 成功"
@@ -544,7 +576,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 imageBeanCache[currentCid] = beforeImageBeanCache!!
                 "删除 ${fileBean.name} 失败~"
             }
-            Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
+            App.instance.toast(message)
         }
     }
 
@@ -558,7 +590,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             fileBeanList[selectIndex] = fileBean.copy(name = name)
             fileListCache[cid]!!.fileBeanList[selectIndex] = fileBean.copy(name = name)
             fileListCache[fileBean.categoryId]?.let { it.path.last().name = name }
-            val rename = fileService.rename(RenameBean(fileBean.fileId, name).toRequestBody())
+            val rename = fileRepository.rename(RenameBean(fileBean.fileId, name).toRequestBody())
             val message = if (rename.state) {
                 "重命名成功"
             } else {
@@ -566,7 +598,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 fileListCache[cid] = beforeFileListCache!!
                 "重命名失败"
             }
-            Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
+            App.instance.toast(message)
         }
 
     }
@@ -592,8 +624,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             fileListCache[cid]!!.fileBeanList = ArrayList(fileBeanList)
             clickMap[cid] = clickMap.getOrDefault(cid, 0) - filter.size
 
-            isLongClickState = false
-            appBarTitle = application.resources.getString(R.string.app_name)
+            recoverFromLongPress()
 
             val deleteMultiple = fileService.deleteMultiple(mapOf)
             val message = if (deleteMultiple.state) {
@@ -604,9 +635,17 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 clickMap[cid] = beforeClickMap
                 "删除 ${filter.size} 个文件失败~"
             }
-            Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
+            App.instance.toast(message)
 
         }
+    }
+
+    /**
+     * 从长按状态恢复
+     */
+    fun recoverFromLongPress() {
+        isLongClickState = false
+        appBarTitle = application.resources.getString(R.string.app_name)
     }
 
     fun search(searchKey: String) {
@@ -621,63 +660,23 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     fun getZipListFile(
-        fileName: String = "",
-        paths: String = "文件",
-        isCheck: Boolean = true
+        fileName: String = "", paths: String = "文件", isCheck: Boolean = true
     ) {
         viewModelScope.launch {
             val fileBean = fileBeanList[selectIndex]
             if (isCheck) {
                 //首次打开
                 if (!isOpenUnzipDialog && paths == "文件") {
-                    val json = fileService.getDecryptZipProcess(fileBean.pickCode)
-                    //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
-                    XLog.d("checkIsEncryptionZip $json")
-                    val unzipStatus = json.getAsJsonObject("data").getAsJsonObject("extract_status")
-                        .get("unzip_status").asInt
-                    //1 is encryption zip file
-                    if (unzipStatus != 4) {
-                        XLog.d("${fileBean.name} is encryption zip file")
-                        isOpenUnzipPasswordDialog = true
-                        return@launch
+                    if (fileRepository.isZipFileEncryption(fileBean.pickCode)) {
+                        if (!fileRepository.tryToExtract(fileBean.pickCode)) {
+                            XLog.d("${fileBean.name} is encryption zip file")
+                            isOpenUnzipPasswordDialog = true
+                            return@launch
+                        }
                     }
                 }
             }
-
-            val data =
-                fileService.getZipListFile(fileBean.pickCode, fileName, paths)
-                    .getAsJsonObject("data")
-            XLog.d(data)
-            val zipBeanList = Gson().fromJson<ZipBeanList>(data, ZipBeanList::class.java)
-            val sj = StringJoiner("/")
-            data.getAsJsonArray("paths")
-                .forEach { sj.add(it.asJsonObject.get("file_name").asString) }
-            zipBeanList.pathString = sj.toString()
-            zipBeanList.list.forEach { i ->
-                if (i.fileCategory == 0) {
-                    i.fileIco = R.drawable.folder
-                } else {
-                    i.timeString = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
-                        i.time.toLong() * 1000
-                    )
-                    i.sizeString = android.text.format.Formatter.formatFileSize(
-                        application, i.size.toLong()
-                    ) + "  "
-                    when (i.icoString) {
-                        "apk" -> i.fileIco = R.drawable.apk
-                        "iso" -> i.fileIco = R.drawable.iso
-                        "zip" -> i.fileIco = R.drawable.zip
-                        "7z" -> i.fileIco = R.drawable.zip
-                        "rar" -> i.fileIco = R.drawable.zip
-                        "png" -> i.fileIco = R.drawable.png
-                        "jpg" -> i.fileIco = R.drawable.png
-                        "mp3" -> i.fileIco = R.drawable.mp3
-                        "txt" -> i.fileIco = R.drawable.txt
-                        "torrent" -> i.fileIco = R.drawable.torrent
-                    }
-                }
-            }
-            unzipBeanList.value = zipBeanList
+            unzipBeanList.value = fileRepository.getZipListFile(fileBean.pickCode, fileName, paths)
             isOpenUnzipDialog = true
         }
     }
@@ -688,53 +687,26 @@ class FileViewModel(private val cookie: String, private val application: Applica
             val fileBean = fileBeanList[selectIndex]
             val pickCode = fileBean.pickCode
             val unzipFolderName = fileBean.name.substring(0, fileBean.name.length - 4)
+
             //确定当前目录下是否存在同名文件，如果不存在，则新建一个
             val currentUnzipFolderNameList =
                 fileBeanList.filter { i -> i.isFolder && i.name == unzipFolderName }
             var zipFileCid = currentCid
             if (currentUnzipFolderNameList.isEmpty()) {
-                val createFolderMessage =
-                    fileService.createFolder(
-                        currentCid,
-                        unzipFolderName
-                    )
-                XLog.d(createFolderMessage)
+                val createFolderMessage = fileRepository.createFolder(
+                    currentCid, unzipFolderName
+                )
+                XLog.d("fileViewModel.unzipFile $createFolderMessage")
                 zipFileCid = createFolderMessage.cid
             }
 
-            val jsonObject = fileService.unzipFile(pickCode, zipFileCid, files, dirs)
-            XLog.d(jsonObject)
-            val extractId = jsonObject.getAsJsonObject("data").get("extract_id").asLong
-            var message = if (jsonObject.get("state").asBoolean) {
-                "后台解压中～"
-            } else {
-                "解压失败～${jsonObject.get("message").asString}"
-            }
-            App.instance.toast(message)
+            val unzipFile = fileRepository.unzipFile(pickCode, zipFileCid, files, dirs)
 
-            // {"state":true,"message":"","code":"","data":{"extract_id":"id","to_pid":"pid","percent":100}}
-            var error = true
-            for (i in 1..10) {
-                val json = fileService.unzipFileProcess(extractId)
-                if (!json.get("state").asBoolean) {
-                    message = json.get("message").asString
-                    break
-                }
-                XLog.d("unzipFile process $i $json")
-                val process = json.getAsJsonObject("data")
-                    .get("percent").asInt
-                if (process == 100) {
-                    error = false
-                    message = "后台解压完成～"
-                    break
-                }
-                Thread.sleep(1000)
-            }
-            if (!error) {
+            if (unzipFile.first) {
                 refresh(refreshCid)
+            } else {
+                App.instance.toast(unzipFile.second)
             }
-
-            App.instance.toast(message)
         }
     }
 
@@ -742,35 +714,24 @@ class FileViewModel(private val cookie: String, private val application: Applica
         viewModelScope.launch {
             val fileBean = fileBeanList[selectIndex]
             val pickCode = fileBean.pickCode
-            //{"state":true,"message":"","code":"","data":{"unzip_status":4}}
-            val json = fileService.decryptZip(pickCode, secret)
-            XLog.d("decryptZip $json")
-            val asInt = json.getAsJsonObject("data")
-                .get("unzip_status").asInt
             isOpenUnzipPasswordDialog = false
-            //4 is success ,6 is decrypt error
-            if (asInt != 4) {
+            val decryptZip = fileRepository.decryptZip(pickCode, secret)
+            if (!decryptZip) {
                 App.instance.toast("密码错误～")
                 return@launch
             }
+
             //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
-            for (i in 1..10) {
-                val json = fileService.getDecryptZipProcess(pickCode)
-                val process = json.getAsJsonObject("data").getAsJsonObject("extract_status")
-                    .get("progress").asInt
-                XLog.d("$i $json")
-                if (process == 100) {
-                    getZipListFile(isCheck = false)
-                    break
-                }
-                Thread.sleep(1000)
+            if (fileRepository.tryToExtract(pickCode)) {
+                getZipListFile(isCheck = false)
             }
         }
     }
 
+
     fun downloadText(fileBean: FileBean) {
         thread {
-            val input = getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
+            val input = fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
             textBodyByteArray = input.readBytes()
             isOpenTextBodyDialog = true
             setRefreshingStatus(false)
@@ -781,7 +742,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
     fun startSendAria2Service(index: Int) {
         val fileBean = fileBeanList[index]
         if (fileBean.isFolder) {
-            Toast.makeText(application, "暂时无法下载文件夹", Toast.LENGTH_SHORT).show()
+            App.instance.toast("暂时无法下载文件夹")
             return
         }
         val intent = Intent(application, Sha1Service::class.java)
@@ -820,7 +781,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         appBarTitle = fileBeanList.filter { i -> i.isSelect }.size.toString()
     }
 
-    private fun unSelect() {
+    fun unSelect() {
         val count = arrayListOf<Int>()
         fileBeanList.forEachIndexed { index, fileBean ->
             if (fileBean.isSelect) {
@@ -858,62 +819,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         val minutes = totalSeconds / 60 % 60
         val hours = totalSeconds / 3600
         return if (hours > 0) String.format(
-            "%02d:%02d:%02d",
-            hours,
-            minutes,
-            seconds
+            "%02d:%02d:%02d", hours, minutes, seconds
         ) else String.format("%02d:%02d", minutes, seconds)
     }
-
-    private fun getDownloadInputStream(
-        pickCode: String,
-        fileId: String
-    ): InputStream {
-        val sha1Util = Sha1Util()
-        val okHttpClient = OkHttpClient()
-        val tm = System.currentTimeMillis() / 1000
-        val m115Encode = sha1Util.m115_encode(pickCode, tm)
-        val map = FormBody.Builder().add("data", m115Encode.data).build()
-
-        val request: Request = Request
-            .Builder()
-            .url("https://proapi.115.com/app/chrome/downurl?t=$tm")
-            .addHeader("cookie", cookie)
-            .addHeader("Content-Type", "application/x-www-form-urlencoded")
-            .addHeader(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
-            )
-            .post(map)
-            .build()
-
-        val response = okHttpClient.newCall(request).execute()
-
-        val returnJson = JsonParser().parse(response.body.string()).asJsonObject
-        val data = returnJson.get("data").asString
-        val m115Decode = sha1Util.m115_decode(data, m115Encode.key)
-
-
-        //{"fileId":{"file_name":"a","file_size":"0","pick_code":"pick_code","url":false}}
-        val downloadUrl = JsonParser().parse(m115Decode).asJsonObject.getAsJsonObject(fileId)
-            .getAsJsonObject("url").get("url").asString
-        XLog.d("downloadUrl $downloadUrl")
-
-
-        val requestDownload: Request = Request
-            .Builder()
-            .url(downloadUrl)
-            .addHeader("cookie", cookie)
-            .addHeader("Content-Type", "application/x-www-form-urlencoded")
-            .addHeader(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
-            )
-            .get()
-            .build()
-        val responseDownload = okHttpClient.newCall(requestDownload).execute();
-        val body = responseDownload.body.byteStream()
-        return body
-    }
-
 }
