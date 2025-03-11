@@ -370,50 +370,50 @@ fun UnzipAllFile(
 ) {
     //todo 取消时还是会解压
     if (fileViewModel.isOpenUnzipAllFileDialog) {
-//        BaseDialog("请输入解压密码", "如无加密，为空即可") {}
-        fileViewModel.isOpenUnzipAllFileDialog = false
-        App.instance.toast("后台解压中......")
-        val dataBuilder: Data.Builder = Data.Builder()
-        val filter =
-            fileViewModel.fileBeanList.filter { i -> i.isSelect && i.fileIco == R.drawable.zip }
-                .map { a -> Pair<String, String>(a.name, a.pickCode) }.toList()
-        val listType = object : TypeToken<List<Pair<String, String>>?>() {}.type
-        val list = Gson().toJson(filter, listType)
-//todo 支持批量解压带密码的压缩文件
-//        if (it != "") {
-//            dataBuilder.putString("pwd", it)
+////        BaseDialog("请输入解压密码", "如无加密，为空即可") {}
+//        fileViewModel.isOpenUnzipAllFileDialog = false
+//        App.instance.toast("后台解压中......")
+//        val dataBuilder: Data.Builder = Data.Builder()
+//        val filter =
+//            fileViewModel.fileBeanList.filter { i -> i.isSelect && i.fileIco == R.drawable.zip }
+//                .map { a -> Pair<String, String>(a.name, a.pickCode) }.toList()
+//        val listType = object : TypeToken<List<Pair<String, String>>?>() {}.type
+//        val list = Gson().toJson(filter, listType)
+////todo 支持批量解压带密码的压缩文件
+////        if (it != "") {
+////            dataBuilder.putString("pwd", it)
+////        }
+//        dataBuilder.putString("list", list)
+//        dataBuilder.putString("cid", fileViewModel.currentCid)
+//
+//        val request: OneTimeWorkRequest = OneTimeWorkRequest
+//            .Builder(UnzipAllFileWorker::class.java)
+//            .addTag("UnzipAllFileWorker")
+//            .setInputData(dataBuilder.build()).build()
+//        val workManager = WorkManager.getInstance(App.instance.applicationContext)
+//        workManager.enqueue(request)
+//        fileViewModel.recoverFromLongPress()
+//        fileViewModel.unSelect()
+//
+//        Thread.sleep(100)
+//        val workInfo by workManager.getWorkInfoByIdLiveData(request.id).observeAsState()
+//        if (workInfo != null) {
+//            when (workInfo?.state) {
+//                WorkInfo.State.SUCCEEDED -> {
+//                    fileViewModel.refresh()
+//                }
+//                WorkInfo.State.FAILED -> {
+//                    fileViewModel.refresh()
+//                }
+//                WorkInfo.State.CANCELLED -> {}
+//                WorkInfo.State.ENQUEUED -> {}
+//                WorkInfo.State.RUNNING -> {}
+//                WorkInfo.State.BLOCKED -> {}
+//                null -> {
+//
+//                }
+//            }
 //        }
-        dataBuilder.putString("list", list)
-        dataBuilder.putString("cid", fileViewModel.currentCid)
-
-        val request: OneTimeWorkRequest = OneTimeWorkRequest
-            .Builder(UnzipAllFileWorker::class.java)
-            .addTag("UnzipAllFileWorker")
-            .setInputData(dataBuilder.build()).build()
-        val workManager = WorkManager.getInstance(App.instance.applicationContext)
-        workManager.enqueue(request)
-        fileViewModel.recoverFromLongPress()
-        fileViewModel.unSelect()
-
-        Thread.sleep(100)
-        val workInfo by workManager.getWorkInfoByIdLiveData(request.id).observeAsState()
-        if (workInfo != null) {
-            when (workInfo?.state) {
-                WorkInfo.State.SUCCEEDED -> {
-                    fileViewModel.refresh()
-                }
-                WorkInfo.State.FAILED -> {
-                    fileViewModel.refresh()
-                }
-                WorkInfo.State.CANCELLED -> {}
-                WorkInfo.State.ENQUEUED -> {}
-                WorkInfo.State.RUNNING -> {}
-                WorkInfo.State.BLOCKED -> {}
-                null -> {
-
-                }
-            }
-        }
 
 
     }

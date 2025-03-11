@@ -90,15 +90,22 @@ class UnzipAllFileWorker(
         val result = (sj.toString() == "")
 
         showCompletionNotification(result, sj.toString(), cid)
-        val addTaskData = Data.Builder().putBoolean("state", true).build()
         val message = if (result) {
             "${size}个文件解压完成！"
         } else {
             "${size}个文件解压完成！" + sj.toString()
         }
+
+        val addTaskData =
+            Data.Builder().putBoolean("state", result).putString("message", message).build()
+
         App.instance.toast(message)
 
-        return Result.success(addTaskData);
+        if (result) {
+            return Result.success(addTaskData);
+        }
+
+        return Result.failure(addTaskData);
     }
 
 
@@ -200,7 +207,7 @@ class UnzipAllFileWorker(
                 .build()
 
         notificationManager.notify(
-            notificationId - 1,
+            System.currentTimeMillis().toInt(),
             notification
         )
     }

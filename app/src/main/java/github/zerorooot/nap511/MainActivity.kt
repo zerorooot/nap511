@@ -32,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -59,6 +60,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.activity.OfflineTaskWorker
+import github.zerorooot.nap511.activity.UnzipAllFileWorker
 import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.screen.CaptchaVideoWebViewScreen
@@ -470,7 +472,11 @@ class MainActivity : ComponentActivity() {
         when (name) {
 //                "back"->{FileScreen里}
             //具体实现在AlertDialog#UnzipAllFile()里
-            "unzipAllFile" -> fileViewModel.isOpenUnzipAllFileDialog = true
+            "unzipAllFile" -> {
+                //fileViewModel.isOpenUnzipAllFileDialog = true
+                unzipAllFile(fileViewModel)
+            }
+
             "selectToUp" -> fileViewModel.selectToUp()
             "selectToDown" -> fileViewModel.selectToDown()
             "cut" -> fileViewModel.cut()
@@ -482,6 +488,49 @@ class MainActivity : ComponentActivity() {
             //具体实现在FileScreen#CreateDialogs()里
             "文件排序" -> fileViewModel.isOpenFileOrderDialog = true
             "刷新文件" -> fileViewModel.refresh()
+        }
+    }
+
+    private fun unzipAllFile(fileViewModel: FileViewModel) {
+        App.instance.toast("后台解压中......")
+        val dataBuilder: Data.Builder = Data.Builder()
+        val filter =
+            fileViewModel.fileBeanList.filter { i -> i.isSelect && i.fileIco == R.drawable.zip }
+                .map { a -> Pair<String, String>(a.name, a.pickCode) }.toList()
+        val listType = object : TypeToken<List<Pair<String, String>>?>() {}.type
+        val list = Gson().toJson(filter, listType)
+//todo 支持批量解压带密码的压缩文件
+//        if (it != "") {
+//            dataBuilder.putString("pwd", it)
+//        }
+        dataBuilder.putString("list", list)
+        dataBuilder.putString("cid", fileViewModel.currentCid)
+
+        val request: OneTimeWorkRequest = OneTimeWorkRequest
+            .Builder(UnzipAllFileWorker::class.java)
+            .addTag("UnzipAllFileWorker")
+            .setInputData(dataBuilder.build()).build()
+        val workManager = WorkManager.getInstance(App.instance.applicationContext)
+        workManager.enqueue(request)
+        fileViewModel.recoverFromLongPress()
+        fileViewModel.unSelect()
+
+        workManager.getWorkInfoByIdLiveData(request.id).observe(this) {
+            when (it?.state) {
+                WorkInfo.State.SUCCEEDED -> {
+                    fileViewModel.refresh()
+                }
+
+                WorkInfo.State.FAILED -> {
+                    fileViewModel.refresh()
+                }
+
+                WorkInfo.State.CANCELLED -> {}
+                WorkInfo.State.ENQUEUED -> {}
+                WorkInfo.State.RUNNING -> {}
+                WorkInfo.State.BLOCKED -> {}
+                null -> {}
+            }
         }
     }
 }
