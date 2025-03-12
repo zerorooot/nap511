@@ -150,6 +150,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent, caller: ComponentCaller) {
         super.onNewIntent(intent, caller)
         XLog.d("onNewIntent $intent")
+        setIntent(intent) // 更新 Intent
         handleIntent(intent)
     }
 
@@ -214,22 +215,22 @@ class MainActivity : ComponentActivity() {
      *
      */
     private fun checkOfflineTask(cookie: String) {
-//        val workQuery = WorkQuery.Builder.fromStates(
-//            listOf(
-//                WorkInfo.State.ENQUEUED,
-//                WorkInfo.State.RUNNING,
-////                WorkInfo.State.SUCCEEDED,
-////                WorkInfo.State.FAILED,
-//                WorkInfo.State.BLOCKED,
-//                WorkInfo.State.CANCELLED
-//            )
-//        ).build()
-//        val workInfos: List<WorkInfo> =
-//            WorkManager.getInstance(applicationContext).getWorkInfos(workQuery).get()
-        //todo 检测是否与解压文件相冲突
+        val workQuery = WorkQuery.Builder.fromStates(
+            listOf(
+                WorkInfo.State.ENQUEUED,
+                WorkInfo.State.RUNNING,
+//                WorkInfo.State.SUCCEEDED,
+//                WorkInfo.State.FAILED,
+                WorkInfo.State.BLOCKED,
+                WorkInfo.State.CANCELLED
+            )
+        ).build()
         val workInfos: List<WorkInfo> =
-            WorkManager.getInstance(applicationContext)
-                .getWorkInfosByTag(ConfigKeyUtil.OFFLINE_TASK_WORKER).get()
+            WorkManager.getInstance(applicationContext).getWorkInfos(workQuery).get()
+        //todo 检测是否与解压文件相冲突
+//        val workInfos: List<WorkInfo> =
+//            WorkManager.getInstance(applicationContext)
+//                .getWorkInfosByTag(ConfigKeyUtil.OFFLINE_TASK_WORKER).get()
         val size = workInfos.size
         if (size != 0) {
             return
@@ -512,24 +513,13 @@ class MainActivity : ComponentActivity() {
             .setInputData(dataBuilder.build()).build()
         val workManager = WorkManager.getInstance(App.instance.applicationContext)
         workManager.enqueue(request)
+
         fileViewModel.recoverFromLongPress()
         fileViewModel.unSelect()
 
         workManager.getWorkInfoByIdLiveData(request.id).observe(this) {
-            when (it?.state) {
-                WorkInfo.State.SUCCEEDED -> {
-                    fileViewModel.refresh()
-                }
-
-                WorkInfo.State.FAILED -> {
-                    fileViewModel.refresh()
-                }
-
-                WorkInfo.State.CANCELLED -> {}
-                WorkInfo.State.ENQUEUED -> {}
-                WorkInfo.State.RUNNING -> {}
-                WorkInfo.State.BLOCKED -> {}
-                null -> {}
+            if (it != null && it.state.isFinished) {
+                fileViewModel.refresh()
             }
         }
     }

@@ -2,7 +2,6 @@ package github.zerorooot.nap511.viewmodel
 
 
 import android.app.Application
-import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -13,8 +12,7 @@ import github.zerorooot.nap511.bean.OfflineInfo
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.bean.TorrentFileBean
-import github.zerorooot.nap511.service.FileService
-import github.zerorooot.nap511.service.OfflineService
+import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
@@ -23,7 +21,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
-import java.util.StringJoiner
 
 class OfflineFileViewModel(private val cookie: String, private val application: Application) :
     ViewModel() {
@@ -44,21 +41,15 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
 
     lateinit var offlineTask: OfflineTask
 
-    //    val addTaskReturn = MutableLiveData<Pair<Boolean, String>>()
-    var addTaskReturn by mutableStateOf(Pair<Boolean, String>(false, "通知信息未初始化，添加失败～"))
-
 
     var torrentBean by mutableStateOf(TorrentFileBean())
 
     //打开对话框相关
     var isOpenCreateSelectTorrentFileDialog by mutableStateOf(false)
 
-    private val offlineService: OfflineService by lazy {
-        OfflineService.getInstance(cookie)
-    }
 
-    private val fileService: FileService by lazy {
-        FileService.getInstance(cookie)
+    private val fileRepository: FileRepository by lazy {
+        FileRepository.getInstance(cookie)
     }
 
     fun getOfflineFileList() {
@@ -69,8 +60,8 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
             _isRefreshing.value = true
 //            val uid = sharedPreferencesUtil.get(ConfigUtil.uid)!!
             val uid = App.uid
-            val sign = offlineService.getSign().sign
-            _offlineInfo.value = offlineService.taskList(uid, sign)
+            val sign = fileRepository.getOfflineSign().sign
+            _offlineInfo.value = fileRepository.getOfflineTaskList(uid, sign)
             setTaskInfo(_offlineInfo.value.tasks)
             _offlineFile.value = _offlineInfo.value.tasks
             _isRefreshing.value = false
@@ -81,8 +72,8 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
         viewModelScope.launch {
             //clear torrent bean
             torrentBean = TorrentFileBean()
-            val sign = offlineService.getSign().sign
-            val torrentTask = offlineService.getTorrentTaskList(sha1, App.uid, sign)
+            val sign = fileRepository.getOfflineSign().sign
+            val torrentTask = fileRepository.getOfflineTorrentTaskList(sha1, sign, App.uid)
             XLog.d("getTorrentTask $torrentTask")
             if (!torrentTask.state) {
                 App.instance.toast(torrentTask.errorMessage)
@@ -103,8 +94,8 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
 
     fun addTorrentTask(torrentFileBean: TorrentFileBean, wanted: String) {
         viewModelScope.launch {
-            val sign = offlineService.getSign().sign
-            val addTorrentTask = offlineService.addTorrentTask(
+            val sign = fileRepository.getOfflineSign().sign
+            val addTorrentTask = fileRepository.addOfflineTorrentTask(
                 torrentFileBean.infoHash,
                 wanted,
                 torrentFileBean.torrentName,
@@ -145,31 +136,31 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
 
     fun clearFinish() {
         viewModelScope.launch {
-            val clearFinish = offlineService.clearFinish()
+            val clearFinish = fileRepository.clearOfflineFinish()
             val message = if (clearFinish.state) {
                 "清除成功"
             } else {
                 "清除失败，${clearFinish.errorMsg}"
             }
-            Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
+            App.instance.toast(message)
         }
     }
 
     fun clearError() {
         viewModelScope.launch {
-            val clearError = offlineService.clearError()
+            val clearError = fileRepository.clearOfflineError()
             val message = if (clearError.state) {
                 "清除成功"
             } else {
                 "清除失败，${clearError.errorMsg}"
             }
-            Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
+            App.instance.toast(message)
         }
     }
 
     fun quota() {
         viewModelScope.launch {
-            _quotaBean.value = offlineService.quota()
+            _quotaBean.value = fileRepository.quota()
         }
     }
 
@@ -185,55 +176,8 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
      */
     fun addTask(list: List<String>, currentCid: String) {
         viewModelScope.launch {
-            addTaskSuspend(list, currentCid)
+            fileRepository.addOfflineTask(list, currentCid)
         }
-    }
-    suspend fun addTaskSuspend(list: List<String>, currentCid: String) {
-        val downloadPath = fileService.setDownloadPath(currentCid)
-        XLog.d("add task $downloadPath")
-        if (!downloadPath.state) {
-            Toast.makeText(
-                application,
-                "设置离线位置失败，默认保存到\"云下载\"目录",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-
-        val map = HashMap<String, String>()
-        map["savepath"] = ""
-        map["wp_path_id"] = currentCid
-        map["uid"] = App.uid
-        map["sign"] = offlineService.getSign().sign
-        map["time"] = (System.currentTimeMillis() / 1000).toString()
-        list.forEachIndexed { index, s ->
-            map["url[$index]"] = s
-        }
-        val addTask = offlineService.addTask(map)
-        val message = if (addTask.state) {
-            "任务添加成功"
-        } else {
-            if (addTask.errorMsg.contains("请验证账号")) {
-                App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
-            }
-            //把失败的离线链接保存起来
-            val currentOfflineTaskList =
-                DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
-                    .split("\n")
-                    .filter { i -> i != "" && i != " " }
-                    .toSet()
-                    .toMutableList()
-            currentOfflineTaskList.addAll(list)
-            val stringJoiner = StringJoiner("\n")
-            currentOfflineTaskList.toSet().forEach { stringJoiner.add(it) }
-            //写入缓存
-            DataStoreUtil.putData(
-                ConfigKeyUtil.CURRENT_OFFLINE_TASK,
-                stringJoiner.toString()
-            )
-            "任务添加失败，${addTask.errorMsg}"
-        }
-        addTaskReturn = Pair<Boolean, String>(addTask.state, message)
-        Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
     }
 
     fun openOfflineDialog(index: Int) {
@@ -250,16 +194,16 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
             val map = hashMapOf("hash[0]" to offlineTask.infoHash)
 //            map["uid"] = sharedPreferencesUtil.get(ConfigUtil.uid)!!
             map["uid"] = DataStoreUtil.getData(ConfigKeyUtil.UID, "")
-            map["sign"] = offlineService.getSign().sign
+            map["sign"] = fileRepository.getOfflineSign().sign
             map["time"] = (System.currentTimeMillis() / 1000).toString()
-            val deleteTask = offlineService.deleteTask(map)
+            val deleteTask = fileRepository.deleteOfflineTask(map)
             val message = if (deleteTask.state) {
                 refresh()
                 "删除成功"
             } else {
                 "删除失败，${deleteTask.errorMsg}"
             }
-            Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
+            App.instance.toast(message)
         }
     }
 }

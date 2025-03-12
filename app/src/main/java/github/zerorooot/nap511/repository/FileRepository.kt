@@ -7,9 +7,16 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.CreateFolderMessage
 import github.zerorooot.nap511.bean.FileInfo
+import github.zerorooot.nap511.bean.OfflineInfo
+import github.zerorooot.nap511.bean.QuotaBean
+import github.zerorooot.nap511.bean.SignBean
+import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.service.FileService
+import github.zerorooot.nap511.service.OfflineService
 import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.Sha1Util
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
@@ -37,6 +44,103 @@ class FileRepository(private val cookie: String) {
         FileService.getInstance(cookie)
     }
 
+    private val offlineService: OfflineService by lazy {
+        OfflineService.getInstance(cookie)
+    }
+
+
+    //-----------------离线下载相关--------------------------------
+    suspend fun getOfflineSign(): SignBean {
+        return offlineService.getSign()
+    }
+
+    suspend fun getOfflineTaskList(uid: String = "", sign: String = ""): OfflineInfo {
+        return offlineService.taskList(uid, sign)
+    }
+
+    suspend fun getOfflineTorrentTaskList(
+        sha1: String = "",
+        sign: String = "",
+        uid: String = "",
+    ): TorrentFileBean {
+        return offlineService.getTorrentTaskList(sha1, sign, uid)
+    }
+
+    suspend fun addOfflineTorrentTask(
+        infoHash: String = "",
+        wanted: String = "",
+        savePath: String = "",
+        uid: String = "",
+        sign: String = "",
+    ): BaseReturnMessage {
+        return offlineService.addTorrentTask(infoHash, wanted, savePath, uid, sign)
+    }
+
+    suspend fun quota(): QuotaBean {
+        return offlineService.quota()
+    }
+
+    suspend fun addOfflineTask(list: List<String>, currentCid: String): Pair<Boolean, String> {
+        val downloadPath = setDownloadPath(currentCid)
+        XLog.d("add task downloadPath $downloadPath")
+        if (!downloadPath.state) {
+            App.instance.toast("设置离线位置失败，默认保存到\"云下载\"目录")
+        }
+
+        val map = HashMap<String, String>()
+        map["savepath"] = ""
+        map["wp_path_id"] = currentCid
+        map["uid"] = App.uid
+        map["sign"] = getOfflineSign().sign
+        map["time"] = (System.currentTimeMillis() / 1000).toString()
+        list.forEachIndexed { index, s ->
+            map["url[$index]"] = s
+        }
+        val addTask = offlineService.addTask(map)
+        XLog.d("add task addTask $addTask")
+        val message = if (addTask.state) {
+            "任务添加成功"
+        } else {
+            if (addTask.errorMsg.contains("请验证账号")) {
+                App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
+            }
+            //把失败的离线链接保存起来
+            val currentOfflineTaskList =
+                DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
+                    .split("\n")
+                    .filter { i -> i != "" && i != " " }
+                    .toSet()
+                    .toMutableList()
+            currentOfflineTaskList.addAll(list)
+            val stringJoiner = StringJoiner("\n")
+            currentOfflineTaskList.toSet().forEach { stringJoiner.add(it) }
+            //写入缓存
+            DataStoreUtil.putData(
+                ConfigKeyUtil.CURRENT_OFFLINE_TASK,
+                stringJoiner.toString()
+            )
+            "任务添加失败，${addTask.errorMsg}"
+        }
+
+        App.instance.toast(message)
+        return Pair(addTask.state, message)
+    }
+
+    suspend fun deleteOfflineTask(body: HashMap<String, String>): BaseReturnMessage {
+        return offlineService.deleteTask(body)
+    }
+
+    suspend fun clearOfflineError(): BaseReturnMessage {
+        return offlineService.clearError()
+    }
+
+    suspend fun clearOfflineFinish(): BaseReturnMessage {
+        return offlineService.clearFinish()
+    }
+
+    //-----------------离线下载结束--------------------------------
+
+
     suspend fun getFileInfo(cid: String): FileInfo {
         return fileService.getFileInfo(cid)
     }
@@ -45,6 +149,10 @@ class FileRepository(private val cookie: String) {
         pid: String, folderName: String
     ): CreateFolderMessage {
         return fileService.createFolder(pid, folderName)
+    }
+
+    suspend fun setDownloadPath(cid: String): BaseReturnMessage {
+        return fileService.setDownloadPath(cid)
     }
 
     /**
@@ -77,7 +185,7 @@ class FileRepository(private val cookie: String) {
         val unzipFile = fileService.unzipFile(pickCode, zipFileCid, files, dirs)
         XLog.d("unzipFile JsonElement $unzipFile")
         val jsonObject = unzipFile.asJsonObject
-        //todo 解压失败时处理 unzipFile {"state":false,"message":"压缩包已损坏，无法解压","code":51005,"data":[]}
+        //解压失败时处理 unzipFile {"state":false,"message":"压缩包已损坏，无法解压","code":51005,"data":[]}
         //{"state":false,"message":"参数错误。","code":990002,"data":[]}
         state = jsonObject.get("state").asBoolean
         var message = if (state) {

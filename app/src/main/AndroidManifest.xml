@@ -27,7 +27,7 @@
         <activity
             android:name=".activity.OfflineTaskActivity"
             android:exported="true"
-            android:launchMode="singleTask"
+            android:launchMode="standard"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             tools:ignore="AppLinkUrlError">
             <intent-filter>

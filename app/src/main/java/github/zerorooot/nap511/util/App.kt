@@ -12,27 +12,17 @@ import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.ViewModelStore
 import com.elvishew.xlog.LogConfiguration
 import com.elvishew.xlog.LogItem
-import com.elvishew.xlog.LogLevel
 import com.elvishew.xlog.XLog
 import com.elvishew.xlog.flattener.ClassicFlattener
-import com.elvishew.xlog.flattener.DefaultFlattener
-import com.elvishew.xlog.flattener.Flattener2
-import com.elvishew.xlog.flattener.PatternFlattener
 import com.elvishew.xlog.interceptor.AbstractFilterInterceptor
-import com.elvishew.xlog.internal.DefaultsFactory
 import com.elvishew.xlog.printer.AndroidPrinter
-import com.elvishew.xlog.printer.ConsolePrinter
 import com.elvishew.xlog.printer.file.FilePrinter
 import com.elvishew.xlog.printer.file.clean.FileLastModifiedCleanStrategy
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import github.zerorooot.nap511.bean.AvatarBean
-import github.zerorooot.nap511.factory.CookieViewModelFactory
-import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import okhttp3.Interceptor
@@ -64,10 +54,6 @@ class App : Application() {
         lateinit var scope: CoroutineScope
         private fun isScopeInitialized() = ::scope.isInitialized
 
-        /**
-         * 用于OfflineTaskActivity中
-         */
-        lateinit var offlineFileViewModel: OfflineFileViewModel
 
     }
 
@@ -77,12 +63,6 @@ class App : Application() {
         cookie = DataStoreUtil.getData(ConfigKeyUtil.COOKIE, "")
         uid = DataStoreUtil.getData(ConfigKeyUtil.UID, "0")
         requestLimitCount = DataStoreUtil.getData(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "100").toInt()
-
-
-        offlineFileViewModel = ViewModelProvider(
-            ViewModelStore(),
-            CookieViewModelFactory(cookie, this)
-        )[OfflineFileViewModel::class.java]
 
         initLog()
     }

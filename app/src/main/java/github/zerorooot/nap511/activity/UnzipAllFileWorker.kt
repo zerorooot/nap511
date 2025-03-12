@@ -26,8 +26,9 @@ class UnzipAllFileWorker(
 ) : CoroutineWorker(appContext, workerParams) {
     private val notificationManager =
         applicationContext.getSystemService(NotificationManager::class.java)
+
     private val fileRepository: FileRepository by lazy {
-        FileRepository.getInstance("cookie")
+        FileRepository.getInstance(App.cookie)
     }
     private val notificationId = 1000
 
@@ -112,7 +113,7 @@ class UnzipAllFileWorker(
     /**
      * 新建文件夹，解压，如果解压失败，则删除创建的空文件夹
      */
-    suspend fun unzipAllAndDeleteFolderIfUnzipError(
+    private suspend fun unzipAllAndDeleteFolderIfUnzipError(
         zipBeanList: ZipBeanList,
         pickCode: String,
         cid: String,
@@ -137,7 +138,7 @@ class UnzipAllFileWorker(
     }
 
 
-    suspend fun getZipListFile(
+    private suspend fun getZipListFile(
         pickCode: String
     ): ZipBeanList? {
         if (fileRepository.isZipFileEncryption(pickCode)) {
@@ -181,7 +182,10 @@ class UnzipAllFileWorker(
         )
         notificationManager.createNotificationChannel(channel)
 
-        val intent = Intent(this.applicationContext, MainActivity::class.java)
+        val intent = Intent(this.applicationContext, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+
         if (!success) {
             intent.action = "unzipError"
             intent.putExtra("message", message)

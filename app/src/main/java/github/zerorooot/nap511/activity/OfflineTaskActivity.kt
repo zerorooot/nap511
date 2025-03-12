@@ -23,6 +23,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.MainActivity
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
@@ -157,14 +158,16 @@ class OfflineTaskActivity : ComponentActivity() {
 class OfflineTaskWorker(
     appContext: Context, workerParams: WorkerParameters
 ) : CoroutineWorker(appContext, workerParams) {
+    private val fileRepository: FileRepository by lazy {
+        FileRepository.getInstance(App.cookie)
+    }
     override suspend fun doWork(): Result {
         val listType = object : TypeToken<List<String?>?>() {}.type
         val a: List<String> = Gson().fromJson(inputData.getString("list").toString(), listType)
         val cid = DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
-        val offlineFileViewModel = App.offlineFileViewModel
-        XLog.d("OfflineTaskWorker cid $cid")
-        offlineFileViewModel.addTaskSuspend(a, cid)
-        val addTaskReturn = offlineFileViewModel.addTaskReturn
+        val addTaskReturn = fileRepository.addOfflineTask(a, cid)
+
+        XLog.d("OfflineTaskWorker cid $cid addTaskReturn $addTaskReturn")
         val state = addTaskReturn.first
         val message = addTaskReturn.second
         if (state) {
@@ -216,9 +219,11 @@ class OfflineTaskWorker(
             setStyle(NotificationCompat.BigTextStyle().bigText(message))
         }
 
-        val intent = Intent(this.applicationContext, MainActivity::class.java)
-        //       intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-        val pendingIntent = if (message.contains("任务添加失败")) {
+        val intent = Intent(this.applicationContext, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        //flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        if (message.contains("任务添加失败")) {
             if (message.contains("请验证账号")) {
                 intent.action = "check"
                 notification.setContentText("$message。点我跳转验证账号页面")
@@ -229,18 +234,18 @@ class OfflineTaskWorker(
                 intent.putExtra("link", stringJoiner.toString())
                 notification.setContentText("$message。点我复制链接")
             }
-            PendingIntent.getActivity(
-                this.applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE
-            )
         } else {
             intent.action = "jump"
             intent.putExtra("cid", cid)
             notification.setContentText(message)
-            PendingIntent.getActivity(
-                this.applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE
-            )
         }
 
+        val pendingIntent = PendingIntent.getActivity(
+            this.applicationContext,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         notification.setContentIntent(pendingIntent)
         notificationManager.notify(notificationId, notification.build())
     }
