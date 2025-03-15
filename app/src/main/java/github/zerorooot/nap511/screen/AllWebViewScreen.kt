@@ -251,8 +251,8 @@ fun CaptchaWebViewScreen() {
 fun CaptchaVideoWebViewScreen() {
     val cookieManager = CookieManager.getInstance()
     App.cookie.split(";").forEach { a ->
-        cookieManager.setCookie("https://v.anxia.com/captchaapi/", a)
-        cookieManager.setCookie("https://v.anxia.com/webapi/user/captcha", a)
+        cookieManager.setCookie("https://115vod.com/captchaapi/", a)
+        cookieManager.setCookie("https://115vod.com/webapi/user/captcha", a)
     }
     cookieManager.flush()
     BaseWebViewScreen(
@@ -261,7 +261,7 @@ fun CaptchaVideoWebViewScreen() {
             App.instance.openDrawerState()
         },
         webViewClient = { captchaWebViewClient(it) },
-        loadUrl = "https://v.anxia.com/captchaapi/?ac=security_code&client=web&type=web&ctype=web&cb=Close911_" + System.currentTimeMillis()
+        loadUrl = "https://115vod.com/captchaapi/?ac=security_code&client=web&type=web&ctype=web&cb=Close911_" + System.currentTimeMillis()
     )
 
 }
@@ -272,6 +272,7 @@ fun captchaWebViewClient(webView: WebView): WebViewClient {
             view: WebView,
             webViewRequest: WebViewRequest
         ): WebResourceResponse? {
+            //磁力链接验证
             if ("https://webapi.115.com/user/captcha" == webViewRequest.url) {
                 val httpClient = OkHttpClient()
                 val a = Request.Builder()
@@ -290,8 +291,11 @@ fun captchaWebViewClient(webView: WebView): WebViewClient {
                     App.instance.toast("验证账号成功~，重新添加链接中.......")
                 }
             }
-
-            if (webViewRequest.url.startsWith("https://v.anxia.com/webapi/user/captcha")) {
+            //todo 视频验证
+//            if ("https://115vod.com/webapi/user/captcha" == webViewRequest.url) {
+//
+//            }
+            if (webViewRequest.url.startsWith("https://115vod.com/webapi/user/captcha")) {
                 return super.shouldInterceptRequest(view, webViewRequest)
             }
             return super.shouldInterceptRequest(view, webViewRequest)

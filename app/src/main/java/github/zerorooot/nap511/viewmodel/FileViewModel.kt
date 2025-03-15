@@ -753,16 +753,16 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
 
-    fun selectAll() {
-        val a = arrayListOf<FileBean>()
-        fileBeanList.forEach { i ->
-            i.isSelect = true
-            a.add(i)
-        }
-        fileBeanList.clear()
-        fileBeanList.addAll(a)
-        appBarTitle = fileBeanList.size.toString()
-    }
+//    fun selectAll() {
+//        val a = arrayListOf<FileBean>()
+//        fileBeanList.forEach { i ->
+//            i.isSelect = true
+//            a.add(i)
+//        }
+//        fileBeanList.clear()
+//        fileBeanList.addAll(a)
+//        appBarTitle = fileBeanList.size.toString()
+//    }
 
     fun selectReverse() {
         val a = arrayListOf<FileBean>()

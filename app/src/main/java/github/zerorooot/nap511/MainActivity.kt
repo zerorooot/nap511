@@ -484,7 +484,7 @@ class MainActivity : ComponentActivity() {
             //具体实现在FileScreen#CreateDialogs()里
             "search" -> fileViewModel.isOpenSearchDialog = true
             "delete" -> fileViewModel.deleteMultiple()
-            "selectAll" -> fileViewModel.selectAll()
+//            "selectAll" -> fileViewModel.selectAll()
             "selectReverse" -> fileViewModel.selectReverse()
             //具体实现在FileScreen#CreateDialogs()里
             "文件排序" -> fileViewModel.isOpenFileOrderDialog = true

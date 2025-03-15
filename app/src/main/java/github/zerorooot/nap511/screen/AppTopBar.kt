@@ -85,12 +85,12 @@ fun AppTopBarMultiple(title: String, onClick: (String) -> Unit) {
             ) {
                 onClick.invoke("delete")
             }
-            TopAppBarActionButton(
-                painter = painterResource(id = R.drawable.ic_baseline_select_all_24),
-                description = "ic_baseline_select_all_24"
-            ) {
-                onClick.invoke("selectAll")
-            }
+//            TopAppBarActionButton(
+//                painter = painterResource(id = R.drawable.ic_baseline_select_all_24),
+//                description = "ic_baseline_select_all_24"
+//            ) {
+//                onClick.invoke("selectAll")
+//            }
             TopAppBarActionButton(
                 painter = painterResource(id = R.drawable.ic_baseline_select_reverse_24),
                 description = "ic_baseline_select_reverse_24"

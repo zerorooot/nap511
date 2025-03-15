@@ -89,7 +89,7 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
         viewModelScope.launch {
             val recycleCleanAll = fileService.recycleCleanAll(password)
             val message = if (recycleCleanAll.state) {
-                recycleFileList.clear()
+                recycleFileList = mutableStateListOf<RecycleBean>()
                 "清除成功"
             } else {
                 "清除失败，${recycleCleanAll.errorMsg}"

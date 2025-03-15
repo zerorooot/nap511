@@ -7,7 +7,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,8 +26,6 @@ import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
-import androidx.compose.material.pullrefresh.pullRefresh
-import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,10 +37,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -56,7 +51,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringArrayResource
@@ -71,18 +65,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.work.Data
-import androidx.work.OneTimeWorkRequest
-import androidx.work.WorkInfo
-import androidx.work.WorkManager
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.JsonObject
-import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.activity.OfflineTaskWorker
-import github.zerorooot.nap511.activity.UnzipAllFileWorker
-import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.TorrentFileListWeb
 import github.zerorooot.nap511.bean.ZipBeanList
@@ -96,7 +82,6 @@ import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import kotlinx.coroutines.delay
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
-import java.io.ByteArrayOutputStream
 import java.nio.charset.Charset
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -218,7 +203,7 @@ fun TextBodyDialogPreview() {
     TextBodyDialogScreen("", "dasfasdfasfdsafs".toByteArray()) { }
 }
 
-@Preview
+
 @Composable
 fun TextBodyDialogScreen(title: String, context: ByteArray, enter: (String) -> Unit) {
     var charsetText by remember {
@@ -245,19 +230,6 @@ fun TextBodyDialogScreen(title: String, context: ByteArray, enter: (String) -> U
         ) {
             TextButton(
                 onClick = {
-                    val charset = try {
-                        Charset.forName(charsetText.text)
-                    } catch (e: Exception) {
-                        App.instance.toast("编码失败~${e.message}，使用默认编码")
-                        Charset.defaultCharset()
-                    }
-                    contentText = TextFieldValue(context.toString(charset))
-                },
-            ) {
-                Text(text = "更改编码")
-            }
-            TextButton(
-                onClick = {
                     enter.invoke("")
                 },
             ) {
@@ -282,6 +254,12 @@ fun TextBodyDialogScreen(title: String, context: ByteArray, enter: (String) -> U
                 label = { Text(text = "文件编码") },
                 onValueChange = {
                     charsetText = it
+                    val charset = try {
+                        Charset.forName(it.text)
+                    } catch (_: Exception) {
+                        Charset.defaultCharset()
+                    }
+                    contentText = TextFieldValue(context.toString(charset))
                 },
             )
             OutlinedTextField(

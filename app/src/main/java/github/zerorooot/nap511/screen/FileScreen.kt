@@ -239,7 +239,7 @@ fun FileScreen(
 
     val myAppBarOnClick = { i: String ->
         if (i == "back") {
-            if (path == "/根目录" && !fileViewModel.isSearchState) {
+            if (path == "/根目录" && !fileViewModel.isSearchState && !fileViewModel.isLongClickState) {
                 App.instance.openDrawerState()
             } else {
                 onBack()
