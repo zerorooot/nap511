@@ -16,6 +16,7 @@ import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.DialogSwitchUtil
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -36,17 +37,12 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
     private val _quotaBean = MutableStateFlow(QuotaBean(1500, 1500))
     var quotaBean = _quotaBean.asStateFlow()
 
-    private val _isOpenOfflineDialog = MutableStateFlow(false)
-    var isOpenOfflineDialog = _isOpenOfflineDialog.asStateFlow()
-
     lateinit var offlineTask: OfflineTask
+
+    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
 
 
     var torrentBean by mutableStateOf(TorrentFileBean())
-
-    //打开对话框相关
-    var isOpenCreateSelectTorrentFileDialog by mutableStateOf(false)
-
 
     private val fileRepository: FileRepository by lazy {
         FileRepository.getInstance(cookie)
@@ -181,12 +177,12 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
     }
 
     fun openOfflineDialog(index: Int) {
-        _isOpenOfflineDialog.value = true
+        dialogSwitchUtil.isOpenOfflineDialog = true
         offlineTask = _offlineFile.value[index]
     }
 
     fun closeOfflineDialog() {
-        _isOpenOfflineDialog.value = false
+        dialogSwitchUtil.isOpenOfflineDialog = false
     }
 
     fun delete(offlineTask: OfflineTask) {

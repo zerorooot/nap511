@@ -80,6 +80,7 @@ import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.DialogSwitchUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
@@ -470,6 +471,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun appBarClick(fileViewModel: FileViewModel) = fun(name: String) {
+        val dialogSwitchUtil = DialogSwitchUtil.getInstance()
         when (name) {
 //                "back"->{FileScreen里}
             //具体实现在AlertDialog#UnzipAllFile()里
@@ -482,12 +484,12 @@ class MainActivity : ComponentActivity() {
             "selectToDown" -> fileViewModel.selectToDown()
             "cut" -> fileViewModel.cut()
             //具体实现在FileScreen#CreateDialogs()里
-            "search" -> fileViewModel.isOpenSearchDialog = true
+            "search" -> dialogSwitchUtil.isOpenSearchDialog = true
             "delete" -> fileViewModel.deleteMultiple()
 //            "selectAll" -> fileViewModel.selectAll()
             "selectReverse" -> fileViewModel.selectReverse()
             //具体实现在FileScreen#CreateDialogs()里
-            "文件排序" -> fileViewModel.isOpenFileOrderDialog = true
+            "文件排序" -> dialogSwitchUtil.isOpenFileOrderDialog = true
             "刷新文件" -> fileViewModel.refresh()
         }
     }

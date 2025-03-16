@@ -20,6 +20,7 @@ import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.DialogSwitchUtil
 import github.zerorooot.nap511.util.Sha1Util
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -75,63 +76,16 @@ class FileViewModel(private val cookie: String, private val application: Applica
     private val _isRefreshing = MutableStateFlow(false)
     var isRefreshing = _isRefreshing.asStateFlow()
 
-    //打开对话框相关
-    //todo 单独创建一个类记录
     /**
-     * 新建文件夹
+     * 打开对话框相关
      */
-    var isOpenCreateFolderDialog by mutableStateOf(false)
+    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
 
-    /**
-     * 重命名
-     */
-    var isOpenRenameFileDialog by mutableStateOf(false)
-
-    /**
-     *文件信息
-     */
-    var isOpenFileInfoDialog by mutableStateOf(false)
-
-    /**
-     *文件排序
-     */
-    var isOpenFileOrderDialog by mutableStateOf(false)
-
-    /**
-     *aria2
-     */
-    var isOpenAria2Dialog by mutableStateOf(false)
 
     /**
      *所选中的文件/文件夹
      */
     var selectIndex by mutableIntStateOf(0)
-
-    /**
-     *搜索
-     */
-    var isOpenSearchDialog by mutableStateOf(false)
-
-    /**
-     * 解压对话框
-     */
-    var isOpenUnzipDialog by mutableStateOf(false)
-
-    /**
-     *解压密码
-     */
-    var isOpenUnzipPasswordDialog by mutableStateOf(false)
-
-    /**
-     *小文本文件
-     */
-    var isOpenTextBodyDialog by mutableStateOf(false)
-
-    /**
-     *解压所有压缩包，提前输入密码，没有为空即可
-     */
-    var isOpenUnzipAllFileDialog by mutableStateOf(false)
-
     //图片浏览相关
     var photoFileBeanList = mutableListOf<FileBean>()
     var photoIndexOf by mutableIntStateOf(-1)
@@ -542,7 +496,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             } else {
                 fileRepository.getFileInfo(fileBean.fileId)
             }
-            isOpenFileInfoDialog = true
+            dialogSwitchUtil.isOpenFileInfoDialog = true
         }
     }
 
@@ -666,18 +620,18 @@ class FileViewModel(private val cookie: String, private val application: Applica
             val fileBean = fileBeanList[selectIndex]
             if (isCheck) {
                 //首次打开
-                if (!isOpenUnzipDialog && paths == "文件") {
+                if (!dialogSwitchUtil.isOpenUnzipDialog && paths == "文件") {
                     if (fileRepository.isZipFileEncryption(fileBean.pickCode)) {
                         if (!fileRepository.tryToExtract(fileBean.pickCode)) {
                             XLog.d("${fileBean.name} is encryption zip file")
-                            isOpenUnzipPasswordDialog = true
+                            dialogSwitchUtil.isOpenUnzipPasswordDialog = true
                             return@launch
                         }
                     }
                 }
             }
             unzipBeanList.value = fileRepository.getZipListFile(fileBean.pickCode, fileName, paths)
-            isOpenUnzipDialog = true
+            dialogSwitchUtil.isOpenUnzipDialog = true
         }
     }
 
@@ -714,7 +668,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         viewModelScope.launch {
             val fileBean = fileBeanList[selectIndex]
             val pickCode = fileBean.pickCode
-            isOpenUnzipPasswordDialog = false
+            dialogSwitchUtil.isOpenUnzipPasswordDialog = false
             val decryptZip = fileRepository.decryptZip(pickCode, secret)
             if (!decryptZip) {
                 App.instance.toast("密码错误～")
@@ -733,7 +687,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         thread {
             val input = fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
             textBodyByteArray = input.readBytes()
-            isOpenTextBodyDialog = true
+            dialogSwitchUtil.isOpenTextBodyDialog = true
             setRefreshingStatus(false)
         }
     }

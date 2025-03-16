@@ -11,6 +11,7 @@ import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.DialogSwitchUtil
 //import github.zerorooot.nap511.util.SharedPreferencesUtil
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,8 +29,7 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
 
     var recycleFileList = mutableStateListOf<RecycleBean>()
 
-    private val _isOpenPasswordDialog = MutableStateFlow(false)
-    var isOpenPasswordDialog = _isOpenPasswordDialog.asStateFlow()
+    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
 
     private val fileService: FileService by lazy {
         FileService.getInstance(cookie)
@@ -57,7 +57,7 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
     fun delete(index: Int) {
         val password = DataStoreUtil.getData(ConfigKeyUtil.PASSWORD, "")
         if (password == "") {
-            _isOpenPasswordDialog.value = true
+            dialogSwitchUtil.isOpenRecyclePasswordDialog = true
             return
         }
         delete(index, password)
@@ -83,7 +83,7 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
     fun deleteAll() {
         val password = DataStoreUtil.getData(ConfigKeyUtil.PASSWORD, "")
         if (password == "") {
-            _isOpenPasswordDialog.value = true
+            dialogSwitchUtil.isOpenRecyclePasswordDialog = true
             return
         }
         viewModelScope.launch {
@@ -112,7 +112,7 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
     }
 
     fun closeDialog() {
-        _isOpenPasswordDialog.value = false
+        dialogSwitchUtil.isOpenRecyclePasswordDialog = false
     }
 
     fun refresh() {
