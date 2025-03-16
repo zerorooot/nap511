@@ -69,11 +69,12 @@ class App : Application() {
 
     fun initLog() {
         //log
-        val build = LogConfiguration.Builder().tag("XLOG").addInterceptor(object : AbstractFilterInterceptor() {
-            override fun reject(log: LogItem?): Boolean {
-                return !DataStoreUtil.getData(ConfigKeyUtil.LOG_SCREEN, true)
-            }
-        }).build()
+        val build = LogConfiguration.Builder().tag("XLOG")
+            .addInterceptor(object : AbstractFilterInterceptor() {
+                override fun reject(log: LogItem?): Boolean {
+                    return !DataStoreUtil.getData(ConfigKeyUtil.LOG_SCREEN, true)
+                }
+            }).build()
         //todo  日志输出代码位置
         /**
          *     val stackTrace = Throwable().stackTrace
@@ -115,6 +116,10 @@ class App : Application() {
             }
         }
 
+    }
+
+    fun getStringRes(id: Int): String {
+        return getString(id)
     }
 
     fun checkLogin(cookie: String): Pair<Boolean, String> {

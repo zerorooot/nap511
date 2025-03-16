@@ -37,13 +37,15 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data android:scheme="magnet" />
-                <!--                <data android:scheme="http" />-->
+                <!-- <data android:scheme="http" /> -->
                 <data android:scheme="ftp" />
                 <data android:scheme="ed2k" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.PROCESS_TEXT" />
+
                 <category android:name="android.intent.category.DEFAULT" />
+
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
@@ -62,11 +64,12 @@
                 <data android:scheme="file" />
                 <data android:scheme="content" />
                 <data android:host="*" />
-
                 <data android:mimeType="application/x-bittorrent" />
             </intent-filter>
-            <!-- HACK to support torrent files on Chrome OS, inspired by
-         https://github.com/LibreOffice/online/blob/d0edfeabbdc969a9a66cf90976a63c2f4403a6d3/android/app/src/main/AndroidManifest.xml#L119-L129 -->
+            <!--
+         HACK to support torrent files on Chrome OS, inspired by
+         https://github.com/LibreOffice/online/blob/d0edfeabbdc969a9a66cf90976a63c2f4403a6d3/android/app/src/main/AndroidManifest.xml#L119-L129
+            -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
 
@@ -77,7 +80,6 @@
                 <data android:scheme="content" />
                 <data android:host="*" />
                 <data android:mimeType="*/*" />
-
                 <data android:pathPattern=".*\\.torrent" />
                 <data android:pathPattern=".*\\..*\\.torrent" />
                 <data android:pathPattern=".*\\..*\\..*\\.torrent" />
@@ -90,8 +92,7 @@
                 <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\..*\\..*\\..*\\..*\\..*\\.torrent" />
                 <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\..*\\..*\\..*\\..*\\..*\\..*\\.torrent" />
             </intent-filter>
-        </activity>
-        <!-- android:screenOrientation="reverseLandscape" -->
+        </activity> <!-- android:screenOrientation="reverseLandscape" -->
         <activity
             android:name=".activity.VideoActivity"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboardHidden"
@@ -101,13 +102,12 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:theme="@style/Theme.Nap511">
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
         </activity>
 
         <service

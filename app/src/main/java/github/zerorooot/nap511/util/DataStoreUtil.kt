@@ -1,9 +1,9 @@
 package github.zerorooot.nap511.util
 
-import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.preference.PreferenceDataStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
@@ -23,6 +23,13 @@ object DataStoreUtil {
      */
     private suspend fun putIntData(key: String, value: Int) = dataStore.edit {
         it[intPreferencesKey(key)] = value
+    }
+
+    /**
+     * 存放Set数据
+     */
+    private suspend fun putStringSetData(key: String, value: Set<*>) = dataStore.edit {
+        it[stringSetPreferencesKey(key)] = value as Set<String>
     }
 
     /**
@@ -81,11 +88,21 @@ object DataStoreUtil {
     /**
      * 取出String数据
      */
-    private fun getStringData(key: String, default: String? = null): String = runBlocking {
+    private fun getStringData(key: String, default: String = ""): String = runBlocking {
         return@runBlocking dataStore.data.map {
             it[stringPreferencesKey(key)] ?: default
-        }.first()!!
+        }.first()
     }
+
+    /**
+     * 取出String set数据
+     */
+    private fun getStringSetData(key: String): Set<String> =
+        runBlocking {
+            return@runBlocking dataStore.data.map {
+                it[stringSetPreferencesKey(key)] ?: setOf()
+            }.first() as Set<String>
+        }
 
     /**
      * 取出Boolean数据
@@ -126,12 +143,16 @@ object DataStoreUtil {
                 is Boolean -> putBooleanData(key, value)
                 is Float -> putFloatData(key, value)
                 is Double -> putDoubleData(key, value)
+                is Set<*> -> putStringSetData(key, value)
                 else -> throw IllegalArgumentException("This type cannot be saved to the Data Store")
             }
         }
     }
 
     fun <T> getData(key: String, defaultValue: T): T {
+        if (defaultValue == null) {
+            return getStringData(key, "") as T
+        }
         val data = when (defaultValue) {
             is Int -> getIntData(key, defaultValue)
             is Long -> getLongData(key, defaultValue)
@@ -139,7 +160,8 @@ object DataStoreUtil {
             is Boolean -> getBooleanData(key, defaultValue)
             is Float -> getFloatData(key, defaultValue)
             is Double -> getDoubleData(key, defaultValue)
-            else -> throw IllegalArgumentException("This type cannot be saved to the Data Store")
+            is Set<*> -> getStringSetData(key)
+            else -> throw IllegalArgumentException("This type cannot be saved to the Data Store key $key defaultValue $defaultValue")
         }
         return data as T
     }
@@ -148,4 +170,75 @@ object DataStoreUtil {
      * 清空数据
      */
     fun clearData() = runBlocking { dataStore.edit { it.clear() } }
+}
+
+
+class SettingsDataStore() : PreferenceDataStore() {
+    override fun putString(key: String?, value: String?) {
+        putData(key, value)
+    }
+
+    override fun putStringSet(
+        key: String?,
+        values: Set<String?>?
+    ) {
+        putData(key, values)
+    }
+
+    override fun putInt(key: String?, value: Int) {
+        putData(key, value)
+    }
+
+    override fun putLong(key: String?, value: Long) {
+        putData(key, value)
+    }
+
+    override fun putFloat(key: String?, value: Float) {
+        putData(key, value)
+    }
+
+    override fun putBoolean(key: String?, value: Boolean) {
+        putData(key, value)
+    }
+
+    override fun getString(key: String?, defValue: String?): String? {
+        return getData(key, defValue)
+    }
+
+    override fun getStringSet(
+        key: String?,
+        defValues: Set<String?>?
+    ): Set<String?>? {
+        return getData(key, defValues)
+    }
+
+    override fun getInt(key: String?, defValue: Int): Int {
+        return getData(key, defValue)
+    }
+
+    override fun getLong(key: String?, defValue: Long): Long {
+        return getData(key, defValue)
+    }
+
+    override fun getFloat(key: String?, defValue: Float): Float {
+        return getData(key, defValue)
+    }
+
+    override fun getBoolean(key: String?, defValue: Boolean): Boolean {
+        return getData(key, defValue)
+    }
+
+    fun <T> putData(key: String?, value: T) {
+        if (key == null) {
+            throw IllegalArgumentException("put data key couldn't null !!!")
+        }
+        DataStoreUtil.putData(key, value)
+    }
+
+    fun <T> getData(key: String?, defaultValue: T): T {
+        if (key == null) {
+            throw IllegalArgumentException("get data key couldn't null !!!")
+        }
+        return DataStoreUtil.getData(key, defaultValue)
+    }
 }

@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -32,7 +33,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -46,6 +46,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.rememberNavController
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkInfo
@@ -74,7 +75,7 @@ import github.zerorooot.nap511.screen.MyPhotoScreen
 import github.zerorooot.nap511.screen.OfflineDownloadScreen
 import github.zerorooot.nap511.screen.OfflineFileScreen
 import github.zerorooot.nap511.screen.RecycleScreen
-import github.zerorooot.nap511.screen.SettingScreen
+import github.zerorooot.nap511.screen.SettingScreenNew
 import github.zerorooot.nap511.screen.WebViewScreen
 import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.App
@@ -88,7 +89,7 @@ import kotlinx.coroutines.launch
 import kotlin.concurrent.thread
 
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     @SuppressLint("CoroutineCreationDuringComposition")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -279,8 +280,8 @@ class MainActivity : ComponentActivity() {
             R.drawable.baseline_cloud_24 to ConfigKeyUtil.MY_FILE,
             R.drawable.baseline_cloud_download_24 to ConfigKeyUtil.OFFLINE_DOWNLOAD,
             R.drawable.baseline_cloud_done_24 to ConfigKeyUtil.OFFLINE_LIST,
-            R.drawable.baseline_video_moderator_24 to ConfigKeyUtil.VERIFY_VIDEO_ACCOUNT,
-            R.drawable.baseline_magent_moderator_24 to ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT,
+//            R.drawable.baseline_video_moderator_24 to ConfigKeyUtil.VERIFY_VIDEO_ACCOUNT,
+//            R.drawable.baseline_magent_moderator_24 to ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT,
 //            R.drawable.baseline_web_24 to ConfigKeyUtil.WEB,
             R.drawable.ic_baseline_delete_24 to ConfigKeyUtil.RECYCLE_BIN,
             R.drawable.baseline_settings_24 to ConfigKeyUtil.ADVANCED_SETTINGS,
@@ -335,7 +336,14 @@ class MainActivity : ComponentActivity() {
 
                     ConfigKeyUtil.WEB -> WebViewScreen()
                     ConfigKeyUtil.RECYCLE_BIN -> RecycleScreen(recycleViewModel)
-                    ConfigKeyUtil.ADVANCED_SETTINGS -> SettingScreen()
+                    ConfigKeyUtil.ADVANCED_SETTINGS -> {
+                        App.gesturesEnabled = false
+                        SettingScreenNew {
+                            App.gesturesEnabled = true
+                            scope.launch { drawerState.open() }
+                        }
+                    }
+
                     ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT -> {
                         CaptchaWebViewScreen()
                     }

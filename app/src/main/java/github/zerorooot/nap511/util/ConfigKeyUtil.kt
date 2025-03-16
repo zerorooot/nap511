@@ -1,5 +1,8 @@
 package github.zerorooot.nap511.util
 
+import github.zerorooot.nap511.R
+
+
 /**
  * DataStoreUtil中的key
  */
@@ -8,32 +11,32 @@ class ConfigKeyUtil {
         /**
          * aria2秘钥
          */
-        const val ARIA2_TOKEN = "aria2Token"
+        val ARIA2_TOKEN by lazy { App.instance.getStringRes(R.string.ARIA2_TOKEN) }
 
         /**
          * aria2 url地址
          */
-        const val ARIA2_URL = "aria2Url"
+        val ARIA2_URL by lazy { App.instance.getStringRes(R.string.ARIA2_URL) }
 
         /**
          * aria2默认地址
          */
-        const val ARIA2_URL_DEFAULT_VALUE = "http://127.0.0.1:6800/jsonrpc"
+        val ARIA2_URL_DEFAULT_VALUE by lazy { App.instance.getStringRes(R.string.ARIA2_URL_DEFAULT_VALUE) }
 
         /**
          * cookie
          */
-        const val COOKIE = "cookie"
+        val COOKIE by lazy { App.instance.getStringRes(R.string.COOKIE) }
 
         /**
          * user id
          */
-        const val UID = "uid"
+        val UID by lazy { App.instance.getStringRes(R.string.UID) }
 
         /**
          * 回收站密码
          */
-        const val PASSWORD = "password"
+        val PASSWORD by lazy { App.instance.getStringRes(R.string.PASSWORD) }
 
         /**
          * sha1 service中使用，原本有发送到aria2和获取文件sha1两种，但现sha1废了，仅有发送到aria2
@@ -48,52 +51,60 @@ class ConfigKeyUtil {
         /**
          * 在设置中，视频是否自动旋转
          */
-        const val AUTO_ROTATE = "autoRotate"
+        val AUTO_ROTATE by lazy { App.instance.getStringRes(R.string.AUTO_ROTATE) }
+
 
         /**
          * 头像信息bean的json信息,包含头像url、过期时间、用户名、过期时间等
          * @see github.zerorooot.nap511.bean.AvatarBean
          */
         const val AVATAR_BEAN = "AVATAR_BEAN"
+
         /**
          * 默认离线位置
          */
-        const val DEFAULT_OFFLINE_CID = "defaultOfflineCid"
+        val DEFAULT_OFFLINE_CID by lazy { App.instance.getStringRes(R.string.DEFAULT_OFFLINE_CID) }
 
         /**
          * 默认请求个数，默认为100，具体在设置中设置
          */
-        const val REQUEST_LIMIT_COUNT = "requestLimitCount"
+        val REQUEST_LIMIT_COUNT by lazy { App.instance.getStringRes(R.string.REQUEST_LIMIT_COUNT) }
 
         /**
          * 默认离线个数，默认为5，具体在设置中设置
          */
-        const val DEFAULT_OFFLINE_COUNT = "defaultOfflineCount"
+        val DEFAULT_OFFLINE_COUNT by lazy { App.instance.getStringRes(R.string.DEFAULT_OFFLINE_COUNT) }
+
 
         /**
          * 当前缓存的离线任务
          */
-        const val CURRENT_OFFLINE_TASK = "currentOfflineTask"
+        val CURRENT_OFFLINE_TASK by lazy { App.instance.getStringRes(R.string.CURRENT_OFFLINE_TASK) }
+
 
         /**
          * 离线任务缓存方式,true为x分钟后统一下载，false为集满后统一下载，具体在SettingActivity中设置
          */
-        const val OFFLINE_METHOD = "offlineMethod"
+        val OFFLINE_METHOD by lazy { App.instance.getStringRes(R.string.OFFLINE_METHOD) }
+
 
         /**
          * 默认离线时间，默认为5分钟，具体在设置中设置
          */
-        const val DEFAULT_OFFLINE_TIME = "defaultOfflineTime"
+        val DEFAULT_OFFLINE_TIME by lazy { App.instance.getStringRes(R.string.DEFAULT_OFFLINE_TIME) }
+
 
         /**
          * 当视频正在加载时，隐藏loadingView
          */
-        const val HIDE_LOADING_VIEW="hideLoadingView"
+        val HIDE_LOADING_VIEW by lazy { App.instance.getStringRes(R.string.HIDE_LOADING_VIEW) }
+
 
         /**
          * 提前加载上下两个文件夹，具体在设置中设置
          */
-        const val EARLY_LOADING = "EarlyLoading"
+        val EARLY_LOADING by lazy { App.instance.getStringRes(R.string.EARLY_LOADING) }
+
 
         /**
          * 磁力链接验证
@@ -153,7 +164,8 @@ class ConfigKeyUtil {
         /**
          * 日志页面
          */
-        const val LOG_SCREEN="日志页面"
+        val LOG_SCREEN by lazy { App.instance.getStringRes(R.string.LOG_SCREEN) }
+
 
         /**
          * 离线task的标签

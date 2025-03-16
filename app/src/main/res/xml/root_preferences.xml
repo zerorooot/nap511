@@ -1,0 +1,102 @@
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <EditTextPreference
+        app:defaultValue="0"
+        app:enabled="false"
+        app:key="@string/UID"
+        app:title="用户id" />
+
+    <EditTextPreference
+        app:defaultValue="cookie"
+        app:key="@string/COOKIE"
+        app:summary="点击更改"
+        app:title="登录Cookie" />
+
+    <!--        number-->
+    <EditTextPreference
+        app:key="@string/PASSWORD"
+        app:summary="清空回收站文件时输入的密码"
+        app:title="数字安全密钥" />
+
+    <EditTextPreference
+        app:defaultValue="@string/ARIA2_URL_DEFAULT_VALUE"
+        app:key="@string/ARIA2_URL"
+        app:summary="@string/ARIA2_URL_DEFAULT_VALUE"
+        app:title="aria2地址" />
+
+    <EditTextPreference
+        app:defaultValue=""
+        app:key="@string/ARIA2_TOKEN"
+        app:summary="没有留空即可"
+        app:title="aria2秘钥" />
+
+    <EditTextPreference
+        app:defaultValue="100"
+        app:key="@string/REQUEST_LIMIT_COUNT"
+        app:summary="100"
+        app:title="每次请求文件数" />
+
+    <EditTextPreference
+        app:defaultValue=""
+        app:key="@string/DEFAULT_OFFLINE_CID"
+        app:summary="输入文件夹cid,长按目录可复制当前目录cid"
+        app:title="默认离线位置"
+        app:useSimpleSummaryProvider="true" />
+
+    <Preference
+        app:key="checkVideo"
+        app:summary="视频播放异常验证页面"
+        app:title="视频播放验证" />
+
+    <Preference
+        app:key="checkMagnet"
+        app:summary="磁力链接添加验证页面"
+        app:title="磁力链接验证" />
+
+    <SwitchPreference
+        app:defaultValue="false"
+        app:key="@string/LOG_SCREEN"
+        app:summary="输出程序中部分关键节点内容，方便调试"
+        app:title="日志记录" />
+
+    <SwitchPreference
+        app:defaultValue="false"
+        app:key="@string/AUTO_ROTATE"
+        app:summary="根据视频横竖自动旋转屏幕"
+        app:title="屏幕自动旋转" />
+
+    <SwitchPreference
+        app:defaultValue="false"
+        app:key="@string/HIDE_LOADING_VIEW"
+        app:summary="当视频正在加载时，隐藏加载提示"
+        app:title="隐藏视频加载提示" />
+
+    <SwitchPreference
+        app:defaultValue="false"
+        app:key="@string/EARLY_LOADING"
+        app:summary="进入下级目录时，提前加载当前文件夹上下两个文件夹内的文件"
+        app:title="提前加载" />
+    <!--number-->
+    <EditTextPreference
+        app:defaultValue="5"
+        app:key="@string/DEFAULT_OFFLINE_TIME"
+        app:summary="延迟5分钟后统一离线下载"
+        app:title="离线任务延迟时间" />
+
+    <EditTextPreference
+        app:key="@string/CURRENT_OFFLINE_TASK"
+        app:summary="当前尚未添加离线任务的链接"
+        app:title="离线任务缓存"
+        app:useSimpleSummaryProvider="true" />
+
+    <!--        <ListPreference-->
+    <!--            app:defaultValue="reply"-->
+    <!--            app:entries="@array/reply_entries"-->
+    <!--            app:entryValues="@array/reply_values"-->
+    <!--            app:key="reply"-->
+    <!--            app:title="@string/reply_title"-->
+    <!--            app:useSimpleSummaryProvider="true" />-->
+
+
+</PreferenceScreen>

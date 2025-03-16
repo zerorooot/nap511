@@ -44,4 +44,36 @@
         <item>文件种类⬇️</item>
         <item>视频时间</item>
     </array>
+    <!-- Preference Titles -->
+    <string name="messages_header">Messages</string>
+    <string name="sync_header">Sync</string>
+
+    <!-- ConfigKeyUtil -->
+    <string name="UID">uid</string>
+    <string name="COOKIE">cookie</string>
+    <string name="PASSWORD">password</string>
+    <string name="ARIA2_URL">aria2Url</string>
+    <string name="ARIA2_URL_DEFAULT_VALUE">http://127.0.0.1:6800/jsonrpc</string>
+    <string name="ARIA2_TOKEN">aria2Token</string>
+    <string name="REQUEST_LIMIT_COUNT">requestLimitCount</string>
+    <string name="DEFAULT_OFFLINE_CID">defaultOfflineCid</string>
+    <string name="LOG_SCREEN">日志页面</string>
+    <string name="AUTO_ROTATE">autoRotate</string>
+    <string name="HIDE_LOADING_VIEW">hideLoadingView</string>
+    <string name="EARLY_LOADING">EarlyLoading</string>
+    <string name="OFFLINE_METHOD">offlineMethod</string>
+    <string name="DEFAULT_OFFLINE_TIME">defaultOfflineTime</string>
+    <string name="DEFAULT_OFFLINE_COUNT">defaultOfflineCount</string>
+    <string name="CURRENT_OFFLINE_TASK">currentOfflineTask</string>
+
+
+    <string name="reply_title">Default reply action</string>
+
+    <!-- Sync Preferences -->
+    <string name="sync_title">Sync email periodically</string>
+    <string name="attachment_title">Download incoming attachments</string>
+    <string name="attachment_summary_on">Automatically download attachments for incoming emails
+    </string>
+    <string name="attachment_summary_off">Only download attachments when manually requested</string>
+    <string name="title_activity_settings">高级设置</string>
 </resources>

@@ -64,7 +64,7 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         batteryTextView = findViewById(R.id.batteryTextView);
         timeTextView = findViewById(R.id.timeTextView);
 
-        if (DataStoreUtil.INSTANCE.getData(ConfigKeyUtil.HIDE_LOADING_VIEW, false)) {
+        if (DataStoreUtil.INSTANCE.getData(ConfigKeyUtil.Companion.getHIDE_LOADING_VIEW(), false)) {
             XLog.d("MyGSYVideoPlayer hide video start view");
             findViewById(R.id.startAndLoadLayout).setVisibility(GONE);
         }
