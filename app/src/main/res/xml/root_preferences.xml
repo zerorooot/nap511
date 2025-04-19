@@ -77,6 +77,19 @@
         app:key="@string/EARLY_LOADING"
         app:summary="进入下级目录时，提前加载当前文件夹上下两个文件夹内的文件"
         app:title="提前加载" />
+
+    <SwitchPreference
+        app:defaultValue="true"
+        app:key="@string/SAVE_REQUEST_CACHE"
+        app:summary="保存fileListCache到application.cacheDir/fileListCache.json中，便于提升加载速度"
+        app:title="保存请求缓存" />
+
+    <SwitchPreference
+        app:defaultValue="false"
+        app:key="@string/POSITION_AFTER_AT"
+        app:summary="重命名时，光标定位在@后"
+        app:title="光标重定位" />
+
     <!--number-->
     <EditTextPreference
         app:defaultValue="5"

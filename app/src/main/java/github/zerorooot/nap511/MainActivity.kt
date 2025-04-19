@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.rememberNavController
 import androidx.work.Data
@@ -533,6 +534,25 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        val fileViewModel = ViewModelProvider(this)[FileViewModel::class.java]
+        fileViewModel.saveFileCache()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        val fileViewModel = ViewModelProvider(this)[FileViewModel::class.java]
+        fileViewModel.saveFileCache()
+    }
+
+    override fun onRestart() {
+        super.onRestart()
+        val fileViewModel = ViewModelProvider(this)[FileViewModel::class.java]
+        fileViewModel.saveFileCache()
+    }
+
 }
 
 

@@ -13,6 +13,7 @@ import androidx.lifecycle.viewModelScope
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.JsonParser
+import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.*
 import github.zerorooot.nap511.repository.FileRepository
@@ -20,6 +21,7 @@ import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.DialogSwitchUtil
 import github.zerorooot.nap511.util.Sha1Util
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,6 +37,7 @@ import java.io.BufferedOutputStream
 import java.io.BufferedReader
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.OutputStream
@@ -86,6 +89,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
      *所选中的文件/文件夹
      */
     var selectIndex by mutableIntStateOf(0)
+
     //图片浏览相关
     var photoFileBeanList = mutableListOf<FileBean>()
     var photoIndexOf by mutableIntStateOf(-1)
@@ -117,6 +121,30 @@ class FileViewModel(private val cookie: String, private val application: Applica
 
     fun init() {
         getFiles(currentCid)
+        val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
+        if (saveRequestCache && fileListCache.isEmpty()) {
+            val file = File(application.cacheDir, "fileListCache.json")
+            val content = if (file.exists()) file.readText() else "{}"
+            val type = object : TypeToken<HashMap<String, FilesBean>?>() {}.type
+            fileListCache = Gson().fromJson(content, type)
+            XLog.d("loading file list cache $content")
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        saveFileCache()
+    }
+
+    fun saveFileCache() {
+        val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
+        if (saveRequestCache) {
+            val type = object : TypeToken<HashMap<String, FilesBean>?>() {}.type
+            val json = Gson().toJson(fileListCache, type)
+            val file = File(application.cacheDir, "fileListCache.json")
+            file.writeText(json)
+            XLog.d("save file list cache $json")
+        }
     }
 
     fun back() {

@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.screen
 
+import android.text.Selection
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -76,6 +77,7 @@ import github.zerorooot.nap511.screenitem.AutoSizableTextField
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.DialogSwitchUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
@@ -112,11 +114,17 @@ fun SearchDialog(enter: (String) -> Unit) {
 fun RenameFileDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
     val dialogSwitchUtil = DialogSwitchUtil.getInstance()
     if (dialogSwitchUtil.isOpenRenameFileDialog) {
+        val name = fileViewModel.fileBeanList[fileViewModel.selectIndex].name
+        val position = DataStoreUtil.getData(ConfigKeyUtil.POSITION_AFTER_AT, false)
+        val atPosition = name.indexOf("@") + 1
         BaseDialog(
             "重命名文件",
             "新文件名",
-            fileViewModel.fileBeanList[fileViewModel.selectIndex].name,
-            enter = enter
+            name,
+            enter = enter,
+            selection = TextRange(
+                if (!position || atPosition == 0) name.length else atPosition
+            )
         )
     }
 }
@@ -171,7 +179,7 @@ fun ExitApp() {
     var isOpen by remember {
         mutableStateOf(true)
     }
-
+    val fileViewModel = viewModel<FileViewModel>()
     if (isOpen) {
         InfoDialog(
             onDismissRequest = {
@@ -179,6 +187,7 @@ fun ExitApp() {
                 App.selectedItem = ConfigKeyUtil.MY_FILE
             },
             onConfirmation = {
+                fileViewModel.saveFileCache()
                 android.os.Process.killProcess(android.os.Process.myPid());
                 exitProcess(1);
             },
@@ -560,7 +569,7 @@ fun FileOrderDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
 
 
 @Composable
-fun Aria2Dialog( context: String, enter: (String) -> Unit) {
+fun Aria2Dialog(context: String, enter: (String) -> Unit) {
     val dialogSwitchUtil = DialogSwitchUtil.getInstance()
     if (!dialogSwitchUtil.isOpenAria2Dialog) {
         return
@@ -582,75 +591,76 @@ fun Aria2Dialog( context: String, enter: (String) -> Unit) {
 
     val focusRequester = remember { FocusRequester() }
 
-    AlertDialog(onDismissRequest = {
-        enter.invoke("")
-    }, confirmButton = {
-        Button(onClick = {
-            val jsonObject = JsonObject()
-            jsonObject.addProperty(ConfigKeyUtil.ARIA2_URL, urlText.text)
-            jsonObject.addProperty(ConfigKeyUtil.ARIA2_TOKEN, tokenText.text)
-            enter.invoke(jsonObject.toString())
-            urlText = TextFieldValue("")
-            tokenText = TextFieldValue("")
-        }) {
-            Text(text = "确认")
-        }
-    }, dismissButton = {
-        TextButton(
-            onClick = {
-                enter.invoke("")
+    AlertDialog(
+        onDismissRequest = {
+            enter.invoke("")
+        }, confirmButton = {
+            Button(onClick = {
+                val jsonObject = JsonObject()
+                jsonObject.addProperty(ConfigKeyUtil.ARIA2_URL, urlText.text)
+                jsonObject.addProperty(ConfigKeyUtil.ARIA2_TOKEN, tokenText.text)
+                enter.invoke(jsonObject.toString())
                 urlText = TextFieldValue("")
                 tokenText = TextFieldValue("")
-            },
-        ) {
-            Text(text = "取消")
-        }
-    }, title = {
-        Text(text = "请配置aria2相关内容", style = MaterialTheme.typography.titleMedium)
-    }, text = {
-        Column(Modifier.padding(8.dp)) {
-            OutlinedTextField(
-                value = urlText,
-                modifier = Modifier.focusRequester(focusRequester),
-                textStyle = LocalTextStyle.current,
-                label = { Text(text = "aria2网址") },
-                placeholder = { Text(text = "http://x.x.x.x:6800/jsonrpc") },
-                trailingIcon = {
-                    Icon(
-                        imageVector = Icons.Filled.Delete,
-                        "clear",
-                        modifier = Modifier.clickable(onClick = {
-                            urlText = TextFieldValue("")
-                        })
-                    )
+            }) {
+                Text(text = "确认")
+            }
+        }, dismissButton = {
+            TextButton(
+                onClick = {
+                    enter.invoke("")
+                    urlText = TextFieldValue("")
+                    tokenText = TextFieldValue("")
                 },
-                onValueChange = {
-                    urlText = it
-                },
-            )
-            OutlinedTextField(
-                value = tokenText,
-                textStyle = LocalTextStyle.current,
-                label = { Text(text = "aria2秘钥") },
-                placeholder = { Text(text = "没配置留空即可") },
-                trailingIcon = {
-                    Icon(
-                        imageVector = Icons.Filled.Delete,
-                        "clear",
-                        modifier = Modifier.clickable(onClick = {
-                            tokenText = TextFieldValue("")
-                        })
-                    )
-                },
-                onValueChange = {
-                    tokenText = it
-                },
-            )
-        }
-    }, shape = MaterialTheme.shapes.medium, properties = DialogProperties(
-        //自适应OutlinedTextField高
-        usePlatformDefaultWidth = false
-    )
+            ) {
+                Text(text = "取消")
+            }
+        }, title = {
+            Text(text = "请配置aria2相关内容", style = MaterialTheme.typography.titleMedium)
+        }, text = {
+            Column(Modifier.padding(8.dp)) {
+                OutlinedTextField(
+                    value = urlText,
+                    modifier = Modifier.focusRequester(focusRequester),
+                    textStyle = LocalTextStyle.current,
+                    label = { Text(text = "aria2网址") },
+                    placeholder = { Text(text = "http://x.x.x.x:6800/jsonrpc") },
+                    trailingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            "clear",
+                            modifier = Modifier.clickable(onClick = {
+                                urlText = TextFieldValue("")
+                            })
+                        )
+                    },
+                    onValueChange = {
+                        urlText = it
+                    },
+                )
+                OutlinedTextField(
+                    value = tokenText,
+                    textStyle = LocalTextStyle.current,
+                    label = { Text(text = "aria2秘钥") },
+                    placeholder = { Text(text = "没配置留空即可") },
+                    trailingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            "clear",
+                            modifier = Modifier.clickable(onClick = {
+                                tokenText = TextFieldValue("")
+                            })
+                        )
+                    },
+                    onValueChange = {
+                        tokenText = it
+                    },
+                )
+            }
+        }, shape = MaterialTheme.shapes.medium, properties = DialogProperties(
+            //自适应OutlinedTextField高
+            usePlatformDefaultWidth = false
+        )
     )
     LaunchedEffect(Unit) {
         delay(10)
@@ -934,72 +944,75 @@ private fun BaseDialog(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     confirmButtonText: String = "确认",
     dismissButtonText: String = "取消",
+    selection: TextRange = TextRange(context.length),
     enter: (String) -> Unit,
 ) {
+
     var text by remember {
         mutableStateOf(
             TextFieldValue(
-                text = context, selection = TextRange(context.length)
+                text = context, selection = selection
             )
         )
     }
     val focusRequester = remember { FocusRequester() }
 
-    AlertDialog(onDismissRequest = {
-        enter.invoke("")
-    }, confirmButton = {
-        Button(onClick = {
-            enter.invoke(text.text)
-            text = TextFieldValue("")
-        }) {
-            Text(text = confirmButtonText)
-        }
-    }, dismissButton = {
-        TextButton(
-            onClick = {
-                enter.invoke(
-                    if (dismissButtonText == "取消") {
-                        ""
-                    } else {
-                        dismissButtonText
-                    }
-                )
+    AlertDialog(
+        onDismissRequest = {
+            enter.invoke("")
+        }, confirmButton = {
+            Button(onClick = {
+                enter.invoke(text.text)
                 text = TextFieldValue("")
-            },
-        ) {
-            Text(text = dismissButtonText)
-        }
-    }, title = {
-        Text(text = title, style = MaterialTheme.typography.titleMedium)
-    }, text = {
-        OutlinedTextField(
-            value = text,
-            keyboardOptions = keyboardOptions,
-            modifier = Modifier
-                .focusRequester(focusRequester)
-                .heightIn(1.dp, Dp.Infinity),
-            readOnly = readOnly,
-            textStyle = if (readOnly) LocalTextStyle.current.copy(textAlign = TextAlign.Center) else LocalTextStyle.current,
-            label = { Text(text = label) },
-            trailingIcon = {
-                if (!readOnly) {
-                    Icon(
-                        imageVector = Icons.Filled.Delete,
-                        "clear",
-                        modifier = Modifier.clickable(onClick = {
-                            text = TextFieldValue("")
-                        })
+            }) {
+                Text(text = confirmButtonText)
+            }
+        }, dismissButton = {
+            TextButton(
+                onClick = {
+                    enter.invoke(
+                        if (dismissButtonText == "取消") {
+                            ""
+                        } else {
+                            dismissButtonText
+                        }
                     )
-                }
-            },
-            onValueChange = {
-                text = it
-            },
+                    text = TextFieldValue("")
+                },
+            ) {
+                Text(text = dismissButtonText)
+            }
+        }, title = {
+            Text(text = title, style = MaterialTheme.typography.titleMedium)
+        }, text = {
+            OutlinedTextField(
+                value = text,
+                keyboardOptions = keyboardOptions,
+                modifier = Modifier
+                    .focusRequester(focusRequester)
+                    .heightIn(1.dp, Dp.Infinity),
+                readOnly = readOnly,
+                textStyle = if (readOnly) LocalTextStyle.current.copy(textAlign = TextAlign.Center) else LocalTextStyle.current,
+                label = { Text(text = label) },
+                trailingIcon = {
+                    if (!readOnly) {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            "clear",
+                            modifier = Modifier.clickable(onClick = {
+                                text = TextFieldValue("")
+                            })
+                        )
+                    }
+                },
+                onValueChange = {
+                    text = it
+                },
+            )
+        }, shape = MaterialTheme.shapes.medium, properties = DialogProperties(
+            //自适应OutlinedTextField高
+            usePlatformDefaultWidth = false
         )
-    }, shape = MaterialTheme.shapes.medium, properties = DialogProperties(
-        //自适应OutlinedTextField高
-        usePlatformDefaultWidth = false
-    )
     )
     LaunchedEffect(Unit) {
         delay(10)
@@ -1021,9 +1034,10 @@ fun aa() {
 @Preview
 fun ab() {
 //    Aria2Dialog()
-    InfoDialog(onDismissRequest = { }, onConfirmation = {
-        println("Confirmation registered") // Add logic here to handle confirmation.
-    }, dialogTitle = "Alert dialog example"
+    InfoDialog(
+        onDismissRequest = { }, onConfirmation = {
+            println("Confirmation registered") // Add logic here to handle confirmation.
+        }, dialogTitle = "Alert dialog example"
     )
 
 }

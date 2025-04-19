@@ -61,6 +61,8 @@
     <string name="AUTO_ROTATE">autoRotate</string>
     <string name="HIDE_LOADING_VIEW">hideLoadingView</string>
     <string name="EARLY_LOADING">EarlyLoading</string>
+    <string name="POSITION_AFTER_AT">PositionAfterAt</string>
+    <string name="SAVE_REQUEST_CACHE">SaveRequestCache</string>
     <string name="OFFLINE_METHOD">offlineMethod</string>
     <string name="DEFAULT_OFFLINE_TIME">defaultOfflineTime</string>
     <string name="DEFAULT_OFFLINE_COUNT">defaultOfflineCount</string>

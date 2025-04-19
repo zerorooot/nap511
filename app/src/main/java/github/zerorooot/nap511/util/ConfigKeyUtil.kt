@@ -105,6 +105,16 @@ class ConfigKeyUtil {
          */
         val EARLY_LOADING by lazy { App.instance.getStringRes(R.string.EARLY_LOADING) }
 
+        /**
+         *重命名时，光标定位在@后
+         */
+        val POSITION_AFTER_AT by lazy { App.instance.getStringRes(R.string.POSITION_AFTER_AT) }
+
+        /**
+         * 保存请求缓存
+         */
+        val SAVE_REQUEST_CACHE by lazy { App.instance.getStringRes(R.string.SAVE_REQUEST_CACHE) }
+
 
         /**
          * 磁力链接验证
