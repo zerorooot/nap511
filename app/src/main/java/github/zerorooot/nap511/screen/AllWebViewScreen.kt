@@ -40,7 +40,6 @@ import github.zerorooot.nap511.util.DataStoreUtil
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.StringJoiner
 import kotlin.text.startsWith
 
 
@@ -103,12 +102,7 @@ fun BaseWebViewScreen(
 @Composable
 fun WebViewScreen() {
     App.gesturesEnabled = false
-    CookieManager.getInstance().removeAllCookies(object : ValueCallback<Boolean> {
-        override fun onReceiveValue(value: Boolean?) {
-            XLog.d("removeAllCookies $value")
-        }
-
-    })
+    CookieManager.getInstance().removeAllCookies { value -> XLog.d("removeAllCookies $value") }
     BaseWebViewScreen(
         titleText = "网页版",
         topAppBarActionButtonOnClick = {
@@ -186,34 +180,26 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
             view: WebView,
             webViewRequest: WebViewRequest
         ): WebResourceResponse? {
-            val loginUrlVip = "https://passportapi.115.com/app/1.0/web/1.0/login/vip"
-            //https://passportapi.115.com/app/1.0/web/1.0/login/login
-            if (loginUrlVip == webViewRequest.url) {
-                val httpClient = OkHttpClient()
-                val a = Request.Builder()
-                    .url(loginUrlVip)
-                    .method("POST", webViewRequest.body.toRequestBody())
-                val headerMap = mapOf(
-                    "sec-ch-ua-platform" to "\"Linux\"",
-                    "sec-ch-ua" to "\"Not A(Brand\";v=\"99\", \"Google Chrome\";v=\"121\", \"Chromium\";v=\"121\"",
-                    "sec-ch-ua-mobile" to "?0",
-                    "user-agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
-                )
-                webViewRequest.headers.forEach { (t, u) -> a.addHeader(t, u) }
-                headerMap.forEach { (t, u) ->
-                    a.removeHeader(t)
-                    a.addHeader(t, u)
-                }
-                val response = httpClient.newCall(a.build()).execute()
-                val headers = response.headers("set-cookie")
-                XLog.d("headers $headers")
-                val sj = StringJoiner(";")
-                headers.forEach { i ->
-                    sj.add(i.split(";")[0])
-                }
-                XLog.d("cookie $sj")
-                val checkLogin = App.instance.checkLogin(sj.toString())
+            var cookie: String? = null
+            val urlList = arrayOf(
+                "https://115.com/?cid=0&offset=0&mode=wangpan",
+                "https://my.115.com/?ct=guide&ac=status"
+            )
 
+            for ((_, it) in urlList.withIndex()) {
+                if (it == webViewRequest.url) {
+                    cookie = CookieManager.getInstance().getCookie(it)
+                    XLog.d("$it cookie $cookie")
+                }
+            }
+//            if ("https://my.115.com/?ct=guide&ac=status" == webViewRequest.url) {
+//                cookie =
+//                    webViewRequest.headers["Cookie"]
+//                XLog.d("loginSuccessUrl cookie $cookie")
+//            }
+
+            if (cookie != null) {
+                val checkLogin = App.instance.checkLogin(cookie)
                 App.instance.toast(checkLogin.second)
                 if (!checkLogin.first) {
                     return null
@@ -221,7 +207,6 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
                 //restart
                 ProcessPhoenix.triggerRebirth(App.instance);
             }
-
             return super.shouldInterceptRequest(view, webViewRequest)
         }
     }

@@ -120,7 +120,6 @@ class FileViewModel(private val cookie: String, private val application: Applica
     fun isFileScreenListState() = ::fileScreenListState.isInitialized
 
     fun init() {
-        getFiles(currentCid)
         val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
         if (saveRequestCache && fileListCache.isEmpty()) {
             val file = File(application.cacheDir, "fileListCache.json")
@@ -129,6 +128,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             fileListCache = Gson().fromJson(content, type)
             XLog.d("loading file list cache $content")
         }
+        getFiles(currentCid)
     }
 
     override fun onCleared() {
@@ -143,7 +143,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             val json = Gson().toJson(fileListCache, type)
             val file = File(application.cacheDir, "fileListCache.json")
             file.writeText(json)
-            XLog.d("save file list cache $json")
+            XLog.d("save file list cache ${fileListCache.size}")
         }
     }
 

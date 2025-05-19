@@ -81,7 +81,7 @@
     <SwitchPreference
         app:defaultValue="true"
         app:key="@string/SAVE_REQUEST_CACHE"
-        app:summary="保存fileListCache到application.cacheDir/fileListCache.json中，便于提升加载速度"
+        app:summary="保存请求文件缓存到application.cacheDir/fileListCache.json中，便于提升加载速度"
         app:title="保存请求缓存" />
 
     <SwitchPreference
