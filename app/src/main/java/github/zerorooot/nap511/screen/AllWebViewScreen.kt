@@ -2,7 +2,6 @@ package github.zerorooot.nap511.screen
 
 import android.annotation.SuppressLint
 import android.webkit.CookieManager
-import android.webkit.ValueCallback
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -40,7 +39,6 @@ import github.zerorooot.nap511.util.DataStoreUtil
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import kotlin.text.startsWith
 
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -190,6 +188,7 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
                 if (it == webViewRequest.url) {
                     cookie = CookieManager.getInstance().getCookie(it)
                     XLog.d("$it cookie $cookie")
+                    break
                 }
             }
 //            if ("https://my.115.com/?ct=guide&ac=status" == webViewRequest.url) {

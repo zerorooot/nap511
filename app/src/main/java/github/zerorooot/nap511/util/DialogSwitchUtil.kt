@@ -74,7 +74,7 @@ class DialogSwitchUtil {
     var isOpenUnzipPasswordDialog by mutableStateOf(false)
 
     /**
-     *小文本文件
+     *小文本文件 [github.zerorooot.nap511.screen.TextBodyDialog]
      */
     var isOpenTextBodyDialog by mutableStateOf(false)
 

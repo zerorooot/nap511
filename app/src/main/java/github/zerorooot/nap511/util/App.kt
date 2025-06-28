@@ -28,6 +28,7 @@ import kotlinx.coroutines.launch
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.File
 import java.lang.Thread.UncaughtExceptionHandler
 import java.lang.reflect.Field
 import java.lang.reflect.InvocationTargetException
@@ -54,7 +55,8 @@ class App : Application() {
         lateinit var scope: CoroutineScope
         private fun isScopeInitialized() = ::scope.isInitialized
 
-
+        //缓存fileListCache文件
+        lateinit var cacheFile: File
     }
 
     override fun onCreate() {
@@ -63,6 +65,7 @@ class App : Application() {
         cookie = DataStoreUtil.getData(ConfigKeyUtil.COOKIE, "")
         uid = DataStoreUtil.getData(ConfigKeyUtil.UID, "0")
         requestLimitCount = DataStoreUtil.getData(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "100").toInt()
+        cacheFile = File(this.cacheDir, "fileListCache.json")
 
         initLog()
     }

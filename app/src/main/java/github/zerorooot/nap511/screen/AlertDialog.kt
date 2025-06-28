@@ -1,6 +1,5 @@
 package github.zerorooot.nap511.screen
 
-import android.text.Selection
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -38,7 +37,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -81,7 +79,6 @@ import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.DialogSwitchUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
-import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import kotlinx.coroutines.delay
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
@@ -89,9 +86,7 @@ import java.nio.charset.Charset
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.stream.Collectors
-import kotlin.collections.set
 import kotlin.system.exitProcess
-import kotlin.text.toByteArray
 
 @Composable
 fun CreateFolderDialog(enter: (String) -> Unit) {
@@ -233,7 +228,7 @@ fun TextBodyDialogScreen(title: String, context: ByteArray, enter: (String) -> U
             )
         )
     }
-
+    val focusRequester = remember { FocusRequester() }
 
     AlertDialog(onDismissRequest = {
         enter.invoke("")
@@ -278,6 +273,9 @@ fun TextBodyDialogScreen(title: String, context: ByteArray, enter: (String) -> U
             OutlinedTextField(
                 value = contentText,
                 label = { Text(text = "文件内容") },
+                modifier = Modifier
+                    .focusRequester(focusRequester)
+                    .heightIn(1.dp, Dp.Infinity),
                 onValueChange = {
                     contentText = it
                 },

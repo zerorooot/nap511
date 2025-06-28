@@ -3,19 +3,32 @@ package github.zerorooot.nap511.viewmodel
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Intent
-import android.widget.Toast
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
-import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.bean.*
+import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.FileInfo
+import github.zerorooot.nap511.bean.FilesBean
+import github.zerorooot.nap511.bean.ImageBean
+import github.zerorooot.nap511.bean.LocationBean
+import github.zerorooot.nap511.bean.OrderBean
+import github.zerorooot.nap511.bean.OrderEnum
+import github.zerorooot.nap511.bean.PathBean
+import github.zerorooot.nap511.bean.RemainingSpaceBean
+import github.zerorooot.nap511.bean.RenameBean
+import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.Sha1Service
@@ -23,33 +36,12 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.DialogSwitchUtil
-import github.zerorooot.nap511.util.Sha1Util
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
-import okhttp3.Call
-import okhttp3.FormBody
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
-import java.io.BufferedOutputStream
-import java.io.BufferedReader
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
-import java.io.File
-import java.io.InputStream
-import java.io.InputStreamReader
-import java.io.OutputStream
-import java.lang.NullPointerException
-import java.nio.charset.Charset
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Locale
 import kotlin.concurrent.thread
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
-import kotlin.math.log10
-import kotlin.math.pow
 import kotlin.math.roundToInt
 
 @SuppressLint("MutableCollectionMutableState")
@@ -108,6 +100,8 @@ class FileViewModel(private val cookie: String, private val application: Applica
 
     var fileInfo by mutableStateOf(FileInfo())
 
+    //小文件缓存
+    private var textFileCache = hashMapOf<FileBean, ByteArray?>()
     var orderBean = OrderBean(OrderEnum.name, 1)
     private val fileService: FileService by lazy {
         FileService.getInstance(cookie)
@@ -122,11 +116,11 @@ class FileViewModel(private val cookie: String, private val application: Applica
     fun init() {
         val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
         if (saveRequestCache && fileListCache.isEmpty()) {
-            val file = File(application.cacheDir, "fileListCache.json")
+            val file = App.cacheFile
             val content = if (file.exists()) file.readText() else "{}"
             val type = object : TypeToken<HashMap<String, FilesBean>?>() {}.type
             fileListCache = Gson().fromJson(content, type)
-            XLog.d("loading file list cache $content")
+            XLog.d("loading file list cache ${fileListCache.size}")
         }
         getFiles(currentCid)
     }
@@ -141,7 +135,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         if (saveRequestCache) {
             val type = object : TypeToken<HashMap<String, FilesBean>?>() {}.type
             val json = Gson().toJson(fileListCache, type)
-            val file = File(application.cacheDir, "fileListCache.json")
+            val file = App.cacheFile
             file.writeText(json)
             XLog.d("save file list cache ${fileListCache.size}")
         }
@@ -314,6 +308,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 _isRefreshing.value = false
             } catch (e: NullPointerException) {
                 App.instance.toast("获取文件列表失败，建议更新您的Cookie")
+                App.cacheFile.delete()
             } catch (e: Exception) {
                 e.printStackTrace()
                 App.instance.toast("${e.message}，请重试～")
@@ -541,6 +536,23 @@ class FileViewModel(private val cookie: String, private val application: Applica
             fileBeanList.remove(fileBean)
             fileListCache[currentCid]!!.fileBeanList.remove(fileBean)
             clickMap[currentCid] = clickMap.getOrDefault(currentCid, 0) - 1
+
+            //删除文件夹内的文件夹
+            if (fileBean.isFolder) {
+                val results = mutableListOf<String>()
+                val walk: (String) -> Unit = object : (String) -> Unit {
+                    override fun invoke(cid: String) {
+                        fileListCache[cid]?.fileBeanList?.stream()?.filter { it.isFolder }
+                            ?.forEach {
+                                results.add(it.categoryId)
+                                this(it.categoryId)
+                            }
+                    }
+                }
+                walk(fileBean.categoryId)
+                results.forEach { fileListCache.remove(it) }
+            }
+
             //delete image bean
             imageBeanCache[currentCid]?.removeIf { i -> i.fileName == fileBean.name }
 
@@ -713,8 +725,12 @@ class FileViewModel(private val cookie: String, private val application: Applica
 
     fun downloadText(fileBean: FileBean) {
         thread {
-            val input = fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
-            textBodyByteArray = input.readBytes()
+            var bytes = textFileCache[fileBean]
+            if (bytes == null) {
+                bytes = fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId).readBytes()
+                textFileCache.put(fileBean, bytes)
+            }
+            textBodyByteArray = bytes
             dialogSwitchUtil.isOpenTextBodyDialog = true
             setRefreshingStatus(false)
         }
