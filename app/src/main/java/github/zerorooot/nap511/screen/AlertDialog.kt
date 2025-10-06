@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.screen
 
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -20,7 +21,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.Switch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.CheckBox
@@ -39,6 +39,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -65,10 +66,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.work.Data
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.activity.UnzipAllFileWorker
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.TorrentFileListWeb
 import github.zerorooot.nap511.bean.ZipBeanList
@@ -355,55 +362,35 @@ fun UnzipDialog(fileViewModel: FileViewModel) {
 fun UnzipAllFile(
     fileViewModel: FileViewModel
 ) {
-    //todo 取消时还是会解压
-//    if (fileViewModel.isOpenUnzipAllFileDialog) {
-////        BaseDialog("请输入解压密码", "如无加密，为空即可") {}
-//        fileViewModel.isOpenUnzipAllFileDialog = false
-//        App.instance.toast("后台解压中......")
-//        val dataBuilder: Data.Builder = Data.Builder()
-//        val filter =
-//            fileViewModel.fileBeanList.filter { i -> i.isSelect && i.fileIco == R.drawable.zip }
-//                .map { a -> Pair<String, String>(a.name, a.pickCode) }.toList()
-//        val listType = object : TypeToken<List<Pair<String, String>>?>() {}.type
-//        val list = Gson().toJson(filter, listType)
-////todo 支持批量解压带密码的压缩文件
-////        if (it != "") {
-////            dataBuilder.putString("pwd", it)
-////        }
-//        dataBuilder.putString("list", list)
-//        dataBuilder.putString("cid", fileViewModel.currentCid)
-//
-//        val request: OneTimeWorkRequest = OneTimeWorkRequest
-//            .Builder(UnzipAllFileWorker::class.java)
-//            .addTag("UnzipAllFileWorker")
-//            .setInputData(dataBuilder.build()).build()
-//        val workManager = WorkManager.getInstance(App.instance.applicationContext)
-//        workManager.enqueue(request)
-//        fileViewModel.recoverFromLongPress()
-//        fileViewModel.unSelect()
-//
-//        Thread.sleep(100)
-//        val workInfo by workManager.getWorkInfoByIdLiveData(request.id).observeAsState()
-//        if (workInfo != null) {
-//            when (workInfo?.state) {
-//                WorkInfo.State.SUCCEEDED -> {
-//                    fileViewModel.refresh()
-//                }
-//                WorkInfo.State.FAILED -> {
-//                    fileViewModel.refresh()
-//                }
-//                WorkInfo.State.CANCELLED -> {}
-//                WorkInfo.State.ENQUEUED -> {}
-//                WorkInfo.State.RUNNING -> {}
-//                WorkInfo.State.BLOCKED -> {}
-//                null -> {
-//
-//                }
-//            }
-//        }
+    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
+    if (dialogSwitchUtil.isOpenUnzipAllFileDialog) {
+        BaseDialog("请输入解压密码", "如无加密，为空即可") {
+            dialogSwitchUtil.isOpenUnzipAllFileDialog = false
+            App.instance.toast("后台解压中......")
+            val dataBuilder: Data.Builder = Data.Builder()
+            val filter =
+                fileViewModel.fileBeanList.filter { i -> i.isSelect && i.fileIco == R.drawable.zip }
+                    .map { a -> Pair(a.name, a.pickCode) }.toList()
+            val listType = object : TypeToken<List<Pair<String, String>>?>() {}.type
+            val list = Gson().toJson(filter, listType)
+            if (it != "") {
+                dataBuilder.putString("pwd", it)
+            }
+            dataBuilder.putString("list", list)
+            dataBuilder.putString("cid", fileViewModel.currentCid)
 
 
-//    }
+            val request: OneTimeWorkRequest = OneTimeWorkRequest
+                .Builder(UnzipAllFileWorker::class.java)
+                .addTag("UnzipAllFileWorker")
+                .setInputData(dataBuilder.build()).build()
+            val workManager = WorkManager.getInstance(App.instance.applicationContext)
+            workManager.enqueue(request)
+
+            fileViewModel.recoverFromLongPress()
+            fileViewModel.unSelect()
+        }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterialApi::class)

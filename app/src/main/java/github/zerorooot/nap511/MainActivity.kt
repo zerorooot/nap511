@@ -485,7 +485,7 @@ class MainActivity : AppCompatActivity() {
 //                "back"->{FileScreen里}
             //具体实现在AlertDialog#UnzipAllFile()里
             "unzipAllFile" -> {
-                //fileViewModel.isOpenUnzipAllFileDialog = true
+//                DialogSwitchUtil.getInstance().isOpenUnzipAllFileDialog = true
                 unzipAllFile(fileViewModel)
             }
 
@@ -508,7 +508,7 @@ class MainActivity : AppCompatActivity() {
         val dataBuilder: Data.Builder = Data.Builder()
         val filter =
             fileViewModel.fileBeanList.filter { i -> i.isSelect && i.fileIco == R.drawable.zip }
-                .map { a -> Pair<String, String>(a.name, a.pickCode) }.toList()
+                .map { a -> Pair(a.name, a.pickCode) }.toList()
         val listType = object : TypeToken<List<Pair<String, String>>?>() {}.type
         val list = Gson().toJson(filter, listType)
 //todo 支持批量解压带密码的压缩文件
@@ -535,8 +535,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
+
+    override fun onPause() {
+        super.onPause()
         val fileViewModel = ViewModelProvider(this)[FileViewModel::class.java]
         fileViewModel.saveFileCache()
     }
@@ -547,11 +548,18 @@ class MainActivity : AppCompatActivity() {
         fileViewModel.saveFileCache()
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        val fileViewModel = ViewModelProvider(this)[FileViewModel::class.java]
+        fileViewModel.saveFileCache()
+    }
+
     override fun onRestart() {
         super.onRestart()
         val fileViewModel = ViewModelProvider(this)[FileViewModel::class.java]
         fileViewModel.saveFileCache()
     }
+
 
 }
 

@@ -718,6 +718,8 @@ class FileViewModel(private val cookie: String, private val application: Applica
             //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
             if (fileRepository.tryToExtract(pickCode)) {
                 getZipListFile(isCheck = false)
+            }else{
+                App.instance.toast("服务器解压中～")
             }
         }
     }

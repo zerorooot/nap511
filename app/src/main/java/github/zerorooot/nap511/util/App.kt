@@ -98,11 +98,9 @@ class App : Application() {
         }
 
         val uncaughtExceptionHandler = Thread.currentThread().uncaughtExceptionHandler
-        Thread.currentThread().uncaughtExceptionHandler = object : UncaughtExceptionHandler {
-            override fun uncaughtException(t: Thread, e: Throwable) {
-                XLog.enableStackTrace(50).e("程序崩溃退出", e)
-                uncaughtExceptionHandler?.uncaughtException(t, e)
-            }
+        Thread.currentThread().uncaughtExceptionHandler = UncaughtExceptionHandler { t, e ->
+            XLog.enableStackTrace(50).e("程序崩溃退出", e)
+            uncaughtExceptionHandler?.uncaughtException(t, e)
         }
     }
 
