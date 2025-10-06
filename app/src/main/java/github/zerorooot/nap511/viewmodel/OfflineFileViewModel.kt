@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elvishew.xlog.XLog
+import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.OfflineInfo
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.QuotaBean
@@ -43,6 +44,7 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
 
 
     var torrentBean by mutableStateOf(TorrentFileBean())
+    val torrentBeanCache = hashMapOf<String, TorrentFileBean>()
 
     private val fileRepository: FileRepository by lazy {
         FileRepository.getInstance(cookie)
@@ -65,9 +67,13 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
     }
 
     fun getTorrentTask(sha1: String) {
+        //clear torrent bean
+        torrentBean = TorrentFileBean()
+        if (torrentBeanCache.contains(sha1)) {
+            torrentBean = torrentBeanCache[sha1]!!
+            return
+        }
         viewModelScope.launch {
-            //clear torrent bean
-            torrentBean = TorrentFileBean()
             val sign = fileRepository.getOfflineSign().sign
             val torrentTask = fileRepository.getOfflineTorrentTaskList(sha1, sign, App.uid)
             XLog.d("getTorrentTask $torrentTask")
@@ -84,6 +90,7 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
                     application, b.size
                 ) + " "
             }
+            torrentBeanCache.put(sha1,torrentTask)
             torrentBean = torrentTask
         }
     }

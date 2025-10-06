@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.Switch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.CheckBox
@@ -113,11 +114,7 @@ fun RenameFileDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
         val position = DataStoreUtil.getData(ConfigKeyUtil.POSITION_AFTER_AT, false)
         val atPosition = name.indexOf("@") + 1
         BaseDialog(
-            "重命名文件",
-            "新文件名",
-            name,
-            enter = enter,
-            selection = TextRange(
+            "重命名文件", "新文件名", name, enter = enter, selection = TextRange(
                 if (!position || atPosition == 0) name.length else atPosition
             )
         )
@@ -725,22 +722,39 @@ fun CreateSelectTorrentFileDialog(
     val dialogSwitchUtil = DialogSwitchUtil.getInstance()
     if (dialogSwitchUtil.isOpenCreateSelectTorrentFileDialog) {
         val torrentBean = offlineFileViewModel.torrentBean
+        // XLog.d("torrentBean: ${Gson().toJson(torrentBean)}")
         if (!torrentBean.state) {
             return
         }
+        var isSort by remember {
+            mutableStateOf(false)
+        }
+        LaunchedEffect(Unit) {
+            isSort = DataStoreUtil.getData(ConfigKeyUtil.TORRENT_SORT, false)
+        }
+
         viewModel<FileViewModel>().setRefreshingStatus(false)
-        SelectTorrentFileDialog(torrentBean, enter)
+        SelectTorrentFileDialog(torrentBean, isSort, enter)
     }
 }
 
 @Composable
 private fun SelectTorrentFileDialog(
     torrentFileBean: TorrentFileBean,
+    isSort: Boolean = false,
     enter: (torrentFileBean: TorrentFileBean, Map<Int, TorrentFileListWeb>) -> Unit
 ) {
     val listState = rememberLazyListState()
+
+    var originTorrentFileListWeb: ArrayList<TorrentFileListWeb>? = null
+    if (isSort) {
+        originTorrentFileListWeb =
+            torrentFileBean.torrentFileListWeb.toMutableList() as ArrayList<TorrentFileListWeb>
+        torrentFileBean.torrentFileListWeb.sortByDescending { torrentFileBean -> torrentFileBean.size }
+    }
+
     //select all
-    val selectMap = remember {
+    val selectMap = remember(torrentFileBean) {
         mutableStateMapOf<Int, TorrentFileListWeb>().apply {
             torrentFileBean.torrentFileListWeb.forEachIndexed { index, torrentFileListWeb ->
                 if (torrentFileListWeb.wanted == 1) {
@@ -757,15 +771,29 @@ private fun SelectTorrentFileDialog(
             selectMap[i] = s
         }
     }
-    AlertDialog(onDismissRequest = {
+    val cancel: () -> Unit = {
         selectMap.clear()
         enter.invoke(torrentFileBean, selectMap)
+        if (isSort) {
+            torrentFileBean.torrentFileListWeb = originTorrentFileListWeb!!
+        }
+    }
+
+    AlertDialog(onDismissRequest = {
+        cancel()
     }, confirmButton = {
         Row(
             verticalAlignment = Alignment.CenterVertically, modifier = Modifier.offset(y = (-20).dp)
         ) {
             TextButton(
                 onClick = {
+                    if (isSort) {
+                        val torrentFileList = selectMap.values.toMutableList()
+                        selectMap.clear()
+                        torrentFileList.forEach { i ->
+                            selectMap.put(originTorrentFileListWeb!!.indexOf(i), i)
+                        }
+                    }
                     enter.invoke(torrentFileBean, selectMap)
                 },
             ) {
@@ -800,8 +828,7 @@ private fun SelectTorrentFileDialog(
             }
             TextButton(
                 onClick = {
-                    selectMap.clear()
-                    enter.invoke(torrentFileBean, selectMap)
+                    cancel()
                 },
             ) {
                 Text(text = "取消")
@@ -812,8 +839,7 @@ private fun SelectTorrentFileDialog(
             AutoSizableTextField(
                 value = "已经选择${selectMap.size}/${torrentFileBean.fileCount}个，总计：${
                     android.text.format.Formatter.formatFileSize(
-                        App.instance,
-                        selectMap.values.sumOf { it.size })
+                        App.instance, selectMap.values.sumOf { it.size })
                 }\n" + "共${torrentFileBean.fileCount}个文件，总计：${torrentFileBean.fileSizeString}",
                 minFontSize = 30.sp,
                 maxLines = 2
@@ -867,16 +893,16 @@ private fun SelectTorrentFileDialog(
 }
 
 @Composable
-//@Preview
+@Preview
 fun SelectTorrentFileDialogPreview() {
-//    val torrentFileBean = Gson().fromJson(
-//        "{\"state\":true,\"errno\":0,\"fileSizeString\":123G,\"errtype\":\"suc\",\"errcode\":0,\"file_size\":70966705837,\"torrent_name\":\"name\",\"file_count\":28,\"info_hash\":\"hash\",\"torrent_filelist_web\":[{\"size\":12312,\"path\":\"预览图/0.JPG\",\"wanted\":1},{\"size\":123443242,\"path\":\"预览图/123123132132131312313123123/1.JPG\",\"wanted\":1},{\"size\":3902418,\"path\":\"预览图/2.JPG\",\"wanted\":1},{\"size\":321231321,\"path\":\"预览图/3.JPG\",\"wanted\":1},{\"size\":312321321,\"path\":\"预览图/4.JPG\",\"wanted\":-1}]}",
-//        TorrentFileBean::class.java
-//    )
-//
-//    SelectTorrentFileDialog(torrentFileBean) { a: TorrentFileBean, m: Map<Int, TorrentFileListWeb> ->
-//
-//    }
+    val torrentFileBean = Gson().fromJson(
+        "{\"errcode\":0,\"errno\":0,\"error_msg\":\"\",\"errtype\":\"suc\",\"file_count\":4,\"file_size\":10345578897,\"fileSizeString\":\"10.35 GB \",\"info_hash\":\"8c9f4db08497563ef6eb01cf81199f645da0954b\",\"state\":true,\"torrent_filelist_web\":[{\"path\":\"[哪吒之魔童降世].Nezha.Birth.of.the.Demon.Child.2019.USA.UHD.BluRay.2160p.x265.DTS-HD.MA5.1-CMCT.mkv\",\"size\":10345101994,\"sizeString\":\"10.35 GB \",\"wanted\":1},{\"path\":\"哪吒之魔童降世.2019.jpg\",\"size\":251007,\"sizeString\":\"251 kB \",\"wanted\":1},{\"path\":\"[哪吒之魔童降世].Nezha.Birth.of.the.Demon.Child.2019.USA.UHD.BluRay.2160p.x265.DTS-HD.MA5.1-CMCT.mkv.jpg\",\"size\":224106,\"sizeString\":\"224 kB \",\"wanted\":1},{\"path\":\"哪吒之魔童降世.2019.txt\",\"size\":1790,\"sizeString\":\"1.79 kB \",\"wanted\":0}],\"torrent_name\":\"[哪吒之魔童降世].Nezha.Birth.of.the.Demon.Child.2019.USA.UHD.BluRay.2160p.x265.DTS-HD.MA5.1-CMCT\"}",
+        TorrentFileBean::class.java
+    )
+
+    SelectTorrentFileDialog(torrentFileBean) { a: TorrentFileBean, m: Map<Int, TorrentFileListWeb> ->
+
+    }
 
 }
 

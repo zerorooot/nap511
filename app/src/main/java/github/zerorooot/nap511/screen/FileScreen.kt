@@ -33,8 +33,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipboardManager
@@ -51,6 +55,7 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
+import github.zerorooot.nap511.bean.TorrentFileListWeb
 import github.zerorooot.nap511.screenitem.FileCellItem
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App

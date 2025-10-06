@@ -62,6 +62,7 @@
     <string name="HIDE_LOADING_VIEW">hideLoadingView</string>
     <string name="EARLY_LOADING">EarlyLoading</string>
     <string name="POSITION_AFTER_AT">PositionAfterAt</string>
+    <string name="TORRENT_SORT">TorrentSort</string>
     <string name="SAVE_REQUEST_CACHE">SaveRequestCache</string>
     <string name="OFFLINE_METHOD">offlineMethod</string>
     <string name="DEFAULT_OFFLINE_TIME">defaultOfflineTime</string>

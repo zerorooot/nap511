@@ -115,6 +115,10 @@ class ConfigKeyUtil {
          */
         val SAVE_REQUEST_CACHE by lazy { App.instance.getStringRes(R.string.SAVE_REQUEST_CACHE) }
 
+        /**
+         * 种子文件按文件大小从大到小排序
+         */
+        val TORRENT_SORT by lazy { App.instance.getStringRes(R.string.TORRENT_SORT) }
 
         /**
          * 磁力链接验证

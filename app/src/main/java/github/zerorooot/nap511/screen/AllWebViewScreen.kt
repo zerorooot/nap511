@@ -40,7 +40,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
-
 @SuppressLint("SetJavaScriptEnabled")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,7 +77,6 @@ fun BaseWebViewScreen(
                         settings.useWideViewPort = true
                         settings.javaScriptCanOpenWindowsAutomatically = true;
                         settings.setSupportZoom(true)
-                        settings.databaseEnabled = true;
                         settings.domStorageEnabled = true;//开启DOM缓存，关闭的话H5自身的一些操作是无效的
                         settings.cacheMode = WebSettings.LOAD_DEFAULT;
                         // Allow mixed content for WebSocket connections (optional, if needed)
@@ -127,38 +125,6 @@ fun webViewClient(): WebViewClient {
     }
 }
 
-@SuppressLint("JavascriptInterface")
-fun webViewClient(webView: WebView): WebViewClient {
-    return object : RequestInspectorWebViewClient(webView) {
-        override fun shouldInterceptRequest(
-            view: WebView,
-            webViewRequest: WebViewRequest
-        ): WebResourceResponse? {
-            val url = webViewRequest.url
-            val cookieManager = CookieManager.getInstance()
-            App.cookie.split(";").forEach { a ->
-                cookieManager.setCookie(url, a)
-            }
-            return super.shouldInterceptRequest(view, webViewRequest)
-        }
-    }
-//    return object : WebViewClient() {
-//        override fun shouldInterceptRequest(
-//            view: WebView?,
-//            request: WebResourceRequest?
-//        ): WebResourceResponse? {
-//            val url = request!!.url.toString()
-//            val cookieManager = CookieManager.getInstance()
-//            App.cookie.split(";").forEach { a ->
-//                cookieManager.setCookie(url, a)
-//                cookieManager.setCookie(url, a)
-//            }
-//            return super.shouldInterceptRequest(view, request)
-//        }
-//    }
-
-}
-
 @Composable
 fun LoginWebViewScreen() {
     App.gesturesEnabled = false
@@ -191,11 +157,6 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
                     break
                 }
             }
-//            if ("https://my.115.com/?ct=guide&ac=status" == webViewRequest.url) {
-//                cookie =
-//                    webViewRequest.headers["Cookie"]
-//                XLog.d("loginSuccessUrl cookie $cookie")
-//            }
 
             if (cookie != null) {
                 val checkLogin = App.instance.checkLogin(cookie)
@@ -259,33 +220,41 @@ fun captchaWebViewClient(webView: WebView): WebViewClient {
         ): WebResourceResponse? {
             //磁力链接验证
             if ("https://webapi.115.com/user/captcha" == webViewRequest.url) {
-                val httpClient = OkHttpClient()
-                val a = Request.Builder()
-                    .url("https://webapi.115.com/user/captcha")
-                    .method("POST", webViewRequest.body.toRequestBody())
-                webViewRequest.headers.forEach { (t, u) -> a.addHeader(t, u) }
-                //移除web添加的cookie
-                a.removeHeader("cookie")
-                a.addHeader("cookie", App.cookie)
-
-                val response = httpClient.newCall(a.build()).execute()
-                val string = response.body.string()
-                if (string.contains("{\"state\":true}")) {
-                    App.selectedItem = ConfigKeyUtil.MY_FILE
+                if (check("https://webapi.115.com/user/captcha", webViewRequest)) {
                     addTask()
                     App.instance.toast("验证账号成功~，重新添加链接中.......")
                 }
             }
-            //todo 视频验证
-//            if ("https://115vod.com/webapi/user/captcha" == webViewRequest.url) {
-//
-//            }
-            if (webViewRequest.url.startsWith("https://115vod.com/webapi/user/captcha")) {
-                return super.shouldInterceptRequest(view, webViewRequest)
+            //视频验证
+            if ("https://115vod.com/webapi/user/captcha" == webViewRequest.url) {
+                if (check("https://115vod.com/webapi/user/captcha", webViewRequest)) {
+                    App.instance.toast("视频验证成功~")
+                }
             }
             return super.shouldInterceptRequest(view, webViewRequest)
         }
     }
+}
+
+private fun check(url: String, webViewRequest: WebViewRequest): Boolean {
+    val httpClient = OkHttpClient()
+    val a = Request.Builder()
+        .url(url)
+        .method("POST", webViewRequest.body.toRequestBody())
+    webViewRequest.headers.forEach { (t, u) -> a.addHeader(t, u) }
+    //移除web添加的cookie
+    a.removeHeader("cookie")
+    a.addHeader("cookie", App.cookie)
+
+    val response = httpClient.newCall(a.build()).execute()
+    val string = response.body.string()
+
+    App.gesturesEnabled = true
+    if (string.contains("{\"state\":true}")) {
+        App.selectedItem = ConfigKeyUtil.MY_FILE
+        return true
+    }
+    return false
 }
 
 private fun addTask() {

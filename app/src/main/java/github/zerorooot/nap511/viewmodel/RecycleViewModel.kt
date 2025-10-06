@@ -44,7 +44,7 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
             _isRefreshing.value = true
             _recycleInfo.value = fileService.recycleList()
             val recycleBeanList = _recycleInfo.value.recycleBeanList
-            if (recycleBeanList.size != 0) {
+            if (recycleBeanList.isNotEmpty()) {
                 setRecycleBean(recycleBeanList)
                 recycleFileList.clear()
                 recycleFileList.addAll(recycleBeanList)
@@ -89,7 +89,7 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
         viewModelScope.launch {
             val recycleCleanAll = fileService.recycleCleanAll(password)
             val message = if (recycleCleanAll.state) {
-                recycleFileList = mutableStateListOf<RecycleBean>()
+                recycleFileList.clear()
                 "清除成功"
             } else {
                 "清除失败，${recycleCleanAll.errorMsg}"
