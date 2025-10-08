@@ -90,23 +90,23 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
                     application, b.size
                 ) + " "
             }
-            torrentBeanCache.put(sha1,torrentTask)
+            torrentBeanCache.put(sha1, torrentTask)
             torrentBean = torrentTask
         }
     }
 
-    fun addTorrentTask(torrentFileBean: TorrentFileBean, wanted: String) {
+    fun addTorrentTask(infoHash: String, savePath: String, wanted: String) {
         viewModelScope.launch {
             val sign = fileRepository.getOfflineSign().sign
             val addTorrentTask = fileRepository.addOfflineTorrentTask(
-                torrentFileBean.infoHash,
+                infoHash,
                 wanted,
-                torrentFileBean.torrentName,
+                savePath,
                 App.uid,
                 sign
             )
             val message = if (addTorrentTask.state) {
-                "任务添加成功，文件已保存至 /云下载/${torrentFileBean.torrentName}"
+                "任务添加成功，文件已保存至 /云下载/${savePath}"
             } else {
                 if (addTorrentTask.errorMsg.contains("请验证账号")) {
                     //打开验证页面

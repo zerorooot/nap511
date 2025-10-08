@@ -46,12 +46,12 @@
 
     <Preference
         app:key="checkVideo"
-        app:summary="视频播放异常验证页面"
+        app:summary="打开视频播放异常验证页面"
         app:title="视频播放验证" />
 
     <Preference
         app:key="checkMagnet"
-        app:summary="磁力链接添加验证页面"
+        app:summary="打开磁力链接添加异常验证页面"
         app:title="磁力链接验证" />
 
     <SwitchPreference
@@ -108,14 +108,6 @@
         app:summary="当前尚未添加离线任务的链接"
         app:title="离线任务缓存"
         app:useSimpleSummaryProvider="true" />
-
-    <!--        <ListPreference-->
-    <!--            app:defaultValue="reply"-->
-    <!--            app:entries="@array/reply_entries"-->
-    <!--            app:entryValues="@array/reply_values"-->
-    <!--            app:key="reply"-->
-    <!--            app:title="@string/reply_title"-->
-    <!--            app:useSimpleSummaryProvider="true" />-->
 
 
 </PreferenceScreen>

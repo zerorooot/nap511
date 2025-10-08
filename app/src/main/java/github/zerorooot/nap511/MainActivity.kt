@@ -485,8 +485,8 @@ class MainActivity : AppCompatActivity() {
 //                "back"->{FileScreen里}
             //具体实现在AlertDialog#UnzipAllFile()里
             "unzipAllFile" -> {
-//                DialogSwitchUtil.getInstance().isOpenUnzipAllFileDialog = true
-                unzipAllFile(fileViewModel)
+                dialogSwitchUtil.isOpenUnzipAllFileDialog = true
+//                unzipAllFile(fileViewModel)
             }
 
             "selectToUp" -> fileViewModel.selectToUp()

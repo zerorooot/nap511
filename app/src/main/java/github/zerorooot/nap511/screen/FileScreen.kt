@@ -399,7 +399,8 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
         }
     }
 //aria2
-    Aria2Dialog(context = DataStoreUtil.getData(
+    Aria2Dialog(
+        context = DataStoreUtil.getData(
             ConfigKeyUtil.ARIA2_URL, ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
         )
     ) {
@@ -420,12 +421,16 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
     }
     //查看种子文件内容
     val offlineFileViewModel = viewModel<OfflineFileViewModel>()
-    CreateSelectTorrentFileDialog() { torrentFileBean, map ->
+    CreateSelectTorrentFileDialog() { infoHash, savePath, wanted ->
         dialogSwitchUtil.isOpenCreateSelectTorrentFileDialog = false
-        if (map.isEmpty()) {
+        if (wanted.isEmpty()) {
             return@CreateSelectTorrentFileDialog
         }
-        offlineFileViewModel.addTorrentTask(torrentFileBean, map.keys.joinToString(separator = ","))
+        offlineFileViewModel.addTorrentTask(
+            infoHash,
+            savePath,
+            wanted
+        )
     }
     //解压文件
     UnzipDialog(fileViewModel)

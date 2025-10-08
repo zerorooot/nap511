@@ -39,12 +39,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -68,7 +69,6 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequest
-import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
@@ -380,10 +380,9 @@ fun UnzipAllFile(
             dataBuilder.putString("cid", fileViewModel.currentCid)
 
 
-            val request: OneTimeWorkRequest = OneTimeWorkRequest
-                .Builder(UnzipAllFileWorker::class.java)
-                .addTag("UnzipAllFileWorker")
-                .setInputData(dataBuilder.build()).build()
+            val request: OneTimeWorkRequest =
+                OneTimeWorkRequest.Builder(UnzipAllFileWorker::class.java)
+                    .addTag("UnzipAllFileWorker").setInputData(dataBuilder.build()).build()
             val workManager = WorkManager.getInstance(App.instance.applicationContext)
             workManager.enqueue(request)
 
@@ -703,7 +702,7 @@ private fun RadioButtonDialog(
 
 @Composable
 fun CreateSelectTorrentFileDialog(
-    enter: (TorrentFileBean, Map<Int, TorrentFileListWeb>) -> Unit
+    enter: (infoHash: String, savePath: String, wanted: String) -> Unit
 ) {
     val offlineFileViewModel = viewModel<OfflineFileViewModel>()
     val dialogSwitchUtil = DialogSwitchUtil.getInstance()
@@ -713,37 +712,62 @@ fun CreateSelectTorrentFileDialog(
         if (!torrentBean.state) {
             return
         }
-        var isSort by remember {
-            mutableStateOf(false)
+
+        val infoHash = torrentBean.infoHash
+        val savePath = torrentBean.torrentName
+
+
+        var isSort by remember { mutableStateOf(false) }
+        val torrentFileListWeb = remember {
+            mutableStateListOf<TorrentFileListWeb>().apply {
+                addAll(torrentBean.torrentFileListWeb)
+            }
         }
+
         LaunchedEffect(Unit) {
             isSort = DataStoreUtil.getData(ConfigKeyUtil.TORRENT_SORT, false)
         }
 
+        if (isSort) {
+            torrentFileListWeb.sortByDescending { it -> it.size }
+        }
+
         viewModel<FileViewModel>().setRefreshingStatus(false)
-        SelectTorrentFileDialog(torrentBean, isSort, enter)
+        SelectTorrentFileDialog(
+            torrentFileListWeb.toList(), torrentBean.fileCount, torrentBean.fileSizeString
+        ) {
+            val map = if (isSort) {
+                val sortMap = hashMapOf<Int, TorrentFileListWeb>()
+                val torrentFileList = it.values.toMutableList()
+                torrentFileList.forEach { i ->
+                    sortMap.put(torrentBean.torrentFileListWeb.indexOf(i), i)
+                }
+                sortMap
+            } else {
+                it
+            }
+            val wanted = map.keys.joinToString(separator = ",")
+            enter.invoke(infoHash, savePath, wanted)
+        }
     }
 }
 
 @Composable
 private fun SelectTorrentFileDialog(
-    torrentFileBean: TorrentFileBean,
-    isSort: Boolean = false,
-    enter: (torrentFileBean: TorrentFileBean, Map<Int, TorrentFileListWeb>) -> Unit
+    torrentFileListWeb: List<TorrentFileListWeb>,
+    fileCount: Int,
+    fileSizeString: String,
+    enter: (Map<Int, TorrentFileListWeb>) -> Unit
 ) {
     val listState = rememberLazyListState()
-
-    var originTorrentFileListWeb: ArrayList<TorrentFileListWeb>? = null
-    if (isSort) {
-        originTorrentFileListWeb =
-            torrentFileBean.torrentFileListWeb.toMutableList() as ArrayList<TorrentFileListWeb>
-        torrentFileBean.torrentFileListWeb.sortByDescending { torrentFileBean -> torrentFileBean.size }
+    //按文件大小排序后，不知道会滚动到什么地方，统一滚动到顶部
+    LaunchedEffect(Unit) {
+        listState.requestScrollToItem(0)
     }
-
     //select all
-    val selectMap = remember(torrentFileBean) {
+    val selectMap = remember(torrentFileListWeb) {
         mutableStateMapOf<Int, TorrentFileListWeb>().apply {
-            torrentFileBean.torrentFileListWeb.forEachIndexed { index, torrentFileListWeb ->
+            torrentFileListWeb.forEachIndexed { index, torrentFileListWeb ->
                 if (torrentFileListWeb.wanted == 1) {
                     this[index] = torrentFileListWeb
                 }
@@ -760,28 +784,19 @@ private fun SelectTorrentFileDialog(
     }
     val cancel: () -> Unit = {
         selectMap.clear()
-        enter.invoke(torrentFileBean, selectMap)
-        if (isSort) {
-            torrentFileBean.torrentFileListWeb = originTorrentFileListWeb!!
-        }
+        enter.invoke(selectMap)
     }
 
     AlertDialog(onDismissRequest = {
         cancel()
     }, confirmButton = {
         Row(
-            verticalAlignment = Alignment.CenterVertically, modifier = Modifier.offset(y = (-20).dp)
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.offset(y = (-20).dp)
         ) {
             TextButton(
                 onClick = {
-                    if (isSort) {
-                        val torrentFileList = selectMap.values.toMutableList()
-                        selectMap.clear()
-                        torrentFileList.forEach { i ->
-                            selectMap.put(originTorrentFileListWeb!!.indexOf(i), i)
-                        }
-                    }
-                    enter.invoke(torrentFileBean, selectMap)
+                    enter.invoke(selectMap)
                 },
             ) {
                 Text(text = "下载")
@@ -789,7 +804,7 @@ private fun SelectTorrentFileDialog(
             TextButton(
                 onClick = {
                     selectMap.clear()
-                    torrentFileBean.torrentFileListWeb.forEachIndexed { index, torrentFileListWeb ->
+                    torrentFileListWeb.forEachIndexed { index, torrentFileListWeb ->
                         if (torrentFileListWeb.wanted == 1) {
                             selectMap[index] = torrentFileListWeb
                         }
@@ -800,7 +815,7 @@ private fun SelectTorrentFileDialog(
             }
             TextButton(
                 onClick = {
-                    torrentFileBean.torrentFileListWeb.forEachIndexed { index, torrentFileListWeb ->
+                    torrentFileListWeb.forEachIndexed { index, torrentFileListWeb ->
                         if (torrentFileListWeb.wanted == 1) {
                             if (selectMap.containsKey(index)) {
                                 selectMap.remove(index)
@@ -824,10 +839,10 @@ private fun SelectTorrentFileDialog(
     }, title = { Text(text = "选择要下载的文件") }, text = {
         Column() {
             AutoSizableTextField(
-                value = "已经选择${selectMap.size}/${torrentFileBean.fileCount}个，总计：${
+                value = "已经选择${selectMap.size}/${fileCount}个，总计：${
                     android.text.format.Formatter.formatFileSize(
                         App.instance, selectMap.values.sumOf { it.size })
-                }\n" + "共${torrentFileBean.fileCount}个文件，总计：${torrentFileBean.fileSizeString}",
+                }\n" + "共${fileCount}个文件，总计：${fileSizeString}",
                 minFontSize = 30.sp,
                 maxLines = 2
             )
@@ -837,7 +852,7 @@ private fun SelectTorrentFileDialog(
                 )
             ) {
                 LazyColumn(modifier = Modifier.padding(8.dp), state = listState) {
-                    itemsIndexed(items = torrentFileBean.torrentFileListWeb, key = { _, item ->
+                    itemsIndexed(items = torrentFileListWeb, key = { _, item ->
                         item.hashCode()
                     }) { index, item ->
                         if (item.wanted == 1) {
@@ -887,9 +902,6 @@ fun SelectTorrentFileDialogPreview() {
         TorrentFileBean::class.java
     )
 
-    SelectTorrentFileDialog(torrentFileBean) { a: TorrentFileBean, m: Map<Int, TorrentFileListWeb> ->
-
-    }
 
 }
 
