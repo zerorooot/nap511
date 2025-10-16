@@ -68,7 +68,7 @@
     <string name="DEFAULT_OFFLINE_TIME">defaultOfflineTime</string>
     <string name="DEFAULT_OFFLINE_COUNT">defaultOfflineCount</string>
     <string name="CURRENT_OFFLINE_TASK">currentOfflineTask</string>
-
+    <string name="CLICK_DOWNLOAD_NOW">clickDownloadNow</string>
 
     <string name="reply_title">Default reply action</string>
 

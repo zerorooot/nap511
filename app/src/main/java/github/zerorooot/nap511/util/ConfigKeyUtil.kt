@@ -180,7 +180,10 @@ class ConfigKeyUtil {
          */
         val LOG_SCREEN by lazy { App.instance.getStringRes(R.string.LOG_SCREEN) }
 
-
+        /**
+         * 立刻下载
+         */
+        val CLICK_DOWNLOAD_NOW by lazy { App.instance.getStringRes(R.string.CLICK_DOWNLOAD_NOW) }
         /**
          * 离线task的标签
          */

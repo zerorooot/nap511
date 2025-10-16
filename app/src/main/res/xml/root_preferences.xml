@@ -103,6 +103,11 @@
         app:summary="延迟5分钟后统一离线下载"
         app:title="离线任务延迟时间" />
 
+    <Preference
+        app:key="@string/CLICK_DOWNLOAD_NOW"
+        app:summary="立刻下载缓存的离线任务"
+        app:title="立即下载" />
+
     <EditTextPreference
         app:key="@string/CURRENT_OFFLINE_TASK"
         app:summary="当前尚未添加离线任务的链接"
