@@ -5,8 +5,13 @@ import com.google.gson.JsonObject
 import github.zerorooot.nap511.bean.*
 import github.zerorooot.nap511.util.App
 import okhttp3.Interceptor
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.RequestBody
+import okhttp3.Response
+import okhttp3.ResponseBody
+import okhttp3.ResponseBody.Companion.toResponseBody
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
@@ -26,15 +31,26 @@ interface FileService {
                     .client(
                         OkHttpClient().newBuilder()
                             .addInterceptor(Interceptor { chain ->
-                                chain.proceed(
-                                    chain.request().newBuilder()
-                                        .addHeader("Cookie", cookie)
-                                        .addHeader(
-                                            "User-Agent",
-                                            "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
-                                        )
+                                try {
+                                    chain.proceed(
+                                        chain.request().newBuilder()
+                                            .addHeader("Cookie", cookie)
+                                            .addHeader(
+                                                "User-Agent",
+                                                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
+                                            )
+                                            .build()
+                                    )
+                                } catch (e: Exception) {
+                                    //防止java.net.SocketTimeoutException: timeout 错误
+                                    Response.Builder()
+                                        .request(chain.request())
+                                        .protocol(Protocol.HTTP_1_1)
+                                        .code(500)
+                                        .message(e.message ?: "Network error")
+                                        .body("".toResponseBody("text/plain".toMediaTypeOrNull()))
                                         .build()
-                                );
+                                }
                             })
                             .build()
                     )

@@ -538,8 +538,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        val fileViewModel = ViewModelProvider(this)[FileViewModel::class.java]
-        fileViewModel.saveFileCache()
+        try {
+            val fileViewModel = ViewModelProvider(this)[FileViewModel::class.java]
+            fileViewModel.saveFileCache()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     override fun onStop() {

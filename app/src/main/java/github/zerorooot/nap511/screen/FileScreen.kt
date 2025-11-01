@@ -28,6 +28,7 @@ import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -88,6 +89,16 @@ fun FileScreen(
 ) {
     val fileViewModel = viewModel<FileViewModel>()
     val offlineFileViewModel = viewModel<OfflineFileViewModel>()
+
+    val fabPosition by mutableStateOf(
+        when (DataStoreUtil.getData(ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION, "End")) {
+            "Start" -> FabPosition.Start
+            "Center" -> FabPosition.Center
+            "End" -> FabPosition.End
+            "EndOverlay" -> FabPosition.EndOverlay
+            else -> FabPosition.End
+        }
+    )
 
     val fileBeanList = fileViewModel.fileBeanList
     val path by fileViewModel.currentPath.collectAsState()
@@ -236,8 +247,7 @@ fun FileScreen(
         fileViewModel.back()
     }
     BackHandler(
-        path != "/根目录" || fileViewModel.isLongClickState || fileViewModel.isSearchState,
-        onBack
+        path != "/根目录" || fileViewModel.isLongClickState || fileViewModel.isSearchState, onBack
     )
 
     val myAppBarOnClick = { i: String ->
@@ -283,8 +293,7 @@ fun FileScreen(
                 ),
         ) {
             MiddleEllipsisText(
-                text = path, modifier = Modifier
-                    .padding(8.dp, 4.dp)
+                text = path, modifier = Modifier.padding(8.dp, 4.dp)
             )
         }
 
@@ -293,7 +302,7 @@ fun FileScreen(
                 fadeIn() togetherWith fadeOut()
             }, label = "") {
                 if (it) {
-                    Column() {
+                    Column {
                         FloatingActionButton(onClick = {
                             floatingActionButtonOnClick.invoke("CloseFloatingActionButton")
                         }) {
@@ -317,11 +326,10 @@ fun FileScreen(
                     }
                 }
             }
-        }) {
+        }, floatingActionButtonPosition = fabPosition) {
             Box(Modifier.pullRefresh(pullRefreshState)) {
                 LazyColumnScrollbar(
-                    state = listState,
-                    settings = ScrollbarSettings.Default.copy(
+                    state = listState, settings = ScrollbarSettings.Default.copy(
                         thumbUnselectedColor = Purple80
                     )
                 ) {
@@ -421,15 +429,13 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
     }
     //查看种子文件内容
     val offlineFileViewModel = viewModel<OfflineFileViewModel>()
-    CreateSelectTorrentFileDialog() { infoHash, savePath, wanted ->
+    CreateSelectTorrentFileDialog { infoHash, savePath, wanted ->
         dialogSwitchUtil.isOpenCreateSelectTorrentFileDialog = false
         if (wanted.isEmpty()) {
             return@CreateSelectTorrentFileDialog
         }
         offlineFileViewModel.addTorrentTask(
-            infoHash,
-            savePath,
-            wanted
+            infoHash, savePath, wanted
         )
     }
     //解压文件

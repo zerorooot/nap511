@@ -120,6 +120,13 @@ class ConfigKeyUtil {
          */
         val TORRENT_SORT by lazy { App.instance.getStringRes(R.string.TORRENT_SORT) }
 
+
+
+        /**
+         * 浮动按钮位置
+         */
+        val FLOATING_ACTION_BUTTON_POSITION by lazy { App.instance.getStringRes(R.string.FLOATING_ACTION_BUTTON_POSITION) }
+
         /**
          * 磁力链接验证
          */

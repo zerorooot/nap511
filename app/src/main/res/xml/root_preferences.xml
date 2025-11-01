@@ -44,6 +44,15 @@
         app:title="默认离线位置"
         app:useSimpleSummaryProvider="true" />
 
+    <ListPreference
+        android:defaultValue="End"
+        android:entries="@array/floatingActionButtonPosition"
+        android:entryValues="@array/floatingActionButtonPosition"
+        android:summary="%s"
+        app:key="@string/FLOATING_ACTION_BUTTON_POSITION"
+        app:title="浮动按钮位置" />
+
+
     <Preference
         app:key="checkVideo"
         app:summary="打开视频播放异常验证页面"
