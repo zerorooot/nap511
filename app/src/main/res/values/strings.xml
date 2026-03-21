@@ -3,6 +3,7 @@
     <array name="appBarMenu">
         <item>文件排序</item>
         <item>刷新文件</item>
+        <item>视频时间</item>
     </array>
     <array name="logScreenAppBarMenu">
         <item>滚动顶部</item>
@@ -42,7 +43,6 @@
         <item>更改时间⬇️</item>
         <item>文件种类⬆️</item>
         <item>文件种类⬇️</item>
-        <item>视频时间</item>
     </array>
     <array name="floatingActionButtonPosition">
         <item>Start</item>

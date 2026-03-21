@@ -4,6 +4,7 @@ import android.app.AppOpsManager
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -12,6 +13,10 @@ import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
 import com.elvishew.xlog.LogConfiguration
 import com.elvishew.xlog.LogItem
 import com.elvishew.xlog.XLog
@@ -37,7 +42,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-class App : Application() {
+class App : Application(), ImageLoaderFactory {
     companion object {
         lateinit var instance: App
         var cookie by mutableStateOf("")
@@ -229,5 +234,20 @@ class App : Application() {
                 drawerState.close()
             }
         }
+    }
+
+    override fun newImageLoader(): ImageLoader {
+        return ImageLoader.Builder(this)
+            .components {
+                // 注册 GIF 解码器
+                if (Build.VERSION.SDK_INT >= 28) {
+                    add(ImageDecoderDecoder.Factory())
+                } else {
+                    add(GifDecoder.Factory())
+                }
+            }
+            // 你也可以在这里配置全局的淡入淡出效果、默认占位图等
+            .crossfade(true)
+            .build()
     }
 }

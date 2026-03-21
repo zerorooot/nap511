@@ -386,12 +386,6 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
     //文件排序
     FileOrderDialog(fileViewModel = fileViewModel) {
         dialogSwitchUtil.isOpenFileOrderDialog = false
-        if (it.contains("视频时间")) {
-            fileViewModel.fileBeanList.sortByDescending { fileBean -> fileBean.playLong }
-            //滚动到顶部
-            fileViewModel.getListLocation("null")
-            return@FileOrderDialog
-        }
         if (it != "") {
             val asc = if (it.subSequence(it.length - 2, it.length) == "⬆️") 1 else 0
             val type = when (it.subSequence(0, it.length - 2)) {

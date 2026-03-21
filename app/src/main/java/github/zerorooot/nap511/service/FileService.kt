@@ -32,15 +32,22 @@ interface FileService {
                         OkHttpClient().newBuilder()
                             .addInterceptor(Interceptor { chain ->
                                 try {
-                                    chain.proceed(
-                                        chain.request().newBuilder()
-                                            .addHeader("Cookie", cookie)
-                                            .addHeader(
-                                                "User-Agent",
-                                                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
-                                            )
-                                            .build()
-                                    )
+                                    val request =  chain.request().newBuilder()
+                                        .addHeader("Cookie", cookie)
+                                        .addHeader(
+                                            "User-Agent",
+                                            "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
+                                        )
+                                        .build()
+                                    val response = chain.proceed(request)
+                                    val code = response.code
+                                    if (code >=400) {
+                                        response.close() // 关闭原始响应体，防止泄漏
+                                        // 手动抛出异常，强制进入下方的 catch 块
+                                        // 这样会复用你原本处理 SocketTimeoutException 的逻辑
+                                        throw java.io.IOException("HTTP $code error")
+                                    }
+                                    return@Interceptor response
                                 } catch (e: Exception) {
                                     //防止java.net.SocketTimeoutException: timeout 错误
                                     Response.Builder()

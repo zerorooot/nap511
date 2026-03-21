@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.screen
 
 import android.annotation.SuppressLint
+import android.graphics.Bitmap
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -39,6 +40,7 @@ import github.zerorooot.nap511.util.DataStoreUtil
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import kotlin.collections.mapOf
 
 @SuppressLint("SetJavaScriptEnabled")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,6 +85,7 @@ fun BaseWebViewScreen(
                         settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                         settings.userAgentString =
                             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+                        CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                     }
                 },
                 update = { webView ->
@@ -98,7 +101,10 @@ fun BaseWebViewScreen(
 @Composable
 fun WebViewScreen() {
     App.gesturesEnabled = false
-    CookieManager.getInstance().removeAllCookies { value -> XLog.d("removeAllCookies $value") }
+    CookieManager.getInstance().removeAllCookies { }
+    CookieManager.getInstance().setAcceptCookie(true)
+    WebView.setWebContentsDebuggingEnabled(true)
+    setRawCookieString("https://115.com/", App.cookie)
     BaseWebViewScreen(
         titleText = "网页版",
         topAppBarActionButtonOnClick = {
@@ -109,17 +115,58 @@ fun WebViewScreen() {
     )
 }
 
+fun setRawCookieString(url: String, rawCookieString: String) {
+    val cookieManager = CookieManager.getInstance()
+//    println("$url ${cookieManager.getCookie(url)}")
+    if (!url.startsWith("https://webapi.115.com") && !url.startsWith("https://115.com") && !url.startsWith(
+            "https://115vod.com/"
+        ) && !url.startsWith("https://aps.115.com/")&& !url.startsWith("https://passportapi.115.com/")
+
+    ) {
+        return
+    }
+
+    // 1. 使用分号分割字符串
+    val cookies = rawCookieString.split(";")
+    // 2. 遍历每一个部分
+    cookies.forEach { cookie ->
+        val cleanCookie = cookie.trim()
+        if (cleanCookie.isNotEmpty()) {
+            val cookieToSet = "$cleanCookie ; Domain=.115.com; Path=/;"
+//            cookieManager.setCookie(url, cookieToSet)
+            cookieManager.setCookie(url, cookieToSet)
+        }
+    }
+    // 6. 同步
+    cookieManager.flush()
+
+}
+
 fun webViewClient(): WebViewClient {
     return object : WebViewClient() {
         override fun shouldInterceptRequest(
             view: WebView?,
-            request: WebResourceRequest
+            request: WebResourceRequest?
         ): WebResourceResponse? {
-            val url = request.url.toString()
-            val cookieManager = CookieManager.getInstance()
-            App.cookie.split(";").forEach { a ->
-                cookieManager.setCookie(url, a)
-            }
+//            request?.let {
+//                val url = it.url.toString()
+//                val headers = it.requestHeaders
+//
+//                // 1. 检查 X-Requested-With 头 (这是最标准的 XHR 标志)
+//                val isAjaxHeader = headers["X-Requested-With"] == "XMLHttpRequest"
+//
+//                // 2. 检查 Accept 头 (通常 XHR 请求 JSON 数据)
+//                val acceptHeader = headers["Accept"] ?: ""
+//                val isJsonType = acceptHeader.contains("application/json")
+//
+//                if (isAjaxHeader || isJsonType) {
+//                    // 这是一个 XHR 请求
+//                    println("Caught XHR: $url")
+//                    setRawCookieString(url, App.cookie)
+//                    // 注意：如果你不打算替换响应，必须返回 null 让 WebView 继续加载
+//                    return null
+//                }
+//            }
             return super.shouldInterceptRequest(view, request)
         }
     }

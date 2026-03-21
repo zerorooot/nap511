@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeContentPadding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.safeGesturesPadding
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material3.MaterialTheme
@@ -18,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
 import coil.request.CachePolicy
 import coil.request.ImageRequest
@@ -59,7 +63,7 @@ private fun ImageBrowserScreen(images: List<ImageBean>, currentIndex: Int = 0) {
      */
     val pageState = rememberPagerState(initialPage = currentIndex)
 
-    Box {
+    Box() {
         HorizontalPager(
             count = images.size,
             state = pageState,
@@ -96,21 +100,44 @@ private fun FullScreenImage(image: ImageBean) {
             text = image.fileName,
             textAlign = TextAlign.Center,
             color = Color.White,
-            style = MaterialTheme.typography.titleMedium
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.safeDrawingPadding()
         )
-        Image(
-            painter = rememberAsyncImagePainter(
-                ImageRequest.Builder(LocalContext.current)
-                    .data(data = image.url)
-                    .apply(block = fun ImageRequest.Builder.() {
-                        scale(Scale.FILL)
-                        placeholder(R.drawable.png)
-                    })
-                    .memoryCachePolicy(CachePolicy.ENABLED)
-                    .diskCachePolicy(CachePolicy.ENABLED)
-                    .networkCachePolicy(CachePolicy.ENABLED)
-                    .build()
-            ),
+//        Image(
+//            painter = rememberAsyncImagePainter(
+//                ImageRequest.Builder(LocalContext.current)
+//                    .data(data = image.url)
+//                    .apply(block = fun ImageRequest.Builder.() {
+//                        scale(Scale.FILL)
+//                        placeholder(R.drawable.png)
+//                    })
+//                    .memoryCachePolicy(CachePolicy.ENABLED)
+//                    .diskCachePolicy(CachePolicy.ENABLED)
+//                    .networkCachePolicy(CachePolicy.ENABLED)
+//                    .build()
+//            ),
+//            contentDescription = "",
+//            contentScale = ContentScale.Fit,
+//            modifier = Modifier.enhancedZoom(
+//                clip = true,
+//                enhancedZoomState = rememberEnhancedZoomState(
+//                    minZoom = .5f,
+//                    imageSize = IntSize(1080, 1920),
+//                    limitPan = true,
+//                    moveToBounds = true
+//                ),
+//                enabled = { zoom, _, _ ->
+//                    (zoom > 1f)
+//                }
+//            ),
+//
+//            )
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(image.url)
+                .scale(Scale.FILL)
+                .placeholder(R.drawable.png)
+                .build(),
             contentDescription = "",
             contentScale = ContentScale.Fit,
             modifier = Modifier.enhancedZoom(
@@ -125,8 +152,7 @@ private fun FullScreenImage(image: ImageBean) {
                     (zoom > 1f)
                 }
             ),
-
-            )
+        )
 
     }
 }

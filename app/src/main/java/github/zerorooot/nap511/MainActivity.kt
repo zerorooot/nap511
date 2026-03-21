@@ -6,7 +6,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -47,7 +46,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.compose.rememberNavController
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkInfo
@@ -281,16 +279,14 @@ class MainActivity : AppCompatActivity() {
             R.drawable.baseline_cloud_24 to ConfigKeyUtil.MY_FILE,
             R.drawable.baseline_cloud_download_24 to ConfigKeyUtil.OFFLINE_DOWNLOAD,
             R.drawable.baseline_cloud_done_24 to ConfigKeyUtil.OFFLINE_LIST,
-//            R.drawable.baseline_video_moderator_24 to ConfigKeyUtil.VERIFY_VIDEO_ACCOUNT,
-//            R.drawable.baseline_magent_moderator_24 to ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT,
-//            R.drawable.baseline_web_24 to ConfigKeyUtil.WEB,
+            //R.drawable.baseline_web_24 to ConfigKeyUtil.WEB,
             R.drawable.ic_baseline_delete_24 to ConfigKeyUtil.RECYCLE_BIN,
             R.drawable.baseline_settings_24 to ConfigKeyUtil.ADVANCED_SETTINGS,
         )
         if (DataStoreUtil.getData(ConfigKeyUtil.LOG_SCREEN, false)) {
-            itemMap.put(R.drawable.baseline_log_24, ConfigKeyUtil.LOG_SCREEN)
+            itemMap[R.drawable.baseline_log_24] = ConfigKeyUtil.LOG_SCREEN
         }
-        itemMap.put(R.drawable.android_exit, ConfigKeyUtil.EXIT_APPLICATION)
+        itemMap[R.drawable.android_exit] = ConfigKeyUtil.EXIT_APPLICATION
         ModalNavigationDrawer(
             gesturesEnabled = App.gesturesEnabled,
             drawerState = drawerState,
@@ -500,6 +496,11 @@ class MainActivity : AppCompatActivity() {
             //具体实现在FileScreen#CreateDialogs()里
             "文件排序" -> dialogSwitchUtil.isOpenFileOrderDialog = true
             "刷新文件" -> fileViewModel.refresh()
+            "视频时间" -> {
+                fileViewModel.fileBeanList.sortByDescending { fileBean -> fileBean.playLong }
+                //滚动到顶部
+                fileViewModel.getListLocation("null")
+            }
         }
     }
 
