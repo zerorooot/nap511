@@ -31,6 +31,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,8 +45,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequest
@@ -56,7 +57,6 @@ import coil.compose.rememberAsyncImagePainter
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.elvishew.xlog.XLog
-import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.jakewharton.processphoenix.ProcessPhoenix
@@ -131,47 +131,23 @@ class MainActivity : AppCompatActivity() {
         val offlineFileViewModel by viewModels<OfflineFileViewModel> { cookieViewModelFactory }
         val recycleViewModel by viewModels<RecycleViewModel> { cookieViewModelFactory }
 
-        //恢复因MyPhotoScreen而造成的isSystemBarsVisible为false的情况
-        var visible by remember {
-            mutableStateOf(true)
-        }
-        rememberSystemUiController().apply {
-            isSystemBarsVisible = visible
-        }
         BackHandler(App.selectedItem != ConfigKeyUtil.MY_FILE) {
             App.selectedItem = ConfigKeyUtil.MY_FILE
-            visible = true
             if (!App.gesturesEnabled) {
                 App.gesturesEnabled = true
             }
         }
 
-        lifecycle.addObserver(object : DefaultLifecycleObserver {
-            override fun onPause(owner: LifecycleOwner) {
-                super.onPause(owner)
+        val lifecycleOwner = LocalLifecycleOwner.current
+        DisposableEffect(lifecycleOwner) {
+            val observer = LifecycleEventObserver { _, _ ->
                 fileViewModel.saveFileCache()
             }
-
-            override fun onDestroy(owner: LifecycleOwner) {
-                super.onDestroy(owner)
-                fileViewModel.saveFileCache()
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
             }
-
-            override fun onResume(owner: LifecycleOwner) {
-                super.onResume(owner)
-                fileViewModel.saveFileCache()
-            }
-
-            override fun onStart(owner: LifecycleOwner) {
-                super.onStart(owner)
-                fileViewModel.saveFileCache()
-            }
-
-            override fun onStop(owner: LifecycleOwner) {
-                super.onStop(owner)
-                fileViewModel.saveFileCache()
-            }
-        })
+        }
 
         MyNavigationDrawer(fileViewModel, offlineFileViewModel, recycleViewModel)
     }

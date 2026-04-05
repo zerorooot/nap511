@@ -36,6 +36,7 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.DialogSwitchUtil
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -131,13 +132,15 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     fun saveFileCache() {
-        val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
-        if (saveRequestCache) {
-            val type = object : TypeToken<HashMap<String, FilesBean>?>() {}.type
-            val json = Gson().toJson(fileListCache, type)
-            val file = App.cacheFile
-            file.writeText(json)
-            XLog.d("save file list cache ${fileListCache.size}")
+        viewModelScope.launch(Dispatchers.IO) {
+            val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
+            if (saveRequestCache) {
+                val type = object : TypeToken<HashMap<String, FilesBean>?>() {}.type
+                val json = Gson().toJson(fileListCache, type)
+                val file = App.cacheFile
+                file.writeText(json)
+                XLog.d("save file list cache ${fileListCache.size}")
+            }
         }
     }
 
@@ -718,7 +721,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
             if (fileRepository.tryToExtract(pickCode)) {
                 getZipListFile(isCheck = false)
-            }else{
+            } else {
                 App.instance.toast("服务器解压中～")
             }
         }
@@ -729,7 +732,8 @@ class FileViewModel(private val cookie: String, private val application: Applica
         thread {
             var bytes = textFileCache[fileBean]
             if (bytes == null) {
-                bytes = fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId).readBytes()
+                bytes = fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
+                    .readBytes()
                 textFileCache.put(fileBean, bytes)
             }
             textBodyByteArray = bytes

@@ -10,80 +10,86 @@
         android:id="@+id/surface_container"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:gravity="center">
-
-    </RelativeLayout>
+        android:gravity="center" />
 
     <RelativeLayout
         android:id="@+id/thumb"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_alignParentStart="true"
-        android:layout_alignParentTop="true"
-        android:layout_alignParentEnd="true"
-        android:layout_alignParentBottom="true"
-        android:background="#000000"
-        android:scaleType="fitCenter">
-
-    </RelativeLayout>
+        android:background="@android:color/black"
+        android:scaleType="fitCenter" />
 
     <LinearLayout
         android:id="@+id/layout_bottom"
         android:layout_width="match_parent"
-        android:layout_height="40dp"
+        android:layout_height="48dp"
         android:layout_alignParentBottom="true"
         android:background="#99000000"
         android:gravity="center_vertical"
         android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
         android:visibility="invisible">
 
         <TextView
             android:id="@+id/current"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="16dp"
+            android:shadowColor="#80000000"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="2"
             android:text="00:00"
-            android:textColor="#ffffff" />
+            android:textColor="@android:color/white"
+            android:textSize="12sp" />
 
         <SeekBar
             android:id="@+id/progress"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_gravity="center_vertical"
-            android:layout_weight="1.0"
+            android:layout_marginHorizontal="12dp"
+            android:layout_weight="1"
             android:background="@null"
             android:max="100"
             android:maxHeight="4dp"
             android:minHeight="4dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp"
+            android:paddingVertical="8dp"
             android:progressDrawable="@drawable/video_seek_progress"
+            android:splitTrack="false"
             android:thumb="@drawable/video_seek_thumb" />
 
         <TextView
             android:id="@+id/total"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginRight="16dp"
+            android:layout_marginEnd="16dp"
+            android:shadowColor="#80000000"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="2"
             android:text="00:00"
-            android:textColor="#ffffff" />
+            android:textColor="@android:color/white"
+            android:textSize="12sp" />
 
         <TextView
             android:id="@+id/switchSpeed"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:layout_marginRight="16dp"
+            android:layout_marginEnd="16dp"
             android:gravity="center"
             android:minEms="2"
+            android:shadowColor="#80000000"
+            android:shadowRadius="2"
             android:text="速度"
-            android:textColor="#ffffff" />
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:textStyle="bold" />
 
         <ImageView
             android:id="@+id/fullscreen"
             android:layout_width="wrap_content"
-            android:layout_height="fill_parent"
-            android:paddingRight="16dp"
-            android:scaleType="center"
+            android:layout_height="match_parent"
+            android:scaleType="centerInside"
             android:src="@drawable/video_enlarge" />
     </LinearLayout>
 
@@ -91,19 +97,19 @@
         android:id="@+id/bottom_progressbar"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
-        android:layout_height="1.5dp"
+        android:layout_height="2dp"
         android:layout_alignParentBottom="true"
         android:max="100"
         android:progressDrawable="@drawable/video_progress" />
 
     <ImageView
         android:id="@+id/back_tiny"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:layout_marginStart="6dp"
-        android:layout_marginTop="6dp"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:padding="4dp"
         android:visibility="gone" />
-
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/startAndLoadLayout"
@@ -112,8 +118,8 @@
 
         <moe.codeest.enviews.ENDownloadView
             android:id="@+id/loading"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:visibility="invisible"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
@@ -122,9 +128,8 @@
 
         <moe.codeest.enviews.ENPlayView
             android:id="@+id/start"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
-            android:layout_gravity="center_vertical"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -132,127 +137,109 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-
     <ImageView
         android:id="@+id/small_close"
-        android:layout_width="30dp"
-        android:layout_height="30dp"
-        android:paddingStart="10dp"
-        android:paddingTop="10dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:padding="8dp"
         android:scaleType="centerInside"
         android:src="@drawable/video_small_close"
         android:visibility="gone" />
 
     <ImageView
         android:id="@+id/lock_screen"
-        android:layout_width="30dp"
-        android:layout_height="30dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
         android:layout_alignParentEnd="true"
         android:layout_centerVertical="true"
-        android:layout_marginEnd="50dp"
+        android:layout_marginEnd="32dp"
+        android:padding="8dp"
         android:scaleType="centerInside"
         android:src="@drawable/unlock"
         android:visibility="gone" />
 
-    <LinearLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/layout_top"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="50dp"
         android:layout_alignParentTop="true"
-        android:layout_toEndOf="@+id/back_tiny"
         android:background="@drawable/video_title_bg"
-        android:gravity="center_vertical">
+        android:paddingEnd="16dp">
 
-        <androidx.constraintlayout.widget.ConstraintLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent">
+        <ImageView
+            android:id="@+id/back"
+            android:layout_width="48dp"
+            android:layout_height="match_parent"
+            android:paddingHorizontal="12dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/video_back"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-            <ImageView
-                android:id="@+id/back"
-                android:layout_width="30dp"
-                android:layout_height="48dp"
-                android:paddingStart="10dp"
-                android:scaleType="centerInside"
-                android:src="@drawable/video_back"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
+        <TextView
+            android:id="@+id/title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="16dp"
+            android:ellipsize="marquee"
+            android:shadowColor="#80000000"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="2"
+            android:singleLine="true"
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/batteryTextView"
+            app:layout_constraintStart_toEndOf="@+id/back"
+            app:layout_constraintTop_toTopOf="parent" />
 
-            <TextView
-                android:id="@+id/title"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:ellipsize="marquee"
-                android:singleLine="true"
-                android:textColor="@android:color/white"
-                android:textSize="18sp"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintEnd_toStartOf="@+id/guideline18"
-                app:layout_constraintStart_toEndOf="@+id/back"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintVertical_bias="0.50" />
+        <TextView
+            android:id="@+id/batteryTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="12dp"
+            android:shadowColor="#80000000"
+            android:shadowRadius="2"
+            android:text="100%"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/timeTextView"
+            app:layout_constraintTop_toTopOf="parent" />
 
-            <TextView
-                android:id="@+id/batteryTextView"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="100%"
-                android:textColor="@color/white"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintEnd_toStartOf="@+id/guideline36"
-                app:layout_constraintStart_toEndOf="@+id/title"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintVertical_bias="0.50" />
+        <TextView
+            android:id="@+id/timeTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="16dp"
+            android:shadowColor="#80000000"
+            android:shadowRadius="2"
+            android:text="13:13"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/moreScale"
+            app:layout_constraintTop_toTopOf="parent" />
 
-            <TextView
-                android:id="@+id/timeTextView"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="13:13"
-                android:textColor="@color/white"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintEnd_toStartOf="@+id/guideline19"
-                app:layout_constraintStart_toStartOf="@+id/guideline36"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintVertical_bias="0.50" />
+        <TextView
+            android:id="@+id/moreScale"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:shadowColor="#80000000"
+            android:shadowRadius="2"
+            android:text="比例"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-            <androidx.constraintlayout.widget.Guideline
-                android:id="@+id/guideline18"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                app:layout_constraintGuide_percent="0.7" />
-
-            <androidx.constraintlayout.widget.Guideline
-                android:id="@+id/guideline19"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                app:layout_constraintGuide_percent="0.90" />
-
-            <androidx.constraintlayout.widget.Guideline
-                android:id="@+id/guideline36"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                app:layout_constraintGuide_percent="0.8" />
-
-            <TextView
-                android:id="@+id/moreScale"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="比例"
-                android:textColor="#FFFFFF"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="@+id/guideline19"
-                app:layout_constraintTop_toTopOf="parent" />
-        </androidx.constraintlayout.widget.ConstraintLayout>
-
-    </LinearLayout>
-
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </RelativeLayout>
-
