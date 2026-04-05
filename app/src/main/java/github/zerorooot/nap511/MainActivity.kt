@@ -44,7 +44,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequest
@@ -145,6 +146,33 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onPause(owner: LifecycleOwner) {
+                super.onPause(owner)
+                fileViewModel.saveFileCache()
+            }
+
+            override fun onDestroy(owner: LifecycleOwner) {
+                super.onDestroy(owner)
+                fileViewModel.saveFileCache()
+            }
+
+            override fun onResume(owner: LifecycleOwner) {
+                super.onResume(owner)
+                fileViewModel.saveFileCache()
+            }
+
+            override fun onStart(owner: LifecycleOwner) {
+                super.onStart(owner)
+                fileViewModel.saveFileCache()
+            }
+
+            override fun onStop(owner: LifecycleOwner) {
+                super.onStop(owner)
+                fileViewModel.saveFileCache()
+            }
+        })
+
         MyNavigationDrawer(fileViewModel, offlineFileViewModel, recycleViewModel)
     }
 
@@ -161,8 +189,7 @@ class MainActivity : AppCompatActivity() {
     private fun handleIntent(intent: Intent): Boolean {
         var isHandle = false
 
-        val action = intent.action
-        when (action) {
+        when (intent.action) {
             //直接添加磁力，但提示请验证账号;跳转到验证账号界面
             "check" -> {
                 App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
@@ -173,14 +200,10 @@ class MainActivity : AppCompatActivity() {
             //跳转到默认下载目录
             "jump" -> {
                 val fileViewModel: FileViewModel by viewModels()
-                val cid = intent.getStringExtra("cid").let {
-                    if (it == null) {
-                        DataStoreUtil.getData(
-                            ConfigKeyUtil.DEFAULT_OFFLINE_CID,
-                            "0"
-                        )
-                    } else it
-                }
+                val cid = intent.getStringExtra("cid") ?: DataStoreUtil.getData(
+                    ConfigKeyUtil.DEFAULT_OFFLINE_CID,
+                    "0"
+                )
                 fileViewModel.getFiles(cid)
 
                 XLog.d("handleIntent jump $intent $cid $fileViewModel")
@@ -534,35 +557,6 @@ class MainActivity : AppCompatActivity() {
                 fileViewModel.refresh()
             }
         }
-    }
-
-
-    override fun onPause() {
-        super.onPause()
-        try {
-            val fileViewModel = ViewModelProvider(this)[FileViewModel::class.java]
-            fileViewModel.saveFileCache()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    override fun onStop() {
-        super.onStop()
-        val fileViewModel = ViewModelProvider(this)[FileViewModel::class.java]
-        fileViewModel.saveFileCache()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        val fileViewModel = ViewModelProvider(this)[FileViewModel::class.java]
-        fileViewModel.saveFileCache()
-    }
-
-    override fun onRestart() {
-        super.onRestart()
-        val fileViewModel = ViewModelProvider(this)[FileViewModel::class.java]
-        fileViewModel.saveFileCache()
     }
 
 
