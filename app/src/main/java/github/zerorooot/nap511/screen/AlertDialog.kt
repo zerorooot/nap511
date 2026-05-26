@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -45,7 +47,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -740,7 +741,7 @@ fun CreateSelectTorrentFileDialog(
                 val sortMap = hashMapOf<Int, TorrentFileListWeb>()
                 val torrentFileList = it.values.toMutableList()
                 torrentFileList.forEach { i ->
-                    sortMap.put(torrentBean.torrentFileListWeb.indexOf(i), i)
+                    sortMap[torrentBean.torrentFileListWeb.indexOf(i)] = i
                 }
                 sortMap
             } else {
@@ -837,7 +838,11 @@ private fun SelectTorrentFileDialog(
             }
         }
     }, title = { Text(text = "选择要下载的文件") }, text = {
-        Column() {
+        Column(
+            modifier = Modifier
+                .wrapContentHeight() // 让高度自适应内容
+                .heightIn(max = 150.dp) // 限制最大高度，防止文件极多时超出屏幕，变成滚动模式
+        ) {
             AutoSizableTextField(
                 value = "已经选择${selectMap.size}/${fileCount}个，总计：${
                     android.text.format.Formatter.formatFileSize(
@@ -851,7 +856,11 @@ private fun SelectTorrentFileDialog(
                     thumbUnselectedColor = Purple80
                 )
             ) {
-                LazyColumn(modifier = Modifier.padding(8.dp), state = listState) {
+                LazyColumn(
+                    modifier = Modifier
+                        .padding(8.dp),
+                    state = listState
+                ) {
                     itemsIndexed(items = torrentFileListWeb, key = { _, item ->
                         item.hashCode()
                     }) { index, item ->
@@ -981,6 +990,7 @@ private fun BaseDialog(
     val focusRequester = remember { FocusRequester() }
 
     AlertDialog(
+        modifier = Modifier.width(IntrinsicSize.Max), // 1. 核心修改：让 Dialog 宽度等于子组件的最大固有宽度
         onDismissRequest = {
             enter.invoke("")
         }, confirmButton = {
@@ -1013,6 +1023,7 @@ private fun BaseDialog(
                 keyboardOptions = keyboardOptions,
                 modifier = Modifier
                     .focusRequester(focusRequester)
+                    .fillMaxWidth()
                     .heightIn(1.dp, Dp.Infinity),
                 readOnly = readOnly,
                 textStyle = if (readOnly) LocalTextStyle.current.copy(textAlign = TextAlign.Center) else LocalTextStyle.current,

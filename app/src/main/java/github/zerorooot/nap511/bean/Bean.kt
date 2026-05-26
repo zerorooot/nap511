@@ -8,6 +8,16 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 
+sealed interface ZipStatus {
+    /** 正常未加密的压缩包，可以直接预览 */
+    object Normal : ZipStatus
+
+    /** 加密压缩包，需要提示用户输入密码 */
+    object Encrypted : ZipStatus
+
+    /** 不支持预览（如文件超大）或接口、网络等其它错误 */
+    data class UnsupportedOrError(val message: String) : ZipStatus
+}
 
 data class AvatarBean(
     var expire: Long = 1L,

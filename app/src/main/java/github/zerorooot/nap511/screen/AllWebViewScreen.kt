@@ -1,8 +1,10 @@
 package github.zerorooot.nap511.screen
 
 import android.annotation.SuppressLint
-import android.graphics.Bitmap
+import android.util.Log
+import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -40,7 +42,6 @@ import github.zerorooot.nap511.util.DataStoreUtil
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import kotlin.collections.mapOf
 
 @SuppressLint("SetJavaScriptEnabled")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,6 +72,7 @@ fun BaseWebViewScreen(
             color = MaterialTheme.colorScheme.background,
         ) {
             AndroidView(
+                modifier = Modifier.fillMaxSize(),
                 factory = { context ->
                     WebView(context).apply {
                         this.webViewClient = webViewClient.invoke(this)
@@ -79,6 +81,7 @@ fun BaseWebViewScreen(
                         settings.useWideViewPort = true
                         settings.javaScriptCanOpenWindowsAutomatically = true;
                         settings.setSupportZoom(true)
+                        settings.builtInZoomControls = true
                         settings.domStorageEnabled = true;//开启DOM缓存，关闭的话H5自身的一些操作是无效的
                         settings.cacheMode = WebSettings.LOAD_DEFAULT;
                         // Allow mixed content for WebSocket connections (optional, if needed)
@@ -118,13 +121,13 @@ fun WebViewScreen() {
 fun setRawCookieString(url: String, rawCookieString: String) {
     val cookieManager = CookieManager.getInstance()
 //    println("$url ${cookieManager.getCookie(url)}")
-    if (!url.startsWith("https://webapi.115.com") && !url.startsWith("https://115.com") && !url.startsWith(
-            "https://115vod.com/"
-        ) && !url.startsWith("https://aps.115.com/")&& !url.startsWith("https://passportapi.115.com/")
-
-    ) {
-        return
-    }
+//    if (!url.startsWith("https://webapi.115.com") && !url.startsWith("https://115.com") && !url.startsWith(
+//            "https://115vod.com/"
+//        ) && !url.startsWith("https://aps.115.com/")&& !url.startsWith("https://passportapi.115.com/")
+//
+//    ) {
+//        return
+//    }
 
     // 1. 使用分号分割字符串
     val cookies = rawCookieString.split(";")
@@ -133,8 +136,8 @@ fun setRawCookieString(url: String, rawCookieString: String) {
         val cleanCookie = cookie.trim()
         if (cleanCookie.isNotEmpty()) {
             val cookieToSet = "$cleanCookie ; Domain=.115.com; Path=/;"
-//            cookieManager.setCookie(url, cookieToSet)
             cookieManager.setCookie(url, cookieToSet)
+//            cookieManager.setCookie(url, cleanCookie)
         }
     }
     // 6. 同步
@@ -143,6 +146,7 @@ fun setRawCookieString(url: String, rawCookieString: String) {
 }
 
 fun webViewClient(): WebViewClient {
+
     return object : WebViewClient() {
         override fun shouldInterceptRequest(
             view: WebView?,
@@ -193,6 +197,7 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
         ): WebResourceResponse? {
             var cookie: String? = null
             val urlList = arrayOf(
+                "https://115.com/storage/netdisk?cid=0&mode=wangpan",
                 "https://115.com/?cid=0&offset=0&mode=wangpan",
                 "https://my.115.com/?ct=guide&ac=status"
             )

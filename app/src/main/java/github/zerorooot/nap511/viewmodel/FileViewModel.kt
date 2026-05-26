@@ -29,6 +29,7 @@ import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.RemainingSpaceBean
 import github.zerorooot.nap511.bean.RenameBean
 import github.zerorooot.nap511.bean.ZipBeanList
+import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.Sha1Service
@@ -661,6 +662,42 @@ class FileViewModel(private val cookie: String, private val application: Applica
     ) {
         viewModelScope.launch {
             val fileBean = fileBeanList[selectIndex]
+            if (isCheck && !dialogSwitchUtil.isOpenUnzipDialog && paths == "文件") {
+                // 首次打开，调用重构后的状态检查方法
+                when (val status = fileRepository.checkZipStatus(fileBean.pickCode)) {
+                    is ZipStatus.Encrypted -> {
+                        XLog.d("${fileBean.name} 是加密压缩包，拦截流程并弹窗")
+                        dialogSwitchUtil.isOpenUnzipPasswordDialog = true
+                        setRefreshingStatus(false)
+                        return@launch // 拦截，等待用户输入密码
+                    }
+
+                    is ZipStatus.UnsupportedOrError -> {
+                        XLog.w("业务不支持或发生错误: ${status.message}")
+                        // 【核心优化】在这里消费错误，比如弹一个 Toast 提示用户，并终止后续流程
+                        App.instance.toast(status.message)
+                        setRefreshingStatus(false)
+                        return@launch // 拦截，不再继续请求文件列表，避免无意义的崩溃或空白页
+                    }
+
+                    is ZipStatus.Normal -> {
+                        // 正常未加密包，不做任何拦截，继续向下执行
+                        XLog.d("${fileBean.name} 为普通压缩包，准备直接打开")
+                    }
+                }
+            }
+
+            // 只有 ZipStatus.Normal 或者已经处理完流程时，才会走到这里
+            unzipBeanList.value = fileRepository.getZipListFile(fileBean.pickCode, fileName, paths)
+            dialogSwitchUtil.isOpenUnzipDialog = true
+        }
+    }
+
+    fun getZipListFileBack(
+        fileName: String = "", paths: String = "文件", isCheck: Boolean = true
+    ) {
+        viewModelScope.launch {
+            val fileBean = fileBeanList[selectIndex]
             if (isCheck) {
                 //首次打开
                 if (!dialogSwitchUtil.isOpenUnzipDialog && paths == "文件") {
@@ -734,7 +771,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             if (bytes == null) {
                 bytes = fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
                     .readBytes()
-                textFileCache.put(fileBean, bytes)
+                textFileCache[fileBean] = bytes
             }
             textBodyByteArray = bytes
             dialogSwitchUtil.isOpenTextBodyDialog = true

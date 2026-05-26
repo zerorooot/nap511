@@ -12,6 +12,7 @@ import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.bean.SignBean
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.ZipBeanList
+import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.OfflineService
 import github.zerorooot.nap511.util.App
@@ -181,7 +182,7 @@ class FileRepository(private val cookie: String) {
         dirs: List<String>?,
         showToast: Boolean = true
     ): Pair<Boolean, String> {
-        var state = true
+        var state: Boolean
         val unzipFile = fileService.unzipFile(pickCode, zipFileCid, files, dirs)
         XLog.d("unzipFile JsonElement $unzipFile")
         val jsonObject = unzipFile.asJsonObject
@@ -237,7 +238,7 @@ class FileRepository(private val cookie: String) {
         val data =
             fileService.getZipListFile(pickCode, fileName, paths).getAsJsonObject("data")
         XLog.d("FileRepository.getZipListFile $data")
-        val zipBeanList = Gson().fromJson<ZipBeanList>(data, ZipBeanList::class.java)
+        val zipBeanList = Gson().fromJson(data, ZipBeanList::class.java)
         val sj = StringJoiner("/")
         data.getAsJsonArray("paths")
             .forEach { sj.add(it.asJsonObject.get("file_name").asString) }
@@ -249,7 +250,7 @@ class FileRepository(private val cookie: String) {
                 i.timeString = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
                     i.time.toLong() * 1000
                 )
-                i.sizeString = formatFileSize(i.size.toLong()) + "  "
+                i.sizeString = formatFileSize(i.size) + "  "
                 when (i.icoString) {
                     "apk" -> i.fileIco = R.drawable.apk
                     "iso" -> i.fileIco = R.drawable.iso
@@ -284,7 +285,7 @@ class FileRepository(private val cookie: String) {
         val json = fileService.decryptZip(pickCode, secret)
         XLog.d("decryptZip $json")
         val asInt = json.getAsJsonObject("data").get("unzip_status").asInt
-        //4 is success,6 is decrypt error,1 is has been done
+        //4 is success,6 is decrypt error,1 is having been done
         return asInt != 6
     }
 
@@ -294,8 +295,51 @@ class FileRepository(private val cookie: String) {
         XLog.d("checkIsEncryptionZip $json")
         val unzipStatus =
             json.getAsJsonObject("data").getAsJsonObject("extract_status").get("unzip_status").asInt
+        //{"state":false,"message":"暂不支持解压预览20GB以上的压缩包","code":51002,"data":[]}
         //1 is encryption zip file
         return unzipStatus != 4
+    }
+    suspend fun checkZipStatus(pickCode: String): ZipStatus {
+        return try {
+            val json = fileService.getDecryptZipProcess(pickCode)
+            //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
+            XLog.d("checkZipStatus $json")
+
+            // 1. 处理接口返回业务错误（如：暂不支持解压预览20GB以上的压缩包）
+            if (json.has("state") && !json.get("state").asBoolean) {
+                //{"state":false,"message":"暂不支持解压预览20GB以上的压缩包","code":51002,"data":[]} todo
+                val message = if (json.has("message")) json.get("message").asString else "未知错误"
+                return ZipStatus.UnsupportedOrError(message)
+            }
+
+            // 2. 防御性解析 JSON 结构
+            val dataElement = json.get("data")
+            if (dataElement == null || !dataElement.isJsonObject) {
+                return ZipStatus.UnsupportedOrError("数据格式异常")
+            }
+
+            val extractStatusElement = dataElement.asJsonObject.get("extract_status")
+            if (extractStatusElement == null || !extractStatusElement.isJsonObject) {
+                return ZipStatus.UnsupportedOrError("提取状态数据缺失")
+            }
+
+            val unzipStatusElement = extractStatusElement.asJsonObject.get("unzip_status")
+                ?: return ZipStatus.UnsupportedOrError("无法获取解压状态码")
+
+            // 3. 根据状态码返回对应的密封类状态
+            val unzipStatus = unzipStatusElement.asInt
+            //1 is encryption zip file
+            if (unzipStatus != 4) {
+                ZipStatus.Encrypted // 1 等状态代表加密
+            } else {
+                ZipStatus.Normal    // 4 代表正常未加密
+            }
+
+        } catch (e: Exception) {
+            // 4. 捕获网络异常、Json语法解析异常等，确保不崩溃
+            XLog.e("checkZipStatus 发生异常", e)
+            ZipStatus.UnsupportedOrError("网络或系统异常: ${e.localizedMessage}")
+        }
     }
 
     /**

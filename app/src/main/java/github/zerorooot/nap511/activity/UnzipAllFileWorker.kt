@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.Data
@@ -16,6 +17,7 @@ import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.MainActivity
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.ZipBeanList
+import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import java.util.StringJoiner
@@ -50,41 +52,58 @@ class UnzipAllFileWorker(
         fileBeanList.forEachIndexed { i, fileBean ->
             val fileName = fileBean.first
             val pickCode = fileBean.second
+            var unzipState: Pair<Boolean, String>
 
-            var zipListFile = getZipListFile(pickCode)
-            var unzipState = Pair(true, "")
+            try {
+                var zipListFile = getZipListFile(pickCode)
 
-            //加密的文件
-            if (zipListFile == null) {
-                //todo 密码错误时的处理
-                if (password != null) {
-                    XLog.d("$fileName is encryption zip file password is $password")
-                    val decryptZip = fileRepository.decryptZip(pickCode, password)
-                    if (decryptZip && fileRepository.tryToExtract(pickCode)) {
-                        zipListFile = getZipListFile(pickCode)
-                        //查看是否解压成功
-                        if (zipListFile != null) {
-                            //非加密文件，正常解压
-                            XLog.d("UnzipAllFileWorker unzip password word $fileName")
-                            unzipState = unzipAllAndDeleteFolderIfUnzipError(
-                                zipListFile,
-                                pickCode,
-                                cid,
-                                fileName
-                            )
+                //加密的文件
+                if (zipListFile == null) {
+                    //todo 密码错误时的处理
+                    if (password != null) {
+                        XLog.d("$fileName is encryption zip file password is $password")
+                        val decryptZip = fileRepository.decryptZip(pickCode, password)
+                        if (decryptZip && fileRepository.tryToExtract(pickCode)) {
+                            zipListFile = getZipListFile(pickCode)
+                            //查看是否解压成功
+                            if (zipListFile != null) {
+                                //非加密文件，正常解压
+                                XLog.d("UnzipAllFileWorker unzip password word $fileName")
+                                unzipState = unzipAllAndDeleteFolderIfUnzipError(
+                                    zipListFile, pickCode, cid, fileName
+                                )
+                            } else {
+                                // 修复：解密尝试后依然获取不到列表
+                                unzipState = Pair(false, "解压失败，文件列表为空")
+                            }
+                        } else {
+                            // 修复：密码解密请求失败或尝试提取失败
+                            unzipState = Pair(false, "密码错误或提取失败")
                         }
+                    } else {
+                        // 修复原代码逻辑漏洞：加密文件但没有提供密码时，应标记为失败
+                        unzipState = Pair(false, "文件已加密，需要提供密码")
                     }
+                } else {
+                    // 非加密文件，直接解压
+                    unzipState =
+                        unzipAllAndDeleteFolderIfUnzipError(zipListFile, pickCode, cid, fileName)
                 }
-            } else {
-                unzipState =
-                    unzipAllAndDeleteFolderIfUnzipError(zipListFile, pickCode, cid, fileName)
+            } catch (e: Exception) {
+                // 【核心修改点】：在这里捕获 getZipListFile 抛出的异常 (如：暂不支持解压预览20GB以上的压缩包)
+                XLog.e("UnzipAllFileWorker 遇到异常: ${e.message}")
+                unzipState = Pair(false, e.message ?: "未知解析错误")
             }
+
+            // 记录失败日志
             if (!unzipState.first) {
                 sj.add(fileBeanList[i].first + " 解压失败！原因：" + unzipState.second)
             }
             unzipResultList.add(unzipState)
+
             //更新解压进度
             updateProgressNotification(i, size, unzipState.first, unzipState.second)
+
         }
 
 
@@ -102,11 +121,11 @@ class UnzipAllFileWorker(
 
         App.instance.toast(message)
 
-        if (result) {
-            return Result.success(addTaskData);
+        return if (result) {
+            Result.success(addTaskData)
+        } else {
+            Result.failure(addTaskData)
         }
-
-        return Result.failure(addTaskData);
     }
 
 
@@ -137,15 +156,27 @@ class UnzipAllFileWorker(
 
     }
 
-
     private suspend fun getZipListFile(
         pickCode: String
     ): ZipBeanList? {
-        if (fileRepository.isZipFileEncryption(pickCode)) {
-            if (!fileRepository.tryToExtract(pickCode)) {
-                return null
+        // 调用重构后的方法
+        when (val status = fileRepository.checkZipStatus(pickCode)) {
+            is ZipStatus.UnsupportedOrError -> {
+                // 遇到限制（如>20GB）或接口错误时，抛出异常中断当前文件的操作，并将 message 抛给外层
+                throw RuntimeException(status.message)
+            }
+
+            is ZipStatus.Encrypted -> {
+                if (!fileRepository.tryToExtract(pickCode)) {
+                    return null // 保持原有逻辑：返回 null 代表是加密文件且需要密码
+                }
+            }
+
+            is ZipStatus.Normal -> {
+                // 正常包，无需拦截，直接去拿文件列表
             }
         }
+
         return fileRepository.getZipListFile(pickCode)
     }
 
@@ -168,7 +199,11 @@ class UnzipAllFileWorker(
             .setOngoing(true)
             .build()
 
-        return ForegroundInfo(notificationId, notification)
+        return ForegroundInfo(
+            notificationId,
+            notification,
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        )
     }
 
     /**

@@ -4,16 +4,15 @@ package github.zerorooot.nap511.service
 import android.app.Service
 import android.content.Intent
 import android.os.Build
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
-import android.widget.Toast
 import androidx.annotation.RequiresApi
+import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.Sha1Util
@@ -168,21 +167,25 @@ class Sha1Service : Service() {
                     .toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
             )
             .build()
-        val response = okHttpClient.newCall(request).execute()
 
-        val bodyJson = JsonParser().parse(response.body.string()).asJsonObject
 
-        Handler(Looper.getMainLooper()).post {
+        val message = try {
+            val response = okHttpClient.newCall(request).execute()
+            val bodyJson = JsonParser().parse(response.body.string()).asJsonObject
+            XLog.d("aria2 json $bodyJson")
             if (bodyJson.has("error")) {
-                Toast.makeText(
-                    application,
-                    "下载失败，${bodyJson.getAsJsonObject("error").get("message").asString}",
-                    Toast.LENGTH_SHORT
-                ).show()
+                "下载失败，${
+                    bodyJson.getAsJsonObject("error").get("message").asString
+                }"
             } else {
-                Toast.makeText(application, "发送成功!", Toast.LENGTH_SHORT).show()
+                "发送成功!"
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            "下载失败！${e.message}"
         }
+
+        App.instance.toast(message)
 
     }
 

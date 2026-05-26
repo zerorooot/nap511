@@ -278,7 +278,7 @@ class MainActivity : AppCompatActivity() {
             R.drawable.baseline_cloud_24 to ConfigKeyUtil.MY_FILE,
             R.drawable.baseline_cloud_download_24 to ConfigKeyUtil.OFFLINE_DOWNLOAD,
             R.drawable.baseline_cloud_done_24 to ConfigKeyUtil.OFFLINE_LIST,
-            //R.drawable.baseline_web_24 to ConfigKeyUtil.WEB,
+//            R.drawable.baseline_web_24 to ConfigKeyUtil.WEB,
             R.drawable.ic_baseline_delete_24 to ConfigKeyUtil.RECYCLE_BIN,
             R.drawable.baseline_settings_24 to ConfigKeyUtil.ADVANCED_SETTINGS,
         )
@@ -481,7 +481,6 @@ class MainActivity : AppCompatActivity() {
             //具体实现在AlertDialog#UnzipAllFile()里
             "unzipAllFile" -> {
                 dialogSwitchUtil.isOpenUnzipAllFileDialog = true
-//                unzipAllFile(fileViewModel)
             }
 
             "selectToUp" -> fileViewModel.selectToUp()
@@ -502,39 +501,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-
-    private fun unzipAllFile(fileViewModel: FileViewModel) {
-        App.instance.toast("后台解压中......")
-        val dataBuilder: Data.Builder = Data.Builder()
-        val filter =
-            fileViewModel.fileBeanList.filter { i -> i.isSelect && i.fileIco == R.drawable.zip }
-                .map { a -> Pair(a.name, a.pickCode) }.toList()
-        val listType = object : TypeToken<List<Pair<String, String>>?>() {}.type
-        val list = Gson().toJson(filter, listType)
-//todo 支持批量解压带密码的压缩文件
-//        if (it != "") {
-//            dataBuilder.putString("pwd", it)
-//        }
-        dataBuilder.putString("list", list)
-        dataBuilder.putString("cid", fileViewModel.currentCid)
-
-        val request: OneTimeWorkRequest = OneTimeWorkRequest
-            .Builder(UnzipAllFileWorker::class.java)
-            .addTag("UnzipAllFileWorker")
-            .setInputData(dataBuilder.build()).build()
-        val workManager = WorkManager.getInstance(App.instance.applicationContext)
-        workManager.enqueue(request)
-
-        fileViewModel.recoverFromLongPress()
-        fileViewModel.unSelect()
-
-        workManager.getWorkInfoByIdLiveData(request.id).observe(this) {
-            if (it != null && it.state.isFinished) {
-                fileViewModel.refresh()
-            }
-        }
-    }
-
 
 }
 
