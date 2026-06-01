@@ -8,7 +8,6 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elvishew.xlog.XLog
-import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.OfflineInfo
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.QuotaBean
@@ -90,7 +89,7 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
                     application, b.size
                 ) + " "
             }
-            torrentBeanCache.put(sha1, torrentTask)
+            torrentBeanCache[sha1] = torrentTask
             torrentBean = torrentTask
         }
     }

@@ -92,13 +92,13 @@ interface FileService {
     @GET("files/image")
     suspend fun image(@Query("pickcode") pickCode: String, @Query("_") current: Long): ImageDate
 
-    @GET("files/search")
+    @GET("files")
     suspend fun search(
         @Query("cid") cid: String,
-        @Query("search_value") searchValue: String,
+        @Query("suffix") searchValue: String,
         @Query("aid") aid: Int = 1,
         @Query("offset") asc: Int = 0,
-        @Query("limit") limit: Int = 400
+        @Query("limit") limit: Int = App.requestLimitCount
     ): FilesBean
 
 

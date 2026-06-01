@@ -1,27 +1,34 @@
 package github.zerorooot.nap511.screen
 
 
+import android.os.Process
+import android.text.format.Formatter
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -32,6 +39,7 @@ import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
@@ -62,6 +70,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -77,6 +86,11 @@ import com.google.gson.JsonObject
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.UnzipAllFileWorker
+import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.FileInfo
+import github.zerorooot.nap511.bean.InfoItem
+import github.zerorooot.nap511.bean.InfoSection
+import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.TorrentFileListWeb
 import github.zerorooot.nap511.bean.ZipBeanList
@@ -130,35 +144,225 @@ fun RenameFileDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
 }
 
 @Composable
-fun FileInfoDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
+fun FileInfoDialog(
+    fileViewModel: FileViewModel,
+    enter: () -> Unit,
+    fileInfoClick: (String) -> Unit
+) {
     val dialogSwitchUtil = DialogSwitchUtil.getInstance()
     if (dialogSwitchUtil.isOpenFileInfoDialog) {
         val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
-        BaseDialog(
-            title = fileBean.name,
-            label = "文件信息",
-            readOnly = true,
-            context = fileBean.toString() + "\n" + fileViewModel.fileInfo,
-            enter = enter
-        )
+//        BaseDialog( title = fileBean.name,label = "文件信息", readOnly = true,context = fileBean.toString() + "\n" + fileViewModel.fileInfo,enter = enter)
+        FileInfoDialog(fileBean, fileViewModel.fileInfo, enter, fileInfoClick)
     }
 }
 
 @Composable
+fun FileInfoDialog(
+    fileBean: FileBean,
+    fileInfo: FileInfo,
+    onDismissRequest: () -> Unit,
+    fileInfoClick: (String) -> Unit
+) {
+    val icon = fileBean.fileIco
+    val sections = mutableListOf<InfoSection>()
+
+    // 区块一：基础信息
+    val baseItems = mutableListOf<InfoItem>()
+    baseItems.add(InfoItem("类型", if (fileBean.isFolder) "文件夹" else "文件"))
+    if (fileBean.isFolder) {
+        baseItems.add(
+            InfoItem(
+                "包含内容",
+                "${fileInfo.count} 个文件, ${fileInfo.folderCount} 个文件夹"
+            )
+        )
+    }
+    baseItems.add(
+        InfoItem(
+            "总大小",
+            fileInfo.size.ifEmpty { fileBean.sizeString.ifEmpty { "0 B" } })
+    )
+    sections.add(InfoSection(title = "基础信息", items = baseItems))
+
+    // 区块二：位置与共享
+    val pathString = fileInfo.paths.joinToString("/") { it.fileName } + "/${fileBean.name}"
+    val locationItems = listOf(
+        InfoItem(
+            "文件路径",
+            pathString.ifEmpty { "根目录" }
+        ) { fileInfoClick.invoke(fileBean.categoryId) },
+        InfoItem("提取码", fileBean.pickCode.ifEmpty { "无" })
+    )
+    sections.add(InfoSection(title = "位置与共享", items = locationItems))
+
+    // 区块三：时间信息
+    val timeItems = listOf(
+        InfoItem("创建时间", fileBean.createTimeString.ifEmpty { "未知" }),
+        InfoItem("修改时间", fileBean.modifiedTimeString.ifEmpty { "未知" })
+    )
+    sections.add(InfoSection(title = "时间信息", items = timeItems))
+
+    BaseDetailDialog(
+        title = fileBean.name,
+        icon = icon,
+        sections = sections,
+        onDismissRequest = onDismissRequest
+    )
+}
+
+@Composable
+fun BaseDetailDialog(
+    title: String,
+    icon: Int,
+    sections: List<InfoSection>,
+    onDismissRequest: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    painter = painterResource(icon),
+                    modifier = Modifier.size(28.dp),
+                    contentScale = ContentScale.Fit,
+                    contentDescription = "",
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 2, // 离线任务名字通常较长，放宽到3行
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = MaterialTheme.typography.titleMedium.lineHeight
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                sections.forEachIndexed { index, section ->
+                    // 区块标题
+                    Text(
+                        text = section.title,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = if (index == 0) 0.dp else 8.dp)
+                    )
+
+                    // 区块内容
+                    section.items.forEach { item ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { item.onClick?.let { it() } } // 绑定点击事件
+                                .padding(vertical = 4.dp), // 增加一点垂直内边距，让点击区域更大、更跟手,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            // 左侧：标签 (占 1 份)
+                            Text(
+                                text = item.label,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(top = 2.dp) // 微调，使其与右侧第一行文本视觉对齐
+                            )
+
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Box(
+                                modifier = Modifier.weight(2f),
+                                contentAlignment = Alignment.TopEnd // 确保内容靠右
+                            ) {
+                                Text(
+                                    text = item.value.ifEmpty { "-" },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    textAlign = TextAlign.End,
+                                    minLines = 1,
+                                    color = if (item.onClick != null) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                                    modifier = Modifier.fillMaxWidth() // 填满 Box，遇到边界自动强制换行
+                                )
+                            }
+                        }
+                    }
+
+                    // 分割线 (最后一个区块不显示)
+                    if (index < sections.lastIndex) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(top = 4.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismissRequest) {
+                Text("关闭")
+            }
+        }
+    )
+}
+
+
+@Composable
 fun OfflineFileInfoDialog(
-    offlineFileViewModel: OfflineFileViewModel, enter: (String) -> Unit
+    offlineFileViewModel: OfflineFileViewModel, enter: () -> Unit, copyUrl: (String) -> Unit
 ) {
     val dialogSwitchUtil = DialogSwitchUtil.getInstance()
     if (dialogSwitchUtil.isOpenOfflineDialog) {
         val offlineTask = offlineFileViewModel.offlineTask
-        BaseDialog(
-            title = offlineTask.name,
-            label = "文件信息",
-            readOnly = true,
-            context = offlineTask.toString(),
-            enter = enter
-        )
+        OfflineTaskDialog(offlineTask, onDismissRequest = enter, urlCopy = copyUrl)
+//        BaseDialog(title = offlineTask.name, label = "文件信息", readOnly = true, context = offlineTask.toString(), enter = enter)
     }
+}
+
+@Composable
+fun OfflineTaskDialog(
+    task: OfflineTask,
+    onDismissRequest: () -> Unit,
+    urlCopy: (String) -> Unit
+) {
+    val sections = listOf(
+        InfoSection(
+            title = "任务信息",
+            items = listOf(
+                InfoItem("状态", task.percentString),
+                InfoItem("总大小", task.sizeString),
+                InfoItem("下载进度", "${task.percentDone}%")
+            )
+        ),
+        InfoSection(
+            title = "链接与哈希",
+            items = listOf(
+                InfoItem("哈希值", task.infoHash),
+                InfoItem("链接", task.url) {
+                    urlCopy.invoke(task.url)
+                }
+            )
+        ),
+        InfoSection(
+            title = "时间信息",
+            items = listOf(
+                InfoItem("添加时间", task.timeString)
+            )
+        )
+    )
+
+    BaseDetailDialog(
+        title = task.name,
+        icon = if (task.fileId == "") R.drawable.other else R.drawable.folder,
+        sections = sections,
+        onDismissRequest = onDismissRequest
+    )
 }
 
 @Composable
@@ -188,7 +392,7 @@ fun ExitApp() {
             },
             onConfirmation = {
                 fileViewModel.saveFileCache()
-                android.os.Process.killProcess(android.os.Process.myPid());
+                Process.killProcess(Process.myPid());
                 exitProcess(1);
             },
             dialogTitle = "是否离开Nap511?",
@@ -845,7 +1049,7 @@ private fun SelectTorrentFileDialog(
         ) {
             AutoSizableTextField(
                 value = "已经选择${selectMap.size}/${fileCount}个，总计：${
-                    android.text.format.Formatter.formatFileSize(
+                    Formatter.formatFileSize(
                         App.instance, selectMap.values.sumOf { it.size })
                 }\n" + "共${fileCount}个文件，总计：${fileSizeString}",
                 minFontSize = 30.sp,

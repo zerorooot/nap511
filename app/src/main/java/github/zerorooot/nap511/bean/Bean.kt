@@ -165,7 +165,24 @@ data class FileInfo(
     @SerializedName("sha1") var sha1: String = "",
     @SerializedName("open_time") var openTime: Int = 0,
     @SerializedName("desc") var desc: String = "",
-    @SerializedName("file_category") var fileCategory: String = ""
+    @SerializedName("file_category") var fileCategory: String = "",
+    var paths: List<PathsBean> = emptyList()
+)
+
+data class InfoSection(
+    val title: String,
+    val items: List<InfoItem>
+)
+// 1. 定义专属的 Item 数据类，并给 onClick 赋默认值 {} (空操作)
+data class InfoItem(
+    val label: String,
+    val value: String,
+    val onClick: (() -> Unit)? = null // 改为可空类型
+)
+
+data class PathsBean(
+    @SerializedName("file_id") var fileId: String = "",
+    @SerializedName("file_name") var fileName: String = ""
 )
 
 data class ImageDate(

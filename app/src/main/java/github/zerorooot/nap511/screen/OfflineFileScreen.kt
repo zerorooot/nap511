@@ -24,13 +24,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat.getSystemService
+import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.screenitem.OfflineCellItem
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
-import java.util.*
+import java.util.StringJoiner
 
 @OptIn(ExperimentalMaterialApi::class)
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter", "UnusedMaterialScaffoldPaddingParameter")
@@ -45,8 +46,14 @@ fun OfflineFileScreen(
     val offlineList by offlineFileViewModel.offlineFile.collectAsState()
     val context = LocalContext.current
 
-    OfflineFileInfoDialog(offlineFileViewModel) {
+    OfflineFileInfoDialog(offlineFileViewModel, {
         offlineFileViewModel.closeOfflineDialog()
+    }) {
+        val clipboard = getSystemService(context, ClipboardManager::class.java)
+        val clip = ClipData.newPlainText("label", it)
+        clipboard?.setPrimaryClip(clip)
+        XLog.d("OfflineFileInfoDialog copy $it")
+        App.instance.toast("复制磁力链接成功!")
     }
 
     val itemOnClick = { i: Int ->

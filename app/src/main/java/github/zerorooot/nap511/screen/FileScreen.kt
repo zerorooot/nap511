@@ -380,7 +380,11 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
         dialogSwitchUtil.isOpenRenameFileDialog = false
     }
     //文件信息
-    FileInfoDialog(fileViewModel) {
+    FileInfoDialog(fileViewModel, { dialogSwitchUtil.isOpenFileInfoDialog = false }) {
+        if (fileViewModel.isSearchState) {
+            fileViewModel.isSearchState = false
+        }
+        fileViewModel.getFiles(it)
         dialogSwitchUtil.isOpenFileInfoDialog = false
     }
     //文件排序
