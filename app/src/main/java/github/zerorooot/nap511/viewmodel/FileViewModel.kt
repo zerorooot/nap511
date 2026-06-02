@@ -156,7 +156,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
 
         if (isLongClickState) {
             recoverFromLongPress()
-            fileBeanList.map { i -> i.isSelect = false }
+            fileBeanList.forEach { i -> i.isSelect = false }
             return
         }
 
@@ -253,9 +253,18 @@ class FileViewModel(private val cookie: String, private val application: Applica
             )
             val files = fileService.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
             setFileBeanProperty(files.fileBeanList)
-//            setFiles(files)
             fileListCache[cid] = files
             _isRefreshing.value = false
+        }
+    }
+
+    fun updateFileBean(cid: String, index: Int, duration: Int) {
+        viewModelScope.launch {
+            val files = fileListCache[cid]!!
+            val fileBean = files.fileBeanList[index]
+            fileBean.currentPlayTime = duration
+            setFileBeanProperty(files.fileBeanList)
+            setFiles(files)
         }
     }
 
@@ -310,6 +319,8 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 setFileBeanProperty(files.fileBeanList)
                 setFiles(files)
                 _isRefreshing.value = false
+
+                saveFileCache()
             } catch (e: NullPointerException) {
                 App.instance.toast("获取文件列表失败，建议更新您的Cookie")
                 App.cacheFile.delete()

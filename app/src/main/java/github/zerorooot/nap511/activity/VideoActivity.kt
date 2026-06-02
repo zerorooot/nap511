@@ -1,12 +1,12 @@
 package github.zerorooot.nap511.activity
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.elvishew.xlog.XLog
 import com.shuyu.gsyvideoplayer.GSYVideoManager
 import com.shuyu.gsyvideoplayer.listener.GSYSampleCallBack
 import com.shuyu.gsyvideoplayer.player.PlayerFactory
@@ -16,12 +16,7 @@ import github.zerorooot.nap511.service.VideoService
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import kotlinx.coroutines.launch
-import okhttp3.FormBody
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
-import kotlin.concurrent.thread
 
 
 class VideoActivity : AppCompatActivity() {
@@ -132,6 +127,15 @@ class VideoActivity : AppCompatActivity() {
     }
 
     private fun back() {
+        val currentDuration = (videoPlayer.currentPositionWhenPlaying / 1000).toInt()
+        val fileBeanIndex = intent.getIntExtra("fileBeanIndex", -1)
+// 1. 创建一个新的 Intent 用来装载要返回的数据
+        val returnIntent = Intent().apply {
+            putExtra("current_time", currentDuration)
+            putExtra("fileBeanIndex", fileBeanIndex)
+        }
+        // 2. 设置结果码为 RESULT_OK，并传入 Intent
+        setResult(RESULT_OK, returnIntent)
         updateTime()
         //释放所有
         videoPlayer.setVideoAllCallBack(null);

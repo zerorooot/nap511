@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -156,6 +158,18 @@ fun FileScreen(
         }
     }
 
+    val videoActivityLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val data = result.data
+            // 从 Intent 中取出 VideoActivity 返回的数据
+            val index = data?.getIntExtra("fileBeanIndex", -1) ?: -1
+            val duration = data?.getIntExtra("current_time", 0) ?: 0
+            fileViewModel.updateFileBean(fileViewModel.currentCid, index, duration)
+        }
+    }
+
     val myItemOnClick = { i: Int ->
         if (fileViewModel.isLongClickState) {
             fileViewModel.select(i)
@@ -179,13 +193,14 @@ fun FileScreen(
                 //加载文件
                 fileViewModel.getFiles(fileBean.categoryId)
             }
-            //打开视频
+            //打开视频 todo 退出时记录时间并显示
             if (fileBean.isVideo == 1) {
                 val intent = Intent(activity, VideoActivity::class.java)
                 intent.putExtra("cookie", App.cookie)
                 intent.putExtra("title", fileBean.name)
                 intent.putExtra("pick_code", fileBean.pickCode)
-                activity.startActivity(intent)
+                intent.putExtra("fileBeanIndex", i)
+                videoActivityLauncher.launch(intent)
             }
             //打开图片
             if (fileBean.photoThumb != "") {

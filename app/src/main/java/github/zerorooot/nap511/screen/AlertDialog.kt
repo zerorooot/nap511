@@ -387,7 +387,6 @@ fun ExitApp() {
     if (isOpen) {
         InfoDialog(
             onDismissRequest = {
-                isOpen = false
                 App.selectedItem = ConfigKeyUtil.MY_FILE
             },
             onConfirmation = {
