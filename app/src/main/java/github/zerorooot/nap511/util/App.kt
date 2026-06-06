@@ -29,6 +29,7 @@ import com.google.gson.Gson
 import com.google.gson.JsonObject
 import github.zerorooot.nap511.bean.AvatarBean
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -110,8 +111,8 @@ class App : Application(), ImageLoaderFactory {
     }
 
     fun toast(text: String) {
-        Handler(Looper.getMainLooper()).post {
-            Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
+        MainScope().launch {
+            Toast.makeText(instance,text, Toast.LENGTH_SHORT).show()
         }
     }
 

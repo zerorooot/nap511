@@ -193,7 +193,7 @@ fun FileScreen(
                 //加载文件
                 fileViewModel.getFiles(fileBean.categoryId)
             }
-            //打开视频 todo 退出时记录时间并显示
+            //打开视频
             if (fileBean.isVideo == 1) {
                 val intent = Intent(activity, VideoActivity::class.java)
                 intent.putExtra("cookie", App.cookie)

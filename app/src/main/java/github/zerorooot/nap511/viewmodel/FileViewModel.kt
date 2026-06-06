@@ -262,8 +262,9 @@ class FileViewModel(private val cookie: String, private val application: Applica
         viewModelScope.launch {
             val files = fileListCache[cid]!!
             val fileBean = files.fileBeanList[index]
-            fileBean.currentPlayTime = duration
-            setFileBeanProperty(files.fileBeanList)
+            val playTime =
+                ((duration.toFloat() / fileBean.playLong) * 100).roundToInt()
+            fileBean.createTimeString = "▶️ $playTime% ${fileBean.createTimeString}"
             setFiles(files)
         }
     }

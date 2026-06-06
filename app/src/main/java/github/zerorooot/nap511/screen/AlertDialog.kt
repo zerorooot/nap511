@@ -158,7 +158,7 @@ fun FileInfoDialog(
 }
 
 @Composable
-fun FileInfoDialog(
+private fun FileInfoDialog(
     fileBean: FileBean,
     fileInfo: FileInfo,
     onDismissRequest: () -> Unit,

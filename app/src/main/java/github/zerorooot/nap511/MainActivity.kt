@@ -44,9 +44,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.concurrent.futures.await
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequest
@@ -61,7 +63,6 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.activity.OfflineTaskWorker
-import github.zerorooot.nap511.activity.UnzipAllFileWorker
 import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.screen.CaptchaVideoWebViewScreen
@@ -85,6 +86,7 @@ import github.zerorooot.nap511.util.DialogSwitchUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlin.concurrent.thread
 
@@ -126,10 +128,11 @@ class MainActivity : AppCompatActivity() {
 
     @Composable
     private fun Init(cookie: String) {
-        val cookieViewModelFactory = CookieViewModelFactory(cookie, this.application)
-        val fileViewModel by viewModels<FileViewModel> { cookieViewModelFactory }
-        val offlineFileViewModel by viewModels<OfflineFileViewModel> { cookieViewModelFactory }
-        val recycleViewModel by viewModels<RecycleViewModel> { cookieViewModelFactory }
+        val factory = remember { CookieViewModelFactory(cookie, application) }
+        // 正确使用 Compose 作用域的 viewModel 初始化
+        val fileViewModel: FileViewModel = viewModel(factory = factory)
+        val offlineFileViewModel: OfflineFileViewModel = viewModel(factory = factory)
+        val recycleViewModel: RecycleViewModel = viewModel(factory = factory)
 
         BackHandler(App.selectedItem != ConfigKeyUtil.MY_FILE) {
             App.selectedItem = ConfigKeyUtil.MY_FILE
@@ -215,51 +218,46 @@ class MainActivity : AppCompatActivity() {
      *
      */
     private fun checkOfflineTask(cookie: String) {
-        val workQuery = WorkQuery.Builder.fromStates(
-            listOf(
-                WorkInfo.State.ENQUEUED,
-                WorkInfo.State.RUNNING,
+        lifecycleScope.launch(Dispatchers.IO) {
+            val workQuery = WorkQuery.Builder.fromStates(
+                listOf(
+                    WorkInfo.State.ENQUEUED,
+                    WorkInfo.State.RUNNING,
 //                WorkInfo.State.SUCCEEDED,
 //                WorkInfo.State.FAILED,
-                WorkInfo.State.BLOCKED,
-                WorkInfo.State.CANCELLED
+                    WorkInfo.State.BLOCKED,
+                    WorkInfo.State.CANCELLED
+                )
+            ).build()
+            // 异步挂起等待结果，避免阻塞主线程
+            val workInfos = WorkManager.getInstance(applicationContext).getWorkInfos(workQuery).await()
+            if (workInfos.isNotEmpty()) return@launch
+            //size等于0,证明后台没有正在添加离线链接
+            val currentOfflineTask = DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
+                .split("\n")
+                .filter { i -> i != "" && i != " " }
+                .toSet()
+                .toMutableList()
+            //currentOfflineTask等于0,证明没有离线链接缓存
+            if (currentOfflineTask.isEmpty()) {
+                return@launch
+            }
+            XLog.d(
+                "checkOfflineTask workManager workInfos $workInfos currentOfflineTask size ${currentOfflineTask.size}"
             )
-        ).build()
-        val workInfos: List<WorkInfo> =
-            WorkManager.getInstance(applicationContext).getWorkInfos(workQuery).get()
-        //todo 检测是否与解压文件相冲突
-//        val workInfos: List<WorkInfo> =
-//            WorkManager.getInstance(applicationContext)
-//                .getWorkInfosByTag(ConfigKeyUtil.OFFLINE_TASK_WORKER).get()
-        val size = workInfos.size
-        if (size != 0) {
-            return
+            //添加离线链接
+            val listType = object : TypeToken<List<String?>?>() {}.type
+            val list = Gson().toJson(currentOfflineTask, listType)
+            val data: Data =
+                Data.Builder().putString("cookie", cookie).putString("list", list)
+                    .build()
+            val request: OneTimeWorkRequest =
+                OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java)
+                    .addTag(ConfigKeyUtil.OFFLINE_TASK_WORKER)
+                    .setInputData(data)
+                    .build()
+            WorkManager.getInstance(App.instance.applicationContext).enqueue(request)
         }
-        //size等于0,证明后台没有正在添加离线链接
-        val currentOfflineTask = DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
-            .split("\n")
-            .filter { i -> i != "" && i != " " }
-            .toSet()
-            .toMutableList()
-        //currentOfflineTask等于0,证明没有离线链接缓存
-        if (currentOfflineTask.isEmpty()) {
-            return
-        }
-        XLog.d(
-            "checkOfflineTask workManager workInfos $workInfos currentOfflineTask size ${currentOfflineTask.size}"
-        )
-        //添加离线链接
-        val listType = object : TypeToken<List<String?>?>() {}.type
-        val list = Gson().toJson(currentOfflineTask, listType)
-        val data: Data =
-            Data.Builder().putString("cookie", cookie).putString("list", list)
-                .build()
-        val request: OneTimeWorkRequest =
-            OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java)
-                .addTag(ConfigKeyUtil.OFFLINE_TASK_WORKER)
-                .setInputData(data)
-                .build()
-        WorkManager.getInstance(App.instance.applicationContext).enqueue(request)
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -440,6 +438,7 @@ class MainActivity : AppCompatActivity() {
         var isOpenLoginWebView by remember {
             mutableStateOf(false)
         }
+        val scope = rememberCoroutineScope()
         if (isOpenLoginWebView) {
             LoginWebViewScreen()
         }
@@ -448,9 +447,9 @@ class MainActivity : AppCompatActivity() {
                 isOpenLoginWebView = true
                 return@CookieDialog
             }
-            if (it != "") {
+            if (it.isNotBlank()) {
                 val replace = it.replace(" ", "").replace("[\r\n]".toRegex(), "");
-                thread {
+                scope.launch(Dispatchers.IO) {
                     val pair = App().checkLogin(replace)
                     if (pair.first) {
                         ProcessPhoenix.triggerRebirth(applicationContext);
