@@ -10,7 +10,6 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -87,8 +86,8 @@ class FileViewModel(private val cookie: String, private val application: Applica
     //图片浏览相关
     var photoFileBeanList = mutableListOf<FileBean>()
     var photoIndexOf by mutableIntStateOf(-1)
-    var imageBeanList = mutableStateListOf<ImageBean>()
-    private val imageBeanCache = hashMapOf<String, SnapshotStateList<ImageBean>>()
+
+    val imageBeanCache = mutableStateMapOf<String, HashMap<Int, ImageBean>>()
 
     //位置与点击记录相关
     val clickMap = mutableStateMapOf<String, Int>()
@@ -200,40 +199,24 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     fun getImage(fileBeanList: List<FileBean>, indexOf: Int) {
-        if (imageBeanCache.containsKey(currentCid)) {
-            imageBeanList = imageBeanCache[currentCid]!!
+        if (imageBeanCache.containsKey(currentCid) &&
+            imageBeanCache[currentCid]!!.containsKey(indexOf)
+        ) {
             return
         }
-        imageBeanList.clear()
-        fileBeanList.forEach { fileBean ->
-            imageBeanList.add(
-                ImageBean(
-                    fileName = fileBean.name, pickCode = fileBean.pickCode, fileSha1 = fileBean.sha1
-                )
-            )
-        }
+
         //获取当前点击的
         viewModelScope.launch {
-            imageBeanList[indexOf] = fileService.image(
+            val imageBean = fileService.image(
                 fileBeanList[indexOf].pickCode, System.currentTimeMillis() / 1000
             ).imageBean
-        }
-        //加载其他剩余的
-        viewModelScope.launch {
-            try {
-                fileBeanList.forEachIndexed { index, fileBean ->
-                    if (indexOf != index) {
-                        imageBeanList[index] = fileService.image(
-                            fileBean.pickCode, System.currentTimeMillis() / 1000
-                        ).imageBean
-                    }
-                }
-            } catch (_: Exception) {
 
-            }
-        }
+            val oldMap = imageBeanCache[currentCid] ?: hashMapOf()
+            val newMap = HashMap(oldMap)
+            newMap[indexOf] = imageBean
 
-        imageBeanCache[currentCid] = imageBeanList
+            imageBeanCache[currentCid] = newMap
+        }
     }
 
     fun updateFileCache(cid: String) {
@@ -570,7 +553,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             }
 
             //delete image bean
-            imageBeanCache[currentCid]?.removeIf { i -> i.fileName == fileBean.name }
+            imageBeanCache[currentCid]?.remove(index)
 
             val fid = fileBean.fileId
             val pid = currentCid
@@ -627,7 +610,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             filter.forEachIndexed { index: Int, fileBean: FileBean ->
                 mapOf["fid[$index]"] = fileBean.fileId
                 //update image cache
-                imageBeanCache[cid]?.removeIf { i -> i.fileName == fileBean.name }
+                imageBeanCache[cid]?.remove(index)
             }
             //提前删除，优化速度
             fileBeanList.removeAll(filter)

@@ -23,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +51,7 @@ import com.google.accompanist.pager.rememberPagerState
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.smarttoolfactory.zoom.enhancedZoom
 import com.smarttoolfactory.zoom.rememberEnhancedZoomState
+import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ImageBean
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -59,9 +61,6 @@ import github.zerorooot.nap511.viewmodel.FileViewModel
 fun MyPhotoScreen(
     fileViewModel: FileViewModel,
 ) {
-    fileViewModel.getImage(fileViewModel.photoFileBeanList, fileViewModel.photoIndexOf)
-    val imageBeanList = fileViewModel.imageBeanList
-
     val systemUiController = rememberSystemUiController()
     var controlsVisible by remember { mutableStateOf(false) }
 
@@ -71,11 +70,18 @@ fun MyPhotoScreen(
             systemUiController.isSystemBarsVisible = true
         }
     }
+// 从 ViewModel 提取当前页面的状态数据
+    val photoList = fileViewModel.photoFileBeanList
+    // 提取当前相册的缓存字典
+    val imageCache = fileViewModel.imageBeanCache[fileViewModel.currentCid] ?: emptyMap()
 
     ImageBrowserScreen(
-        images = imageBeanList,
+        photoList = photoList,
+        imageCache = imageCache,
         currentIndex = fileViewModel.photoIndexOf,
-        controlsVisible = controlsVisible,
+        onLoadImage = { pageIndex ->
+            fileViewModel.getImage(photoList, pageIndex)
+        },
         onToggleControls = { controlsVisible = !controlsVisible },
         onBack = {
             App.selectedItem = ConfigKeyUtil.MY_FILE
@@ -88,13 +94,18 @@ fun MyPhotoScreen(
 @OptIn(ExperimentalPagerApi::class)
 @Composable
 private fun ImageBrowserScreen(
-    images: List<ImageBean>,
+    // 1. 纯数据传入
+    photoList: List<FileBean>,
+    imageCache: Map<Int, ImageBean>,
     currentIndex: Int = 0,
     controlsVisible: Boolean = true,
+    // 2. 动作回调传出
+    onLoadImage: (pageIndex: Int) -> Unit, // 替换原来的 viewModel.getImage
     onToggleControls: () -> Unit = {},
     onBack: () -> Unit = {}
 ) {
     val pageState = rememberPagerState(initialPage = currentIndex)
+    val size = remember(photoList) { photoList.size }
 
     Box(
         modifier = Modifier
@@ -102,13 +113,19 @@ private fun ImageBrowserScreen(
             .background(Color.Black)
     ) {
         HorizontalPager(
-            count = images.size,
+            count = size,
             state = pageState,
             contentPadding = PaddingValues(horizontal = 0.dp),
             modifier = Modifier.fillMaxSize()
         ) { page ->
+            LaunchedEffect(page) {
+                onLoadImage(page)
+            }
+            // 直接从传入的 Map 中取数据，不需要知道 currentCid 是什么
+            val pageImage = imageCache[page] ?: ImageBean()
             FullScreenImage(
-                image = images[page], onClick = onToggleControls
+                image = pageImage,
+                onClick = onToggleControls
             )
         }
 
@@ -120,7 +137,10 @@ private fun ImageBrowserScreen(
             modifier = Modifier.align(Alignment.TopCenter)
         ) {
             PhotoTopBar(
-                title = if (images.isNotEmpty()) images[pageState.currentPage].fileName else "",
+                title = imageCache.getOrDefault(
+                    pageState.currentPage,
+                    ImageBean()
+                ).fileName.ifEmpty { "" },
                 onBack = onBack
             )
         }
@@ -133,7 +153,7 @@ private fun ImageBrowserScreen(
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             PhotoBottomBar(
-                currentIndex = pageState.currentPage + 1, totalCount = images.size
+                currentIndex = pageState.currentPage + 1, totalCount = size
             )
         }
     }
@@ -251,7 +271,7 @@ fun ImageBrowserScreenPreview() {
     for (i in 1..5) {
         images.add(ImageBean("url", "Image $i.jpg"))
     }
-    ImageBrowserScreen(
-        images = images, currentIndex = 0
-    )
+//    ImageBrowserScreen(
+//        images = images, currentIndex = 0
+//    )
 }
