@@ -244,6 +244,7 @@ fun FileScreen(
             }
         }
     }
+
     val onBack = {
         val lastIndexOf = path.lastIndexOf("/")
         val parentDirectory = path.subSequence(

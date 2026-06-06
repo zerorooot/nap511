@@ -145,17 +145,17 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     fun back() {
+        if (isLongClickState) {
+            recoverFromLongPress()
+            fileBeanList.forEach { i -> i.isSelect = false }
+            return
+        }
+
         if (isSearchState) {
             fileBeanList.clear()
             setFiles(fileListCache[currentCid]!!)
             appBarTitle = application.resources.getString(R.string.app_name)
             isSearchState = false
-            return
-        }
-
-        if (isLongClickState) {
-            recoverFromLongPress()
-            fileBeanList.forEach { i -> i.isSelect = false }
             return
         }
 
@@ -638,7 +638,11 @@ class FileViewModel(private val cookie: String, private val application: Applica
      */
     fun recoverFromLongPress() {
         isLongClickState = false
-        appBarTitle = application.resources.getString(R.string.app_name)
+        appBarTitle = if (isSearchState) {
+            "搜索"
+        } else {
+            application.resources.getString(R.string.app_name)
+        }
     }
 
     fun search(searchKey: String) {
@@ -648,7 +652,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             setFileBeanProperty(files.fileBeanList)
             fileBeanList.clear()
             fileBeanList.addAll(files.fileBeanList)
-            appBarTitle = "搜索-$searchKey"
+            appBarTitle = "搜索 - $searchKey"
         }
     }
 

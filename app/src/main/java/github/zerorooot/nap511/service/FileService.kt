@@ -92,10 +92,10 @@ interface FileService {
     @GET("files/image")
     suspend fun image(@Query("pickcode") pickCode: String, @Query("_") current: Long): ImageDate
 
-    @GET("files")
+    @GET("files/search")
     suspend fun search(
         @Query("cid") cid: String,
-        @Query("suffix") searchValue: String,
+        @Query("search_value") searchValue: String,
         @Query("aid") aid: Int = 1,
         @Query("offset") asc: Int = 0,
         @Query("limit") limit: Int = App.requestLimitCount
