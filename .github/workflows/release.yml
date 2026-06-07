@@ -37,4 +37,6 @@ jobs:
           artifacts: "*.apk"
           token: ${{ github.token }}
           generateReleaseNotes: true
+          allowUpdates: true
+          replacesArtifacts: true
 

@@ -116,16 +116,14 @@ class FileViewModel(private val cookie: String, private val application: Applica
     fun isFileScreenListState() = ::fileScreenListState.isInitialized
 
     fun init() {
-        viewModelScope.launch {
-            if (fileListCache.isEmpty()) {
-                val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
-                if (saveRequestCache) {
-                    val file = App.cacheFile
-                    val content = if (file.exists()) file.readText() else "{}"
-                    val type = object : TypeToken<HashMap<String, FilesBean>?>() {}.type
-                    fileListCache = Gson().fromJson(content, type)
-                    XLog.d("loading file list cache ${fileListCache.size}")
-                }
+        viewModelScope.launch(Dispatchers.IO) {
+            val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
+            if (saveRequestCache) {
+                val file = App.cacheFile
+                val content = if (file.exists()) file.readText() else "{}"
+                val type = object : TypeToken<HashMap<String, FilesBean>?>() {}.type
+                fileListCache = Gson().fromJson(content, type)
+                XLog.d("loading file list cache ${fileListCache.size}")
             }
             getFiles(currentCid)
 
