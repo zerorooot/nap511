@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -108,7 +109,7 @@ fun FileScreen(
     val listState = fileViewModel.fileScreenListState
     val refreshing by fileViewModel.isRefreshing.collectAsState()
 
-    val activity = LocalContext.current as Activity
+    val context = LocalContext.current
 
     CreateDialogs(fileViewModel)
 
@@ -195,7 +196,7 @@ fun FileScreen(
             }
             //打开视频
             if (fileBean.isVideo == 1) {
-                val intent = Intent(activity, VideoActivity::class.java)
+                val intent = Intent(context, VideoActivity::class.java)
                 intent.putExtra("cookie", App.cookie)
                 intent.putExtra("title", fileBean.name)
                 intent.putExtra("pick_code", fileBean.pickCode)

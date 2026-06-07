@@ -17,12 +17,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.Paragraph
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
 import coil.compose.rememberAsyncImagePainter
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.screen.FileMoreMenu
+import kotlin.collections.listOf
 import kotlin.math.ceil
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -182,27 +184,29 @@ fun AutoSizableTextField(
     ) {
         var nFontSize = fontSize
 
-        val calculateParagraph = @Composable {
+        // 1. 将 Composable 环境的变量提取到 lambda 外部
+        val density = LocalDensity.current
+        val fontFamilyResolver = LocalFontFamilyResolver.current
+
+        // 2. 移除 @Composable 注解，直接作为普通 lambda
+        val calculateParagraph = {
             Paragraph(
                 text = value,
                 style = TextStyle(fontSize = nFontSize),
-                constraints = Constraints(
-                    maxWidth = ceil(
-                        with(
-                            LocalDensity.current
-                        ) { maxWidth.toPx() }).toInt()
-                ),
-                density = LocalDensity.current,
-                fontFamilyResolver = LocalFontFamilyResolver.current,
-                spanStyles = listOf(),
-                placeholders = listOf(),
+                // 3. 直接使用 BoxWithConstraints 提供的 constraints
+                constraints = Constraints(maxWidth = constraints.maxWidth),
+                density = density,
+                fontFamilyResolver = fontFamilyResolver,
                 maxLines = maxLines,
-                ellipsis = false
+                // 4. 将 ellipsis = false 替换为 overflow = TextOverflow.Clip
+                overflow = TextOverflow.Clip
+                // 5. 移除了无法推断泛型的 spanStyles 和 placeholders，直接使用底层默认参数
             )
         }
 
         var intrinsics = calculateParagraph()
-        with(LocalDensity.current) {
+
+        with(density) {
             while ((intrinsics.height.toDp() > maxHeight || intrinsics.didExceedMaxLines) && nFontSize >= minFontSize) {
                 nFontSize *= scaleFactor
                 intrinsics = calculateParagraph()
@@ -217,4 +221,54 @@ fun AutoSizableTextField(
         )
     }
 }
+
+//@Composable
+//fun AutoSizableTextField(
+//    value: String,
+//    modifier: Modifier = Modifier,
+//    fontSize: TextUnit = 16.sp,
+//    maxLines: Int = Int.MAX_VALUE,
+//    minFontSize: TextUnit,
+//    scaleFactor: Float = 0.9f,
+//) {
+//    BoxWithConstraints(
+//        modifier = modifier
+//    ) {
+//        var nFontSize = fontSize
+//
+//        val calculateParagraph = @Composable {
+//            Paragraph(
+//                text = value,
+//                style = TextStyle(fontSize = nFontSize),
+//                constraints = Constraints(
+//                    maxWidth = ceil(
+//                        with(
+//                            LocalDensity.current
+//                        ) { maxWidth.toPx() }).toInt()
+//                ),
+//                density = LocalDensity.current,
+//                fontFamilyResolver = LocalFontFamilyResolver.current,
+//                spanStyles = listOf(),
+//                placeholders = listOf(),
+//                maxLines = maxLines,
+//                ellipsis = false
+//            )
+//        }
+//
+//        var intrinsics = calculateParagraph()
+//        with(LocalDensity.current) {
+//            while ((intrinsics.height.toDp() > maxHeight || intrinsics.didExceedMaxLines) && nFontSize >= minFontSize) {
+//                nFontSize *= scaleFactor
+//                intrinsics = calculateParagraph()
+//            }
+//        }
+//
+//        Text(
+//            text = value,
+//            style = TextStyle(fontSize = nFontSize),
+//            maxLines = maxLines,
+//            fontWeight = FontWeight.Bold,
+//        )
+//    }
+//}
 

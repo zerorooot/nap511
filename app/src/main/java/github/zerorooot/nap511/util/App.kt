@@ -221,9 +221,9 @@ class App : Application(), ImageLoaderFactory {
     fun goToNotificationSetting(context: Context) {
         val intent = Intent()
         // android 8.0引导
-        intent.setAction("android.settings.APP_NOTIFICATION_SETTINGS")
+        intent.action = "android.settings.APP_NOTIFICATION_SETTINGS"
         intent.putExtra("android.provider.extra.APP_PACKAGE", context.packageName)
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
         context.startActivity(intent)
     }
 

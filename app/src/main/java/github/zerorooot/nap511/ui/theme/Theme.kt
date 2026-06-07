@@ -55,32 +55,10 @@ fun Nap511Theme(
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
-    val view = LocalView.current
-    if (!view.isInEditMode) {
-        SideEffect {
-            (view.context as Activity).window.statusBarColor = colorScheme.primary.toArgb()
-            ViewCompat.getWindowInsetsController(view)?.isAppearanceLightStatusBars = darkTheme
-        }
-    }
 
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
         content = content
     )
-
-    // Remember a SystemUiController
-    val systemUiController = rememberSystemUiController()
-    val useDarkIcons = !darkTheme
-    SideEffect {
-        systemUiController.setSystemBarsColor(
-            color = if (darkTheme) LightColorScheme.primary else DarkColorScheme.primary,
-            darkIcons = useDarkIcons
-        )
-        systemUiController.setNavigationBarColor(
-            color = Color.Transparent,
-            darkIcons = useDarkIcons
-        )
-    }
-
 }

@@ -76,7 +76,7 @@ fun RecycleScreen(recycleViewModel: RecycleViewModel) {
                 }) { index, item ->
                     RecycleCellItem(
                         recycleBean = item,
-                        Modifier.animateItemPlacement(),
+                        Modifier.animateItem(),
                         index = index,
                         menuOnClick
                     )
