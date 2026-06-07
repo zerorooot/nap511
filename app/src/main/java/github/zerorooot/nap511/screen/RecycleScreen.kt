@@ -24,7 +24,6 @@ import github.zerorooot.nap511.viewmodel.RecycleViewModel
 @OptIn(ExperimentalMaterialApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun RecycleScreen(recycleViewModel: RecycleViewModel) {
-    recycleViewModel.getRecycleFileList()
     var deleteIndex by remember {
         mutableIntStateOf(-1)
     }

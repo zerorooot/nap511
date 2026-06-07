@@ -35,6 +35,9 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
         FileService.getInstance(cookie)
     }
 
+    init {
+        getRecycleFileList()
+    }
 
     fun getRecycleFileList() {
         if (recycleFileList.isNotEmpty()) {
