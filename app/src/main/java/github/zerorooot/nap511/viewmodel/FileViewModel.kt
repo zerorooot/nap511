@@ -40,6 +40,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.concurrent.thread
@@ -133,13 +134,17 @@ class FileViewModel(private val cookie: String, private val application: Applica
 
     fun saveFileCache() {
         viewModelScope.launch(Dispatchers.IO) {
-            val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
-            if (saveRequestCache) {
-                val type = object : TypeToken<HashMap<String, FilesBean>?>() {}.type
-                val json = Gson().toJson(fileListCache, type)
-                val file = App.cacheFile
-                file.writeText(json)
-                XLog.d("save file list cache ${fileListCache.size}")
+            try {
+                val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
+                if (saveRequestCache) {
+                    val type = object : TypeToken<HashMap<String, FilesBean>?>() {}.type
+                    val json = Gson().toJson(fileListCache, type)
+                    val file = App.cacheFile
+                    file.writeText(json)
+                    XLog.d("save file list cache ${fileListCache.size}")
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
@@ -199,8 +204,9 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     fun getImage(fileBeanList: List<FileBean>, indexOf: Int) {
-        if (imageBeanCache.containsKey(currentCid) &&
-            imageBeanCache[currentCid]!!.containsKey(indexOf)
+        if (imageBeanCache.containsKey(currentCid) && imageBeanCache[currentCid]!!.containsKey(
+                indexOf
+            )
         ) {
             return
         }
@@ -221,9 +227,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
 
     fun updateFileCache(cid: String) {
         viewModelScope.launch {
-            _isRefreshing.value = true
             if (fileListCache.containsKey(cid)) {
-                _isRefreshing.value = false
                 return@launch
             }
             fileService.order(
@@ -237,18 +241,32 @@ class FileViewModel(private val cookie: String, private val application: Applica
             val files = fileService.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
             setFileBeanProperty(files.fileBeanList)
             fileListCache[cid] = files
-            _isRefreshing.value = false
         }
     }
 
-    fun updateFileBean(cid: String, index: Int, duration: Int) {
+    fun updateVideoFileBean(cid: String, index: Int, duration: Int) {
         viewModelScope.launch {
-            val files = fileListCache[cid]!!
-            val fileBean = files.fileBeanList[index]
-            val playTime =
-                ((duration.toFloat() / fileBean.playLong) * 100).roundToInt()
-            fileBean.createTimeString = "▶️ $playTime% ${fileBean.createTimeString}"
-            setFiles(files)
+            val fileBean = fileBeanList[index]
+
+            if (fileBean.isVideo != 1) return@launch
+
+            val playTime = ((duration.toFloat() / fileBean.playLong) * 100).roundToInt()
+            val createTimeString =
+                SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
+                    fileBean.createTime.toLong() * 1000
+                )
+            fileBean.createTimeString = "▶️ $playTime% $createTimeString"
+
+            val arrayListOf = arrayListOf<FileBean>()
+            arrayListOf.addAll(fileBeanList)
+            arrayListOf[index] = fileBean
+            fileBeanList.clear()
+            fileBeanList.addAll(arrayListOf)
+
+            if (!isSearchState) {
+                fileListCache[cid]?.fileBeanList = arrayListOf
+            }
+
         }
     }
 
@@ -344,7 +362,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
                             fileBean.modifiedTime
                         )!!.time / 1000).toString()
                 }
-                if (fileBean.currentPlayTime != 0) {
+                if (fileBean.currentPlayTime != 0 && fileBean.playLong != 0.00) {
                     val playTime =
                         ((fileBean.currentPlayTime.toFloat() / fileBean.playLong) * 100).roundToInt()
                     fileBean.createTimeString = "▶️ $playTime% ${fileBean.createTimeString}"
@@ -523,9 +541,8 @@ class FileViewModel(private val cookie: String, private val application: Applica
     }
 
     fun delete(index: Int) {
+        val fileBean = fileBeanList[index]
         viewModelScope.launch {
-            val fileBean = fileBeanList[index]
-
             val beforeList = fileBeanList
             val beforeFileListCache = fileListCache[currentCid]
             val beforeClickMap = clickMap.getOrDefault(currentCid, 0)
@@ -692,48 +709,39 @@ class FileViewModel(private val cookie: String, private val application: Applica
         }
     }
 
-    fun getZipListFileBack(
-        fileName: String = "", paths: String = "文件", isCheck: Boolean = true
-    ) {
+    fun unzipFile(zipBeanList: ZipBeanList) {
+        val refreshCid = currentCid
+
         viewModelScope.launch {
-            val fileBean = fileBeanList[selectIndex]
-            if (isCheck) {
-                //首次打开
-                if (!dialogSwitchUtil.isOpenUnzipDialog && paths == "文件") {
-                    if (fileRepository.isZipFileEncryption(fileBean.pickCode)) {
-                        if (!fileRepository.tryToExtract(fileBean.pickCode)) {
-                            XLog.d("${fileBean.name} is encryption zip file")
-                            dialogSwitchUtil.isOpenUnzipPasswordDialog = true
-                            return@launch
-                        }
-                    }
+            val unzipFile = withContext(Dispatchers.IO) {
+                val dirs = zipBeanList.list
+                    .filter { i -> i.fileIco == R.drawable.folder }
+                    .map { a -> a.fileName }
+                    .takeIf { it.isNotEmpty() }
+
+                val files = zipBeanList.list
+                    .filter { i -> i.fileIco != R.drawable.folder }
+                    .map { a -> a.fileName }
+                    .takeIf { it.isNotEmpty() }
+
+                val fileBean = fileBeanList[selectIndex]
+                val pickCode = fileBean.pickCode
+                val unzipFolderName = fileBean.name.substring(0, fileBean.name.length - 4)
+
+                //确定当前目录下是否存在同名文件，如果不存在，则新建一个
+                val currentUnzipFolderNameList =
+                    fileBeanList.filter { i -> i.isFolder && i.name == unzipFolderName }
+                var zipFileCid = currentCid
+                if (currentUnzipFolderNameList.isEmpty()) {
+                    val createFolderMessage = fileRepository.createFolder(
+                        currentCid, unzipFolderName
+                    )
+                    XLog.d("fileViewModel.unzipFile $createFolderMessage")
+                    zipFileCid = createFolderMessage.cid
                 }
+
+                fileRepository.unzipFile(pickCode, zipFileCid, files, dirs, unzipFolderName)
             }
-            unzipBeanList.value = fileRepository.getZipListFile(fileBean.pickCode, fileName, paths)
-            dialogSwitchUtil.isOpenUnzipDialog = true
-        }
-    }
-
-    fun unzipFile(files: List<String>?, dirs: List<String>?) {
-        viewModelScope.launch {
-            val refreshCid = currentCid
-            val fileBean = fileBeanList[selectIndex]
-            val pickCode = fileBean.pickCode
-            val unzipFolderName = fileBean.name.substring(0, fileBean.name.length - 4)
-
-            //确定当前目录下是否存在同名文件，如果不存在，则新建一个
-            val currentUnzipFolderNameList =
-                fileBeanList.filter { i -> i.isFolder && i.name == unzipFolderName }
-            var zipFileCid = currentCid
-            if (currentUnzipFolderNameList.isEmpty()) {
-                val createFolderMessage = fileRepository.createFolder(
-                    currentCid, unzipFolderName
-                )
-                XLog.d("fileViewModel.unzipFile $createFolderMessage")
-                zipFileCid = createFolderMessage.cid
-            }
-
-            val unzipFile = fileRepository.unzipFile(pickCode, zipFileCid, files, dirs)
 
             if (unzipFile.first) {
                 refresh(refreshCid)

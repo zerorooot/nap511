@@ -32,9 +32,9 @@
         app:title="aria2秘钥" />
 
     <EditTextPreference
-        app:defaultValue="100"
+        app:defaultValue="200"
         app:key="@string/REQUEST_LIMIT_COUNT"
-        app:summary="100"
+        app:summary="200"
         app:title="每次请求文件数" />
 
     <EditTextPreference

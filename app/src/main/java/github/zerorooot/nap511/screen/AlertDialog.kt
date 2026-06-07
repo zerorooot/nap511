@@ -538,17 +538,7 @@ fun UnzipDialog(fileViewModel: FileViewModel) {
                     }
 
                     "unzipAll" -> {
-                        val dirs =
-                            zipBeanList.list.stream().filter { i -> i.fileIco == R.drawable.folder }
-                                .map { a -> a.fileName }.collect(Collectors.toList()).takeIf {
-                                    it.isNotEmpty()
-                                }
-                        val files =
-                            zipBeanList.list.stream().filter { i -> i.fileIco != R.drawable.folder }
-                                .map { a -> a.fileName }.collect(Collectors.toList()).takeIf {
-                                    it.isNotEmpty()
-                                }
-                        fileViewModel.unzipFile(files, dirs)
+                        fileViewModel.unzipFile(zipBeanList)
                         dialogSwitchUtil.isOpenUnzipDialog = false
                     }
                 }

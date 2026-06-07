@@ -19,6 +19,9 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.Sha1Util
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -180,6 +183,7 @@ class FileRepository(private val cookie: String) {
         zipFileCid: String,
         files: List<String>?,
         dirs: List<String>?,
+        unzipFolderName: String = "",
         showToast: Boolean = true
     ): Pair<Boolean, String> {
         var state: Boolean
@@ -219,10 +223,10 @@ class FileRepository(private val cookie: String) {
             val process = json.getAsJsonObject("data").get("percent").asInt
             if (process == 100) {
                 state = true
-                message = "后台解压完成～"
+                message = "${unzipFolderName}后台解压完成～"
                 break
             }
-            Thread.sleep(1000)
+            delay(1500)
         }
         if (showToast) {
             App.instance.toast(message)

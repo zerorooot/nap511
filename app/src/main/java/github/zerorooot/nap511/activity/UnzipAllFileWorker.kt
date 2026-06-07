@@ -147,7 +147,7 @@ class UnzipAllFileWorker(
             .map { a -> a.fileName }.collect(Collectors.toList()).takeIf {
                 it.isNotEmpty()
             }
-        val unzipFile = fileRepository.unzipFile(pickCode, zipFileCid, files, dirs, false)
+        val unzipFile = fileRepository.unzipFile(pickCode, zipFileCid, files, dirs, fileName, false)
 
         if (!unzipFile.first && zipFileCid != cid) {
             fileRepository.delete(cid, zipFileCid)

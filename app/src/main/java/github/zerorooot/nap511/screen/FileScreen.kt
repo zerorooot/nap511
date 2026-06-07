@@ -166,7 +166,7 @@ fun FileScreen(
             // 从 Intent 中取出 VideoActivity 返回的数据
             val index = data?.getIntExtra("fileBeanIndex", -1) ?: -1
             val duration = data?.getIntExtra("current_time", 0) ?: 0
-            fileViewModel.updateFileBean(fileViewModel.currentCid, index, duration)
+            fileViewModel.updateVideoFileBean(fileViewModel.currentCid, index, duration)
         }
     }
 

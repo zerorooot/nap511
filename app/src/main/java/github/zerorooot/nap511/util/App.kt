@@ -5,8 +5,6 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.material3.DrawerState
@@ -35,13 +33,13 @@ import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
-import java.lang.Thread.UncaughtExceptionHandler
 import java.lang.reflect.Field
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.properties.Delegates
 
 class App : Application(), ImageLoaderFactory {
     companion object {
@@ -56,7 +54,7 @@ class App : Application(), ImageLoaderFactory {
         var gesturesEnabled by mutableStateOf(true)
 
         //每次请求文件数
-        var requestLimitCount: Int = 100
+        var requestLimitCount by Delegates.notNull<Int>()
         lateinit var drawerState: DrawerState
         lateinit var scope: CoroutineScope
         private fun isScopeInitialized() = ::scope.isInitialized
@@ -70,7 +68,7 @@ class App : Application(), ImageLoaderFactory {
         instance = this
         cookie = DataStoreUtil.getData(ConfigKeyUtil.COOKIE, "")
         uid = DataStoreUtil.getData(ConfigKeyUtil.UID, "0")
-        requestLimitCount = DataStoreUtil.getData(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "100").toInt()
+        requestLimitCount = DataStoreUtil.getData(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200").toInt()
         cacheFile = File(this.cacheDir, "fileListCache.json")
 
         initLog()
@@ -97,17 +95,17 @@ class App : Application(), ImageLoaderFactory {
             .build()
         XLog.init(build, AndroidPrinter(true), print);
         XLog.d("-----------------------init-----------------------------------")
-        val handler = Thread.getDefaultUncaughtExceptionHandler()
-        Thread.setDefaultUncaughtExceptionHandler { thread, e ->
-            XLog.enableStackTrace(50).e("程序崩溃退出", e)
-            handler?.uncaughtException(thread, e)
-        }
-
-        val uncaughtExceptionHandler = Thread.currentThread().uncaughtExceptionHandler
-        Thread.currentThread().uncaughtExceptionHandler = UncaughtExceptionHandler { t, e ->
-            XLog.enableStackTrace(50).e("程序崩溃退出", e)
-            uncaughtExceptionHandler?.uncaughtException(t, e)
-        }
+//        val handler = Thread.getDefaultUncaughtExceptionHandler()
+//        Thread.setDefaultUncaughtExceptionHandler { thread, e ->
+//            XLog.enableStackTrace(50).e("程序崩溃退出", e)
+//            handler?.uncaughtException(thread, e)
+//        }
+//
+//        val uncaughtExceptionHandler = Thread.currentThread().uncaughtExceptionHandler
+//        Thread.currentThread().uncaughtExceptionHandler = UncaughtExceptionHandler { t, e ->
+//            XLog.enableStackTrace(50).e("程序崩溃退出", e)
+//            uncaughtExceptionHandler?.uncaughtException(t, e)
+//        }
     }
 
     fun toast(text: String) {
