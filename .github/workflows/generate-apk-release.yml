@@ -18,16 +18,26 @@ jobs:
       - name: Set current date as env variable
         run: echo "date_today=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
-      - uses: actions/setup-java@v3
+      - name: Setup Java
+        uses: actions/setup-java@v5
         with:
-          distribution: 'zulu' # See 'Supported distributions' for available options
-          java-version: '17'
-          cache: 'gradle'
+          distribution: 'temurin'
+          java-version: 17
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+      - name: Build with Gradle
+        run: ./gradlew assembleRelease
 
-      - uses: gradle/gradle-build-action@v2
-        with:
-          gradle-version: '9.4.1'
-          arguments: assembleRelease
+#      - uses: actions/setup-java@v3
+#        with:
+#          distribution: 'zulu' # See 'Supported distributions' for available options
+#          java-version: '17'
+#          cache: 'gradle'
+#
+#      - uses: gradle/gradle-build-action@v2
+#        with:
+#          gradle-version: '9.4.1'
+#          arguments: assembleRelease
 
       - uses: ilharp/sign-android-release@v1
         id: sign_app
