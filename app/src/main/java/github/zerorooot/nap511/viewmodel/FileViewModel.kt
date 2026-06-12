@@ -118,7 +118,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
     fun init() {
         viewModelScope.launch(Dispatchers.IO) {
             val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
-            if (saveRequestCache) {
+            if (fileListCache.isEmpty() && saveRequestCache) {
                 val file = App.cacheFile
                 val content = if (file.exists()) file.readText() else "{}"
                 val type = object : TypeToken<HashMap<String, FilesBean>?>() {}.type
@@ -126,7 +126,6 @@ class FileViewModel(private val cookie: String, private val application: Applica
                 XLog.d("loading file list cache ${fileListCache.size}")
             }
             getFiles(currentCid)
-
         }
     }
 
@@ -155,7 +154,11 @@ class FileViewModel(private val cookie: String, private val application: Applica
     fun back() {
         if (isLongClickState) {
             recoverFromLongPress()
-            fileBeanList.forEach { i -> i.isSelect = false }
+//            fileBeanList.forEach { i -> i.isSelect = false }
+            //触发compose重组
+            for (i in fileBeanList.indices) {
+                fileBeanList[i] = fileBeanList[i].copy(isSelect = false)
+            }
             return
         }
 
@@ -581,6 +584,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
             val delete = fileRepository.delete(pid, fid)
 
             val message = if (delete.state) {
+                // saveFileCache()
                 "删除 ${fileBean.name} 成功"
             } else {
                 fileBeanList = beforeList
