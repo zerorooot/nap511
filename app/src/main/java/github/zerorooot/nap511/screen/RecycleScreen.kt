@@ -1,18 +1,13 @@
 package github.zerorooot.nap511.screen
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.pullrefresh.PullRefreshIndicator
-import androidx.compose.material.pullrefresh.pullRefresh
-import androidx.compose.material.pullrefresh.rememberPullRefreshState
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.screenitem.RecycleCellItem
@@ -21,7 +16,7 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 
-@OptIn(ExperimentalMaterialApi::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun RecycleScreen(recycleViewModel: RecycleViewModel) {
     var deleteIndex by remember {
@@ -61,14 +56,15 @@ fun RecycleScreen(recycleViewModel: RecycleViewModel) {
         recycleViewModel.closeDialog()
     }
 
-    val pullRefreshState = rememberPullRefreshState(refreshing, { recycleViewModel.refresh() })
-
     Column {
         AppTopBarRecycle("回收站", appBarOnClick)
         MiddleEllipsisText(
             text = "当前文件数：${recycleFileList.size}", modifier = Modifier.padding(8.dp, 4.dp)
         )
-        Box(Modifier.pullRefresh(pullRefreshState)) {
+        PullToRefreshBox(
+            isRefreshing = refreshing,
+            onRefresh = { recycleViewModel.refresh() }
+        ) {
             LazyColumn(Modifier.fillMaxSize()) {
                 itemsIndexed(items = recycleFileList, key = { _, item ->
                     item.hashCode()
@@ -81,8 +77,6 @@ fun RecycleScreen(recycleViewModel: RecycleViewModel) {
                     )
                 }
             }
-
-            PullRefreshIndicator(refreshing, pullRefreshState, Modifier.align(Alignment.TopCenter))
         }
 
     }

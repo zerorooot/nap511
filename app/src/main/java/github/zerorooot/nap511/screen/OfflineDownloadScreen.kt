@@ -1,7 +1,7 @@
 package github.zerorooot.nap511.screen
 
 
-//noinspection UsingMaterialAndMaterial3Libraries
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,12 +10,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.Surface
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -28,7 +28,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.R
@@ -44,7 +45,13 @@ fun OfflineDownloadScreen(
     offlineFileViewModel: OfflineFileViewModel,
     fileViewModel: FileViewModel
 ) {
+    val containerSize = LocalWindowInfo.current.containerSize
+    val density = LocalDensity.current
+
+    val screenWidthDp = with(density) { containerSize.width.toDp() }
+    val screenHeightDp =  with(density) { containerSize.height.toDp() }
     offlineFileViewModel.quota()
+
     val quotaBean by offlineFileViewModel.quotaBean.collectAsState()
     val path by fileViewModel.currentPath.collectAsState()
     val clickFun = { command: String, url: String ->
@@ -114,10 +121,12 @@ fun OfflineDownloadScreen(
                         }
                     },
                     modifier = Modifier
-                        .width((maxHeightPercentage * LocalConfiguration.current.screenWidthDp).dp)
+                        //LocalConfiguration.current.screenWidthDp
+                        .width((maxHeightPercentage * screenWidthDp.value).dp)
                         .heightIn(
-                            min = (minHeightPercentage * LocalConfiguration.current.screenHeightDp).dp,
-                            max = (maxHeightPercentage * LocalConfiguration.current.screenHeightDp).dp
+                            //LocalConfiguration.current.screenHeightDp
+                            min = (minHeightPercentage * screenHeightDp.value).dp,
+                            max = (maxHeightPercentage * screenHeightDp.value).dp
                         )
                 )
                 Spacer(modifier = Modifier.height(10.dp))
@@ -129,7 +138,7 @@ fun OfflineDownloadScreen(
                     label = { Text(text = "离线位置") },
                     readOnly = true,
                     onValueChange = { },
-                    modifier = Modifier.width((maxHeightPercentage * LocalConfiguration.current.screenWidthDp).dp)
+                    modifier = Modifier.width((maxHeightPercentage * screenWidthDp.value).dp)
                 )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

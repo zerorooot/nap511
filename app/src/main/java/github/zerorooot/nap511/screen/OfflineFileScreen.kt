@@ -1,24 +1,18 @@
 package github.zerorooot.nap511.screen
 
-import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.pullrefresh.PullRefreshIndicator
-import androidx.compose.material.pullrefresh.pullRefresh
-import androidx.compose.material.pullrefresh.rememberPullRefreshState
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
@@ -34,8 +28,6 @@ import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import java.util.StringJoiner
 
-@OptIn(ExperimentalMaterialApi::class)
-@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter", "UnusedMaterialScaffoldPaddingParameter")
 @Composable
 fun OfflineFileScreen(
     offlineFileViewModel: OfflineFileViewModel,
@@ -84,8 +76,6 @@ fun OfflineFileScreen(
         }
     }
 
-    val pullRefreshState = rememberPullRefreshState(refreshing, { offlineFileViewModel.refresh() })
-
     Column {
         AppTopBarOfflineFile(stringResource(R.string.app_name), appBarOnClick)
 
@@ -94,7 +84,10 @@ fun OfflineFileScreen(
             modifier = Modifier.padding(8.dp, 4.dp)
         )
 
-        Box(Modifier.pullRefresh(pullRefreshState)) {
+        PullToRefreshBox(
+            isRefreshing = refreshing,
+            onRefresh = { offlineFileViewModel.refresh() }
+        ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
             ) {
@@ -109,8 +102,6 @@ fun OfflineFileScreen(
                     )
                 }
             }
-
-            PullRefreshIndicator(refreshing, pullRefreshState, Modifier.align(Alignment.TopCenter))
         }
 
 //        Scaffold() {

@@ -11,3 +11,5 @@
 .externalNativeBuild
 .cxx
 local.properties
+.deepseek
+修复方案.md

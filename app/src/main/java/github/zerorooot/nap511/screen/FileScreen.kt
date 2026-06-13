@@ -1,6 +1,5 @@
 package github.zerorooot.nap511.screen
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ClipData
 import android.content.Intent
@@ -22,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -69,15 +67,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
-@SuppressLint(
-    "UnusedMaterial3ScaffoldPaddingParameter",
-    "MutableCollectionMutableState",
-    "UnrememberedMutableState"
-)
 @OptIn(
     ExperimentalFoundationApi::class,
-    ExperimentalMaterial3Api::class,
-    ExperimentalMaterialApi::class
+    ExperimentalMaterial3Api::class
 )
 @Composable
 fun FileScreen(
@@ -361,7 +353,7 @@ fun FileScreen(
                     }
                 }
             }
-        }, floatingActionButtonPosition = fabPosition) {
+        }, floatingActionButtonPosition = fabPosition) { _ ->
             PullToRefreshBox(
                 isRefreshing = refreshing,
                 onRefresh = { fileViewModel.refresh() }
