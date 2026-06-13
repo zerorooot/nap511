@@ -1,7 +1,6 @@
 package github.zerorooot.nap511.viewmodel
 
-import android.app.Application
-import android.widget.Toast
+//import github.zerorooot.nap511.util.SharedPreferencesUtil
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -9,18 +8,17 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.service.FileService
+import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.DialogSwitchUtil
-//import github.zerorooot.nap511.util.SharedPreferencesUtil
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.*
-import kotlin.collections.ArrayList
+import java.util.Locale
 
-class RecycleViewModel(private val cookie: String, private val application: Application) :
+class RecycleViewModel(private val cookie: String) :
     ViewModel() {
     private val _isRefreshing = MutableStateFlow(false)
     var isRefreshing = _isRefreshing.asStateFlow()
@@ -79,7 +77,7 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
                 DataStoreUtil.putData(ConfigKeyUtil.PASSWORD, "")
                 "删除失败，${revert.errorMsg}"
             }
-            Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
+           App.instance.toast(message)
         }
     }
 
@@ -97,7 +95,7 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
             } else {
                 "清除失败，${recycleCleanAll.errorMsg}"
             }
-            Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
+            App.instance.toast(message)
         }
     }
 
@@ -110,7 +108,7 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
             } else {
                 "恢复失败，${revert.errorMsg}"
             }
-            Toast.makeText(application, message, Toast.LENGTH_SHORT).show()
+            App.instance.toast(message)
         }
     }
 
@@ -132,7 +130,7 @@ class RecycleViewModel(private val cookie: String, private val application: Appl
                 )
 
             recycleBean.fileSizeString = android.text.format.Formatter.formatFileSize(
-                application,
+                App.instance,
                 if (recycleBean.fileSize == "") "0".toLong() else recycleBean.fileSize.toLong()
             ) + " "
             setIco(recycleBean)

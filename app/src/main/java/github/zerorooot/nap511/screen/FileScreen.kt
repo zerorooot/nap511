@@ -2,6 +2,7 @@ package github.zerorooot.nap511.screen
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.ClipData
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -12,7 +13,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,31 +26,28 @@ import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.pullrefresh.PullRefreshIndicator
-import androidx.compose.material.pullrefresh.pullRefresh
-import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.ClipboardManager
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
-import com.google.gson.JsonParser
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
 import github.zerorooot.nap511.bean.OrderBean
@@ -63,13 +60,14 @@ import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.DialogSwitchUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import kotlin.concurrent.thread
 
 @SuppressLint(
     "UnusedMaterial3ScaffoldPaddingParameter",
@@ -88,15 +86,18 @@ fun FileScreen(
     val fileViewModel = viewModel<FileViewModel>()
     val offlineFileViewModel = viewModel<OfflineFileViewModel>()
 
-    val fabPosition by mutableStateOf(
-        when (DataStoreUtil.getData(ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION, "End")) {
-            "Start" -> FabPosition.Start
-            "Center" -> FabPosition.Center
-            "End" -> FabPosition.End
-            "EndOverlay" -> FabPosition.EndOverlay
-            else -> FabPosition.End
-        }
-    )
+    val fabPosition by remember {
+        mutableStateOf(
+            when (DataStoreUtil.getData(ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION, "End")) {
+                "Start" -> FabPosition.Start
+                "Center" -> FabPosition.Center
+                "End" -> FabPosition.End
+                "EndOverlay" -> FabPosition.EndOverlay
+                else -> FabPosition.End
+            }
+        )
+    }
+
 
     val fileBeanList = fileViewModel.fileBeanList
     val path by fileViewModel.currentPath.collectAsState()
@@ -114,45 +115,52 @@ fun FileScreen(
 
     val dialogSwitchUtil = DialogSwitchUtil.getInstance()
 
-    val itemOnLongClick = { i: Int ->
-        fileViewModel.isLongClickState = !fileViewModel.isLongClickState
-        if (fileViewModel.isLongClickState) {
-            fileViewModel.select(i)
-        } else {
-            fileViewModel.appBarTitle = "nap511"
-        }
-    }
-    val floatingActionButtonOnClick = { i: String ->
-        when (i) {
-            "CutFloatingActionButton" -> fileViewModel.removeFile()
-            //打开添加文件夹
-            "AddFloatingActionButton" -> dialogSwitchUtil.isOpenCreateFolderDialog = true
-            "CloseFloatingActionButton" -> fileViewModel.cancelCut()
-        }
-    }
-
-    val menuOnClick = { itemName: String, index: Int ->
-        when (itemName) {
-            "剪切" -> fileViewModel.cut(index)
-            "删除" -> fileViewModel.delete(index)
-            "重命名" -> {
-                fileViewModel.selectIndex = index
-                dialogSwitchUtil.isOpenRenameFileDialog = true
+    val itemOnLongClick = remember {
+        { i: Int ->
+            fileViewModel.isLongClickState = !fileViewModel.isLongClickState
+            if (fileViewModel.isLongClickState) {
+                fileViewModel.select(i)
+            } else {
+                fileViewModel.appBarTitle = "nap511"
             }
+        }
+    }
 
-            "文件信息" -> {
-                fileViewModel.selectIndex = index
-                fileViewModel.getFileInfo(index)
+    val floatingActionButtonOnClick = remember {
+        { i: String ->
+            when (i) {
+                "CutFloatingActionButton" -> fileViewModel.removeFile()
+                //打开添加文件夹
+                "AddFloatingActionButton" -> dialogSwitchUtil.isOpenCreateFolderDialog = true
+                "CloseFloatingActionButton" -> fileViewModel.cancelCut()
+            }
+        }
+    }
+
+    val menuOnClick = remember {
+        { itemName: String, index: Int ->
+            when (itemName) {
+                "剪切" -> fileViewModel.cut(index)
+                "删除" -> fileViewModel.delete(index)
+                "重命名" -> {
+                    fileViewModel.selectIndex = index
+                    dialogSwitchUtil.isOpenRenameFileDialog = true
+                }
+
+                "文件信息" -> {
+                    fileViewModel.selectIndex = index
+                    fileViewModel.getFileInfo(index)
 //                fileViewModel.isOpenFileInfoDialog = true
-            }
+                }
 
-            "通过aria2下载" -> {
+                "通过aria2下载" -> {
 //                val aria2Url = SharedPreferencesUtil(activity).get(ConfigUtil.aria2Url)
-                val aria2Url = DataStoreUtil.getData(ConfigKeyUtil.ARIA2_URL, "")
-                if (aria2Url == "") {
-                    dialogSwitchUtil.isOpenAria2Dialog = true
-                } else {
-                    fileViewModel.startSendAria2Service(index)
+                    val aria2Url = DataStoreUtil.getData(ConfigKeyUtil.ARIA2_URL, "")
+                    if (aria2Url == "") {
+                        dialogSwitchUtil.isOpenAria2Dialog = true
+                    } else {
+                        fileViewModel.startSendAria2Service(index)
+                    }
                 }
             }
         }
@@ -276,10 +284,9 @@ fun FileScreen(
         }
         appBarOnClick.invoke(i)
     }
+    val clipboardManager = LocalClipboard.current
 
-    val pullRefreshState = rememberPullRefreshState(refreshing, { fileViewModel.refresh() })
-
-    val clipboardManager: ClipboardManager = LocalClipboardManager.current
+    // val clipboardManager: ClipboardManager = LocalClipboardManager.current
     Column {
         AnimatedContent(targetState = fileViewModel.isLongClickState, transitionSpec = {
             fadeIn() togetherWith fadeOut()
@@ -295,7 +302,13 @@ fun FileScreen(
                 .fillMaxWidth()
                 .combinedClickable(
                     onClick = {
-                        clipboardManager.setText(AnnotatedString((path)))
+                        // clipboardManager.setText(AnnotatedString((path)))
+                        clipboardManager.nativeClipboard.setPrimaryClip(
+                            ClipData.newPlainText(
+                                "path",
+                                path
+                            )
+                        )
                         App.instance.toast("$path 已复制到剪切板")
                     },
                     onDoubleClick = {
@@ -303,7 +316,13 @@ fun FileScreen(
                         fileViewModel.getListLocation("null")
                     },
                     onLongClick = {
-                        clipboardManager.setText(AnnotatedString((fileViewModel.currentCid)))
+//                        clipboardManager.setText(AnnotatedString((fileViewModel.currentCid)))
+                        clipboardManager.nativeClipboard.setPrimaryClip(
+                            ClipData.newPlainText(
+                                "currentCid",
+                                fileViewModel.currentCid
+                            )
+                        )
                         App.instance.toast("cid ${fileViewModel.currentCid} 已复制到剪切板")
                     },
                 ),
@@ -343,7 +362,10 @@ fun FileScreen(
                 }
             }
         }, floatingActionButtonPosition = fabPosition) {
-            Box(Modifier.pullRefresh(pullRefreshState)) {
+            PullToRefreshBox(
+                isRefreshing = refreshing,
+                onRefresh = { fileViewModel.refresh() }
+            ) {
                 LazyColumnScrollbar(
                     state = listState, settings = ScrollbarSettings.Default.copy(
                         thumbUnselectedColor = Purple80
@@ -367,9 +389,6 @@ fun FileScreen(
                         }
                     }
                 }
-                PullRefreshIndicator(
-                    refreshing, pullRefreshState, Modifier.align(Alignment.TopCenter)
-                )
             }
 
         }
@@ -421,6 +440,7 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
         }
     }
 //aria2
+    val scope = rememberCoroutineScope()
     Aria2Dialog(
         context = DataStoreUtil.getData(
             ConfigKeyUtil.ARIA2_URL, ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
@@ -428,10 +448,10 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
     ) {
         dialogSwitchUtil.isOpenAria2Dialog = false
         if (it != "") {
-            val jsonObject = JsonParser().parse(it).asJsonObject
+            val jsonObject = Gson().fromJson(it, JsonObject::class.java)
             val aria2Url = jsonObject.get(ConfigKeyUtil.ARIA2_URL).asString
             val aria2Token = jsonObject.get(ConfigKeyUtil.ARIA2_TOKEN).asString
-            thread { checkAria2(aria2Url, aria2Token) }
+            scope.launch(Dispatchers.IO) { checkAria2(aria2Url, aria2Token) }
         }
     }
     //搜索
@@ -483,7 +503,8 @@ private fun checkAria2(aria2Url: String, aria2Token: String) {
 
     val message: String = try {
         val body = okHttpClient.newCall(request).execute().body.string()
-        val bodyJson = JsonParser().parse(body).asJsonObject
+        val bodyJson = Gson().fromJson(body, JsonObject::class.java)
+
 
         if (bodyJson.has("error")) {
             "aria2配置失败," + bodyJson.getAsJsonObject("error").get("message").asString

@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-class OfflineFileViewModel(private val cookie: String, private val application: Application) :
+class OfflineFileViewModel(private val cookie: String) :
     ViewModel() {
     private val _isRefreshing = MutableStateFlow(false)
     var isRefreshing = _isRefreshing.asStateFlow()
@@ -47,6 +47,10 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
 
     private val fileRepository: FileRepository by lazy {
         FileRepository.getInstance(cookie)
+    }
+
+    init {
+        getOfflineFileList()
     }
 
     fun getOfflineFileList() {
@@ -81,12 +85,12 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
                 return@launch
             }
             torrentTask.fileSizeString = android.text.format.Formatter.formatFileSize(
-                application, torrentTask.fileSize
+                App.instance, torrentTask.fileSize
             ) + " "
 //            torrentTask.torrentFileListWeb.removeIf { i -> i.wanted == -1 }
             torrentTask.torrentFileListWeb.forEach { b ->
                 b.sizeString = android.text.format.Formatter.formatFileSize(
-                    application, b.size
+                    App.instance, b.size
                 ) + " "
             }
             torrentBeanCache[sha1] = torrentTask
@@ -124,7 +128,7 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
                     offlineTask.addTime * 1000
                 )
             offlineTask.sizeString = android.text.format.Formatter.formatFileSize(
-                application, if (offlineTask.size == -1L) 0L else offlineTask.size
+                App.instance, if (offlineTask.size == -1L) 0L else offlineTask.size
             )
             offlineTask.percentString =
                 if (offlineTask.status == -1) "❎下载失败" else "⬇${offlineTask.percentDone.toInt()}%"
@@ -132,7 +136,7 @@ class OfflineFileViewModel(private val cookie: String, private val application: 
     }
 
     fun refresh() {
-        _offlineFile.value.clear()
+        _offlineFile.value = arrayListOf()
         getOfflineFileList()
     }
 

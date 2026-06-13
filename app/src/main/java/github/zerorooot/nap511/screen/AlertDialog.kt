@@ -134,7 +134,7 @@ fun RenameFileDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
     if (dialogSwitchUtil.isOpenRenameFileDialog) {
         val name = fileViewModel.fileBeanList[fileViewModel.selectIndex].name
         val position = DataStoreUtil.getData(ConfigKeyUtil.POSITION_AFTER_AT, false)
-        val atPosition = name.indexOf("@") + 1
+        val atPosition = name.lastIndexOf("@") + 1
         BaseDialog(
             "重命名文件", "新文件名", name, enter = enter, selection = TextRange(
                 if (!position || atPosition == 0) name.length else atPosition

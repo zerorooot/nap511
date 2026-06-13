@@ -1,6 +1,5 @@
 package github.zerorooot.nap511.util
 
-import android.app.AppOpsManager
 import android.app.Application
 import android.content.Context
 import android.content.Intent
@@ -11,6 +10,7 @@ import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.app.NotificationManagerCompat
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.GifDecoder
@@ -27,15 +27,12 @@ import com.google.gson.Gson
 import com.google.gson.JsonObject
 import github.zerorooot.nap511.bean.AvatarBean
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
-import java.lang.reflect.Field
-import java.lang.reflect.InvocationTargetException
-import java.lang.reflect.Method
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -107,9 +104,10 @@ class App : Application(), ImageLoaderFactory {
 //            uncaughtExceptionHandler?.uncaughtException(t, e)
 //        }
     }
+    private val toastScope = CoroutineScope(Dispatchers.Main.immediate)
 
     fun toast(text: String) {
-        MainScope().launch {
+        toastScope.launch {
             Toast.makeText(instance,text, Toast.LENGTH_SHORT).show()
         }
     }
@@ -179,41 +177,8 @@ class App : Application(), ImageLoaderFactory {
      * @param context 上下文
      */
     fun isNotificationEnabled(context: Context): Boolean {
-        val CHECK_OP_NO_THROW = "checkOpNoThrow"
-        val OP_POST_NOTIFICATION = "OP_POST_NOTIFICATION"
-        val mAppOps = context.getSystemService(APP_OPS_SERVICE) as AppOpsManager
-        val appInfo = context.applicationInfo
-        val pkg = context.applicationContext.packageName
-        val uid = appInfo.uid
-        val appOpsClass: Class<*>?
-        /* Context.APP_OPS_MANAGER */try {
-            appOpsClass = Class.forName(AppOpsManager::class.java.name)
-            val checkOpNoThrowMethod: Method = appOpsClass.getMethod(
-                CHECK_OP_NO_THROW, Integer.TYPE, Integer.TYPE,
-                String::class.java
-            )
-            val opPostNotificationValue: Field = appOpsClass.getDeclaredField(OP_POST_NOTIFICATION)
-            val value = opPostNotificationValue.get(Int::class.java) as Int
-            return checkOpNoThrowMethod.invoke(
-                mAppOps,
-                value,
-                uid,
-                pkg
-            ) as Int == AppOpsManager.MODE_ALLOWED
-        } catch (e: ClassNotFoundException) {
-            e.printStackTrace()
-        } catch (e: NoSuchMethodException) {
-            e.printStackTrace()
-        } catch (e: NoSuchFieldException) {
-            e.printStackTrace()
-        } catch (e: InvocationTargetException) {
-            e.printStackTrace()
-        } catch (e: IllegalAccessException) {
-            e.printStackTrace()
-        }
-        return false
+        return NotificationManagerCompat.from(context).areNotificationsEnabled()
     }
-
     /**
      * 跳转到app的设置界面--开启通知
      * @param context

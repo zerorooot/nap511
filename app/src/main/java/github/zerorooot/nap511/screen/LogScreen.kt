@@ -36,7 +36,7 @@ import java.io.InputStream
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun LogScreen() {
-    var log = remember {
+    val log = remember {
         mutableStateOf(
             try {
                 readInputStreamAsString(

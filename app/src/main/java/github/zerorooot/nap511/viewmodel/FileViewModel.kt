@@ -2,6 +2,7 @@ package github.zerorooot.nap511.viewmodel
 
 import android.annotation.SuppressLint
 import android.app.Application
+import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.getValue
@@ -43,18 +44,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Locale
-import kotlin.concurrent.thread
 import kotlin.math.roundToInt
 
 @SuppressLint("MutableCollectionMutableState")
-class FileViewModel(private val cookie: String, private val application: Application) :
+class FileViewModel(private val cookie: String, private val context: Context) :
     ViewModel() {
     var fileBeanList = mutableStateListOf<FileBean>()
     var unzipBeanList = mutableStateOf(ZipBeanList())
     var remainingSpace by mutableStateOf(RemainingSpaceBean())
     var textBodyByteArray: ByteArray? = null
 
-    var appBarTitle by mutableStateOf(application.resources.getString(R.string.app_name))
+    var appBarTitle by mutableStateOf(context.getString(R.string.app_name))
 
     private val _currentPath = MutableStateFlow("")
     var currentPath = _currentPath.asStateFlow()
@@ -115,7 +115,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
 
     fun isFileScreenListState() = ::fileScreenListState.isInitialized
 
-    fun init() {
+    fun loadCacheFile() {
         viewModelScope.launch(Dispatchers.IO) {
             val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
             if (fileListCache.isEmpty() && saveRequestCache) {
@@ -165,7 +165,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         if (isSearchState) {
             fileBeanList.clear()
             setFiles(fileListCache[currentCid]!!)
-            appBarTitle = application.resources.getString(R.string.app_name)
+            appBarTitle = context.getString(R.string.app_name)
             isSearchState = false
             return
         }
@@ -584,7 +584,6 @@ class FileViewModel(private val cookie: String, private val application: Applica
             val delete = fileRepository.delete(pid, fid)
 
             val message = if (delete.state) {
-                // saveFileCache()
                 "删除 ${fileBean.name} 成功"
             } else {
                 fileBeanList = beforeList
@@ -665,7 +664,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
         appBarTitle = if (isSearchState) {
             "搜索"
         } else {
-            application.resources.getString(R.string.app_name)
+           context.getString(R.string.app_name)
         }
     }
 
@@ -780,7 +779,7 @@ class FileViewModel(private val cookie: String, private val application: Applica
 
 
     fun downloadText(fileBean: FileBean) {
-        thread {
+        viewModelScope.launch(Dispatchers.IO) {
             var bytes = textFileCache[fileBean]
             if (bytes == null) {
                 bytes = fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
@@ -800,11 +799,11 @@ class FileViewModel(private val cookie: String, private val application: Applica
             App.instance.toast("暂时无法下载文件夹")
             return
         }
-        val intent = Intent(application, Sha1Service::class.java)
+        val intent = Intent(context, Sha1Service::class.java)
         intent.putExtra(ConfigKeyUtil.COMMAND, ConfigKeyUtil.SENT_TO_ARIA2)
         intent.putExtra("list", Gson().toJson(fileBean))
         intent.putExtra("cookie", cookie)
-        application.startService(intent)
+        context.startService(intent)
     }
 
 

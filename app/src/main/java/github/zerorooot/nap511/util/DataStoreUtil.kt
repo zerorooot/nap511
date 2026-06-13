@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.util
 
+import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
@@ -10,13 +11,14 @@ import kotlinx.coroutines.runBlocking
 
 
 object DataStoreUtil {
-    // 创建DataStore
-    val App.dataStore: DataStore<Preferences> by preferencesDataStore(
+    // 独立创建DataStore
+    private val dataStore: DataStore<Preferences> by lazy {
+        App.instance.applicationContext.dataStore
+    }
+
+    private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
         name = "Setting"
     )
-
-    // DataStore变量
-    private val dataStore = App.instance.dataStore
 
     /**
      * 存放Int数据
@@ -131,8 +133,73 @@ object DataStoreUtil {
         }.first()
     }
 
+    // === suspend 版本的私有 getter（供 getDataSuspend 使用） ===
+    private suspend fun getIntDataSuspend(key: String, default: Int = 0): Int {
+        return dataStore.data.map { it[intPreferencesKey(key)] ?: default }.first()
+    }
+
+    private suspend fun getLongDataSuspend(key: String, default: Long = 0): Long {
+        return dataStore.data.map { it[longPreferencesKey(key)] ?: default }.first()
+    }
+
+    private suspend fun getStringDataSuspend(key: String, default: String = ""): String {
+        return dataStore.data.map { it[stringPreferencesKey(key)] ?: default }.first()
+    }
+
+    private suspend fun getStringSetDataSuspend(key: String): Set<String> {
+        return dataStore.data.map { it[stringSetPreferencesKey(key)] ?: setOf() }.first()
+    }
+
+    private suspend fun getBooleanDataSuspend(key: String, default: Boolean = false): Boolean {
+        return dataStore.data.map { it[booleanPreferencesKey(key)] ?: default }.first()
+    }
+
+    private suspend fun getFloatDataSuspend(key: String, default: Float = 0.0f): Float {
+        return dataStore.data.map { it[floatPreferencesKey(key)] ?: default }.first()
+    }
+
+    private suspend fun getDoubleDataSuspend(key: String, default: Double = 0.00): Double {
+        return dataStore.data.map { it[doublePreferencesKey(key)] ?: default }.first()
+    }
+
     /**
-     * 存数据
+     * suspend 版本：取数据（新版主 API）
+     */
+    suspend fun <T> getDataSuspend(key: String, defaultValue: T): T {
+        if (defaultValue == null) {
+            return getStringDataSuspend(key, "") as T
+        }
+        val data = when (defaultValue) {
+            is Int -> getIntDataSuspend(key, defaultValue)
+            is Long -> getLongDataSuspend(key, defaultValue)
+            is String -> getStringDataSuspend(key, defaultValue)
+            is Boolean -> getBooleanDataSuspend(key, defaultValue)
+            is Float -> getFloatDataSuspend(key, defaultValue)
+            is Double -> getDoubleDataSuspend(key, defaultValue)
+            is Set<*> -> getStringSetDataSuspend(key)
+            else -> throw IllegalArgumentException("This type cannot be saved to the Data Store key $key defaultValue $defaultValue")
+        }
+        return data as T
+    }
+
+    /**
+     * suspend 版本：存数据（新版主 API）
+     */
+    suspend fun <T> putDataSuspend(key: String, value: T) {
+        when (value) {
+            is Int -> putIntData(key, value)
+            is Long -> putLongData(key, value)
+            is String -> putStringData(key, value)
+            is Boolean -> putBooleanData(key, value)
+            is Float -> putFloatData(key, value)
+            is Double -> putDoubleData(key, value)
+            is Set<*> -> putStringSetData(key, value)
+            else -> throw IllegalArgumentException("This type cannot be saved to the Data Store")
+        }
+    }
+
+    /**
+     * 存数据（阻塞版本，用于非协程上下文）
      */
     fun <T> putData(key: String, value: T) {
         runBlocking {
@@ -167,9 +234,14 @@ object DataStoreUtil {
     }
 
     /**
-     * 清空数据
+     * suspend 版本：清空数据
      */
-    fun clearData() = runBlocking { dataStore.edit { it.clear() } }
+    suspend fun clearData() = dataStore.edit { it.clear() }
+
+    /**
+     * 阻塞版本：清空数据（用于非协程上下文）
+     */
+    fun clearDataBlocking() = runBlocking { dataStore.edit { it.clear() } }
 }
 
 

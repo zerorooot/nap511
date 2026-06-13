@@ -20,6 +20,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -40,18 +41,17 @@ fun OfflineFileScreen(
     offlineFileViewModel: OfflineFileViewModel,
     fileViewModel: FileViewModel,
 ) {
-    offlineFileViewModel.getOfflineFileList()
     val offlineInfo by offlineFileViewModel.offlineInfo.collectAsState()
     val refreshing by offlineFileViewModel.isRefreshing.collectAsState()
     val offlineList by offlineFileViewModel.offlineFile.collectAsState()
     val context = LocalContext.current
+    val clipboardManager = LocalClipboard.current
 
     OfflineFileInfoDialog(offlineFileViewModel, {
         offlineFileViewModel.closeOfflineDialog()
     }) {
-        val clipboard = getSystemService(context, ClipboardManager::class.java)
         val clip = ClipData.newPlainText("label", it)
-        clipboard?.setPrimaryClip(clip)
+        clipboardManager.nativeClipboard.setPrimaryClip(clip)
         XLog.d("OfflineFileInfoDialog copy $it")
         App.instance.toast("复制磁力链接成功!")
     }

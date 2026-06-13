@@ -2,7 +2,7 @@ package github.zerorooot.nap511.repository
 
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
-import com.google.gson.JsonParser
+import com.google.gson.JsonObject
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.CreateFolderMessage
@@ -19,9 +19,7 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.Sha1Util
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -303,6 +301,7 @@ class FileRepository(private val cookie: String) {
         //1 is encryption zip file
         return unzipStatus != 4
     }
+
     suspend fun checkZipStatus(pickCode: String): ZipStatus {
         return try {
             val json = fileService.getDecryptZipProcess(pickCode)
@@ -372,7 +371,7 @@ class FileRepository(private val cookie: String) {
             if (process == 100) {
                 return true
             }
-            Thread.sleep(1000)
+            delay(1500)
         }
         return false
     }
@@ -396,14 +395,15 @@ class FileRepository(private val cookie: String) {
 
         val response = okHttpClient.newCall(request).execute()
 
-        val returnJson = JsonParser().parse(response.body.string()).asJsonObject
+        val returnJson = Gson().fromJson(response.body.string(), JsonObject::class.java)
         val data = returnJson.get("data").asString
         val m115Decode = sha1Util.m115_decode(data, m115Encode.key)
 
 
         //{"fileId":{"file_name":"a","file_size":"0","pick_code":"pick_code","url":false}}
-        val downloadUrl = JsonParser().parse(m115Decode).asJsonObject.getAsJsonObject(fileId)
-            .getAsJsonObject("url").get("url").asString
+        val downloadUrl =
+            Gson().fromJson(m115Decode, JsonObject::class.java).getAsJsonObject(fileId)
+                .getAsJsonObject("url").get("url").asString
         XLog.d("downloadUrl $downloadUrl")
 
 

@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.screen
 
+import android.app.Activity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -8,12 +9,13 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
@@ -34,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,14 +44,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.request.ImageRequest
 import coil.size.Scale
-import com.google.accompanist.pager.ExperimentalPagerApi
-import com.google.accompanist.pager.HorizontalPager
-import com.google.accompanist.pager.rememberPagerState
-import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.smarttoolfactory.zoom.enhancedZoom
 import com.smarttoolfactory.zoom.rememberEnhancedZoomState
 import github.zerorooot.nap511.bean.FileBean
@@ -61,15 +63,29 @@ import github.zerorooot.nap511.viewmodel.FileViewModel
 fun MyPhotoScreen(
     fileViewModel: FileViewModel,
 ) {
-    val systemUiController = rememberSystemUiController()
     var controlsVisible by remember { mutableStateOf(false) }
-
+    val view = LocalView.current
     DisposableEffect(Unit) {
-        systemUiController.isSystemBarsVisible = false
+        // 获取 Window 实例（注意：需要确保 context 是 Activity）
+        val window = (view.context as? Activity)?.window
+            ?: throw Exception("Not in an Activity - unable to get Window reference")
+
+        // 创建控制器
+        val insetsController = WindowCompat.getInsetsController(window, view)
+
+        // 隐藏状态栏和导航栏
+        insetsController.hide(WindowInsetsCompat.Type.systemBars())
+
+        // 设置交互模式：滑动边缘时临时显示（Immersive Sticky 模式）
+        insetsController.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+
         onDispose {
-            systemUiController.isSystemBarsVisible = true
+            // 退出时恢复显示
+            insetsController.show(WindowInsetsCompat.Type.systemBars())
         }
     }
+
 // 从 ViewModel 提取当前页面的状态数据
     val photoList = fileViewModel.photoFileBeanList
     // 提取当前相册的缓存字典
@@ -91,7 +107,7 @@ fun MyPhotoScreen(
 /**
  * 大图预览
  */
-@OptIn(ExperimentalPagerApi::class)
+
 @Composable
 private fun ImageBrowserScreen(
     // 1. 纯数据传入
@@ -104,8 +120,10 @@ private fun ImageBrowserScreen(
     onToggleControls: () -> Unit = {},
     onBack: () -> Unit = {}
 ) {
-    val pageState = rememberPagerState(initialPage = currentIndex)
-    val size = remember(photoList) { photoList.size }
+    val rememberPagerState = rememberPagerState(
+        initialPage = currentIndex,
+        pageCount = { photoList.size })
+
 
     Box(
         modifier = Modifier
@@ -113,9 +131,7 @@ private fun ImageBrowserScreen(
             .background(Color.Black)
     ) {
         HorizontalPager(
-            count = size,
-            state = pageState,
-            contentPadding = PaddingValues(horizontal = 0.dp),
+            rememberPagerState,
             modifier = Modifier.fillMaxSize()
         ) { page ->
             LaunchedEffect(page) {
@@ -138,7 +154,7 @@ private fun ImageBrowserScreen(
         ) {
             PhotoTopBar(
                 title = imageCache.getOrDefault(
-                    pageState.currentPage,
+                    rememberPagerState.currentPage,
                     ImageBean()
                 ).fileName.ifEmpty { "" },
                 onBack = onBack
@@ -153,7 +169,8 @@ private fun ImageBrowserScreen(
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             PhotoBottomBar(
-                currentIndex = pageState.currentPage + 1, totalCount = size
+                currentIndex = rememberPagerState.currentPage + 1,
+                totalCount = rememberPagerState.pageCount
             )
         }
     }

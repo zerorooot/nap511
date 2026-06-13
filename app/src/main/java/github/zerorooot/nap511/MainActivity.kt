@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -89,7 +90,6 @@ import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlin.concurrent.thread
 
 
 class MainActivity : AppCompatActivity() {
@@ -232,7 +232,8 @@ class MainActivity : AppCompatActivity() {
                 )
             ).build()
             // 异步挂起等待结果，避免阻塞主线程
-            val workInfos = WorkManager.getInstance(applicationContext).getWorkInfos(workQuery).await()
+            val workInfos =
+                WorkManager.getInstance(applicationContext).getWorkInfos(workQuery).await()
             if (workInfos.isNotEmpty()) return@launch
             //size等于0,证明后台没有正在添加离线链接
             val currentOfflineTask = DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
@@ -364,7 +365,7 @@ class MainActivity : AppCompatActivity() {
     @Composable
     private fun Avatar() {
         val fileViewModel = viewModel<FileViewModel>()
-        fileViewModel.getRemainingSpace()
+        LaunchedEffect(Unit) { fileViewModel.getRemainingSpace() }
         val remainingSpaceBean = fileViewModel.remainingSpace
 
         val avatarBean = remember {
@@ -468,7 +469,8 @@ class MainActivity : AppCompatActivity() {
     private fun MyFileScreen(
         fileViewModel: FileViewModel
     ) {
-        fileViewModel.init()
+
+        fileViewModel.loadCacheFile()
 
         FileScreen(
             appBarClick(fileViewModel),
