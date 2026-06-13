@@ -58,6 +58,7 @@ import github.zerorooot.nap511.bean.ImageBean
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
+import github.zerorooot.nap511.viewmodel.getImage
 
 @Composable
 fun MyPhotoScreen(

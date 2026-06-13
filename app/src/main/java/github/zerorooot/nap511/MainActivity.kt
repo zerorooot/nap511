@@ -87,6 +87,8 @@ import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
+import github.zerorooot.nap511.viewmodel.cut
+import github.zerorooot.nap511.viewmodel.deleteMultiple
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 

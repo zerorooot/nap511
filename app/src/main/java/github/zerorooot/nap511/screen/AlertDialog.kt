@@ -101,6 +101,9 @@ import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
+import github.zerorooot.nap511.viewmodel.decryptZip
+import github.zerorooot.nap511.viewmodel.getZipListFile
+import github.zerorooot.nap511.viewmodel.unzipFile
 import kotlinx.coroutines.delay
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings

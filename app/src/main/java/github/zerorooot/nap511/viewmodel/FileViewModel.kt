@@ -3,7 +3,6 @@ package github.zerorooot.nap511.viewmodel
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
-import android.content.Intent
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -27,12 +26,9 @@ import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.RemainingSpaceBean
-import github.zerorooot.nap511.bean.RenameBean
 import github.zerorooot.nap511.bean.ZipBeanList
-import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.service.FileService
-import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
@@ -42,13 +38,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.math.roundToInt
 
 @SuppressLint("MutableCollectionMutableState")
-class FileViewModel(private val cookie: String, private val context: Context) :
+class FileViewModel(internal val cookie: String, internal val context: Context) :
     ViewModel() {
     var fileBeanList = mutableStateListOf<FileBean>()
     var unzipBeanList = mutableStateOf(ZipBeanList())
@@ -65,10 +60,10 @@ class FileViewModel(private val cookie: String, private val context: Context) :
     //当前cid下的文件数量
     private var count: Int by mutableIntStateOf(0)
 
-    private var fileListCache = hashMapOf<String, FilesBean>()
+    internal var fileListCache = hashMapOf<String, FilesBean>()
     private var pathList = emptyList<PathBean>()
 
-    private var cutFileList = emptyList<FileBean>()
+    internal var cutFileList = emptyList<FileBean>()
 
 
     private val _isRefreshing = MutableStateFlow(false)
@@ -80,27 +75,27 @@ class FileViewModel(private val cookie: String, private val context: Context) :
     private val dialogEventRepository = DialogEventRepository.getInstance()
 
     var isOpenCreateFolderDialog by mutableStateOf(false)
-        private set
+        internal set
     var isOpenSearchDialog by mutableStateOf(false)
-        private set
+        internal set
     var isOpenRenameFileDialog by mutableStateOf(false)
-        private set
+        internal set
     var isOpenFileInfoDialog by mutableStateOf(false)
-        private set
+        internal set
     var isOpenFileOrderDialog by mutableStateOf(false)
-        private set
+        internal set
     var isOpenAria2Dialog by mutableStateOf(false)
-        private set
+        internal set
     var isOpenUnzipDialog by mutableStateOf(false)
-        private set
+        internal set
     var isOpenUnzipPasswordDialog by mutableStateOf(false)
-        private set
+        internal set
     var isOpenTextBodyDialog by mutableStateOf(false)
-        private set
+        internal set
     var isOpenUnzipAllFileDialog by mutableStateOf(false)
-        private set
+        internal set
     var isOpenCreateSelectTorrentFileDialog by mutableStateOf(false)
-        private set
+        internal set
 
     init {
         viewModelScope.launch {
@@ -150,13 +145,13 @@ class FileViewModel(private val cookie: String, private val context: Context) :
     var fileInfo by mutableStateOf(FileInfo())
 
     //小文件缓存
-    private var textFileCache = hashMapOf<FileBean, ByteArray?>()
+    internal var textFileCache = hashMapOf<FileBean, ByteArray?>()
     var orderBean = OrderBean(OrderEnum.name, 1)
-    private val fileService: FileService by lazy {
+    internal val fileService: FileService by lazy {
         FileService.getInstance(cookie)
     }
 
-    private val fileRepository: FileRepository by lazy {
+    internal val fileRepository: FileRepository by lazy {
         FileRepository.getInstance(cookie)
     }
 
@@ -256,28 +251,6 @@ class FileViewModel(private val cookie: String, private val context: Context) :
         }
     }
 
-    fun getImage(fileBeanList: List<FileBean>, indexOf: Int) {
-        if (imageBeanCache.containsKey(currentCid) && imageBeanCache[currentCid]!!.containsKey(
-                indexOf
-            )
-        ) {
-            return
-        }
-
-        //获取当前点击的
-        viewModelScope.launch {
-            val imageBean = fileService.image(
-                fileBeanList[indexOf].pickCode, System.currentTimeMillis() / 1000
-            ).imageBean
-
-            val oldMap = imageBeanCache[currentCid] ?: hashMapOf()
-            val newMap = HashMap(oldMap)
-            newMap[indexOf] = imageBean
-
-            imageBeanCache[currentCid] = newMap
-        }
-    }
-
     fun updateFileCache(cid: String) {
         viewModelScope.launch {
             if (fileListCache.containsKey(cid)) {
@@ -294,32 +267,6 @@ class FileViewModel(private val cookie: String, private val context: Context) :
             val files = fileService.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
             setFileBeanProperty(files.fileBeanList)
             fileListCache[cid] = files
-        }
-    }
-
-    fun updateVideoFileBean(cid: String, index: Int, duration: Int) {
-        viewModelScope.launch {
-            val fileBean = fileBeanList[index]
-
-            if (fileBean.isVideo != 1) return@launch
-
-            val playTime = ((duration.toFloat() / fileBean.playLong) * 100).roundToInt()
-            val createTimeString =
-                SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
-                    fileBean.createTime.toLong() * 1000
-                )
-            fileBean.createTimeString = "▶️ $playTime% $createTimeString"
-
-            val arrayListOf = arrayListOf<FileBean>()
-            arrayListOf.addAll(fileBeanList)
-            arrayListOf[index] = fileBean
-            fileBeanList.clear()
-            fileBeanList.addAll(arrayListOf)
-
-            if (!isSearchState) {
-                fileListCache[cid]?.fileBeanList = arrayListOf
-            }
-
         }
     }
 
@@ -490,85 +437,13 @@ class FileViewModel(private val cookie: String, private val context: Context) :
 
     }
 
-    fun cut(index: Int = -1) {
-        cutFileList = if (index == -1) {
-            fileBeanList.filter { i -> i.isSelect }
-        } else {
-            select(index)
-            arrayListOf(fileBeanList[index])
-        }
-        isCutState = true
-        recoverFromLongPress()
-        unSelect()
-    }
 
-    fun cancelCut() {
-        unSelect()
-        isCutState = false
-        cutFileList = emptyList()
-    }
-
-    fun removeFile() {
-        if (cutFileList.isEmpty()) {
-            isCutState = false
-            return
-        }
-        //提前保存cid,防止进入其他文件夹后刷新当前目录
-        val tempCid = currentCid
-        isCutState = false
-        viewModelScope.launch {
-            val hashMapOf = hashMapOf<String, String>()
-            hashMapOf["pid"] = currentCid
-            cutFileList.forEachIndexed { index, fileBean ->
-                hashMapOf["fid[$index]"] = fileBean.fileId
-            }
-            val move = fileService.move(hashMapOf)
-
-            val message = if (move.state) {
-                cutFileList.forEach { i -> i.isSelect = false }
-                val fileBean = cutFileList[0]
-                val cid = if (fileBean.isFolder) fileBean.parentId else fileBean.categoryId
-                //移除之前目录下剪切的文件
-                fileListCache[cid]?.fileBeanList?.removeAll(cutFileList.toSet())
-                //移除被剪切文件夹的缓存，防止路径未更改
-                cutFileList.forEach { i ->
-                    if (i.isFolder) {
-                        fileListCache.remove(i.categoryId)
-                    }
-                }
-
-                refresh(tempCid)
-                "移动${cutFileList.size}个文件成功"
-            } else {
-                "移动失败~"
-            }
-            App.instance.toast(message)
-        }
-    }
-
-
-    fun createFolder(folderName: String) {
-        viewModelScope.launch {
-            //提前保存cid,防止进入其他文件夹后刷新当前目录
-            val cid = currentCid
-            val createFolder = fileService.createFolder(cid, folderName)
-            val message = if (createFolder.state) {
-                refresh(cid)
-                "创建文件夹 $folderName 成功"
-            } else {
-                "创建失败"
-            }
-            App.instance.toast(message)
-
-        }
-
-    }
 
     fun refresh() {
         refresh(currentCid)
     }
 
-    private fun refresh(cid: String) {
+    internal fun refresh(cid: String) {
         recoverFromLongPress()
         fileListCache.remove(cid)
         // XLog.d("fileViewModel.refresh cid $cid, currentCid $currentCid")
@@ -581,127 +456,6 @@ class FileViewModel(private val cookie: String, private val context: Context) :
         imageBeanCache.remove(cid)
     }
 
-    fun getFileInfo(index: Int) {
-        viewModelScope.launch {
-            val fileBean = fileBeanList[index]
-            fileInfo = if (fileBean.isFolder) {
-                fileRepository.getFileInfo(fileBean.categoryId)
-            } else {
-                fileRepository.getFileInfo(fileBean.fileId)
-            }
-            isOpenFileInfoDialog = true
-        }
-    }
-
-    fun delete(index: Int) {
-        val fileBean = fileBeanList[index]
-        viewModelScope.launch {
-            val beforeList = fileBeanList
-            val beforeFileListCache = fileListCache[currentCid]
-            val beforeClickMap = clickMap.getOrDefault(currentCid, 0)
-            val beforeImageBeanCache = imageBeanCache[currentCid]
-
-            //提前删除，优化速度
-            fileBeanList.remove(fileBean)
-            fileListCache[currentCid]!!.fileBeanList.remove(fileBean)
-            clickMap[currentCid] = clickMap.getOrDefault(currentCid, 0) - 1
-
-            //删除文件夹内的文件夹
-            if (fileBean.isFolder) {
-                val results = mutableListOf<String>()
-                val walk: (String) -> Unit = object : (String) -> Unit {
-                    override fun invoke(cid: String) {
-                        fileListCache[cid]?.fileBeanList?.stream()?.filter { it.isFolder }
-                            ?.forEach {
-                                results.add(it.categoryId)
-                                this(it.categoryId)
-                            }
-                    }
-                }
-                walk(fileBean.categoryId)
-                results.forEach { fileListCache.remove(it) }
-            }
-
-            //delete image bean
-            imageBeanCache[currentCid]?.remove(index)
-
-            val fid = fileBean.fileId
-            val pid = currentCid
-
-            val delete = fileRepository.delete(pid, fid)
-
-            val message = if (delete.state) {
-                "删除 ${fileBean.name} 成功"
-            } else {
-                fileBeanList = beforeList
-                fileListCache[currentCid] = beforeFileListCache!!
-                clickMap[currentCid] = beforeClickMap
-                imageBeanCache[currentCid] = beforeImageBeanCache!!
-                "删除 ${fileBean.name} 失败~"
-            }
-            App.instance.toast(message)
-        }
-    }
-
-    fun rename(name: String) {
-        viewModelScope.launch {
-            val cid = currentCid
-            val fileBean = fileBeanList[selectIndex]
-            val beforeList = fileBeanList
-            val beforeFileListCache = fileListCache[cid]
-            //提前重命名，提升相应速度
-            fileBeanList[selectIndex] = fileBean.copy(name = name)
-            fileListCache[cid]!!.fileBeanList[selectIndex] = fileBean.copy(name = name)
-            fileListCache[fileBean.categoryId]?.let { it.path.last().name = name }
-            val rename = fileRepository.rename(RenameBean(fileBean.fileId, name).toRequestBody())
-            val message = if (rename.state) {
-                "重命名成功"
-            } else {
-                fileBeanList = beforeList
-                fileListCache[cid] = beforeFileListCache!!
-                "重命名失败"
-            }
-            App.instance.toast(message)
-        }
-
-    }
-
-    fun deleteMultiple() {
-        viewModelScope.launch {
-            val cid = currentCid
-            val beforeList = fileBeanList
-            val beforeFileListCache = fileListCache[cid]
-            val beforeClickMap = clickMap.getOrDefault(cid, 0)
-
-            val mapOf = hashMapOf<String, String>()
-            mapOf["ignore_warn"] = "1"
-            mapOf["pid"] = cid
-            val filter = fileBeanList.filter { i -> i.isSelect }
-            filter.forEachIndexed { index: Int, fileBean: FileBean ->
-                mapOf["fid[$index]"] = fileBean.fileId
-                //update image cache
-                imageBeanCache[cid]?.remove(index)
-            }
-            //提前删除，优化速度
-            fileBeanList.removeAll(filter)
-            fileListCache[cid]!!.fileBeanList = ArrayList(fileBeanList)
-            clickMap[cid] = clickMap.getOrDefault(cid, 0) - filter.size
-
-            recoverFromLongPress()
-
-            val deleteMultiple = fileService.deleteMultiple(mapOf)
-            val message = if (deleteMultiple.state) {
-                "成功删除 ${filter.size} 个文件"
-            } else {
-                fileBeanList = beforeList
-                fileListCache[cid] = beforeFileListCache!!
-                clickMap[cid] = beforeClickMap
-                "删除 ${filter.size} 个文件失败~"
-            }
-            App.instance.toast(message)
-
-        }
-    }
 
     /**
      * 从长按状态恢复
@@ -726,132 +480,7 @@ class FileViewModel(private val cookie: String, private val context: Context) :
         }
     }
 
-    fun getZipListFile(
-        fileName: String = "", paths: String = "文件", isCheck: Boolean = true
-    ) {
-        viewModelScope.launch {
-            val fileBean = fileBeanList[selectIndex]
-            if (isCheck && !isOpenUnzipDialog && paths == "文件") {
-                // 首次打开，调用重构后的状态检查方法
-                when (val status = fileRepository.checkZipStatus(fileBean.pickCode)) {
-                    is ZipStatus.Encrypted -> {
-                        XLog.d("${fileBean.name} 是加密压缩包，拦截流程并弹窗")
-                        isOpenUnzipPasswordDialog = true
-                        setRefreshingStatus(false)
-                        return@launch // 拦截，等待用户输入密码
-                    }
 
-                    is ZipStatus.UnsupportedOrError -> {
-                        XLog.w("业务不支持或发生错误: ${status.message}")
-                        // 【核心优化】在这里消费错误，比如弹一个 Toast 提示用户，并终止后续流程
-                        App.instance.toast(status.message)
-                        setRefreshingStatus(false)
-                        return@launch // 拦截，不再继续请求文件列表，避免无意义的崩溃或空白页
-                    }
-
-                    is ZipStatus.Normal -> {
-                        // 正常未加密包，不做任何拦截，继续向下执行
-                        XLog.d("${fileBean.name} 为普通压缩包，准备直接打开")
-                    }
-                }
-            }
-
-            // 只有 ZipStatus.Normal 或者已经处理完流程时，才会走到这里
-            unzipBeanList.value = fileRepository.getZipListFile(fileBean.pickCode, fileName, paths)
-            isOpenUnzipDialog = true
-        }
-    }
-
-    fun unzipFile(zipBeanList: ZipBeanList) {
-        val refreshCid = currentCid
-
-        viewModelScope.launch {
-            val unzipFile = withContext(Dispatchers.IO) {
-                val dirs = zipBeanList.list
-                    .filter { i -> i.fileIco == R.drawable.folder }
-                    .map { a -> a.fileName }
-                    .takeIf { it.isNotEmpty() }
-
-                val files = zipBeanList.list
-                    .filter { i -> i.fileIco != R.drawable.folder }
-                    .map { a -> a.fileName }
-                    .takeIf { it.isNotEmpty() }
-
-                val fileBean = fileBeanList[selectIndex]
-                val pickCode = fileBean.pickCode
-                val unzipFolderName = fileBean.name.substring(0, fileBean.name.length - 4)
-
-                //确定当前目录下是否存在同名文件，如果不存在，则新建一个
-                val currentUnzipFolderNameList =
-                    fileBeanList.filter { i -> i.isFolder && i.name == unzipFolderName }
-                var zipFileCid = currentCid
-                if (currentUnzipFolderNameList.isEmpty()) {
-                    val createFolderMessage = fileRepository.createFolder(
-                        currentCid, unzipFolderName
-                    )
-                    XLog.d("fileViewModel.unzipFile $createFolderMessage")
-                    zipFileCid = createFolderMessage.cid
-                }
-
-                fileRepository.unzipFile(pickCode, zipFileCid, files, dirs, unzipFolderName)
-            }
-
-            if (unzipFile.first) {
-                refresh(refreshCid)
-            } else {
-                App.instance.toast(unzipFile.second)
-            }
-        }
-    }
-
-    fun decryptZip(secret: String) {
-        viewModelScope.launch {
-            val fileBean = fileBeanList[selectIndex]
-            val pickCode = fileBean.pickCode
-            isOpenUnzipPasswordDialog = false
-            val decryptZip = fileRepository.decryptZip(pickCode, secret)
-            if (!decryptZip) {
-                App.instance.toast("密码错误～")
-                return@launch
-            }
-
-            //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
-            if (fileRepository.tryToExtract(pickCode)) {
-                getZipListFile(isCheck = false)
-            } else {
-                App.instance.toast("服务器解压中～")
-            }
-        }
-    }
-
-
-    fun downloadText(fileBean: FileBean) {
-        viewModelScope.launch(Dispatchers.IO) {
-            var bytes = textFileCache[fileBean]
-            if (bytes == null) {
-                bytes = fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
-                    .readBytes()
-                textFileCache[fileBean] = bytes
-            }
-            textBodyByteArray = bytes
-            isOpenTextBodyDialog = true
-            setRefreshingStatus(false)
-        }
-    }
-
-
-    fun startSendAria2Service(index: Int) {
-        val fileBean = fileBeanList[index]
-        if (fileBean.isFolder) {
-            App.instance.toast("暂时无法下载文件夹")
-            return
-        }
-        val intent = Intent(context, Sha1Service::class.java)
-        intent.putExtra(ConfigKeyUtil.COMMAND, ConfigKeyUtil.SENT_TO_ARIA2)
-        intent.putExtra("list", Gson().toJson(fileBean))
-        intent.putExtra("cookie", cookie)
-        context.startService(intent)
-    }
 
 
 //    fun selectAll() {
