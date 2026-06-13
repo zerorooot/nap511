@@ -55,7 +55,6 @@ import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import github.zerorooot.nap511.util.DialogSwitchUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import kotlinx.coroutines.Dispatchers
@@ -105,8 +104,6 @@ fun FileScreen(
 
     CreateDialogs(fileViewModel)
 
-    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
-
     val itemOnLongClick = remember {
         { i: Int ->
             fileViewModel.isLongClickState = !fileViewModel.isLongClickState
@@ -123,7 +120,7 @@ fun FileScreen(
             when (i) {
                 "CutFloatingActionButton" -> fileViewModel.removeFile()
                 //打开添加文件夹
-                "AddFloatingActionButton" -> dialogSwitchUtil.isOpenCreateFolderDialog = true
+                "AddFloatingActionButton" -> fileViewModel.openCreateFolderDialog()
                 "CloseFloatingActionButton" -> fileViewModel.cancelCut()
             }
         }
@@ -136,7 +133,7 @@ fun FileScreen(
                 "删除" -> fileViewModel.delete(index)
                 "重命名" -> {
                     fileViewModel.selectIndex = index
-                    dialogSwitchUtil.isOpenRenameFileDialog = true
+                    fileViewModel.openRenameFileDialog()
                 }
 
                 "文件信息" -> {
@@ -149,7 +146,7 @@ fun FileScreen(
 //                val aria2Url = SharedPreferencesUtil(activity).get(ConfigUtil.aria2Url)
                     val aria2Url = DataStoreUtil.getData(ConfigKeyUtil.ARIA2_URL, "")
                     if (aria2Url == "") {
-                        dialogSwitchUtil.isOpenAria2Dialog = true
+                        fileViewModel.openAria2Dialog()
                     } else {
                         fileViewModel.startSendAria2Service(index)
                     }
@@ -215,7 +212,7 @@ fun FileScreen(
             // 打开种子文件
             if (fileBean.fileIco == R.drawable.torrent) {
                 fileViewModel.setRefreshingStatus(true)
-                dialogSwitchUtil.isOpenCreateSelectTorrentFileDialog = true
+                fileViewModel.openCreateSelectTorrentFileDialog()
                 offlineFileViewModel.getTorrentTask(fileBean.sha1)
             }
             //打开压缩文件
@@ -391,32 +388,31 @@ fun FileScreen(
 @Composable
 fun CreateDialogs(fileViewModel: FileViewModel) {
 //    val context = LocalContext.current
-    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
     //新建文件夹
-    CreateFolderDialog {
+    CreateFolderDialog(fileViewModel) {
         if (it != "") {
             fileViewModel.createFolder(it)
         }
-        dialogSwitchUtil.isOpenCreateFolderDialog = false
+        fileViewModel.closeCreateFolderDialog()
     }
     //重命名
     RenameFileDialog(fileViewModel) {
         if (it != "") {
             fileViewModel.rename(it)
         }
-        dialogSwitchUtil.isOpenRenameFileDialog = false
+        fileViewModel.closeRenameFileDialog()
     }
     //文件信息
-    FileInfoDialog(fileViewModel, { dialogSwitchUtil.isOpenFileInfoDialog = false }) {
+    FileInfoDialog(fileViewModel, { fileViewModel.closeFileInfoDialog() }) {
         if (fileViewModel.isSearchState) {
             fileViewModel.isSearchState = false
         }
         fileViewModel.getFiles(it)
-        dialogSwitchUtil.isOpenFileInfoDialog = false
+        fileViewModel.closeFileInfoDialog()
     }
     //文件排序
     FileOrderDialog(fileViewModel = fileViewModel) {
-        dialogSwitchUtil.isOpenFileOrderDialog = false
+        fileViewModel.closeFileOrderDialog()
         if (it != "") {
             val asc = if (it.subSequence(it.length - 2, it.length) == "⬆️") 1 else 0
             val type = when (it.subSequence(0, it.length - 2)) {
@@ -433,12 +429,12 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
     }
 //aria2
     val scope = rememberCoroutineScope()
-    Aria2Dialog(
+    Aria2Dialog(fileViewModel,
         context = DataStoreUtil.getData(
             ConfigKeyUtil.ARIA2_URL, ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
         )
     ) {
-        dialogSwitchUtil.isOpenAria2Dialog = false
+        fileViewModel.closeAria2Dialog()
         if (it != "") {
             val jsonObject = Gson().fromJson(it, JsonObject::class.java)
             val aria2Url = jsonObject.get(ConfigKeyUtil.ARIA2_URL).asString
@@ -447,16 +443,16 @@ fun CreateDialogs(fileViewModel: FileViewModel) {
         }
     }
     //搜索
-    SearchDialog {
+    SearchDialog(fileViewModel) {
         if (it != "") {
             fileViewModel.search(it)
         }
-        dialogSwitchUtil.isOpenSearchDialog = false
+        fileViewModel.closeSearchDialog()
     }
     //查看种子文件内容
     val offlineFileViewModel = viewModel<OfflineFileViewModel>()
-    CreateSelectTorrentFileDialog { infoHash, savePath, wanted ->
-        dialogSwitchUtil.isOpenCreateSelectTorrentFileDialog = false
+    CreateSelectTorrentFileDialog(fileViewModel) { infoHash, savePath, wanted ->
+        fileViewModel.closeCreateSelectTorrentFileDialog()
         if (wanted.isEmpty()) {
             return@CreateSelectTorrentFileDialog
         }

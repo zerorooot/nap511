@@ -98,30 +98,27 @@ import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import github.zerorooot.nap511.util.DialogSwitchUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
+import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import kotlinx.coroutines.delay
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 import java.nio.charset.Charset
 import java.text.SimpleDateFormat
 import java.util.Locale
-import java.util.stream.Collectors
 import kotlin.system.exitProcess
 
 @Composable
-fun CreateFolderDialog(enter: (String) -> Unit) {
-    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
-    if (dialogSwitchUtil.isOpenCreateFolderDialog) {
+fun CreateFolderDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
+    if (fileViewModel.isOpenCreateFolderDialog) {
         BaseDialog("请输入新建文件名", "文件名", enter = enter)
     }
 }
 
 @Composable
-fun SearchDialog(enter: (String) -> Unit) {
-    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
-    if (dialogSwitchUtil.isOpenSearchDialog) {
+fun SearchDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
+    if (fileViewModel.isOpenSearchDialog) {
         BaseDialog("在当前目录下搜索", "关键字", enter = enter)
     }
 }
@@ -129,8 +126,7 @@ fun SearchDialog(enter: (String) -> Unit) {
 
 @Composable
 fun RenameFileDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
-    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
-    if (dialogSwitchUtil.isOpenRenameFileDialog) {
+    if (fileViewModel.isOpenRenameFileDialog) {
         val name = fileViewModel.fileBeanList[fileViewModel.selectIndex].name
         val position = DataStoreUtil.getData(ConfigKeyUtil.POSITION_AFTER_AT, false)
         val atPosition = name.lastIndexOf("@") + 1
@@ -148,8 +144,7 @@ fun FileInfoDialog(
     enter: () -> Unit,
     fileInfoClick: (String) -> Unit
 ) {
-    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
-    if (dialogSwitchUtil.isOpenFileInfoDialog) {
+    if (fileViewModel.isOpenFileInfoDialog) {
         val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
 //        BaseDialog( title = fileBean.name,label = "文件信息", readOnly = true,context = fileBean.toString() + "\n" + fileViewModel.fileInfo,enter = enter)
         FileInfoDialog(fileBean, fileViewModel.fileInfo, enter, fileInfoClick)
@@ -316,8 +311,7 @@ fun BaseDetailDialog(
 fun OfflineFileInfoDialog(
     offlineFileViewModel: OfflineFileViewModel, enter: () -> Unit, copyUrl: (String) -> Unit
 ) {
-    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
-    if (dialogSwitchUtil.isOpenOfflineDialog) {
+    if (offlineFileViewModel.isOpenOfflineDialog) {
         val offlineTask = offlineFileViewModel.offlineTask
         OfflineTaskDialog(offlineTask, onDismissRequest = enter, urlCopy = copyUrl)
 //        BaseDialog(title = offlineTask.name, label = "文件信息", readOnly = true, context = offlineTask.toString(), enter = enter)
@@ -365,9 +359,8 @@ fun OfflineTaskDialog(
 }
 
 @Composable
-fun RecyclePasswordDialog(enter: (String) -> Unit) {
-    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
-    if (dialogSwitchUtil.isOpenRecyclePasswordDialog) {
+fun RecyclePasswordDialog(recycleViewModel: RecycleViewModel, enter: (String) -> Unit) {
+    if (recycleViewModel.isOpenRecyclePasswordDialog) {
         BaseDialog(
             title = "请输入6位数字安全密钥",
             label = "数字安全密钥",
@@ -400,13 +393,12 @@ fun ExitApp() {
 
 @Composable
 fun TextBodyDialog(fileViewModel: FileViewModel) {
-    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
-    if (dialogSwitchUtil.isOpenTextBodyDialog && fileViewModel.textBodyByteArray != null) {
+    if (fileViewModel.isOpenTextBodyDialog && fileViewModel.textBodyByteArray != null) {
         val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
         TextBodyDialogScreen(fileBean.name, fileViewModel.textBodyByteArray!!) {
             if (it == "") {
                 fileViewModel.textBodyByteArray = null
-                dialogSwitchUtil.isOpenTextBodyDialog = false
+                fileViewModel.closeTextBodyDialog()
             }
         }
     }
@@ -496,8 +488,7 @@ fun TextBodyDialogScreen(title: String, context: ByteArray, enter: (String) -> U
  */
 @Composable
 fun UnzipDialog(fileViewModel: FileViewModel) {
-    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
-    if (dialogSwitchUtil.isOpenUnzipPasswordDialog) {
+    if (fileViewModel.isOpenUnzipPasswordDialog) {
         val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
         fileViewModel.setRefreshingStatus(false)
         BaseDialog(
@@ -507,12 +498,12 @@ fun UnzipDialog(fileViewModel: FileViewModel) {
             if (it != "") {
                 fileViewModel.decryptZip(it)
             } else {
-                dialogSwitchUtil.isOpenUnzipPasswordDialog = false
+                fileViewModel.closeUnzipPasswordDialog()
             }
         }
     }
 
-    if (dialogSwitchUtil.isOpenUnzipDialog) {
+    if (fileViewModel.isOpenUnzipDialog) {
         val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
         val zipBeanList by fileViewModel.unzipBeanList
         fileViewModel.setRefreshingStatus(false)
@@ -521,7 +512,7 @@ fun UnzipDialog(fileViewModel: FileViewModel) {
             if (it.first) {
                 when (it.second) {
                     "exit" -> {
-                        dialogSwitchUtil.isOpenUnzipDialog = false
+                        fileViewModel.closeUnzipDialog()
                     }
 
                     "up" -> {
@@ -538,7 +529,7 @@ fun UnzipDialog(fileViewModel: FileViewModel) {
 
                     "unzipAll" -> {
                         fileViewModel.unzipFile(zipBeanList)
-                        dialogSwitchUtil.isOpenUnzipDialog = false
+                        fileViewModel.closeUnzipDialog()
                     }
                 }
             } else {
@@ -555,10 +546,9 @@ fun UnzipDialog(fileViewModel: FileViewModel) {
 fun UnzipAllFile(
     fileViewModel: FileViewModel
 ) {
-    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
-    if (dialogSwitchUtil.isOpenUnzipAllFileDialog) {
+    if (fileViewModel.isOpenUnzipAllFileDialog) {
         BaseDialog("请输入解压密码", "如无加密，为空即可") {
-            dialogSwitchUtil.isOpenUnzipAllFileDialog = false
+            fileViewModel.closeUnzipAllFileDialog()
             App.instance.toast("后台解压中......")
             val dataBuilder: Data.Builder = Data.Builder()
             val filter =
@@ -734,8 +724,7 @@ fun CookieDialog(enter: (String) -> Unit) {
 @ExperimentalMaterial3Api
 @Composable
 fun FileOrderDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
-    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
-    if (dialogSwitchUtil.isOpenFileOrderDialog) {
+    if (fileViewModel.isOpenFileOrderDialog) {
         val fileOrderList = stringArrayResource(id = R.array.fileOrder).toList()
         RadioButtonDialog(fileOrderList, fileViewModel.orderBean.toString(), enter)
     }
@@ -743,9 +732,8 @@ fun FileOrderDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
 
 
 @Composable
-fun Aria2Dialog(context: String, enter: (String) -> Unit) {
-    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
-    if (!dialogSwitchUtil.isOpenAria2Dialog) {
+fun Aria2Dialog(fileViewModel: FileViewModel, context: String, enter: (String) -> Unit) {
+    if (!fileViewModel.isOpenAria2Dialog) {
         return
     }
 
@@ -895,11 +883,11 @@ private fun RadioButtonDialog(
 
 @Composable
 fun CreateSelectTorrentFileDialog(
+    fileViewModel: FileViewModel,
     enter: (infoHash: String, savePath: String, wanted: String) -> Unit
 ) {
     val offlineFileViewModel = viewModel<OfflineFileViewModel>()
-    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
-    if (dialogSwitchUtil.isOpenCreateSelectTorrentFileDialog) {
+    if (fileViewModel.isOpenCreateSelectTorrentFileDialog) {
         val torrentBean = offlineFileViewModel.torrentBean
         // XLog.d("torrentBean: ${Gson().toJson(torrentBean)}")
         if (!torrentBean.state) {

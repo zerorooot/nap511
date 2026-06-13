@@ -36,7 +36,8 @@ import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import github.zerorooot.nap511.util.DialogSwitchUtil
+import github.zerorooot.nap511.repository.DialogEvent
+import github.zerorooot.nap511.repository.DialogEventRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -74,9 +75,55 @@ class FileViewModel(private val cookie: String, private val context: Context) :
     var isRefreshing = _isRefreshing.asStateFlow()
 
     /**
-     * 打开对话框相关
+     * 打开对话框相关（状态下沉到 ViewModel 本地）
      */
-    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
+    private val dialogEventRepository = DialogEventRepository.getInstance()
+
+    var isOpenCreateFolderDialog by mutableStateOf(false)
+        private set
+    var isOpenSearchDialog by mutableStateOf(false)
+        private set
+    var isOpenRenameFileDialog by mutableStateOf(false)
+        private set
+    var isOpenFileInfoDialog by mutableStateOf(false)
+        private set
+    var isOpenFileOrderDialog by mutableStateOf(false)
+        private set
+    var isOpenAria2Dialog by mutableStateOf(false)
+        private set
+    var isOpenUnzipDialog by mutableStateOf(false)
+        private set
+    var isOpenUnzipPasswordDialog by mutableStateOf(false)
+        private set
+    var isOpenTextBodyDialog by mutableStateOf(false)
+        private set
+    var isOpenUnzipAllFileDialog by mutableStateOf(false)
+        private set
+    var isOpenCreateSelectTorrentFileDialog by mutableStateOf(false)
+        private set
+
+    init {
+        viewModelScope.launch {
+            dialogEventRepository.events.collect { event ->
+                when (event) {
+                    is DialogEvent.OpenCreateFolder -> isOpenCreateFolderDialog = true
+                    is DialogEvent.OpenSearch -> isOpenSearchDialog = true
+                    is DialogEvent.OpenRenameFile -> isOpenRenameFileDialog = true
+                    is DialogEvent.OpenFileInfo -> isOpenFileInfoDialog = true
+                    is DialogEvent.OpenFileOrder -> isOpenFileOrderDialog = true
+                    is DialogEvent.OpenAria2Dialog -> isOpenAria2Dialog = true
+                    is DialogEvent.OpenUnzipDialog -> isOpenUnzipDialog = true
+                    is DialogEvent.OpenUnzipPasswordDialog -> isOpenUnzipPasswordDialog = true
+                    is DialogEvent.OpenTextBodyDialog -> isOpenTextBodyDialog = true
+                    is DialogEvent.OpenUnzipAllFileDialog -> isOpenUnzipAllFileDialog = true
+                    is DialogEvent.OpenCreateSelectTorrentFileDialog -> isOpenCreateSelectTorrentFileDialog = true
+                    // 不属于 FileViewModel 的事件，忽略
+                    is DialogEvent.OpenOfflineDialog,
+                    is DialogEvent.OpenRecyclePasswordDialog -> { /* ignore */ }
+                }
+            }
+        }
+    }
 
 
     /**
@@ -542,7 +589,7 @@ class FileViewModel(private val cookie: String, private val context: Context) :
             } else {
                 fileRepository.getFileInfo(fileBean.fileId)
             }
-            dialogSwitchUtil.isOpenFileInfoDialog = true
+            isOpenFileInfoDialog = true
         }
     }
 
@@ -684,12 +731,12 @@ class FileViewModel(private val cookie: String, private val context: Context) :
     ) {
         viewModelScope.launch {
             val fileBean = fileBeanList[selectIndex]
-            if (isCheck && !dialogSwitchUtil.isOpenUnzipDialog && paths == "文件") {
+            if (isCheck && !isOpenUnzipDialog && paths == "文件") {
                 // 首次打开，调用重构后的状态检查方法
                 when (val status = fileRepository.checkZipStatus(fileBean.pickCode)) {
                     is ZipStatus.Encrypted -> {
                         XLog.d("${fileBean.name} 是加密压缩包，拦截流程并弹窗")
-                        dialogSwitchUtil.isOpenUnzipPasswordDialog = true
+                        isOpenUnzipPasswordDialog = true
                         setRefreshingStatus(false)
                         return@launch // 拦截，等待用户输入密码
                     }
@@ -711,7 +758,7 @@ class FileViewModel(private val cookie: String, private val context: Context) :
 
             // 只有 ZipStatus.Normal 或者已经处理完流程时，才会走到这里
             unzipBeanList.value = fileRepository.getZipListFile(fileBean.pickCode, fileName, paths)
-            dialogSwitchUtil.isOpenUnzipDialog = true
+            isOpenUnzipDialog = true
         }
     }
 
@@ -761,7 +808,7 @@ class FileViewModel(private val cookie: String, private val context: Context) :
         viewModelScope.launch {
             val fileBean = fileBeanList[selectIndex]
             val pickCode = fileBean.pickCode
-            dialogSwitchUtil.isOpenUnzipPasswordDialog = false
+            isOpenUnzipPasswordDialog = false
             val decryptZip = fileRepository.decryptZip(pickCode, secret)
             if (!decryptZip) {
                 App.instance.toast("密码错误～")
@@ -787,7 +834,7 @@ class FileViewModel(private val cookie: String, private val context: Context) :
                 textFileCache[fileBean] = bytes
             }
             textBodyByteArray = bytes
-            dialogSwitchUtil.isOpenTextBodyDialog = true
+            isOpenTextBodyDialog = true
             setRefreshingStatus(false)
         }
     }
@@ -876,4 +923,52 @@ class FileViewModel(private val cookie: String, private val context: Context) :
             "%02d:%02d:%02d", hours, minutes, seconds
         ) else String.format("%02d:%02d", minutes, seconds)
     }
+
+    // ==================== 公开方法：供外部触发对话框事件 ====================
+
+    fun openCreateFolderDialog() {
+        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenCreateFolder) }
+    }
+
+    fun openSearchDialog() {
+        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenSearch) }
+    }
+
+    fun openRenameFileDialog() {
+        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenRenameFile) }
+    }
+
+    fun openFileInfoDialog() {
+        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenFileInfo) }
+    }
+
+    fun openFileOrderDialog() {
+        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenFileOrder) }
+    }
+
+    fun openAria2Dialog() {
+        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenAria2Dialog) }
+    }
+
+    fun openUnzipAllFileDialog() {
+        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenUnzipAllFileDialog) }
+    }
+
+    fun openCreateSelectTorrentFileDialog() {
+        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenCreateSelectTorrentFileDialog) }
+    }
+
+    // ==================== 关闭方法（直接在本地设 false） ====================
+
+    fun closeCreateFolderDialog() { isOpenCreateFolderDialog = false }
+    fun closeSearchDialog() { isOpenSearchDialog = false }
+    fun closeRenameFileDialog() { isOpenRenameFileDialog = false }
+    fun closeFileInfoDialog() { isOpenFileInfoDialog = false }
+    fun closeFileOrderDialog() { isOpenFileOrderDialog = false }
+    fun closeAria2Dialog() { isOpenAria2Dialog = false }
+    fun closeUnzipDialog() { isOpenUnzipDialog = false }
+    fun closeUnzipPasswordDialog() { isOpenUnzipPasswordDialog = false }
+    fun closeTextBodyDialog() { isOpenTextBodyDialog = false }
+    fun closeUnzipAllFileDialog() { isOpenUnzipAllFileDialog = false }
+    fun closeCreateSelectTorrentFileDialog() { isOpenCreateSelectTorrentFileDialog = false }
 }

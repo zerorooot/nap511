@@ -1,7 +1,10 @@
 package github.zerorooot.nap511.viewmodel
 
 //import github.zerorooot.nap511.util.SharedPreferencesUtil
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import github.zerorooot.nap511.R
@@ -11,7 +14,8 @@ import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import github.zerorooot.nap511.util.DialogSwitchUtil
+import github.zerorooot.nap511.repository.DialogEvent
+import github.zerorooot.nap511.repository.DialogEventRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -27,13 +31,24 @@ class RecycleViewModel(private val cookie: String) :
 
     var recycleFileList = mutableStateListOf<RecycleBean>()
 
-    val dialogSwitchUtil = DialogSwitchUtil.getInstance()
+    private val dialogEventRepository = DialogEventRepository.getInstance()
+
+    var isOpenRecyclePasswordDialog by mutableStateOf(false)
+        private set
 
     private val fileService: FileService by lazy {
         FileService.getInstance(cookie)
     }
 
     init {
+        viewModelScope.launch {
+            dialogEventRepository.events.collect { event ->
+                when (event) {
+                    is DialogEvent.OpenRecyclePasswordDialog -> isOpenRecyclePasswordDialog = true
+                    else -> { /* ignore */ }
+                }
+            }
+        }
         getRecycleFileList()
     }
 
@@ -58,7 +73,7 @@ class RecycleViewModel(private val cookie: String) :
     fun delete(index: Int) {
         val password = DataStoreUtil.getData(ConfigKeyUtil.PASSWORD, "")
         if (password == "") {
-            dialogSwitchUtil.isOpenRecyclePasswordDialog = true
+            isOpenRecyclePasswordDialog = true
             return
         }
         delete(index, password)
@@ -84,7 +99,7 @@ class RecycleViewModel(private val cookie: String) :
     fun deleteAll() {
         val password = DataStoreUtil.getData(ConfigKeyUtil.PASSWORD, "")
         if (password == "") {
-            dialogSwitchUtil.isOpenRecyclePasswordDialog = true
+            isOpenRecyclePasswordDialog = true
             return
         }
         viewModelScope.launch {
@@ -113,7 +128,7 @@ class RecycleViewModel(private val cookie: String) :
     }
 
     fun closeDialog() {
-        dialogSwitchUtil.isOpenRecyclePasswordDialog = false
+        isOpenRecyclePasswordDialog = false
     }
 
     fun refresh() {
