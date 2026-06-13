@@ -385,7 +385,6 @@ fun ExitApp() {
                 App.selectedItem = ConfigKeyUtil.MY_FILE
             },
             onConfirmation = {
-                fileViewModel.saveFileCache()
                 Process.killProcess(Process.myPid());
                 exitProcess(1);
             },

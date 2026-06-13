@@ -1,11 +1,9 @@
 package github.zerorooot.nap511.viewmodel
 
 import androidx.lifecycle.viewModelScope
-import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.RenameBean
 import github.zerorooot.nap511.util.App
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**

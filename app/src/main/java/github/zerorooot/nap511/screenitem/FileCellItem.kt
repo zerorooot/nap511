@@ -37,7 +37,11 @@ fun FileCellItem(
     modifier: Modifier,
     itemOnClick: (Int) -> Unit,
     itemOnLongClick: (Int) -> Unit,
-    menuOnClick: (String, Int) -> Unit
+    onCut: ((Int) -> Unit)? = null,
+    onDelete: ((Int) -> Unit)? = null,
+    onRename: ((Int) -> Unit)? = null,
+    onFileInfo: ((Int) -> Unit)? = null,
+    onAria2Download: ((Int) -> Unit)? = null,
 ) {
 
     val image = fileBean.fileIco
@@ -158,9 +162,16 @@ fun FileCellItem(
                     }
                 }
 
-                FileMoreMenu() { itemName, _ ->
-                    menuOnClick.invoke(itemName, index)
+                val dispatchMenuClick: (String, Int) -> Unit = { name, _ ->
+                    when (name) {
+                        "剪切" -> onCut?.invoke(index)
+                        "删除" -> onDelete?.invoke(index)
+                        "重命名" -> onRename?.invoke(index)
+                        "文件信息" -> onFileInfo?.invoke(index)
+                        "通过aria2下载" -> onAria2Download?.invoke(index)
+                    }
                 }
+                FileMoreMenu(onClick = dispatchMenuClick)
 
             }
 

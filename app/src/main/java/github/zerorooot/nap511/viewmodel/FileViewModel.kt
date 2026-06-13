@@ -1,7 +1,6 @@
 package github.zerorooot.nap511.viewmodel
 
 import android.annotation.SuppressLint
-import android.app.Application
 import android.content.Context
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.getValue
@@ -27,13 +26,13 @@ import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.RemainingSpaceBean
 import github.zerorooot.nap511.bean.ZipBeanList
+import github.zerorooot.nap511.repository.DialogEvent
+import github.zerorooot.nap511.repository.DialogEventRepository
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import github.zerorooot.nap511.repository.DialogEvent
-import github.zerorooot.nap511.repository.DialogEventRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -111,10 +110,12 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                     is DialogEvent.OpenUnzipPasswordDialog -> isOpenUnzipPasswordDialog = true
                     is DialogEvent.OpenTextBodyDialog -> isOpenTextBodyDialog = true
                     is DialogEvent.OpenUnzipAllFileDialog -> isOpenUnzipAllFileDialog = true
-                    is DialogEvent.OpenCreateSelectTorrentFileDialog -> isOpenCreateSelectTorrentFileDialog = true
+                    is DialogEvent.OpenCreateSelectTorrentFileDialog -> isOpenCreateSelectTorrentFileDialog =
+                        true
                     // 不属于 FileViewModel 的事件，忽略
                     is DialogEvent.OpenOfflineDialog,
-                    is DialogEvent.OpenRecyclePasswordDialog -> { /* ignore */ }
+                    is DialogEvent.OpenRecyclePasswordDialog -> { /* ignore */
+                    }
                 }
             }
         }
@@ -180,7 +181,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
-                if (saveRequestCache) {
+                if (fileListCache.isNotEmpty() && saveRequestCache) {
                     val type = object : TypeToken<HashMap<String, FilesBean>?>() {}.type
                     val json = Gson().toJson(fileListCache, type)
                     val file = App.cacheFile
@@ -301,6 +302,8 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     fun getFiles(cid: String) {
         viewModelScope.launch {
             _isRefreshing.value = true
+            saveFileCache()
+
             if (fileListCache.containsKey(cid)) {
                 setFiles(fileListCache[cid]!!)
                 _isRefreshing.value = false
@@ -321,8 +324,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                 setFileBeanProperty(files.fileBeanList)
                 setFiles(files)
                 _isRefreshing.value = false
-
-                saveFileCache()
             } catch (e: NullPointerException) {
                 App.instance.toast("获取文件列表失败，建议更新您的Cookie")
                 App.cacheFile.delete()
@@ -438,7 +439,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     }
 
 
-
     fun refresh() {
         refresh(currentCid)
     }
@@ -465,7 +465,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         appBarTitle = if (isSearchState) {
             "搜索"
         } else {
-           context.getString(R.string.app_name)
+            context.getString(R.string.app_name)
         }
     }
 
@@ -479,8 +479,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
             appBarTitle = "搜索 - $searchKey"
         }
     }
-
-
 
 
 //    fun selectAll() {
@@ -589,15 +587,47 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
 
     // ==================== 关闭方法（直接在本地设 false） ====================
 
-    fun closeCreateFolderDialog() { isOpenCreateFolderDialog = false }
-    fun closeSearchDialog() { isOpenSearchDialog = false }
-    fun closeRenameFileDialog() { isOpenRenameFileDialog = false }
-    fun closeFileInfoDialog() { isOpenFileInfoDialog = false }
-    fun closeFileOrderDialog() { isOpenFileOrderDialog = false }
-    fun closeAria2Dialog() { isOpenAria2Dialog = false }
-    fun closeUnzipDialog() { isOpenUnzipDialog = false }
-    fun closeUnzipPasswordDialog() { isOpenUnzipPasswordDialog = false }
-    fun closeTextBodyDialog() { isOpenTextBodyDialog = false }
-    fun closeUnzipAllFileDialog() { isOpenUnzipAllFileDialog = false }
-    fun closeCreateSelectTorrentFileDialog() { isOpenCreateSelectTorrentFileDialog = false }
+    fun closeCreateFolderDialog() {
+        isOpenCreateFolderDialog = false
+    }
+
+    fun closeSearchDialog() {
+        isOpenSearchDialog = false
+    }
+
+    fun closeRenameFileDialog() {
+        isOpenRenameFileDialog = false
+    }
+
+    fun closeFileInfoDialog() {
+        isOpenFileInfoDialog = false
+    }
+
+    fun closeFileOrderDialog() {
+        isOpenFileOrderDialog = false
+    }
+
+    fun closeAria2Dialog() {
+        isOpenAria2Dialog = false
+    }
+
+    fun closeUnzipDialog() {
+        isOpenUnzipDialog = false
+    }
+
+    fun closeUnzipPasswordDialog() {
+        isOpenUnzipPasswordDialog = false
+    }
+
+    fun closeTextBodyDialog() {
+        isOpenTextBodyDialog = false
+    }
+
+    fun closeUnzipAllFileDialog() {
+        isOpenUnzipAllFileDialog = false
+    }
+
+    fun closeCreateSelectTorrentFileDialog() {
+        isOpenCreateSelectTorrentFileDialog = false
+    }
 }

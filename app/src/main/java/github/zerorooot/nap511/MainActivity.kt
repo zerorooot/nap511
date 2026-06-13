@@ -144,17 +144,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        val lifecycleOwner = LocalLifecycleOwner.current
-        DisposableEffect(lifecycleOwner) {
-            val observer = LifecycleEventObserver { _, _ ->
-                fileViewModel.saveFileCache()
-            }
-            lifecycleOwner.lifecycle.addObserver(observer)
-            onDispose {
-                lifecycleOwner.lifecycle.removeObserver(observer)
-            }
-        }
-
         MyNavigationDrawer(fileViewModel, offlineFileViewModel, recycleViewModel)
     }
 
@@ -470,8 +459,7 @@ class MainActivity : AppCompatActivity() {
     private fun MyFileScreen(
         fileViewModel: FileViewModel
     ) {
-
-        fileViewModel.loadCacheFile()
+        LaunchedEffect(Unit) { fileViewModel.loadCacheFile() }
 
         FileScreen(
             appBarClick(fileViewModel),
