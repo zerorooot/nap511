@@ -300,10 +300,9 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     }
 
     fun getFiles(cid: String) {
+        saveFileCache()
         viewModelScope.launch {
             _isRefreshing.value = true
-            saveFileCache()
-
             if (fileListCache.containsKey(cid)) {
                 setFiles(fileListCache[cid]!!)
                 _isRefreshing.value = false
@@ -324,6 +323,8 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                 setFileBeanProperty(files.fileBeanList)
                 setFiles(files)
                 _isRefreshing.value = false
+
+                saveFileCache()
             } catch (e: NullPointerException) {
                 App.instance.toast("获取文件列表失败，建议更新您的Cookie")
                 App.cacheFile.delete()

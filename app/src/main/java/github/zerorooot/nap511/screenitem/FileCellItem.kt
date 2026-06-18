@@ -2,10 +2,26 @@ package github.zerorooot.nap511.screenitem
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -18,14 +34,15 @@ import androidx.compose.ui.text.Paragraph
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.*
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.rememberAsyncImagePainter
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.screen.FileMoreMenu
-import kotlin.collections.listOf
-import kotlin.math.ceil
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -76,14 +93,6 @@ fun FileCellItem(
                 Modifier
                     .fillMaxSize()
             ) {
-//                Image(
-//                    painter = painterResource(image),
-//                    contentDescription = "",
-//                    modifier = Modifier
-//                        .weight(0.2f)
-//                        .height(60.dp)
-//                        .align(androidx.compose.ui.Alignment.CenterVertically)
-//                )
                 Box(
                     Modifier
                         .height(60.dp)
@@ -118,14 +127,6 @@ fun FileCellItem(
                         .fillMaxHeight()
                         .weight(0.7f)
                 ) {
-//                    MiddleEllipsisText(
-//                        text = name,
-//                        style = MaterialTheme.typography.titleMedium,
-//                        modifier = Modifier
-//                            .padding(start = 4.dp, top = 9.dp)
-//                            .fillMaxWidth(),
-//                        fontWeight = FontWeight.Bold,
-//                    )
                     AutoSizableTextField(
                         value = name,
                         modifier = Modifier
@@ -144,11 +145,22 @@ fun FileCellItem(
                             text = size,
                             style = MaterialTheme.typography.bodyMedium,
                         )
+                        // 视频时长（作为独立 Badge 标签凸显）
                         if (fileBean.isVideo == 1) {
-                            Text(
-                                text = playLong,
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        color = MaterialTheme.colorScheme.secondaryContainer,
+                                        shape = RoundedCornerShape(4.dp)
+                                    )
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = playLong,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
                         }
                         Text(
                             text = time,

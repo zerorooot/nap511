@@ -97,7 +97,8 @@ internal fun FileViewModel.delete(index: Int) {
         val beforeList = fileBeanList
         val beforeFileListCache = fileListCache[currentCid]
         val beforeClickMap = clickMap.getOrDefault(currentCid, 0)
-        val beforeImageBeanCache = imageBeanCache[currentCid]
+        val beforeImageBeanCache =
+            imageBeanCache.getOrDefault(currentCid, hashMapOf())
 
         //提前删除，优化速度
         fileBeanList.remove(fileBean)
@@ -134,8 +135,8 @@ internal fun FileViewModel.delete(index: Int) {
             fileBeanList = beforeList
             fileListCache[currentCid] = beforeFileListCache!!
             clickMap[currentCid] = beforeClickMap
-            imageBeanCache[currentCid] = beforeImageBeanCache!!
-            "删除 ${fileBean.name} 失败~"
+            imageBeanCache[currentCid] = beforeImageBeanCache
+            "删除 ${fileBean.name} 失败~${delete.errorMsg}"
         }
         App.instance.toast(message)
     }
