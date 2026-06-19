@@ -65,7 +65,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     internal var cutFileList = emptyList<FileBean>()
 
 
-    private val _isRefreshing = MutableStateFlow(false)
+    internal val _isRefreshing = MutableStateFlow(false)
     var isRefreshing = _isRefreshing.asStateFlow()
 
     /**

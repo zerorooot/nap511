@@ -82,12 +82,15 @@ internal fun FileViewModel.createFolder(folderName: String) {
 
 internal fun FileViewModel.getFileInfo(index: Int) {
     viewModelScope.launch {
+        _isRefreshing.value = true
         val fileBean = fileBeanList[index]
         fileInfo = if (fileBean.isFolder) {
             fileRepository.getFileInfo(fileBean.categoryId)
         } else {
             fileRepository.getFileInfo(fileBean.fileId)
         }
+        _isRefreshing.value = false
+        openFileInfoDialog()
     }
 }
 

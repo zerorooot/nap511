@@ -306,11 +306,12 @@ class FileRepository(private val cookie: String) {
         return try {
             val json = fileService.getDecryptZipProcess(pickCode)
             //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
+            //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":0,"progress":0}}}
             XLog.d("checkZipStatus $json")
 
             // 1. 处理接口返回业务错误（如：暂不支持解压预览20GB以上的压缩包）
             if (json.has("state") && !json.get("state").asBoolean) {
-                //{"state":false,"message":"暂不支持解压预览20GB以上的压缩包","code":51002,"data":[]} todo
+                //{"state":false,"message":"暂不支持解压预览20GB以上的压缩包","code":51002,"data":[]}
                 val message = if (json.has("message")) json.get("message").asString else "未知错误"
                 return ZipStatus.UnsupportedOrError(message)
             }
@@ -331,6 +332,28 @@ class FileRepository(private val cookie: String) {
 
             // 3. 根据状态码返回对应的密封类状态
             val unzipStatus = unzipStatusElement.asInt
+            //等于0意味着加密或者非加密文件，非加密文件需要再post push_extract一次
+            if (unzipStatus == 0) {
+                val checkEncryptionStatus = fileService.checkEncryptionStatus(pickCode)
+                //非加密文件 {"state":true,"message":"","code":"","data":{"unzip_status":1}}
+                //加密文件 {"state":true,"message":"","code":"","data":{"unzip_status":6}}
+                XLog.d("checkEncryptionStatus $checkEncryptionStatus")
+                if (checkEncryptionStatus.get("state").asBoolean) {
+                    val unzip_status =
+                        checkEncryptionStatus.getAsJsonObject("data").get("unzip_status").asInt
+
+                    return if (unzip_status == 1) {
+                        ZipStatus.Normal
+                    } else {
+                        ZipStatus.Encrypted
+                    }
+                } else {
+                    val message =
+                        if (checkEncryptionStatus.has("message")) checkEncryptionStatus.get("message").asString else "未知错误"
+                    return ZipStatus.UnsupportedOrError(message)
+                }
+            }
+
             //1 is encryption zip file
             if (unzipStatus != 4) {
                 ZipStatus.Encrypted // 1 等状态代表加密

@@ -238,7 +238,7 @@ fun FileScreen(
     val onMenuFileInfo: (Int) -> Unit = { index ->
         fileViewModel.selectIndex = index
         fileViewModel.getFileInfo(index)
-        fileViewModel.openFileInfoDialog()
+//        fileViewModel.openFileInfoDialog()
     }
     val onMenuAria2Download: (Int) -> Unit = { index ->
         val aria2Url = DataStoreUtil.getData(ConfigKeyUtil.ARIA2_URL, "")

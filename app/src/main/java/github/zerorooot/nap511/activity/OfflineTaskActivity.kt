@@ -29,9 +29,14 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import java.util.StringJoiner
 import java.util.concurrent.TimeUnit
-
+import java.util.regex.Pattern
 
 class OfflineTaskActivity : ComponentActivity() {
+    // 40位十六进制哈希正则 (BTih v1 标准)
+    private val HEX_40_PATTERN = Pattern.compile("^[0-9a-fA-F]{40}$")
+    // 32位Base32哈希正则 (早期或简短版磁力链标准)
+    private val BASE32_32_PATTERN = Pattern.compile("^[a-zA-Z2-7]{32}$")
+
     @SuppressLint("EnqueueWork")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,11 +45,11 @@ class OfflineTaskActivity : ComponentActivity() {
                 intent.getStringExtra(Intent.EXTRA_PROCESS_TEXT)
             } ?: run { "" }).split("\n").map { i ->
                 //支持复制无头磁力链接
-                val a = i.replace(Regex("&dn=.*"), "")
-                if (a.length == 40 && Regex("^[a-z0-9A-Z]+\$").matches(a)) {
-                    "magnet:?xt=urn:btih:$i"
+                val a = i.replace(Regex("&dn=.*"), "").trim()
+                if (HEX_40_PATTERN.matcher(a).matches() || BASE32_32_PATTERN.matcher(a).matches()) {
+                    "magnet:?xt=urn:btih:$a"
                 } else {
-                    i
+                    a
                 }
             }.filter { i ->
                 i.startsWith("http", true) || i.startsWith(
@@ -161,6 +166,7 @@ class OfflineTaskWorker(
     private val fileRepository: FileRepository by lazy {
         FileRepository.getInstance(App.cookie)
     }
+
     override suspend fun doWork(): Result {
         val listType = object : TypeToken<List<String?>?>() {}.type
         val a: List<String> = Gson().fromJson(inputData.getString("list").toString(), listType)

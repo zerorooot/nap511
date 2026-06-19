@@ -2,7 +2,12 @@ package github.zerorooot.nap511.service
 
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
-import github.zerorooot.nap511.bean.*
+import github.zerorooot.nap511.bean.BaseReturnMessage
+import github.zerorooot.nap511.bean.CreateFolderMessage
+import github.zerorooot.nap511.bean.FileInfo
+import github.zerorooot.nap511.bean.FilesBean
+import github.zerorooot.nap511.bean.ImageDate
+import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.util.App
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -10,11 +15,16 @@ import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.RequestBody
 import okhttp3.Response
-import okhttp3.ResponseBody
 import okhttp3.ResponseBody.Companion.toResponseBody
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import retrofit2.http.*
+import retrofit2.http.Body
+import retrofit2.http.Field
+import retrofit2.http.FieldMap
+import retrofit2.http.FormUrlEncoded
+import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.Query
 
 interface FileService {
     companion object {
@@ -32,7 +42,7 @@ interface FileService {
                         OkHttpClient().newBuilder()
                             .addInterceptor(Interceptor { chain ->
                                 try {
-                                    val request =  chain.request().newBuilder()
+                                    val request = chain.request().newBuilder()
                                         .addHeader("Cookie", cookie)
                                         .addHeader(
                                             "User-Agent",
@@ -41,7 +51,7 @@ interface FileService {
                                         .build()
                                     val response = chain.proceed(request)
                                     val code = response.code
-                                    if (code >=400) {
+                                    if (code >= 400) {
                                         response.close() // 关闭原始响应体，防止泄漏
                                         // 手动抛出异常，强制进入下方的 catch 块
                                         // 这样会复用你原本处理 SocketTimeoutException 的逻辑
@@ -207,6 +217,17 @@ interface FileService {
     suspend fun decryptZip(
         @Field("pick_code") pickCode: String,
         @Field("secret") secret: String
+    ): JsonObject
+
+    /**
+     *非加密文件 {"state":true,"message":"","code":"","data":{"unzip_status":1}}
+     *
+     *加密文件 {"state":true,"message":"","code":"","data":{"unzip_status":6}}
+     */
+    @FormUrlEncoded
+    @POST("files/push_extract")
+    suspend fun checkEncryptionStatus(
+        @Field("pick_code") pickCode: String
     ): JsonObject
 
     /**
