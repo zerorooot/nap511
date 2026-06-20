@@ -342,6 +342,13 @@ data class TorrentFileListWeb(
     var size: Long = 0,
     var sizeString: String = "",
     var path: String = "",
+    /**
+     * 1是选中的
+     *
+     * 0的未选中的
+     *
+     * -1是_____padding_file_0_如果您看到此文件，请升级到BitComet(比特彗星)0.85或以上版本____
+     */
     val wanted: Int = -1,
 )
 

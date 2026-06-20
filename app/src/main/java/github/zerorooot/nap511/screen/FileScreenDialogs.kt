@@ -53,7 +53,7 @@ fun CreateDialogs(
         fileViewModel.closeFileInfoDialog()
     }
     //文件排序
-    FileOrderDialog(fileViewModel = fileViewModel) {
+    FileOrderDialog(fileViewModel) {
         fileViewModel.closeFileOrderDialog()
         if (it != "") {
             val asc = if (it.subSequence(it.length - 2, it.length) == "⬆️") 1 else 0
@@ -93,7 +93,10 @@ fun CreateDialogs(
         fileViewModel.closeSearchDialog()
     }
 
-    CreateSelectTorrentFileDialog(fileViewModel) { infoHash, savePath, wanted ->
+    CreateSelectTorrentFileDialog(
+        fileViewModel,
+        offlineFileViewModel
+    ) { infoHash, savePath, wanted ->
         fileViewModel.closeCreateSelectTorrentFileDialog()
         if (wanted.isEmpty()) {
             return@CreateSelectTorrentFileDialog

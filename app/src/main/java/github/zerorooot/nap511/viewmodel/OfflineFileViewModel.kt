@@ -107,6 +107,15 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
                 ) + " "
             }
             torrentBeanCache[sha1] = torrentTask
+            //1是选中的，0的未选中的，-1是_____padding_file_0_如果您看到此文件，请升级到BitComet(比特彗星)0.85或以上版本____
+            torrentTask.torrentFileListWeb.removeIf { f -> f.wanted == -1 }
+
+            // test
+//            val subList = ArrayList(torrentTask.torrentFileListWeb.subList(0, 2))
+//            torrentTask.torrentFileListWeb.clear()
+//            torrentTask.torrentFileListWeb = subList
+
+            torrentTask.fileCount = torrentTask.torrentFileListWeb.size
             torrentBean = torrentTask
         }
     }

@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -62,6 +61,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.semantics.Role
@@ -94,7 +94,6 @@ import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.TorrentFileListWeb
 import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.screenitem.AutoSizableTextField
-import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
@@ -105,8 +104,6 @@ import github.zerorooot.nap511.viewmodel.decryptZip
 import github.zerorooot.nap511.viewmodel.getZipListFile
 import github.zerorooot.nap511.viewmodel.unzipFile
 import kotlinx.coroutines.delay
-import my.nanihadesuka.compose.LazyColumnScrollbar
-import my.nanihadesuka.compose.ScrollbarSettings
 import java.nio.charset.Charset
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -886,9 +883,9 @@ private fun RadioButtonDialog(
 @Composable
 fun CreateSelectTorrentFileDialog(
     fileViewModel: FileViewModel,
+    offlineFileViewModel: OfflineFileViewModel,
     enter: (infoHash: String, savePath: String, wanted: String) -> Unit
 ) {
-    val offlineFileViewModel = viewModel<OfflineFileViewModel>()
     if (fileViewModel.isOpenCreateSelectTorrentFileDialog) {
         val torrentBean = offlineFileViewModel.torrentBean
         // XLog.d("torrentBean: ${Gson().toJson(torrentBean)}")
@@ -912,10 +909,10 @@ fun CreateSelectTorrentFileDialog(
         }
 
         if (isSort) {
-            torrentFileListWeb.sortByDescending { it -> it.size }
+            torrentFileListWeb.sortByDescending { it.size }
         }
+        fileViewModel.setRefreshingStatus(false)
 
-        viewModel<FileViewModel>().setRefreshingStatus(false)
         SelectTorrentFileDialog(
             torrentFileListWeb.toList(), torrentBean.fileCount, torrentBean.fileSizeString
         ) {
@@ -932,6 +929,7 @@ fun CreateSelectTorrentFileDialog(
             val wanted = map.keys.joinToString(separator = ",")
             enter.invoke(infoHash, savePath, wanted)
         }
+
     }
 }
 
@@ -957,26 +955,60 @@ private fun SelectTorrentFileDialog(
             }
         }
     }
-    val isSelectedItem: (Int) -> Boolean = { selectMap.containsKey(it) }
-    val onChangeState: (Int, TorrentFileListWeb) -> Unit = { i: Int, s: TorrentFileListWeb ->
-        if (selectMap.containsKey(i)) {
-            selectMap.remove(i)
+
+    fun isSelectedItem(index: Int): Boolean = selectMap.containsKey(index)
+
+    fun onChangeState(index: Int, item: TorrentFileListWeb) {
+        if (selectMap.containsKey(index)) {
+            selectMap.remove(index)
         } else {
-            selectMap[i] = s
+            selectMap[index] = item
         }
     }
-    val cancel: () -> Unit = {
+
+    fun cancel() {
         selectMap.clear()
         enter.invoke(selectMap)
     }
 
-    AlertDialog(onDismissRequest = {
-        cancel()
-    }, confirmButton = {
+    fun default() {
+        val defaultItems = torrentFileListWeb.mapIndexedNotNull { index, item ->
+            if (item.wanted == 1) index to item else null
+        }
+        selectMap.clear()
+        selectMap.putAll(defaultItems)
+    }
+
+    fun selectAll() {
+        val allItems = torrentFileListWeb.mapIndexed { index, item -> index to item }
+        selectMap.clear() // 确保没有遗留脏数据后再全量覆盖
+        selectMap.putAll(allItems)
+    }
+
+    // 先通过 map 构建反选后的数据集合，再进行一次性状态赋值
+    fun reversal() {
+        val reversedItems = torrentFileListWeb.mapIndexedNotNull { index, item ->
+            if (selectMap.containsKey(index)) null else index to item
+        }
+        selectMap.clear()
+        selectMap.putAll(reversedItems)
+    }
+
+
+    // 设置最大高度为屏幕高度的80%
+    val maxDialogHeight =
+        with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() * 0.65f }
+
+    AlertDialog(onDismissRequest = ::cancel, confirmButton = {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.offset(y = (-20).dp)
         ) {
+            TextButton(
+                onClick = ::default,
+            ) {
+                Text(text = "默认")
+            }
             TextButton(
                 onClick = {
                     enter.invoke(selectMap)
@@ -985,36 +1017,17 @@ private fun SelectTorrentFileDialog(
                 Text(text = "下载")
             }
             TextButton(
-                onClick = {
-                    selectMap.clear()
-                    torrentFileListWeb.forEachIndexed { index, torrentFileListWeb ->
-                        if (torrentFileListWeb.wanted == 1) {
-                            selectMap[index] = torrentFileListWeb
-                        }
-                    }
-                },
+                onClick = ::selectAll,
             ) {
                 Text(text = "全选")
             }
             TextButton(
-                onClick = {
-                    torrentFileListWeb.forEachIndexed { index, torrentFileListWeb ->
-                        if (torrentFileListWeb.wanted == 1) {
-                            if (selectMap.containsKey(index)) {
-                                selectMap.remove(index)
-                            } else {
-                                selectMap[index] = torrentFileListWeb
-                            }
-                        }
-                    }
-                },
+                onClick = ::reversal,
             ) {
                 Text(text = "反选")
             }
             TextButton(
-                onClick = {
-                    cancel()
-                },
+                onClick = ::cancel,
             ) {
                 Text(text = "取消")
             }
@@ -1022,8 +1035,7 @@ private fun SelectTorrentFileDialog(
     }, title = { Text(text = "选择要下载的文件") }, text = {
         Column(
             modifier = Modifier
-                .wrapContentHeight() // 让高度自适应内容
-                .heightIn(max = 150.dp) // 限制最大高度，防止文件极多时超出屏幕，变成滚动模式
+                .heightIn(max = maxDialogHeight) // 限制最大高度，防止文件极多时超出屏幕，变成滚动模式
         ) {
             AutoSizableTextField(
                 value = "已经选择${selectMap.size}/${fileCount}个，总计：${
@@ -1033,51 +1045,43 @@ private fun SelectTorrentFileDialog(
                 minFontSize = 30.sp,
                 maxLines = 2
             )
-            LazyColumnScrollbar(
-                state = listState, settings = ScrollbarSettings.Default.copy(
-                    thumbUnselectedColor = Purple80
-                )
+            LazyColumn(
+//                modifier = Modifier.padding(8.dp),
+                state = listState
             ) {
-                LazyColumn(
-                    modifier = Modifier
-                        .padding(8.dp),
-                    state = listState
-                ) {
-                    itemsIndexed(items = torrentFileListWeb, key = { _, item ->
-                        item.hashCode()
-                    }) { index, item ->
-                        if (item.wanted == 1) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .selectable(
-                                        selected = isSelectedItem(index), onClick = {
-                                            onChangeState(index, item)
+                itemsIndexed(items = torrentFileListWeb, key = { _, item ->
+                    item.hashCode()
+                }) { index, item ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .selectable(
+                                selected = isSelectedItem(index), onClick = {
+                                    onChangeState(index, item)
 //                                            println("select $selectMap")
-                                        }, role = Role.RadioButton
-                                    )
-                                    .padding(8.dp)
-                            ) {
-                                Icon(
-                                    modifier = Modifier.padding(end = 16.dp),
-                                    imageVector = if (isSelectedItem(index)) {
-                                        Icons.Outlined.CheckBox
-                                    } else {
-                                        Icons.Outlined.CheckBoxOutlineBlank
-                                    },
-                                    contentDescription = null,
-                                    tint = Color.Magenta
-                                )
-                                DynamicEllipsizedTextView(
-                                    text = item.path,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                Text(
-                                    text = item.sizeString, modifier = Modifier.weight(0.5f),
-                                )
-                            }
-                        }
+                                }, role = Role.RadioButton
+                            )
+                            .padding(8.dp)
+                    ) {
+                        Icon(
+                            modifier = Modifier.padding(end = 16.dp),
+                            imageVector = if (isSelectedItem(index)) {
+                                Icons.Outlined.CheckBox
+                            } else {
+                                Icons.Outlined.CheckBoxOutlineBlank
+                            },
+                            contentDescription = null,
+                            tint = Color.Magenta
+                        )
+                        DynamicEllipsizedTextView(
+                            text = item.path,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = item.sizeString, modifier = Modifier.weight(0.5f),
+                        )
                     }
+
                 }
             }
         }

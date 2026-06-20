@@ -153,10 +153,11 @@ fun FileScreen(
         fileViewModel.selectedItem = ConfigKeyUtil.PHOTO
     }
 
+
     fun handleTorrentClick(fileBean: FileBean) {
         fileViewModel.setRefreshingStatus(true)
-        fileViewModel.openCreateSelectTorrentFileDialog()
         offlineFileViewModel.getTorrentTask(fileBean.sha1)
+        fileViewModel.openCreateSelectTorrentFileDialog()
     }
 
     fun handleZipClick(i: Int) {
@@ -180,7 +181,7 @@ fun FileScreen(
     }
 
     // Assembled myItemOnClick — routes to focused handlers
-    val myItemOnClick = { i: Int ->
+    fun myItemOnClick(i: Int) {
         if (fileViewModel.isLongClickState) {
             handleMultiSelectClick(i)
         } else {
@@ -219,25 +220,41 @@ fun FileScreen(
     // ============================================================
     // Phase 2.1: Eliminate FAB string dispatch
     // ============================================================
-    val onCutPasteClick: () -> Unit = { fileViewModel.removeFile() }
-    val onAddFolderClick: () -> Unit = { fileViewModel.openCreateFolderDialog() }
-    val onCancelCutClick: () -> Unit = { fileViewModel.cancelCut() }
+    fun onCutPasteClick() {
+        fileViewModel.removeFile()
+    }
+
+    fun onAddFolderClick() {
+        fileViewModel.openCreateFolderDialog()
+    }
+
+    fun onCancelCutClick() {
+        fileViewModel.cancelCut()
+    }
 
     // ============================================================
     // Phase 2.2: Eliminate menu string dispatch
     // ============================================================
-    val onMenuCut: (Int) -> Unit = { index -> fileViewModel.cut(index) }
-    val onMenuDelete: (Int) -> Unit = { index -> fileViewModel.delete(index) }
-    val onMenuRename: (Int) -> Unit = { index ->
+    fun onMenuCut(index: Int) {
+        fileViewModel.cut(index)
+    }
+
+    fun onMenuDelete(index: Int) {
+        fileViewModel.delete(index)
+    }
+
+    fun onMenuRename(index: Int) {
         fileViewModel.selectIndex = index
         fileViewModel.openRenameFileDialog()
     }
-    val onMenuFileInfo: (Int) -> Unit = { index ->
+
+    fun onMenuFileInfo(index: Int) {
         fileViewModel.selectIndex = index
         fileViewModel.getFileInfo(index)
 //        fileViewModel.openFileInfoDialog()
     }
-    val onMenuAria2Download: (Int) -> Unit = { index ->
+
+    fun onMenuAria2Download(index: Int) {
         val aria2Url = DataStoreUtil.getData(ConfigKeyUtil.ARIA2_URL, "")
         if (aria2Url == "") {
             fileViewModel.openAria2Dialog()
@@ -249,7 +266,7 @@ fun FileScreen(
     // ============================================================
     // Phase 2.3: Extract onBackClick
     // ============================================================
-    val onBack = {
+    fun onBack() {
         val lastIndexOf = path.lastIndexOf("/")
         val parentDirectory = if (lastIndexOf == -1) {
             ""
@@ -263,10 +280,11 @@ fun FileScreen(
             fileViewModel.getListLocation(parentDirectory, listState)
         }
     }
+
     val drawerState = LocalDrawerState.current
     val scope = rememberCoroutineScope()
 
-    val onBackClick: () -> Unit = {
+    fun onBackClick() {
         if (path == "/根目录" && !fileViewModel.isSearchState && !fileViewModel.isLongClickState) {
             scope.launch { drawerState.open() }
         } else {
@@ -276,7 +294,7 @@ fun FileScreen(
 
     BackHandler(
         path != "/根目录" || fileViewModel.isLongClickState || fileViewModel.isSearchState,
-        onBack
+        ::onBack
     )
 
     val myAppBarOnClick = fun(name: String) {
@@ -301,18 +319,18 @@ fun FileScreen(
     // ============================================================
     // Phase 3: Extract path bar click callbacks
     // ============================================================
-    val onPathClick: () -> Unit = {
+    fun onPathClick() {
         clipboardManager.nativeClipboard.setPrimaryClip(
             ClipData.newPlainText("path", path)
         )
         App.instance.toast("$path 已复制到剪切板")
     }
 
-    val onPathDoubleClick: () -> Unit = {
+    fun onPathDoubleClick() {
         fileViewModel.getListLocation("null", listState)
     }
 
-    val onPathLongClick: () -> Unit = {
+    fun onPathLongClick() {
         clipboardManager.nativeClipboard.setPrimaryClip(
             ClipData.newPlainText("currentCid", fileViewModel.currentCid)
         )
@@ -322,7 +340,7 @@ fun FileScreen(
     // ============================================================
     // Phase 4: inline itemOnLongClick (no remember needed)
     // ============================================================
-    val itemOnLongClick = { i: Int ->
+    fun itemOnLongClick(i: Int) {
         fileViewModel.isLongClickState = !fileViewModel.isLongClickState
         if (fileViewModel.isLongClickState) {
             fileViewModel.select(i)
@@ -348,9 +366,9 @@ fun FileScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .combinedClickable(
-                    onClick = onPathClick,
-                    onDoubleClick = onPathDoubleClick,
-                    onLongClick = onPathLongClick,
+                    onClick = ::onPathClick,
+                    onDoubleClick = ::onPathDoubleClick,
+                    onLongClick = ::onPathLongClick,
                 ),
         ) {
             MiddleEllipsisText(
@@ -367,11 +385,11 @@ fun FileScreen(
                 ) {
                     if (it) {
                         Column {
-                            FloatingActionButton(onClick = onCancelCutClick) {
+                            FloatingActionButton(onClick = ::onCancelCutClick) {
                                 Icon(Icons.Filled.Close, "close")
                             }
                             Spacer(modifier = Modifier.height(16.dp))
-                            FloatingActionButton(onClick = onCutPasteClick) {
+                            FloatingActionButton(onClick = ::onCutPasteClick) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.baseline_content_paste_24),
                                     "cut"
@@ -379,7 +397,7 @@ fun FileScreen(
                             }
                         }
                     } else {
-                        FloatingActionButton(onClick = onAddFolderClick) {
+                        FloatingActionButton(onClick = ::onAddFolderClick) {
                             Icon(Icons.Filled.Add, "add")
                         }
                     }
@@ -410,13 +428,13 @@ fun FileScreen(
                                 index,
                                 fileViewModel.clickMap.getOrDefault(path, -1),
                                 Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null),
-                                myItemOnClick,
-                                itemOnLongClick = itemOnLongClick,
-                                onCut = onMenuCut,
-                                onDelete = onMenuDelete,
-                                onRename = onMenuRename,
-                                onFileInfo = onMenuFileInfo,
-                                onAria2Download = onMenuAria2Download,
+                                ::myItemOnClick,
+                                itemOnLongClick = ::itemOnLongClick,
+                                onCut = ::onMenuCut,
+                                onDelete = ::onMenuDelete,
+                                onRename = ::onMenuRename,
+                                onFileInfo = ::onMenuFileInfo,
+                                onAria2Download = ::onMenuAria2Download,
                             )
                         }
                     }
