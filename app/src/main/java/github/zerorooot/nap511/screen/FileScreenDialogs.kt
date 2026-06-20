@@ -100,7 +100,11 @@ fun CreateDialogs(
         }
         offlineFileViewModel.addTorrentTask(
             infoHash, savePath, wanted
-        )
+        ) {
+            if (it) {
+                fileViewModel.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
+            }
+        }
     }
     //解压文件
     UnzipDialog(fileViewModel)

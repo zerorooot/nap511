@@ -101,7 +101,7 @@ fun MyPhotoScreen(
         },
         onToggleControls = { controlsVisible = !controlsVisible },
         onBack = {
-            App.selectedItem = ConfigKeyUtil.MY_FILE
+            fileViewModel.selectedItem = ConfigKeyUtil.MY_FILE
         })
 }
 

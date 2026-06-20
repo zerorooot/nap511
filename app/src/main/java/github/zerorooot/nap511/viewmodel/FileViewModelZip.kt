@@ -23,7 +23,7 @@ internal fun FileViewModel.getZipListFile(
             when (val status = fileRepository.checkZipStatus(fileBean.pickCode)) {
                 is ZipStatus.Encrypted -> {
                     XLog.d("${fileBean.name} 是加密压缩包，拦截流程并弹窗")
-                    isOpenUnzipPasswordDialog = true
+                    openUnzipPasswordDialog()
                     setRefreshingStatus(false)
                     return@launch // 拦截，等待用户输入密码
                 }
@@ -45,7 +45,7 @@ internal fun FileViewModel.getZipListFile(
 
         // 只有 ZipStatus.Normal 或者已经处理完流程时，才会走到这里
         unzipBeanList.value = fileRepository.getZipListFile(fileBean.pickCode, fileName, paths)
-        isOpenUnzipDialog = true
+        openUnzipDialog()
     }
 }
 
@@ -71,10 +71,10 @@ internal fun FileViewModel.unzipFile(zipBeanList: ZipBeanList) {
             //确定当前目录下是否存在同名文件，如果不存在，则新建一个
             val currentUnzipFolderNameList =
                 fileBeanList.filter { i -> i.isFolder && i.name == unzipFolderName }
-            var zipFileCid = currentCid
+            var zipFileCid = refreshCid
             if (currentUnzipFolderNameList.isEmpty()) {
                 val createFolderMessage = fileRepository.createFolder(
-                    currentCid, unzipFolderName
+                    refreshCid, unzipFolderName
                 )
                 XLog.d("fileViewModel.unzipFile $createFolderMessage")
                 zipFileCid = createFolderMessage.cid
@@ -95,7 +95,7 @@ internal fun FileViewModel.decryptZip(secret: String) {
     viewModelScope.launch {
         val fileBean = fileBeanList[selectIndex]
         val pickCode = fileBean.pickCode
-        isOpenUnzipPasswordDialog = false
+        closeUnzipPasswordDialog()
         val decryptZip = fileRepository.decryptZip(pickCode, secret)
         if (!decryptZip) {
             App.instance.toast("密码错误～")

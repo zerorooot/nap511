@@ -20,6 +20,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.fragment.app.commit
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
@@ -40,6 +42,7 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.SettingsDataStore
+import github.zerorooot.nap511.viewmodel.FileViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,13 +89,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 screen.getPreference(i).isIconSpaceReserved = false
             }
         }
+        val fileViewModel: FileViewModel by viewModels()
 
         findPreference<Preference>("checkMagnet")?.setOnPreferenceClickListener {
-            App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
+            fileViewModel.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
             true
         }
         findPreference<Preference>("checkVideo")?.setOnPreferenceClickListener {
-            App.selectedItem = ConfigKeyUtil.VERIFY_VIDEO_ACCOUNT
+            fileViewModel.selectedItem = ConfigKeyUtil.VERIFY_VIDEO_ACCOUNT
             true
         }
         findPreference<Preference>(ConfigKeyUtil.CLICK_DOWNLOAD_NOW)?.setOnPreferenceClickListener {

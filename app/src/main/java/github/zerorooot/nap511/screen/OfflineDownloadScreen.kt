@@ -25,6 +25,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,8 +36,11 @@ import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.LocalDrawerState
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
+import kotlinx.coroutines.launch
 
 
 @ExperimentalMaterial3Api
@@ -47,6 +51,8 @@ fun OfflineDownloadScreen(
 ) {
     val containerSize = LocalWindowInfo.current.containerSize
     val density = LocalDensity.current
+    val drawerState = LocalDrawerState.current
+    val scope = rememberCoroutineScope()
 
     val screenWidthDp = with(density) { containerSize.width.toDp() }
     val screenHeightDp =  with(density) { containerSize.height.toDp() }
@@ -64,7 +70,11 @@ fun OfflineDownloadScreen(
                         true
                     ) || i.startsWith("magnet", true) || i.startsWith("ed2k", true)
                 }.toList()
-                offlineFileViewModel.addTask(urlList, fileViewModel.currentCid)
+                offlineFileViewModel.addTask(urlList, fileViewModel.currentCid){
+                    if (it) {
+                        fileViewModel.selectedItem= ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
+                    }
+                }
             }
         }
     }
@@ -89,7 +99,7 @@ fun OfflineDownloadScreen(
                     imageVector = Icons.Rounded.Menu,
                     description = "navigationIcon"
                 ) {
-                    App.instance.openDrawerState()
+                    scope.launch { drawerState.open() }
                 }
             },
         )

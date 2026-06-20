@@ -13,6 +13,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
@@ -24,8 +25,10 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.screenitem.OfflineCellItem
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.LocalDrawerState
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
+import kotlinx.coroutines.launch
 import java.util.StringJoiner
 
 @Composable
@@ -38,6 +41,8 @@ fun OfflineFileScreen(
     val offlineList by offlineFileViewModel.offlineFile.collectAsState()
     val context = LocalContext.current
     val clipboardManager = LocalClipboard.current
+    val drawerState = LocalDrawerState.current
+    val scope = rememberCoroutineScope()
 
     OfflineFileInfoDialog(offlineFileViewModel, {
         offlineFileViewModel.closeOfflineDialog()
@@ -51,7 +56,7 @@ fun OfflineFileScreen(
     val itemOnClick = { i: Int ->
         val offlineTask = offlineList[i]
         val cid = if (offlineTask.fileId == "") offlineTask.wpPathId else offlineTask.fileId
-        App.selectedItem = ConfigKeyUtil.MY_FILE
+        fileViewModel.selectedItem = ConfigKeyUtil.MY_FILE
         fileViewModel.getFiles(cid)
     }
     val menuOnClick = { name: String, index: Int ->
@@ -72,7 +77,7 @@ fun OfflineFileScreen(
                 copyDownloadUrl(context, stringJoiner.toString())
             }
 
-            "ModalNavigationDrawerMenu" -> App.instance.openDrawerState()
+            "ModalNavigationDrawerMenu" -> scope.launch { drawerState.open() }
         }
     }
 

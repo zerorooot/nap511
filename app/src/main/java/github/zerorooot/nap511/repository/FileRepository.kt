@@ -82,7 +82,11 @@ class FileRepository(private val cookie: String) {
         return offlineService.quota()
     }
 
-    suspend fun addOfflineTask(list: List<String>, currentCid: String): Pair<Boolean, String> {
+    suspend fun addOfflineTask(
+        list: List<String>,
+        currentCid: String,
+        handle: (Boolean) -> Unit
+    ): Pair<Boolean, String> {
         val downloadPath = setDownloadPath(currentCid)
         XLog.d("add task downloadPath $downloadPath")
         if (!downloadPath.state) {
@@ -104,7 +108,8 @@ class FileRepository(private val cookie: String) {
             "任务添加成功"
         } else {
             if (addTask.errorMsg.contains("请验证账号")) {
-                App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
+                handle.invoke(true)
+             //   App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
             }
             //把失败的离线链接保存起来
             val currentOfflineTaskList =

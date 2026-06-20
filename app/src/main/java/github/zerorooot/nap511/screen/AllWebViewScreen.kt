@@ -1,10 +1,7 @@
 package github.zerorooot.nap511.screen
 
 import android.annotation.SuppressLint
-import android.util.Log
-import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
-import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -21,9 +18,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
@@ -39,6 +38,9 @@ import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.LocalDrawerState
+import github.zerorooot.nap511.viewmodel.FileViewModel
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -103,7 +105,11 @@ fun BaseWebViewScreen(
 @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
 @Composable
 fun WebViewScreen() {
-    App.gesturesEnabled = false
+    val drawerState = LocalDrawerState.current
+    val scope = rememberCoroutineScope()
+    val fileViewModel = viewModel<FileViewModel>()
+    fileViewModel.gesturesEnabled = false
+
     CookieManager.getInstance().removeAllCookies { }
     CookieManager.getInstance().setAcceptCookie(true)
     WebView.setWebContentsDebuggingEnabled(true)
@@ -111,7 +117,7 @@ fun WebViewScreen() {
     BaseWebViewScreen(
         titleText = "网页版",
         topAppBarActionButtonOnClick = {
-            App.instance.openDrawerState()
+            scope.launch { drawerState.open() }
         },
         webViewClient = { webViewClient() },
         loadUrl = "https://115.com/"
@@ -178,11 +184,15 @@ fun webViewClient(): WebViewClient {
 
 @Composable
 fun LoginWebViewScreen() {
-    App.gesturesEnabled = false
+    val fileViewModel = viewModel<FileViewModel>()
+    fileViewModel.gesturesEnabled = false
+
+    val drawerState = LocalDrawerState.current
+    val scope = rememberCoroutineScope()
     BaseWebViewScreen(
         titleText = "通过网页登陆",
         topAppBarActionButtonOnClick = {
-            App.instance.openDrawerState()
+            scope.launch { drawerState.open() }
         },
         webViewClient = { loginWebViewClient(it) },
         loadUrl = "https://115.com/"
@@ -234,12 +244,24 @@ fun CaptchaWebViewScreen() {
         cookieManager.setCookie("https://webapi.115.com/user/captcha", a)
     }
     cookieManager.flush()
+    val drawerState = LocalDrawerState.current
+    val scope = rememberCoroutineScope()
+    val fileViewModel = viewModel<FileViewModel>()
     BaseWebViewScreen(
         titleText = "磁力链接验证码",
         topAppBarActionButtonOnClick = {
-            App.instance.openDrawerState()
+            scope.launch { drawerState.open() }
         },
-        webViewClient = { captchaWebViewClient(it) },
+        webViewClient = {
+            captchaWebViewClient(it) { gesture, select ->
+                if (gesture) {
+                    fileViewModel.gesturesEnabled = true
+                }
+                if (select) {
+                    fileViewModel.selectedItem = ConfigKeyUtil.MY_FILE
+                }
+            }
+        },
         loadUrl = "https://captchaapi.115.com/?ac=security_code&type=web&cb=Close911_" + System.currentTimeMillis()
     )
 
@@ -247,7 +269,11 @@ fun CaptchaWebViewScreen() {
 
 @Composable
 fun CaptchaVideoWebViewScreen() {
+    val drawerState = LocalDrawerState.current
+    val scope = rememberCoroutineScope()
     val cookieManager = CookieManager.getInstance()
+    val fileViewModel = viewModel<FileViewModel>()
+
     App.cookie.split(";").forEach { a ->
         cookieManager.setCookie("https://115vod.com/captchaapi/", a)
         cookieManager.setCookie("https://115vod.com/webapi/user/captcha", a)
@@ -256,15 +282,24 @@ fun CaptchaVideoWebViewScreen() {
     BaseWebViewScreen(
         titleText = "视频播放验证码",
         topAppBarActionButtonOnClick = {
-            App.instance.openDrawerState()
+            scope.launch { drawerState.open() }
         },
-        webViewClient = { captchaWebViewClient(it) },
+        webViewClient = {
+            captchaWebViewClient(it) { gesture, select ->
+                if (gesture) {
+                    fileViewModel.gesturesEnabled = true
+                }
+                if (select) {
+                    fileViewModel.selectedItem = ConfigKeyUtil.MY_FILE
+                }
+            }
+        },
         loadUrl = "https://115vod.com/captchaapi/?ac=security_code&client=web&type=web&ctype=web&cb=Close911_" + System.currentTimeMillis()
     )
 
 }
 
-fun captchaWebViewClient(webView: WebView): WebViewClient {
+fun captchaWebViewClient(webView: WebView, handle: (Boolean, Boolean) -> Unit): WebViewClient {
     return object : RequestInspectorWebViewClient(webView) {
         override fun shouldInterceptRequest(
             view: WebView,
@@ -272,14 +307,14 @@ fun captchaWebViewClient(webView: WebView): WebViewClient {
         ): WebResourceResponse? {
             //磁力链接验证
             if ("https://webapi.115.com/user/captcha" == webViewRequest.url) {
-                if (check("https://webapi.115.com/user/captcha", webViewRequest)) {
+                if (check("https://webapi.115.com/user/captcha", webViewRequest, handle)) {
                     addTask()
                     App.instance.toast("验证账号成功~，重新添加链接中.......")
                 }
             }
             //视频验证
             if ("https://115vod.com/webapi/user/captcha" == webViewRequest.url) {
-                if (check("https://115vod.com/webapi/user/captcha", webViewRequest)) {
+                if (check("https://115vod.com/webapi/user/captcha", webViewRequest, handle)) {
                     App.instance.toast("视频验证成功~")
                 }
             }
@@ -288,7 +323,11 @@ fun captchaWebViewClient(webView: WebView): WebViewClient {
     }
 }
 
-private fun check(url: String, webViewRequest: WebViewRequest): Boolean {
+private fun check(
+    url: String,
+    webViewRequest: WebViewRequest,
+    handle: (Boolean, Boolean) -> Unit
+): Boolean {
     val httpClient = OkHttpClient()
     val a = Request.Builder()
         .url(url)
@@ -300,10 +339,12 @@ private fun check(url: String, webViewRequest: WebViewRequest): Boolean {
 
     val response = httpClient.newCall(a.build()).execute()
     val string = response.body.string()
+    //启用手势，不跳转页面
+    handle.invoke(true, false)
 
-    App.gesturesEnabled = true
     if (string.contains("{\"state\":true}")) {
-        App.selectedItem = ConfigKeyUtil.MY_FILE
+        //启用手势，跳转页面
+        handle.invoke(true, true)
         return true
     }
     return false

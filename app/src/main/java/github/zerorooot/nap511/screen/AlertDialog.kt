@@ -382,7 +382,7 @@ fun ExitApp() {
     if (isOpen) {
         InfoDialog(
             onDismissRequest = {
-                App.selectedItem = ConfigKeyUtil.MY_FILE
+                fileViewModel.selectedItem = ConfigKeyUtil.MY_FILE
             },
             onConfirmation = {
                 Process.killProcess(Process.myPid());

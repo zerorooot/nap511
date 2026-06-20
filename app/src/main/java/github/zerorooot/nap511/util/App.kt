@@ -7,6 +7,7 @@ import android.os.Build
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.material3.DrawerState
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -38,23 +39,18 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.properties.Delegates
 
+val LocalDrawerState = compositionLocalOf<DrawerState> {
+    error("DrawerState not provided! Ensure you wrapped your content in CompositionLocalProvider.")
+}
+
+
 class App : Application(), ImageLoaderFactory {
     companion object {
         lateinit var instance: App
         var cookie by mutableStateOf("")
         var uid by mutableStateOf("0")
-
-        //页面导航
-        var selectedItem by mutableStateOf(ConfigKeyUtil.MY_FILE)
-
-        //页面手势
-        var gesturesEnabled by mutableStateOf(true)
-
         //每次请求文件数
         var requestLimitCount by Delegates.notNull<Int>()
-        lateinit var drawerState: DrawerState
-        lateinit var scope: CoroutineScope
-        private fun isScopeInitialized() = ::scope.isInitialized
 
         //缓存fileListCache文件
         lateinit var cacheFile: File
@@ -112,14 +108,6 @@ class App : Application(), ImageLoaderFactory {
         }
     }
 
-    fun openDrawerState() {
-        if (isScopeInitialized()) {
-            scope.launch {
-                drawerState.open()
-            }
-        }
-
-    }
 
     fun getStringRes(id: Int): String {
         return getString(id)
@@ -192,13 +180,6 @@ class App : Application(), ImageLoaderFactory {
         context.startActivity(intent)
     }
 
-    fun closeDrawerState() {
-        if (isScopeInitialized()) {
-            scope.launch {
-                drawerState.close()
-            }
-        }
-    }
 
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)

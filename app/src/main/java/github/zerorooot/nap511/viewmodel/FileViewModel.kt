@@ -33,6 +33,7 @@ import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -68,6 +69,12 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     internal val _isRefreshing = MutableStateFlow(false)
     var isRefreshing = _isRefreshing.asStateFlow()
 
+    //页面导航
+    var selectedItem by mutableStateOf(ConfigKeyUtil.MY_FILE)
+    //页面手势
+    var gesturesEnabled by mutableStateOf(true)
+
+
     /**
      * 打开对话框相关（状态下沉到 ViewModel 本地）
      */
@@ -97,7 +104,20 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         internal set
 
     init {
-        viewModelScope.launch {
+        // 定义全局异常处理器处理，防止
+        val exceptionHandler = CoroutineExceptionHandler { coroutineContext, throwable ->
+            when (throwable) {
+                is retrofit2.HttpException -> {
+                    App.instance.toast("HTTP请求错误: ${throwable.code()}，请重试")
+                    setRefreshingStatus(false)
+                }
+
+                else -> {
+                    App.instance.toast("错误: ${throwable.message}")
+                }
+            }
+        }
+        viewModelScope.launch(exceptionHandler) {
             dialogEventRepository.events.collect { event ->
                 when (event) {
                     is DialogEvent.OpenCreateFolder -> isOpenCreateFolderDialog = true
@@ -136,7 +156,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     //位置与点击记录相关
     val clickMap = mutableStateMapOf<String, Int>()
     private var currentLocation = hashMapOf<String, LocationBean>()
-    lateinit var fileScreenListState: LazyListState
 
     //相关状态
     var isLongClickState: Boolean by mutableStateOf(false)
@@ -156,7 +175,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         FileRepository.getInstance(cookie)
     }
 
-    fun isFileScreenListState() = ::fileScreenListState.isInitialized
 
     fun loadCacheFile() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -224,29 +242,29 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         }
     }
 
-    fun setListLocation(path: String) {
+    fun setListLocation(path: String, listState: LazyListState) {
         val locationBean = LocationBean(
-            fileScreenListState.firstVisibleItemIndex,
-            fileScreenListState.firstVisibleItemScrollOffset
+            listState.firstVisibleItemIndex,
+            listState.firstVisibleItemScrollOffset
         )
         currentLocation[path] = locationBean
     }
 
-    fun setListLocationAndClickCache(index: Int) {
+    fun setListLocationAndClickCache(index: Int, listState: LazyListState) {
         val currentPath = _currentPath.value
         //记录上级目录当前的位置
-        setListLocation(currentPath)
+        setListLocation(currentPath, listState)
         //标记此点击文件，方便确认到底点了那个
         clickMap[currentPath] = index
     }
 
-    fun getListLocation(path: String) {
-        App.scope.launch {
+    fun getListLocation(path: String, listState: LazyListState) {
+        viewModelScope.launch {
             val locationBean = currentLocation[path] ?: run {
                 LocationBean(0, 0)
             }
 //            Thread.sleep(100)
-            fileScreenListState.scrollToItem(
+            listState.scrollToItem(
                 locationBean.firstVisibleItemIndex, locationBean.firstVisibleItemScrollOffset
             )
         }
@@ -584,6 +602,14 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
 
     fun openCreateSelectTorrentFileDialog() {
         viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenCreateSelectTorrentFileDialog) }
+    }
+
+    fun openUnzipDialog() {
+        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenUnzipDialog) }
+    }
+
+    fun openUnzipPasswordDialog() {
+        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenUnzipPasswordDialog) }
     }
 
     // ==================== 关闭方法（直接在本地设 false） ====================

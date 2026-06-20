@@ -34,6 +34,7 @@ import java.util.regex.Pattern
 class OfflineTaskActivity : ComponentActivity() {
     // 40位十六进制哈希正则 (BTih v1 标准)
     private val HEX_40_PATTERN = Pattern.compile("^[0-9a-fA-F]{40}$")
+
     // 32位Base32哈希正则 (早期或简短版磁力链标准)
     private val BASE32_32_PATTERN = Pattern.compile("^[a-zA-Z2-7]{32}$")
 
@@ -171,7 +172,7 @@ class OfflineTaskWorker(
         val listType = object : TypeToken<List<String?>?>() {}.type
         val a: List<String> = Gson().fromJson(inputData.getString("list").toString(), listType)
         val cid = DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
-        val addTaskReturn = fileRepository.addOfflineTask(a, cid)
+        val addTaskReturn = fileRepository.addOfflineTask(a, cid) {}
 
         XLog.d("OfflineTaskWorker cid $cid addTaskReturn $addTaskReturn")
         val state = addTaskReturn.first

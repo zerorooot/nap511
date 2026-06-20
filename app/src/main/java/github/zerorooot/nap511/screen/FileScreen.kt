@@ -36,6 +36,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
@@ -50,6 +51,7 @@ import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.LocalDrawerState
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.cancelCut
@@ -61,6 +63,7 @@ import github.zerorooot.nap511.viewmodel.getZipListFile
 import github.zerorooot.nap511.viewmodel.removeFile
 import github.zerorooot.nap511.viewmodel.startSendAria2Service
 import github.zerorooot.nap511.viewmodel.updateVideoFileBean
+import kotlinx.coroutines.launch
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 
@@ -91,11 +94,7 @@ fun FileScreen(
     val fileBeanList = fileViewModel.fileBeanList
     val path by fileViewModel.currentPath.collectAsState()
 
-    if (!fileViewModel.isFileScreenListState()) {
-        fileViewModel.fileScreenListState = rememberLazyListState()
-    }
-
-    val listState = fileViewModel.fileScreenListState
+    val listState = rememberLazyListState()
     val refreshing by fileViewModel.isRefreshing.collectAsState()
 
     val context = LocalContext.current
@@ -122,7 +121,7 @@ fun FileScreen(
     }
 
     fun handleFolderClick(i: Int, fileBean: FileBean) {
-        fileViewModel.setListLocationAndClickCache(i)
+//        fileViewModel.setListLocationAndClickCache(i)
         if (DataStoreUtil.getData(ConfigKeyUtil.EARLY_LOADING, false)) {
             val before = i - 1
             val after = i + 1
@@ -151,7 +150,7 @@ fun FileScreen(
         fileViewModel.photoFileBeanList.clear()
         fileViewModel.photoFileBeanList.addAll(photoList)
         fileViewModel.photoIndexOf = photoList.indexOf(fileBean)
-        App.selectedItem = ConfigKeyUtil.PHOTO
+        fileViewModel.selectedItem = ConfigKeyUtil.PHOTO
     }
 
     fun handleTorrentClick(fileBean: FileBean) {
@@ -177,7 +176,7 @@ fun FileScreen(
     }
 
     fun handleScrollToDirectory(fileBean: FileBean) {
-        fileViewModel.getListLocation("$path/${fileBean.name}")
+        fileViewModel.getListLocation("$path/${fileBean.name}", listState)
     }
 
     // Assembled myItemOnClick — routes to focused handlers
@@ -186,11 +185,13 @@ fun FileScreen(
             handleMultiSelectClick(i)
         } else {
             //记录上级目录当前的位置
-            fileViewModel.setListLocationAndClickCache(i)
+            fileViewModel.setListLocationAndClickCache(i, listState)
             val fileBean = fileBeanList[i]
 
             if (fileBean.isFolder) {
                 handleFolderClick(i, fileBean)
+                //滚动到当前目录
+                handleScrollToDirectory(fileBean)
             }
 
             if (fileBean.isVideo == 1) {
@@ -211,10 +212,6 @@ fun FileScreen(
 
             if (fileBean.fileIco == R.drawable.txt) {
                 handleTextClick(i, fileBean)
-            }
-            //滚动到当前目录
-            if (fileBean.isFolder) {
-                handleScrollToDirectory(fileBean)
             }
         }
     }
@@ -259,16 +256,19 @@ fun FileScreen(
         } else {
             path.subSequence(0, lastIndexOf).toString()
         }
-        if (path != "/根目录" && !fileViewModel.isLongClickState) {
-            fileViewModel.setListLocation(path)
-            fileViewModel.getListLocation(parentDirectory)
-        }
         fileViewModel.back()
+
+        if (path != "/根目录" && !fileViewModel.isLongClickState) {
+            fileViewModel.setListLocation(path, listState)
+            fileViewModel.getListLocation(parentDirectory, listState)
+        }
     }
+    val drawerState = LocalDrawerState.current
+    val scope = rememberCoroutineScope()
 
     val onBackClick: () -> Unit = {
         if (path == "/根目录" && !fileViewModel.isSearchState && !fileViewModel.isLongClickState) {
-            App.instance.openDrawerState()
+            scope.launch { drawerState.open() }
         } else {
             onBack()
         }
@@ -279,11 +279,20 @@ fun FileScreen(
         onBack
     )
 
-    val myAppBarOnClick = { name: String ->
-        if (name == "back") {
-            onBackClick()
-        } else {
-            appBarOnClick(name)
+    val myAppBarOnClick = fun(name: String) {
+        when (name) {
+            "back" -> {
+                onBackClick()
+            }
+
+            "视频时间" -> {
+                fileViewModel.fileBeanList.sortByDescending { fileBean -> fileBean.playLong }
+                fileViewModel.getListLocation("null", listState)
+            }
+
+            else -> {
+                appBarOnClick(name)
+            }
         }
     }
 
@@ -300,7 +309,7 @@ fun FileScreen(
     }
 
     val onPathDoubleClick: () -> Unit = {
-        fileViewModel.getListLocation("null")
+        fileViewModel.getListLocation("null", listState)
     }
 
     val onPathLongClick: () -> Unit = {

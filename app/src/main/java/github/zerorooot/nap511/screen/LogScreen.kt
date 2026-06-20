@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.LocalDrawerState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.BufferedInputStream
@@ -53,6 +54,8 @@ fun LogScreen() {
     val verticalScrollState = rememberScrollState()
     val horizontalScrollState = rememberScrollState()
     val coroutine = rememberCoroutineScope()
+    val drawerState = LocalDrawerState.current
+
     val appBarOnClick = { name: String ->
         when (name) {
             "滚动顶部" -> {
@@ -79,7 +82,7 @@ fun LogScreen() {
                 writeToPublicExternalStorage(App.instance, "log.txt", log.value)
             }
 
-            "ModalNavigationDrawerMenu" -> App.instance.openDrawerState()
+            "ModalNavigationDrawerMenu" -> coroutine.launch { drawerState.open() }
             else -> {}
         }
     }

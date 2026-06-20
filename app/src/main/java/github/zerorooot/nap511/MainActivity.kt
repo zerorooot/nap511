@@ -32,7 +32,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,8 +48,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.concurrent.futures.await
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.work.Data
@@ -84,6 +82,7 @@ import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.LocalDrawerState
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
@@ -137,10 +136,10 @@ class MainActivity : AppCompatActivity() {
         val offlineFileViewModel: OfflineFileViewModel = viewModel(factory = factory)
         val recycleViewModel: RecycleViewModel = viewModel(factory = factory)
 
-        BackHandler(App.selectedItem != ConfigKeyUtil.MY_FILE) {
-            App.selectedItem = ConfigKeyUtil.MY_FILE
-            if (!App.gesturesEnabled) {
-                App.gesturesEnabled = true
+        BackHandler(fileViewModel.selectedItem != ConfigKeyUtil.MY_FILE) {
+            fileViewModel.selectedItem = ConfigKeyUtil.MY_FILE
+            if (!fileViewModel.gesturesEnabled) {
+                fileViewModel.gesturesEnabled = true
             }
         }
 
@@ -159,18 +158,18 @@ class MainActivity : AppCompatActivity() {
      */
     private fun handleIntent(intent: Intent): Boolean {
         var isHandle = false
+        val fileViewModel: FileViewModel by viewModels()
 
         when (intent.action) {
             //直接添加磁力，但提示请验证账号;跳转到验证账号界面
             "check" -> {
-                App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
+                fileViewModel.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
                 XLog.d("handleIntent check $intent")
                 intent.action = ""
                 isHandle = true
             }
             //跳转到默认下载目录
             "jump" -> {
-                val fileViewModel: FileViewModel by viewModels()
                 val cid = intent.getStringExtra("cid") ?: DataStoreUtil.getData(
                     ConfigKeyUtil.DEFAULT_OFFLINE_CID,
                     "0"
@@ -262,8 +261,7 @@ class MainActivity : AppCompatActivity() {
     ) {
         val drawerState = rememberDrawerState(DrawerValue.Closed)
         val scope = rememberCoroutineScope()
-        App.drawerState = drawerState
-        App.scope = scope
+
         val itemMap = linkedMapOf(
             R.drawable.baseline_login_24 to ConfigKeyUtil.LOGIN,
             R.drawable.baseline_cloud_24 to ConfigKeyUtil.MY_FILE,
@@ -277,76 +275,79 @@ class MainActivity : AppCompatActivity() {
             itemMap[R.drawable.baseline_log_24] = ConfigKeyUtil.LOG_SCREEN
         }
         itemMap[R.drawable.android_exit] = ConfigKeyUtil.EXIT_APPLICATION
-        ModalNavigationDrawer(
-            gesturesEnabled = App.gesturesEnabled,
-            drawerState = drawerState,
-            drawerContent = {
-                ModalDrawerSheet {
-                    Spacer(Modifier.height(6.dp))
-                    //头像
-                    Avatar()
-                    //菜单栏
-                    Spacer(Modifier.height(6.dp))
-                    itemMap.forEach { (t, u) ->
-                        NavigationDrawerItem(
-                            icon = {
-                                Icon(
-                                    painterResource(t), contentDescription = u
-                                )
-                            },
-                            label = { Text(u) },
-                            selected = u == App.selectedItem,
-                            onClick = {
-                                App.gesturesEnabled = true
-                                scope.launch { drawerState.close() }
-                                App.selectedItem = u
-                            },
-                            modifier = Modifier
-                                .padding(NavigationDrawerItemDefaults.ItemPadding)
-                        )
-                    }
-                }
-            },
-            content = {
-                when (App.selectedItem) {
-                    ConfigKeyUtil.LOGIN -> Login()
-                    ConfigKeyUtil.MY_FILE -> MyFileScreen(fileViewModel)
-                    ConfigKeyUtil.OFFLINE_DOWNLOAD -> OfflineDownloadScreen(
-                        offlineFileViewModel,
-                        fileViewModel
-                    )
 
-                    ConfigKeyUtil.OFFLINE_LIST -> OfflineFileScreen(
-                        offlineFileViewModel,
-                        fileViewModel
-                    )
-
-                    ConfigKeyUtil.WEB -> WebViewScreen()
-                    ConfigKeyUtil.RECYCLE_BIN -> RecycleScreen(recycleViewModel)
-                    ConfigKeyUtil.ADVANCED_SETTINGS -> {
-                        App.gesturesEnabled = false
-                        SettingScreenNew {
-                            App.gesturesEnabled = true
-                            scope.launch { drawerState.open() }
+        CompositionLocalProvider(LocalDrawerState provides drawerState) {
+            ModalNavigationDrawer(
+                gesturesEnabled = fileViewModel.gesturesEnabled,
+                drawerState = drawerState,
+                drawerContent = {
+                    ModalDrawerSheet {
+                        Spacer(Modifier.height(6.dp))
+                        //头像
+                        Avatar()
+                        //菜单栏
+                        Spacer(Modifier.height(6.dp))
+                        itemMap.forEach { (t, u) ->
+                            NavigationDrawerItem(
+                                icon = {
+                                    Icon(
+                                        painterResource(t), contentDescription = u
+                                    )
+                                },
+                                label = { Text(u) },
+                                selected = u == fileViewModel.selectedItem,
+                                onClick = {
+                                    fileViewModel.gesturesEnabled = true
+                                    scope.launch { drawerState.close() }
+                                    fileViewModel.selectedItem = u
+                                },
+                                modifier = Modifier
+                                    .padding(NavigationDrawerItemDefaults.ItemPadding)
+                            )
                         }
                     }
+                },
+                content = {
+                    when (fileViewModel.selectedItem) {
+                        ConfigKeyUtil.LOGIN -> Login()
+                        ConfigKeyUtil.MY_FILE -> MyFileScreen(fileViewModel)
+                        ConfigKeyUtil.OFFLINE_DOWNLOAD -> OfflineDownloadScreen(
+                            offlineFileViewModel,
+                            fileViewModel
+                        )
 
-                    ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT -> {
-                        CaptchaWebViewScreen()
+                        ConfigKeyUtil.OFFLINE_LIST -> OfflineFileScreen(
+                            offlineFileViewModel,
+                            fileViewModel
+                        )
+
+                        ConfigKeyUtil.WEB -> WebViewScreen()
+                        ConfigKeyUtil.RECYCLE_BIN -> RecycleScreen(recycleViewModel)
+                        ConfigKeyUtil.ADVANCED_SETTINGS -> {
+                            fileViewModel.gesturesEnabled = false
+                            SettingScreenNew {
+                                fileViewModel.gesturesEnabled = true
+                                scope.launch { drawerState.open() }
+                            }
+                        }
+
+                        ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT -> {
+                            CaptchaWebViewScreen()
+                        }
+
+                        ConfigKeyUtil.VERIFY_VIDEO_ACCOUNT -> {
+                            CaptchaVideoWebViewScreen()
+                        }
+
+                        ConfigKeyUtil.LOG_SCREEN -> LogScreen()
+                        ConfigKeyUtil.EXIT_APPLICATION -> ExitApp()
+
+                        ConfigKeyUtil.PHOTO -> {
+                            MyPhotoScreen(fileViewModel)
+                        }
                     }
-
-                    ConfigKeyUtil.VERIFY_VIDEO_ACCOUNT -> {
-                        CaptchaVideoWebViewScreen()
-                    }
-
-                    ConfigKeyUtil.LOG_SCREEN -> LogScreen()
-                    ConfigKeyUtil.EXIT_APPLICATION -> ExitApp()
-
-                    ConfigKeyUtil.PHOTO -> {
-                        MyPhotoScreen(fileViewModel)
-                    }
-                }
-            })
+                })
+        }
     }
 
     /**
@@ -486,9 +487,7 @@ class MainActivity : AppCompatActivity() {
             "文件排序" -> fileViewModel.openFileOrderDialog()
             "刷新文件" -> fileViewModel.refresh()
             "视频时间" -> {
-                fileViewModel.fileBeanList.sortByDescending { fileBean -> fileBean.playLong }
-                //滚动到顶部
-                fileViewModel.getListLocation("null")
+                //具体实现在FileScreen#myAppBarOnClick里
             }
         }
     }

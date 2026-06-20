@@ -1,7 +1,6 @@
 package github.zerorooot.nap511.viewmodel
 
 
-import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -12,20 +11,19 @@ import github.zerorooot.nap511.bean.OfflineInfo
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.bean.TorrentFileBean
+import github.zerorooot.nap511.repository.DialogEvent
+import github.zerorooot.nap511.repository.DialogEventRepository
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import github.zerorooot.nap511.repository.DialogEvent
-import github.zerorooot.nap511.repository.DialogEventRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-class OfflineFileViewModel(private val cookie: String) :
-    ViewModel() {
+class OfflineFileViewModel(private val cookie: String) : ViewModel() {
     private val _isRefreshing = MutableStateFlow(false)
     var isRefreshing = _isRefreshing.asStateFlow()
 
@@ -50,7 +48,8 @@ class OfflineFileViewModel(private val cookie: String) :
             dialogEventRepository.events.collect { event ->
                 when (event) {
                     is DialogEvent.OpenOfflineDialog -> isOpenOfflineDialog = true
-                    else -> { /* ignore */ }
+                    else -> { /* ignore */
+                    }
                 }
             }
         }
@@ -112,22 +111,21 @@ class OfflineFileViewModel(private val cookie: String) :
         }
     }
 
-    fun addTorrentTask(infoHash: String, savePath: String, wanted: String) {
+    fun addTorrentTask(
+        infoHash: String, savePath: String, wanted: String, handle: (Boolean) -> Unit
+    ) {
         viewModelScope.launch {
             val sign = fileRepository.getOfflineSign().sign
             val addTorrentTask = fileRepository.addOfflineTorrentTask(
-                infoHash,
-                wanted,
-                savePath,
-                App.uid,
-                sign
+                infoHash, wanted, savePath, App.uid, sign
             )
             val message = if (addTorrentTask.state) {
                 "任务添加成功，文件已保存至 /云下载/${savePath}"
             } else {
                 if (addTorrentTask.errorMsg.contains("请验证账号")) {
                     //打开验证页面
-                    App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
+//                    fv.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
+                    handle.invoke(true)
                 }
                 "任务添加失败，${addTorrentTask.errorMsg}"
             }
@@ -194,9 +192,9 @@ class OfflineFileViewModel(private val cookie: String) :
     sign:xxxxxxx
     time:1675155957
      */
-    fun addTask(list: List<String>, currentCid: String) {
+    fun addTask(list: List<String>, currentCid: String, handle: (Boolean) -> Unit) {
         viewModelScope.launch {
-            fileRepository.addOfflineTask(list, currentCid)
+            fileRepository.addOfflineTask(list, currentCid, handle)
         }
     }
 
