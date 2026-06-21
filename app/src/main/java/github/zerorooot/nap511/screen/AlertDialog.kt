@@ -61,6 +61,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringArrayResource
@@ -108,6 +109,7 @@ import java.nio.charset.Charset
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.system.exitProcess
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun CreateFolderDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
@@ -1235,7 +1237,7 @@ private fun BaseDialog(
         )
     )
     LaunchedEffect(Unit) {
-        delay(10)
+        delay(10.milliseconds)
         focusRequester.requestFocus()
     }
 }

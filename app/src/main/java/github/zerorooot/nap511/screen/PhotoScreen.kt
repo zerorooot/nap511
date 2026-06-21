@@ -16,13 +16,13 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.Surface
-import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -55,7 +55,6 @@ import com.smarttoolfactory.zoom.enhancedZoom
 import com.smarttoolfactory.zoom.rememberEnhancedZoomState
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ImageBean
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.getImage
@@ -64,7 +63,6 @@ import github.zerorooot.nap511.viewmodel.getImage
 fun MyPhotoScreen(
     fileViewModel: FileViewModel,
 ) {
-    var controlsVisible by remember { mutableStateOf(false) }
     val view = LocalView.current
     DisposableEffect(Unit) {
         // 获取 Window 实例（注意：需要确保 context 是 Activity）
@@ -99,7 +97,6 @@ fun MyPhotoScreen(
         onLoadImage = { pageIndex ->
             fileViewModel.getImage(photoList, pageIndex)
         },
-        onToggleControls = { controlsVisible = !controlsVisible },
         onBack = {
             fileViewModel.selectedItem = ConfigKeyUtil.MY_FILE
         })
@@ -115,16 +112,19 @@ private fun ImageBrowserScreen(
     photoList: List<FileBean>,
     imageCache: Map<Int, ImageBean>,
     currentIndex: Int = 0,
-    controlsVisible: Boolean = true,
     // 2. 动作回调传出
     onLoadImage: (pageIndex: Int) -> Unit, // 替换原来的 viewModel.getImage
-    onToggleControls: () -> Unit = {},
     onBack: () -> Unit = {}
 ) {
     val rememberPagerState = rememberPagerState(
         initialPage = currentIndex,
         pageCount = { photoList.size })
 
+    var controlsVisible by remember { mutableStateOf(true) }
+
+    fun onToggleControl() {
+        controlsVisible = !controlsVisible
+    }
 
     Box(
         modifier = Modifier
@@ -142,7 +142,7 @@ private fun ImageBrowserScreen(
             val pageImage = imageCache[page] ?: ImageBean()
             FullScreenImage(
                 image = pageImage,
-                onClick = onToggleControls
+                onClick = ::onToggleControl
             )
         }
 

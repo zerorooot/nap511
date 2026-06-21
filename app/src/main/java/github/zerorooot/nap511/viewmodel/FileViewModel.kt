@@ -71,6 +71,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
 
     //页面导航
     var selectedItem by mutableStateOf(ConfigKeyUtil.MY_FILE)
+
     //页面手势
     var gesturesEnabled by mutableStateOf(true)
 
@@ -258,17 +259,12 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         clickMap[currentPath] = index
     }
 
-    fun getListLocation(path: String, listState: LazyListState) {
-        viewModelScope.launch {
-            val locationBean = currentLocation[path] ?: run {
-                LocationBean(0, 0)
-            }
-//            Thread.sleep(100)
-            listState.scrollToItem(
-                locationBean.firstVisibleItemIndex, locationBean.firstVisibleItemScrollOffset
-            )
+    fun getListLocation(path: String): LocationBean {
+        return currentLocation[path] ?: run {
+            LocationBean(0, 0)
         }
     }
+
 
     fun updateFileCache(cid: String) {
         viewModelScope.launch {
