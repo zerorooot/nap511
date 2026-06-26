@@ -124,7 +124,8 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
         infoHash: String, savePath: String, wanted: String, handle: (Boolean) -> Unit
     ) {
         viewModelScope.launch {
-            val sign = fileRepository.getOfflineSign().sign
+            val offlineSign = fileRepository.getOfflineSign()
+            val sign = offlineSign.sign
             val addTorrentTask = fileRepository.addOfflineTorrentTask(
                 infoHash, wanted, savePath, App.uid, sign
             )

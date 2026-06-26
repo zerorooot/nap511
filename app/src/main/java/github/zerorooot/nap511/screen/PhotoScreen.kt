@@ -49,6 +49,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
+import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Scale
 import com.smarttoolfactory.zoom.enhancedZoom
@@ -120,7 +121,7 @@ private fun ImageBrowserScreen(
         initialPage = currentIndex,
         pageCount = { photoList.size })
 
-    var controlsVisible by remember { mutableStateOf(true) }
+    var controlsVisible by remember { mutableStateOf(false) }
 
     fun onToggleControl() {
         controlsVisible = !controlsVisible
@@ -247,6 +248,11 @@ private fun FullScreenImage(image: ImageBean, onClick: () -> Unit) {
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current).data(image.url)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .networkCachePolicy(CachePolicy.ENABLED)
+                .memoryCacheKey(image.pickCode)
+                .diskCacheKey(image.pickCode)
                 .crossfade(true).scale(Scale.FIT).build(),
             contentDescription = null,
             contentScale = ContentScale.Fit,

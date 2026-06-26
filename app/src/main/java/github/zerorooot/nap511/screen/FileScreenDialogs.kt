@@ -48,6 +48,7 @@ fun CreateDialogs(
     FileInfoDialog(fileViewModel, { fileViewModel.closeFileInfoDialog() }) {
         if (fileViewModel.isSearchState) {
             fileViewModel.isSearchState = false
+            fileViewModel.recoverFromLongPress()
         }
         fileViewModel.getFiles(it)
         fileViewModel.closeFileInfoDialog()

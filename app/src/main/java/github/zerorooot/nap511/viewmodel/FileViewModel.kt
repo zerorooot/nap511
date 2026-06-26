@@ -459,6 +459,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     }
 
     internal fun refresh(cid: String) {
+        isSearchState = false
         recoverFromLongPress()
         fileListCache.remove(cid)
         // XLog.d("fileViewModel.refresh cid $cid, currentCid $currentCid")
@@ -606,6 +607,10 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
 
     fun openUnzipPasswordDialog() {
         viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenUnzipPasswordDialog) }
+    }
+
+    fun openTextBodyDialog() {
+        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenTextBodyDialog) }
     }
 
     // ==================== 关闭方法（直接在本地设 false） ====================

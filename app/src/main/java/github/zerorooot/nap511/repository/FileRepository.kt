@@ -73,7 +73,7 @@ class FileRepository(private val cookie: String) {
         wanted: String = "",
         savePath: String = "",
         uid: String = "",
-        sign: String = "",
+        sign: String,
     ): BaseReturnMessage {
         return offlineService.addTorrentTask(infoHash, wanted, savePath, uid, sign)
     }

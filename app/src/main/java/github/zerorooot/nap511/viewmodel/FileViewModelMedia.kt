@@ -75,7 +75,8 @@ internal fun FileViewModel.downloadText(fileBean: FileBean) {
             textFileCache[fileBean] = bytes
         }
         textBodyByteArray = bytes
-        isOpenTextBodyDialog = true
+//        isOpenTextBodyDialog = true
+        openTextBodyDialog()
         setRefreshingStatus(false)
     }
 }

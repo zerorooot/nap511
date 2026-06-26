@@ -129,7 +129,6 @@ fun FileScreen(
     }
 
     fun handleFolderClick(i: Int, fileBean: FileBean) {
-//        fileViewModel.setListLocationAndClickCache(i)
         if (DataStoreUtil.getData(ConfigKeyUtil.EARLY_LOADING, false)) {
             val before = i - 1
             val after = i + 1
@@ -272,7 +271,7 @@ fun FileScreen(
         if (path != "/根目录" && !fileViewModel.isLongClickState) {
             fileViewModel.setListLocation(path, listState)
         }
-        //触发路径和数据源的改变，重组后交由上方的 LaunchedEffect 处理滚动
+        //触发路径和数据源的改变，重组后交由上方滚动
         fileViewModel.back()
     }
 

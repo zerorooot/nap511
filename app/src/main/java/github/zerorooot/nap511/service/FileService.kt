@@ -108,7 +108,7 @@ interface FileService {
         @Query("search_value") searchValue: String,
         @Query("aid") aid: Int = 1,
         @Query("offset") asc: Int = 0,
-        @Query("limit") limit: Int = App.requestLimitCount
+        @Query("limit") limit: Int = 999
     ): FilesBean
 
 
