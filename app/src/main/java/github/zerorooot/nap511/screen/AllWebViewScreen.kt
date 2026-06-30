@@ -207,6 +207,8 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
         ): WebResourceResponse? {
             var cookie: String? = null
             val urlList = arrayOf(
+                "https://115.com/storage/netdisk",
+                "https://115.com/storage/allfiles",
                 "https://115.com/storage/netdisk?cid=0&mode=wangpan",
                 "https://115.com/?cid=0&offset=0&mode=wangpan",
                 "https://my.115.com/?ct=guide&ac=status"

@@ -35,7 +35,7 @@ internal fun FileViewModel.removeFile() {
     //提前保存cid,防止进入其他文件夹后刷新当前目录
     val tempCid = currentCid
     isCutState = false
-    viewModelScope.launch {
+    viewModelScope.launch(exceptionHandler) {
         val hashMapOf = hashMapOf<String, String>()
         hashMapOf["pid"] = currentCid
         cutFileList.forEachIndexed { index, fileBean ->
@@ -96,7 +96,7 @@ internal fun FileViewModel.getFileInfo(index: Int) {
 
 internal fun FileViewModel.delete(index: Int) {
     val fileBean = fileBeanList[index]
-    viewModelScope.launch {
+    viewModelScope.launch(exceptionHandler) {
         val beforeList = fileBeanList
         val beforeFileListCache = fileListCache[currentCid]
         val beforeClickMap = clickMap.getOrDefault(currentCid, 0)
@@ -146,7 +146,7 @@ internal fun FileViewModel.delete(index: Int) {
 }
 
 internal fun FileViewModel.rename(name: String) {
-    viewModelScope.launch {
+    viewModelScope.launch(exceptionHandler) {
         val cid = currentCid
         val fileBean = fileBeanList[selectIndex]
         val beforeList = fileBeanList
@@ -168,7 +168,7 @@ internal fun FileViewModel.rename(name: String) {
 }
 
 internal fun FileViewModel.deleteMultiple() {
-    viewModelScope.launch {
+    viewModelScope.launch(exceptionHandler) {
         val cid = currentCid
         val beforeList = fileBeanList
         val beforeFileListCache = fileListCache[cid]

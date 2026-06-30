@@ -34,7 +34,9 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -104,21 +106,23 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     var isOpenCreateSelectTorrentFileDialog by mutableStateOf(false)
         internal set
 
-    init {
-        // 定义全局异常处理器处理，防止
-        val exceptionHandler = CoroutineExceptionHandler { coroutineContext, throwable ->
-            when (throwable) {
-                is retrofit2.HttpException -> {
-                    App.instance.toast("HTTP请求错误: ${throwable.code()}，请重试")
-                    setRefreshingStatus(false)
-                }
+    // 定义全局异常处理器处理，防止
+    val exceptionHandler = CoroutineExceptionHandler { coroutineContext, throwable ->
+        when (throwable) {
+            is retrofit2.HttpException -> {
+                App.instance.toast("HTTP请求错误: ${throwable.code()}，请重试")
+                setRefreshingStatus(false)
+            }
 
-                else -> {
-                    App.instance.toast("错误: ${throwable.message}")
-                }
+            else -> {
+                App.instance.toast("错误: ${throwable.message}")
+                setRefreshingStatus(false)
             }
         }
-        viewModelScope.launch(exceptionHandler) {
+    }
+
+    init {
+        viewModelScope.launch {
             dialogEventRepository.events.collect { event ->
                 when (event) {
                     is DialogEvent.OpenCreateFolder -> isOpenCreateFolderDialog = true

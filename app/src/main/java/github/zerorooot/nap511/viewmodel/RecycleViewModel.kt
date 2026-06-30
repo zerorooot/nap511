@@ -10,12 +10,12 @@ import androidx.lifecycle.viewModelScope
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
+import github.zerorooot.nap511.repository.DialogEvent
+import github.zerorooot.nap511.repository.DialogEventRepository
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import github.zerorooot.nap511.repository.DialogEvent
-import github.zerorooot.nap511.repository.DialogEventRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -45,11 +45,11 @@ class RecycleViewModel(private val cookie: String) :
             dialogEventRepository.events.collect { event ->
                 when (event) {
                     is DialogEvent.OpenRecyclePasswordDialog -> isOpenRecyclePasswordDialog = true
-                    else -> { /* ignore */ }
+                    else -> { /* ignore */
+                    }
                 }
             }
         }
-        getRecycleFileList()
     }
 
     fun getRecycleFileList() {
@@ -57,16 +57,24 @@ class RecycleViewModel(private val cookie: String) :
             return
         }
         viewModelScope.launch {
-            _isRefreshing.value = true
-            _recycleInfo.value = fileService.recycleList()
-            val recycleBeanList = _recycleInfo.value.recycleBeanList
-            if (recycleBeanList.isNotEmpty()) {
-                setRecycleBean(recycleBeanList)
-                recycleFileList.clear()
-                recycleFileList.addAll(recycleBeanList)
-            }
+            try {
+                _isRefreshing.value = true
+                _recycleInfo.value = fileService.recycleList()
+                val recycleBeanList = _recycleInfo.value.recycleBeanList
+                if (recycleBeanList.isNotEmpty()) {
+                    setRecycleBean(recycleBeanList)
+                    recycleFileList.clear()
+                    recycleFileList.addAll(recycleBeanList)
+                }
 
-            _isRefreshing.value = false
+            } catch (e: NullPointerException) {
+                App.instance.toast("获取文件列表失败，建议更新您的Cookie")
+            } catch (e: Exception) {
+                e.printStackTrace()
+                App.instance.toast("${e.message}，请重试～")
+            } finally {
+                _isRefreshing.value = false
+            }
         }
     }
 
@@ -92,7 +100,7 @@ class RecycleViewModel(private val cookie: String) :
                 DataStoreUtil.putData(ConfigKeyUtil.PASSWORD, "")
                 "删除失败，${revert.errorMsg}"
             }
-           App.instance.toast(message)
+            App.instance.toast(message)
         }
     }
 

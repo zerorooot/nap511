@@ -136,6 +136,10 @@ class MainActivity : AppCompatActivity() {
         val offlineFileViewModel: OfflineFileViewModel = viewModel(factory = factory)
         val recycleViewModel: RecycleViewModel = viewModel(factory = factory)
 
+        LaunchedEffect(Unit) {
+            fileViewModel.loadCacheFile()
+        }
+
         BackHandler(fileViewModel.selectedItem != ConfigKeyUtil.MY_FILE) {
             fileViewModel.selectedItem = ConfigKeyUtil.MY_FILE
             if (!fileViewModel.gesturesEnabled) {
@@ -310,7 +314,7 @@ class MainActivity : AppCompatActivity() {
                 content = {
                     when (fileViewModel.selectedItem) {
                         ConfigKeyUtil.LOGIN -> Login()
-                        ConfigKeyUtil.MY_FILE -> MyFileScreen(fileViewModel)
+                        ConfigKeyUtil.MY_FILE -> FileScreen(appBarClick(fileViewModel))
                         ConfigKeyUtil.OFFLINE_DOWNLOAD -> OfflineDownloadScreen(
                             offlineFileViewModel,
                             fileViewModel
@@ -381,6 +385,8 @@ class MainActivity : AppCompatActivity() {
                         .memoryCachePolicy(CachePolicy.ENABLED)
                         .diskCachePolicy(CachePolicy.ENABLED)
                         .networkCachePolicy(CachePolicy.ENABLED)
+                        .memoryCacheKey(avatarBean.value.userId)
+                        .diskCacheKey(avatarBean.value.userName)
                         .apply(block = fun ImageRequest.Builder.() {
                             scale(coil.size.Scale.FILL)
                             placeholder(R.drawable.avatar)
@@ -456,16 +462,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    @Composable
-    private fun MyFileScreen(
-        fileViewModel: FileViewModel
-    ) {
-        LaunchedEffect(Unit) { fileViewModel.loadCacheFile() }
-
-        FileScreen(
-            appBarClick(fileViewModel),
-        )
-    }
 
     private fun appBarClick(fileViewModel: FileViewModel) = fun(name: String) {
         when (name) {

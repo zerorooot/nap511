@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -36,6 +37,11 @@ fun OfflineFileScreen(
     offlineFileViewModel: OfflineFileViewModel,
     fileViewModel: FileViewModel,
 ) {
+
+    LaunchedEffect(Unit) {
+        offlineFileViewModel.getOfflineFileList()
+    }
+
     val offlineInfo by offlineFileViewModel.offlineInfo.collectAsState()
     val refreshing by offlineFileViewModel.isRefreshing.collectAsState()
     val offlineList by offlineFileViewModel.offlineFile.collectAsState()

@@ -62,9 +62,6 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
         FileRepository.getInstance(cookie)
     }
 
-    init {
-        getOfflineFileList()
-    }
 
     fun getOfflineFileList() {
         if (_offlineFile.value.isNotEmpty()) {

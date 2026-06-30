@@ -7,11 +7,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.screenitem.RecycleCellItem
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.LocalDrawerState
@@ -21,9 +27,14 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun RecycleScreen(recycleViewModel: RecycleViewModel) {
+    LaunchedEffect(Unit) {
+        recycleViewModel.getRecycleFileList()
+    }
+
     var deleteIndex by remember {
         mutableIntStateOf(-1)
     }
+
     val refreshing by recycleViewModel.isRefreshing.collectAsState()
     val recycleFileList = recycleViewModel.recycleFileList
     val drawerState = LocalDrawerState.current
