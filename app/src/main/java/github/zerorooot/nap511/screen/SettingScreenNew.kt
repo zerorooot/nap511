@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FabPosition
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -19,11 +18,10 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.commit
-import androidx.fragment.app.viewModels
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.preference.EditTextPreference
-import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.Preference.SummaryProvider
 import androidx.preference.PreferenceFragmentCompat
@@ -37,6 +35,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.OfflineTaskWorker
+import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -80,6 +79,10 @@ fun SettingScreenNew(topAppBarActionButtonOnClick: () -> Unit) {
 }
 
 class SettingsFragment : PreferenceFragmentCompat() {
+    // 在 Fragment 顶层声明委托
+    private val fileViewModel: FileViewModel by activityViewModels {
+        CookieViewModelFactory(App.cookie, requireActivity().application)
+    }
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         preferenceManager.preferenceDataStore = SettingsDataStore()
         setPreferencesFromResource(R.xml.root_preferences, rootKey)
@@ -89,7 +92,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 screen.getPreference(i).isIconSpaceReserved = false
             }
         }
-        val fileViewModel: FileViewModel by viewModels()
 
         findPreference<Preference>("checkMagnet")?.setOnPreferenceClickListener {
             fileViewModel.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
