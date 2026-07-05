@@ -11,7 +11,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -34,14 +38,14 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.util.UUID
 import kotlin.math.roundToInt
 
 @SuppressLint("MutableCollectionMutableState")
@@ -77,6 +81,15 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     //页面手势
     var gesturesEnabled by mutableStateOf(true)
 
+
+    private val _currentUnzipWorkId = MutableStateFlow<UUID?>(null)
+    private val _unzipWorkerRefreshCid = MutableStateFlow("0")
+
+
+    fun monitorUnzipWorkForRefresh(id: UUID, cid: String) {
+        _currentUnzipWorkId.value = id
+        _unzipWorkerRefreshCid.value = cid
+    }
 
     /**
      * 打开对话框相关（状态下沉到 ViewModel 本地）
@@ -142,6 +155,24 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                     is DialogEvent.OpenRecyclePasswordDialog -> { /* ignore */
                     }
                 }
+            }
+
+            _currentUnzipWorkId.collectLatest { id ->
+                if (id == null) return@collectLatest
+                // 将 WorkManager 的 LiveData 转换为 Flow 进行监听
+                WorkManager.getInstance(context)
+                    .getWorkInfoByIdLiveData(id!!)
+                    .asFlow() // 需要引入 androidx.lifecycle:lifecycle-livedata-ktx
+                    .collect { workInfo ->
+                        if (workInfo?.state == WorkInfo.State.SUCCEEDED ||
+                            workInfo?.state == WorkInfo.State.FAILED
+                        ) {
+                            // 核心：直接在这里调用刷新
+                            refresh(_unzipWorkerRefreshCid.value)
+                            // 完毕后重置，防止重复触发
+                            _currentUnzipWorkId.value = null
+                        }
+                    }
             }
         }
     }
@@ -269,6 +300,23 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         }
     }
 
+    fun startUnzipWorker(request: OneTimeWorkRequest, cid: String) {
+        val workManager = WorkManager.getInstance(context.applicationContext)
+        workManager.enqueue(request)
+        viewModelScope.launch(Dispatchers.IO) {
+            // 将 LiveData 转为 Flow 或者直接观察（这里利用 WorkManager 提供的 LiveData 转换为 Flow）
+            // 注意：需要引入 androidx.lifecycle:lifecycle-livedata-ktx 依赖
+            workManager.getWorkInfoByIdLiveData(request.id)
+                .asFlow() // 将 LiveData 转换为 Flow
+                .collect { workInfo ->
+                    if (workInfo != null) {
+                        if (workInfo.state == WorkInfo.State.SUCCEEDED || workInfo.state == WorkInfo.State.FAILED) {
+                            refresh(cid)
+                        }
+                    }
+                }
+        }
+    }
 
     fun updateFileCache(cid: String) {
         viewModelScope.launch {

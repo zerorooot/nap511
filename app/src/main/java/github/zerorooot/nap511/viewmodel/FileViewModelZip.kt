@@ -40,6 +40,15 @@ internal fun FileViewModel.getZipListFile(
                     // 正常未加密包，不做任何拦截，继续向下执行
                     XLog.d("${fileBean.name} 为普通压缩包，准备直接打开")
                 }
+
+                is ZipStatus.Loading -> {
+                    val message = "正在进行云解压，请稍等...(${status.progress}%)"
+                    XLog.d("${fileBean.name} 要云解压，$message")
+                    App.instance.toast(message)
+                    setRefreshingStatus(false)
+                    return@launch
+                }
+
             }
         }
 
@@ -66,12 +75,13 @@ internal fun FileViewModel.unzipFile(zipBeanList: ZipBeanList) {
 
             val fileBean = fileBeanList[selectIndex]
             val pickCode = fileBean.pickCode
-            val unzipFolderName = fileBean.name.substring(0, fileBean.name.length - 4)
+            val unzipFolderName = fileBean.name.substringBeforeLast(".")
 
             //确定当前目录下是否存在同名文件，如果不存在，则新建一个
             val currentUnzipFolderNameList =
                 fileBeanList.filter { i -> i.isFolder && i.name == unzipFolderName }
             var zipFileCid = refreshCid
+
             if (currentUnzipFolderNameList.isEmpty()) {
                 val createFolderMessage = fileRepository.createFolder(
                     refreshCid, unzipFolderName
@@ -82,6 +92,8 @@ internal fun FileViewModel.unzipFile(zipBeanList: ZipBeanList) {
                 if (createFolderMessage.state) {
                     zipFileCid = createFolderMessage.cid
                 }
+            } else {
+                zipFileCid = currentUnzipFolderNameList[0].categoryId
             }
 
             fileRepository.unzipFile(pickCode, zipFileCid, files, dirs, unzipFolderName)

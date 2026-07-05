@@ -167,11 +167,13 @@ class FileRepository(private val cookie: String) {
      * 根据文件名，创建一个去除后缀的文件夹，如果文件夹存在则返回当前cid,不存在则返回文件夹cid
      */
     suspend fun createFolderAndReturnCid(cid: String, fileName: String): String {
-        val unzipFolderName = fileName.substring(0, fileName.length - 4)
+        val unzipFolderName = fileName.substringBeforeLast(".")
         val createFolderMessage = createFolder(
             cid, unzipFolderName
         )
-        return createFolderMessage.let { if (it.cid == "") cid else it.cid }
+        val returnCid = createFolderMessage.let { if (it.cid == "") cid else it.cid }
+        XLog.d("createFolderAndReturnCid $createFolderMessage  inputCid:$cid returnCid:$returnCid ")
+        return returnCid
     }
 
     suspend fun delete(pid: String, fid: String): BaseReturnMessage {
@@ -243,9 +245,10 @@ class FileRepository(private val cookie: String) {
         fileName: String = "",
         paths: String = "文件"
     ): ZipBeanList {
-        val data =
-            fileService.getZipListFile(pickCode, fileName, paths).getAsJsonObject("data")
-        XLog.d("FileRepository.getZipListFile $data")
+        val zipListFile = fileService.getZipListFile(pickCode, fileName, paths)
+        val data = zipListFile.getAsJsonObject("data")
+        XLog.d("FileRepository.getZipListFile $zipListFile")
+
         val zipBeanList = Gson().fromJson(data, ZipBeanList::class.java)
         val sj = StringJoiner("/")
         data.getAsJsonArray("paths")
@@ -301,8 +304,10 @@ class FileRepository(private val cookie: String) {
     suspend fun checkZipStatus(pickCode: String): ZipStatus {
         return try {
             val json = fileService.getDecryptZipProcess(pickCode)
-            //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
+            //正常无加密压缩包 {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
             //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":0,"progress":0}}}
+            //官网显示正在服务器解压 {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":1,"progress":5}}}
+            //加密压缩包 {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":6,"progress":88}}}
             XLog.d("Get files/push_extract checkZipStatus $json")
 
             // 1. 处理接口返回业务错误（如：暂不支持解压预览20GB以上的压缩包）
@@ -317,32 +322,24 @@ class FileRepository(private val cookie: String) {
             if (dataElement == null || !dataElement.isJsonObject) {
                 return ZipStatus.UnsupportedOrError("数据格式异常")
             }
-
             val extractStatusElement = dataElement.asJsonObject.get("extract_status")
             if (extractStatusElement == null || !extractStatusElement.isJsonObject) {
                 return ZipStatus.UnsupportedOrError("提取状态数据缺失")
             }
-
             val unzipStatusElement = extractStatusElement.asJsonObject.get("unzip_status")
                 ?: return ZipStatus.UnsupportedOrError("无法获取解压状态码")
 
             // 3. 根据状态码返回对应的密封类状态
-            val unzipStatus = unzipStatusElement.asInt
+            var unzipStatus = unzipStatusElement.asInt
             //等于0意味着加密或者非加密文件，非加密文件需要再post push_extract一次
             if (unzipStatus == 0) {
                 val checkEncryptionStatus = fileService.checkEncryptionStatus(pickCode)
                 //非加密文件 {"state":true,"message":"","code":"","data":{"unzip_status":1}}
                 //加密文件 {"state":true,"message":"","code":"","data":{"unzip_status":6}}
-                XLog.d("checkEncryptionStatus $checkEncryptionStatus")
+                XLog.d("checkEncryptionStatus Post files/push_extract pickCode $checkEncryptionStatus")
                 if (checkEncryptionStatus.get("state").asBoolean) {
-                    val unzip_status =
+                    unzipStatus =
                         checkEncryptionStatus.getAsJsonObject("data").get("unzip_status").asInt
-
-                    return if (unzip_status == 1) {
-                        ZipStatus.Normal
-                    } else {
-                        ZipStatus.Encrypted
-                    }
                 } else {
                     val message =
                         if (checkEncryptionStatus.has("message")) checkEncryptionStatus.get("message").asString else "未知错误"
@@ -350,13 +347,12 @@ class FileRepository(private val cookie: String) {
                 }
             }
 
-            //1 is encryption zip file
-            if (unzipStatus != 4) {
-                ZipStatus.Encrypted // 1 等状态代表加密
-            } else {
-                ZipStatus.Normal    // 4 代表正常未加密
+            when (unzipStatus) {
+                1 -> ZipStatus.Loading(extractStatusElement.asJsonObject.get("progress").asInt)
+                4 -> ZipStatus.Normal
+                6 -> ZipStatus.Encrypted
+                else -> ZipStatus.UnsupportedOrError("未知错误，$json")
             }
-
         } catch (e: Exception) {
             // 4. 捕获网络异常、Json语法解析异常等，确保不崩溃
             XLog.e("checkZipStatus 发生异常", e)
@@ -383,7 +379,7 @@ class FileRepository(private val cookie: String) {
         }
 
         //等待解压中
-        for (i in 1..20) {
+        for (i in 1..100) {
             val json = fileService.getDecryptZipProcess(pickCode)
             val process =
                 json.getAsJsonObject("data").getAsJsonObject("extract_status").get("progress").asInt
@@ -391,7 +387,7 @@ class FileRepository(private val cookie: String) {
             if (process == 100) {
                 return true
             }
-            delay(1500.milliseconds)
+            delay(1000.milliseconds)
         }
         return false
     }

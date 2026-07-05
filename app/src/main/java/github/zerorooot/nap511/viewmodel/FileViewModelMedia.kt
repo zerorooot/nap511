@@ -1,18 +1,16 @@
 package github.zerorooot.nap511.viewmodel
 
+import android.content.Intent
 import androidx.lifecycle.viewModelScope
+import com.google.gson.Gson
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.service.Sha1Service
-import android.content.Intent
-import android.content.Context
-import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
-import kotlin.context
 import kotlin.math.roundToInt
 
 /**
@@ -46,7 +44,12 @@ internal fun FileViewModel.updateVideoFileBean(cid: String, index: Int, duration
 
         if (fileBean.isVideo != 1) return@launch
 
-        val playTime = ((duration.toFloat() / fileBean.playLong) * 100).roundToInt()
+        val playTime = if (fileBean.playLong == 0.0) {
+            100
+        } else {
+            ((duration.toFloat() / fileBean.playLong) * 100).roundToInt()
+        }
+
         val createTimeString =
             SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
                 fileBean.createTime.toLong() * 1000

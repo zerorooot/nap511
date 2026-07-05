@@ -35,6 +35,13 @@ internal fun FileViewModel.removeFile() {
     //提前保存cid,防止进入其他文件夹后刷新当前目录
     val tempCid = currentCid
     isCutState = false
+
+    val fileBean = cutFileList[0]
+    val cid = if (fileBean.isFolder) fileBean.parentId else fileBean.categoryId
+    if (cid == currentCid) {
+        App.instance.toast("禁止原地移动～")
+        return
+    }
     viewModelScope.launch(exceptionHandler) {
         val hashMapOf = hashMapOf<String, String>()
         hashMapOf["pid"] = currentCid
@@ -45,8 +52,6 @@ internal fun FileViewModel.removeFile() {
 
         val message = if (move.state) {
             cutFileList.forEach { i -> i.isSelect = false }
-            val fileBean = cutFileList[0]
-            val cid = if (fileBean.isFolder) fileBean.parentId else fileBean.categoryId
             //移除之前目录下剪切的文件
             fileListCache[cid]?.fileBeanList?.removeAll(cutFileList.toSet())
             //移除被剪切文件夹的缓存，防止路径未更改

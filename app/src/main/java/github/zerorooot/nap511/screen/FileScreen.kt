@@ -121,7 +121,7 @@ fun FileScreen(
     }
 
     // ============================================================
-    // Phase 1: Split myItemOnClick into focused handler functions
+    // todo 滑动条时有时消失
     // ============================================================
 
     fun handleMultiSelectClick(i: Int) {

@@ -12,6 +12,9 @@ sealed interface ZipStatus {
     /** 正常未加密的压缩包，可以直接预览 */
     object Normal : ZipStatus
 
+    /** 正在加载中，需等待 */
+    data class Loading(val progress: Int) : ZipStatus
+
     /** 加密压缩包，需要提示用户输入密码 */
     object Encrypted : ZipStatus
 
@@ -173,6 +176,7 @@ data class InfoSection(
     val title: String,
     val items: List<InfoItem>
 )
+
 // 1. 定义专属的 Item 数据类，并给 onClick 赋默认值 {} (空操作)
 data class InfoItem(
     val label: String,

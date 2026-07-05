@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.Data
@@ -20,34 +21,70 @@ import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
+import java.io.File
 import java.util.StringJoiner
 import java.util.stream.Collectors
 
 class UnzipAllFileWorker(
     appContext: Context, workerParams: WorkerParameters
 ) : CoroutineWorker(appContext, workerParams) {
+    private val NOTIFICATION_ID = 1001
+
+    @Volatile
+    private var lastUpdateTime: Long = 0 //用于控制通知更新频率的变量
+    private val UPDATE_INTERVAL = 500L // 500毫秒更新一次，避免频繁刷新导致系统丢弃更新
     private val notificationManager =
         applicationContext.getSystemService(NotificationManager::class.java)
 
     private val fileRepository: FileRepository by lazy {
         FileRepository.getInstance(App.cookie)
     }
-    private val notificationId = 1000
+    private val CHANNEL_ID = "unzip_completion_channel"
+
+    private fun createNotificationChannel() {
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            "文件解压",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "文件在线解压结果"
+            setShowBadge(false) // 进度条不需要应用图标上的小红点
+            enableLights(false)
+            enableVibration(false)
+        }
+        notificationManager.createNotificationChannel(channel)
+    }
 
     override suspend fun doWork(): Result {
+        createNotificationChannel()
         val sj = StringJoiner("\n")
-        val unzipResultList = arrayListOf<Pair<Boolean, String>>()
+//        val unzipResultList = arrayListOf<Pair<Boolean, String>>()
         val listType = object : TypeToken<List<Pair<String, String>>?>() {}.type
-        //todo 为节约资源，仅传入name、pickCode
+        //仅传入name、pickCode
+        val taskFilePath = inputData.getString("listPath") ?: return Result.failure(
+            Data.Builder().putBoolean("state", false).putString("message", "listPath不存在！！")
+                .build()
+        )
+        val file = File(taskFilePath)
+        if (!file.exists()) {
+            return Result.failure(
+                Data.Builder().putBoolean("state", false)
+                    .putString("message", "${file.absolutePath}不存在！！")
+                    .build()
+            )
+        }
+        val jsonString = file.readText()
         val fileBeanList: List<Pair<String, String>> =
-            Gson().fromJson(inputData.getString("list").toString(), listType)
+            Gson().fromJson(jsonString, listType)
+        file.delete()
+
         val cid = inputData.getString("cid").toString()
         val password = inputData.getString("pwd")
-        XLog.d("UnzipAllFileWorker $password $cid $fileBeanList ")
+        XLog.d("UnzipAllFileWorker password:$password  cid: $cid  fileBeanList:$fileBeanList ")
 
         //设置解压时的通知
         val size = fileBeanList.size
-        setForegroundAsync(createForegroundNotification(size))
+        setForegroundAsync(createForegroundInfo("解压中", "正在解压中", 0, size))
 
         fileBeanList.forEachIndexed { i, fileBean ->
             val fileName = fileBean.first
@@ -95,15 +132,20 @@ class UnzipAllFileWorker(
                 unzipState = Pair(false, e.message ?: "未知解析错误")
             }
 
+            val state = unzipState.first
+
             // 记录失败日志
-            if (!unzipState.first) {
+            if (!state) {
                 sj.add(fileBeanList[i].first + " 解压失败！原因：" + unzipState.second)
             }
-            unzipResultList.add(unzipState)
 
             //更新解压进度
-            updateProgressNotification(i, size, unzipState.first, unzipState.second)
-
+            updateNotification(
+                "解压中",
+                i + 1,
+                size,
+                (if (state) "$fileName ${i + 1}/$size" else "$fileName 解压失败！${unzipState.second}")
+            )
         }
 
 
@@ -128,6 +170,23 @@ class UnzipAllFileWorker(
         }
     }
 
+    @Synchronized
+    private fun updateNotification(
+        titleString: String, progress: Int, max: Int, content: String, force: Boolean = false
+    ) {
+        val currentTime = System.currentTimeMillis()
+        // 节流阀逻辑保持不变，这对于性能至关重要
+        if (force || currentTime - lastUpdateTime > UPDATE_INTERVAL) {
+            lastUpdateTime = currentTime
+            XLog.d("updateProgressNotification 已解压: $progress/$max")
+            try {
+                val build = createNotification(titleString, content, progress, max).build()
+                notificationManager.notify(NOTIFICATION_ID, build)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
 
     /**
      * 新建文件夹，解压，如果解压失败，则删除创建的空文件夹
@@ -172,6 +231,10 @@ class UnzipAllFileWorker(
                 }
             }
 
+            is ZipStatus.Loading -> {
+                throw RuntimeException("正在进行云解压，请稍等...(${status.progress}%)")
+            }
+
             is ZipStatus.Normal -> {
                 // 正常包，无需拦截，直接去拿文件列表
             }
@@ -183,27 +246,51 @@ class UnzipAllFileWorker(
     /**
      * 创建前台通知
      */
-    private fun createForegroundNotification(max: Int): ForegroundInfo {
-        val channel = NotificationChannel(
-            "unzip_file_channel",
-            "文件在线解压进度",
-            NotificationManager.IMPORTANCE_HIGH
-        )
-        notificationManager.createNotificationChannel(channel)
+    private fun createNotification(
+        titleString: String, detailedText: String, progress: Int, max: Int
+    ): NotificationCompat.Builder {
+        val notificationBuilder =
+            NotificationCompat.Builder(applicationContext, CHANNEL_ID)
+                .setContentTitle(titleString)
+                .setContentText(detailedText) // 具体内容
+                .setAutoCancel(false)
+                .setSmallIcon(R.drawable.ic_launcher_foreground).setOnlyAlertOnce(true)
+                // [修改] 明确设置为进度类型，这有助于系统正确渲染进度条样式 CATEGORY_SERVICE CATEGORY_PROGRESS
+                .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+                .setStyle(
+                    NotificationCompat.ProgressStyle()
+                        .setProgress(((progress.toFloat() / max) * 100).toInt())
+                        //true=流动条纹, false=具体百分比
+                        .setProgressIndeterminate(progress == 0)
+                )
+                .setPriority(NotificationCompat.PRIORITY_MAX)
 
-        val notification = NotificationCompat.Builder(applicationContext, "unzip_file_channel")
-            .setContentTitle("文件解压中...")
-            .setContentText("已解压: 1/$max")
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setProgress(max, 0, false)
-            .setOngoing(true)
-            .build()
 
-        return ForegroundInfo(
-            notificationId,
-            notification,
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-        )
+        // [新增] 尝试适配 Android 16 (Baklava) 的新特性
+        // 注意：目前 SDK 可能还需要预览版支持，这里是一个兼容性写法的示例
+        if (Build.VERSION.SDK_INT >= 35) { // 35+ 或 Build.VERSION_CODES.BAKLAVA
+            // 这一行让系统知道这是一个高优先级的持续任务（胶囊样式）
+            notificationBuilder.setOngoing(true)
+            notificationBuilder.setRequestPromotedOngoing(true)
+        }
+
+        // 适配 Android 12+ 立即显示
+        notificationBuilder.setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+        return notificationBuilder
+    }
+
+    private fun createForegroundInfo(
+        titleString: String, detailedText: String, progress: Int, max: Int
+    ): ForegroundInfo {
+        val build = createNotification(titleString, detailedText, progress, max).build()
+        // Android 14 前台服务类型适配
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            return ForegroundInfo(
+                NOTIFICATION_ID, build, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        }
+
+        return ForegroundInfo(NOTIFICATION_ID, build)
     }
 
     /**
@@ -236,48 +323,27 @@ class UnzipAllFileWorker(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification =
+        val notificationBuilder =
             NotificationCompat.Builder(applicationContext, "unzip_completion_channel")
                 .setContentTitle(if (success) "解压完成" else "部分文件解压失败")
                 .setContentText(message)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(false)
-                .build()
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+        // [新增] 尝试适配 Android 16 (Baklava) 的新特性
+        // 注意：目前 SDK 可能还需要预览版支持，这里是一个兼容性写法的示例
+        if (Build.VERSION.SDK_INT >= 35) { // 35+ 或 Build.VERSION_CODES.BAKLAVA
+            // 这一行让系统知道这是一个高优先级的持续任务（胶囊样式）
+            notificationBuilder.setOngoing(true)
+            notificationBuilder.setRequestPromotedOngoing(true)
+        }
 
         notificationManager.notify(
             System.currentTimeMillis().toInt(),
-            notification
+            notificationBuilder.build()
         )
     }
 
-    /**
-     * 更新通知的进度条
-     */
-    private fun updateProgressNotification(
-        progress: Int,
-        max: Int,
-        state: Boolean,
-        message: String
-    ) {
-        val channel = NotificationChannel(
-            "unzip_file_channel",
-            "文件在线解压进度",
-            NotificationManager.IMPORTANCE_HIGH
-        )
-        notificationManager.createNotificationChannel(channel)
 
-        val notification = NotificationCompat.Builder(applicationContext, "unzip_file_channel")
-            .setContentTitle("文件解压中...")
-            .setContentText(if (state) "已解压: ${progress + 1}/$max" else "解压失败！$message")
-            .setProgress(max, progress, false)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setOngoing(true) // 不能滑动取消
-            .build()
-        XLog.d("updateProgressNotification 已解压: $progress/$max")
-        notificationManager.notify(
-            notificationId,
-            notification
-        )
-    }
 }

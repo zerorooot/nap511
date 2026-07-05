@@ -78,7 +78,6 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequest
-import androidx.work.WorkManager
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.JsonObject
@@ -104,6 +103,7 @@ import github.zerorooot.nap511.viewmodel.decryptZip
 import github.zerorooot.nap511.viewmodel.getZipListFile
 import github.zerorooot.nap511.viewmodel.unzipFile
 import kotlinx.coroutines.delay
+import java.io.File
 import java.nio.charset.Charset
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -546,31 +546,39 @@ fun UnzipDialog(fileViewModel: FileViewModel) {
 fun UnzipAllFile(
     fileViewModel: FileViewModel
 ) {
+
     if (fileViewModel.isOpenUnzipAllFileDialog) {
         BaseDialog("请输入解压密码", "如无加密，为空即可") {
+            val currentCid = fileViewModel.currentCid
+
             fileViewModel.closeUnzipAllFileDialog()
             App.instance.toast("后台解压中......")
+
             val dataBuilder: Data.Builder = Data.Builder()
             val filter =
                 fileViewModel.fileBeanList.filter { i -> i.isSelect && i.fileIco == R.drawable.zip }
                     .map { a -> Pair(a.name, a.pickCode) }.toList()
             val listType = object : TypeToken<List<Pair<String, String>>?>() {}.type
-            val list = Gson().toJson(filter, listType)
+            val listJson = Gson().toJson(filter, listType)
             if (it != "") {
                 dataBuilder.putString("pwd", it)
             }
-            dataBuilder.putString("list", list)
-            dataBuilder.putString("cid", fileViewModel.currentCid)
+            //防止输入太多导致崩溃
+            val cacheFile =
+                File(App.instance.cacheDir, "unzip_tasks_${System.currentTimeMillis()}.json")
+            cacheFile.writeText(listJson)
+            dataBuilder.putString("listPath", cacheFile.absolutePath)
+            dataBuilder.putString("cid", currentCid)
 
 
             val request: OneTimeWorkRequest =
                 OneTimeWorkRequest.Builder(UnzipAllFileWorker::class.java)
                     .addTag("UnzipAllFileWorker").setInputData(dataBuilder.build()).build()
-            val workManager = WorkManager.getInstance(App.instance.applicationContext)
-            workManager.enqueue(request)
 
+            fileViewModel.startUnzipWorker(request, currentCid)
             fileViewModel.recoverFromLongPress()
             fileViewModel.unSelect()
+            fileViewModel.saveFileCache()
         }
     }
 }

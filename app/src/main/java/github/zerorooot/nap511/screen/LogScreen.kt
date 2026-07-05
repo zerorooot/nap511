@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import com.elvishew.xlog.XLog
+import github.zerorooot.nap511.R
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.LocalDrawerState
@@ -31,6 +32,9 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
 import java.io.InputStream
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun LogScreen() {
@@ -55,6 +59,7 @@ fun LogScreen() {
     val horizontalScrollState = rememberScrollState()
     val coroutine = rememberCoroutineScope()
     val drawerState = LocalDrawerState.current
+    val formatter = DateTimeFormatter.ofPattern("yyyy_MM_dd HH_mm_ss")
 
     val appBarOnClick = { name: String ->
         when (name) {
@@ -79,7 +84,11 @@ fun LogScreen() {
             }
 
             "导出日志" -> {
-                writeToPublicExternalStorage(App.instance, "log.txt", log.value)
+                writeToPublicExternalStorage(
+                    App.instance,
+                    "${App.instance.getStringRes(R.string.app_name)}_${LocalDateTime.now().format(formatter)}_log.txt",
+                    log.value
+                )
             }
 
             "ModalNavigationDrawerMenu" -> coroutine.launch { drawerState.open() }
@@ -106,7 +115,7 @@ fun LogScreen() {
 
 
     LaunchedEffect(Unit) {
-        delay(10)
+        delay(10.milliseconds)
         verticalScrollState.animateScrollTo(verticalScrollState.maxValue)
     }
 

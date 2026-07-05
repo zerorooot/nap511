@@ -198,9 +198,14 @@ class MainActivity : AppCompatActivity() {
 
             "unzipError" -> {
                 val message = intent.getStringExtra("message")
+                val clipboard = ContextCompat.getSystemService(this, ClipboardManager::class.java)
+                val clip = ClipData.newPlainText("unzipError", message)
+                clipboard?.setPrimaryClip(clip)
                 XLog.d("handleIntent unzipError $intent $message")
+                App.instance.toast("解压失败信息已复制到剪切板!")
                 intent.action = ""
                 isHandle = true
+
             }
         }
         return isHandle
