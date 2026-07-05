@@ -77,7 +77,11 @@ internal fun FileViewModel.unzipFile(zipBeanList: ZipBeanList) {
                     refreshCid, unzipFolderName
                 )
                 XLog.d("fileViewModel.unzipFile $createFolderMessage")
-                zipFileCid = createFolderMessage.cid
+                //(state=false, error=该目录名称已存在。, errno=20004, aid=0, cid=, cname=, fileId=, fileName=)
+                //(state=true, error=, errno=, aid=1, cid=123123132131321, cname=cname, fileId=1231232131232, fileName=fileName)
+                if (createFolderMessage.state) {
+                    zipFileCid = createFolderMessage.cid
+                }
             }
 
             fileRepository.unzipFile(pickCode, zipFileCid, files, dirs, unzipFolderName)

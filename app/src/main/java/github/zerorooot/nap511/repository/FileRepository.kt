@@ -30,6 +30,7 @@ import java.util.Locale
 import java.util.StringJoiner
 import kotlin.math.log10
 import kotlin.math.pow
+import kotlin.time.Duration.Companion.milliseconds
 
 class FileRepository(private val cookie: String) {
     companion object {
@@ -109,7 +110,7 @@ class FileRepository(private val cookie: String) {
         } else {
             if (addTask.errorMsg.contains("请验证账号")) {
                 handle.invoke(true)
-             //   App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
+                //   App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
             }
             //把失败的离线链接保存起来
             val currentOfflineTaskList =
@@ -229,7 +230,7 @@ class FileRepository(private val cookie: String) {
                 message = "${unzipFolderName}后台解压完成～"
                 break
             }
-            delay(1500)
+            delay(3000.milliseconds)
         }
         if (showToast) {
             App.instance.toast(message)
@@ -290,29 +291,19 @@ class FileRepository(private val cookie: String) {
     suspend fun decryptZip(pickCode: String, secret: String): Boolean {
         //{"state":true,"message":"","code":"","data":{"unzip_status":4}}
         val json = fileService.decryptZip(pickCode, secret)
-        XLog.d("decryptZip $json")
+        XLog.d("Post files/push_extract decryptZip $json")
         val asInt = json.getAsJsonObject("data").get("unzip_status").asInt
         //4 is success,6 is decrypt error,1 is having been done
         return asInt != 6
     }
 
-    suspend fun isZipFileEncryption(pickCode: String): Boolean {
-        val json = fileService.getDecryptZipProcess(pickCode)
-        //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
-        XLog.d("checkIsEncryptionZip $json")
-        val unzipStatus =
-            json.getAsJsonObject("data").getAsJsonObject("extract_status").get("unzip_status").asInt
-        //{"state":false,"message":"暂不支持解压预览20GB以上的压缩包","code":51002,"data":[]}
-        //1 is encryption zip file
-        return unzipStatus != 4
-    }
 
     suspend fun checkZipStatus(pickCode: String): ZipStatus {
         return try {
             val json = fileService.getDecryptZipProcess(pickCode)
             //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
             //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":0,"progress":0}}}
-            XLog.d("checkZipStatus $json")
+            XLog.d("Get files/push_extract checkZipStatus $json")
 
             // 1. 处理接口返回业务错误（如：暂不支持解压预览20GB以上的压缩包）
             if (json.has("state") && !json.get("state").asBoolean) {
@@ -377,10 +368,11 @@ class FileRepository(private val cookie: String) {
      * {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
      */
     suspend fun tryToExtract(pickCode: String): Boolean {
-        //{"state":true,"message":"","code":"","data":{"unzip_status":1}}
-        val checkDecryptZip = fileService.checkDecryptZip(pickCode)
-        val asInt = checkDecryptZip.getAsJsonObject("data").get("unzip_status").asInt
-        XLog.d("tryToExtract.checkDecryptZip $checkDecryptZip")
+        //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
+        val checkDecryptZip = fileService.getDecryptZipProcess(pickCode)
+        val asInt = checkDecryptZip.getAsJsonObject("data").getAsJsonObject("extract_status")
+            .get("unzip_status").asInt
+        XLog.d("Get files/push_extract tryToExtract.checkDecryptZip $checkDecryptZip")
         //之前解压过，密码在115缓存中
         if (asInt == 1) {
             return true
@@ -399,7 +391,7 @@ class FileRepository(private val cookie: String) {
             if (process == 100) {
                 return true
             }
-            delay(1500)
+            delay(1500.milliseconds)
         }
         return false
     }

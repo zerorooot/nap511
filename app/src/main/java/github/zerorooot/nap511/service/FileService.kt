@@ -238,14 +238,6 @@ interface FileService {
         @Query("pick_code") pickCode: String
     ): JsonObject
 
-    /**
-     * {"state":true,"message":"","code":"","data":{"unzip_status":1}}
-     */
-    @FormUrlEncoded
-    @POST("files/push_extract")
-    suspend fun checkDecryptZip(
-        @Field("pick_code") pickCode: String
-    ): JsonObject
 
     /**
      * map extract_file[] -> xxxx
