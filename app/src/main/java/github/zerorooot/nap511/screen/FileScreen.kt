@@ -404,33 +404,36 @@ fun FileScreen(
                 isRefreshing = refreshing,
                 onRefresh = { fileViewModel.refresh() }
             ) {
-                LazyColumnScrollbar(
-                    state = listState,
-                    settings = ScrollbarSettings.Default.copy(
-                        thumbUnselectedColor = Purple80
-                    )
-                ) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        state = listState
+                //当 path 改变时，强制销毁并重新创建 Scrollbar，让它正确绑定新传入的 listState
+                key(path) {
+                    LazyColumnScrollbar(
+                        state = listState,
+                        settings = ScrollbarSettings.Default.copy(
+                            thumbUnselectedColor = Purple80
+                        )
                     ) {
-                        itemsIndexed(
-                            items = fileBeanList,
-                            key = { _, item -> item.hashCode() }
-                        ) { index, item ->
-                            FileCellItem(
-                                item,
-                                index,
-                                fileViewModel.clickMap.getOrDefault(path, -1),
-                                Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null),
-                                ::myItemOnClick,
-                                itemOnLongClick = ::itemOnLongClick,
-                                onCut = ::onMenuCut,
-                                onDelete = ::onMenuDelete,
-                                onRename = ::onMenuRename,
-                                onFileInfo = ::onMenuFileInfo,
-                                onAria2Download = ::onMenuAria2Download,
-                            )
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            state = listState
+                        ) {
+                            itemsIndexed(
+                                items = fileBeanList,
+                                key = { _, item -> item.hashCode() }
+                            ) { index, item ->
+                                FileCellItem(
+                                    item,
+                                    index,
+                                    fileViewModel.clickMap.getOrDefault(path, -1),
+                                    Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null),
+                                    ::myItemOnClick,
+                                    itemOnLongClick = ::itemOnLongClick,
+                                    onCut = ::onMenuCut,
+                                    onDelete = ::onMenuDelete,
+                                    onRename = ::onMenuRename,
+                                    onFileInfo = ::onMenuFileInfo,
+                                    onAria2Download = ::onMenuAria2Download,
+                                )
+                            }
                         }
                     }
                 }
