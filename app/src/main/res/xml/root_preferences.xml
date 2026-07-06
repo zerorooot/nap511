@@ -4,54 +4,58 @@
     <EditTextPreference
         app:defaultValue="0"
         app:enabled="false"
-        app:key="@string/UID"
+        app:key="uid"
         app:title="用户id" />
 
     <EditTextPreference
         app:defaultValue="cookie"
-        app:key="@string/COOKIE"
+        app:key="cookie"
         app:summary="点击更改"
         app:title="登录Cookie" />
 
     <!--        number-->
     <EditTextPreference
-        app:key="@string/PASSWORD"
+        app:key="password"
         app:summary="清空回收站文件时输入的密码"
         app:title="数字安全密钥" />
 
     <EditTextPreference
-        app:defaultValue="@string/ARIA2_URL_DEFAULT_VALUE"
-        app:key="@string/ARIA2_URL"
-        app:summary="@string/ARIA2_URL_DEFAULT_VALUE"
+        app:defaultValue="http://127.0.0.1:6800/jsonrpc"
+        app:key="aria2Url"
+        app:summary="http://127.0.0.1:6800/jsonrpc"
         app:title="aria2地址" />
 
     <EditTextPreference
         app:defaultValue=""
-        app:key="@string/ARIA2_TOKEN"
+        app:key="aria2Token"
         app:summary="没有留空即可"
         app:title="aria2秘钥" />
 
     <EditTextPreference
         app:defaultValue="200"
-        app:key="@string/REQUEST_LIMIT_COUNT"
+        app:key="requestLimitCount"
         app:summary="200"
         app:title="每次请求文件数" />
 
     <EditTextPreference
         app:defaultValue=""
-        app:key="@string/DEFAULT_OFFLINE_CID"
+        app:key="defaultOfflineCid"
         app:summary="输入文件夹cid,长按目录可复制当前目录cid"
-        app:title="默认离线位置"
-        app:useSimpleSummaryProvider="true" />
+        app:title="默认离线位置" />
 
     <ListPreference
         android:defaultValue="End"
         android:entries="@array/floatingActionButtonPosition"
         android:entryValues="@array/floatingActionButtonPosition"
         android:summary="%s"
-        app:key="@string/FLOATING_ACTION_BUTTON_POSITION"
+        app:key="floatingActionButtonPosition"
         app:title="浮动按钮位置" />
 
+    <EditTextPreference
+        app:defaultValue=""
+        app:key="moveFailFile"
+        app:summary="解压失败后，压缩包将移动至解压目录此名称的文件夹中，留空则不移动"
+        app:title="解压失败存放文件夹" />
 
     <Preference
         app:key="checkVideo"
@@ -65,60 +69,60 @@
 
     <SwitchPreference
         app:defaultValue="false"
-        app:key="@string/LOG_SCREEN"
+        app:key="日志页面"
         app:summary="输出程序中部分关键节点内容，方便调试"
         app:title="日志记录" />
 
     <SwitchPreference
         app:defaultValue="false"
-        app:key="@string/AUTO_ROTATE"
+        app:key="autoRotate"
         app:summary="根据视频横竖自动旋转屏幕"
         app:title="屏幕自动旋转" />
 
     <SwitchPreference
         app:defaultValue="false"
-        app:key="@string/HIDE_LOADING_VIEW"
+        app:key="hideLoadingView"
         app:summary="当视频正在加载时，隐藏加载提示"
         app:title="隐藏视频加载提示" />
 
     <SwitchPreference
         app:defaultValue="false"
-        app:key="@string/EARLY_LOADING"
+        app:key="EarlyLoading"
         app:summary="进入下级目录时，提前加载当前文件夹上下两个文件夹内的文件"
         app:title="提前加载" />
 
     <SwitchPreference
         app:defaultValue="true"
-        app:key="@string/SAVE_REQUEST_CACHE"
+        app:key="SaveRequestCache"
         app:summary="保存请求文件缓存到application.cacheDir/fileListCache.json中，便于提升加载速度"
         app:title="保存请求缓存" />
 
     <SwitchPreference
         app:defaultValue="false"
-        app:key="@string/POSITION_AFTER_AT"
+        app:key="PositionAfterAt"
         app:summary="重命名时，光标定位在@后"
         app:title="光标重定位" />
 
     <SwitchPreference
         app:defaultValue="false"
-        app:key="@string/TORRENT_SORT"
+        app:key="TorrentSort"
         app:summary="种子文件按文件大小从大到小排序"
         app:title="种子排序" />
 
     <!--number-->
     <EditTextPreference
         app:defaultValue="5"
-        app:key="@string/DEFAULT_OFFLINE_TIME"
+        app:key="defaultOfflineTime"
         app:summary="延迟5分钟后统一离线下载"
         app:title="离线任务延迟时间" />
 
     <Preference
-        app:key="@string/CLICK_DOWNLOAD_NOW"
+        app:key="clickDownloadNow"
         app:summary="立刻下载缓存的离线任务"
         app:title="立即下载" />
 
     <EditTextPreference
-        app:key="@string/CURRENT_OFFLINE_TASK"
+        app:key="currentOfflineTask"
         app:summary="当前尚未添加离线任务的链接"
         app:title="离线任务缓存"
         app:useSimpleSummaryProvider="true" />

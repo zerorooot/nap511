@@ -17,10 +17,13 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.MainActivity
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.DataStoreUtil
 import java.io.File
 import java.util.StringJoiner
 import java.util.stream.Collectors
@@ -58,8 +61,9 @@ class UnzipAllFileWorker(
     override suspend fun doWork(): Result {
         createNotificationChannel()
         val sj = StringJoiner("\n")
-//        val unzipResultList = arrayListOf<Pair<Boolean, String>>()
-        val listType = object : TypeToken<List<Pair<String, String>>?>() {}.type
+        val unzipFailList = arrayListOf<FileBean>()
+//        val listType = object : TypeToken<List<Pair<String, String>>?>() {}.type
+        val listType = object : TypeToken<List<FileBean>>() {}.type
         //仅传入name、pickCode
         val taskFilePath = inputData.getString("listPath") ?: return Result.failure(
             Data.Builder().putBoolean("state", false).putString("message", "listPath不存在！！")
@@ -74,7 +78,7 @@ class UnzipAllFileWorker(
             )
         }
         val jsonString = file.readText()
-        val fileBeanList: List<Pair<String, String>> =
+        val fileBeanList: List<FileBean> =
             Gson().fromJson(jsonString, listType)
         file.delete()
 
@@ -87,16 +91,14 @@ class UnzipAllFileWorker(
         setForegroundAsync(createForegroundInfo("解压中", "正在解压中", 0, size))
 
         fileBeanList.forEachIndexed { i, fileBean ->
-            val fileName = fileBean.first
-            val pickCode = fileBean.second
+            val fileName = fileBean.name
+            val pickCode = fileBean.pickCode
             var unzipState: Pair<Boolean, String>
 
             try {
                 var zipListFile = getZipListFile(pickCode)
-
                 //加密的文件
                 if (zipListFile == null) {
-                    //todo 密码错误时的处理
                     if (password != null) {
                         XLog.d("$fileName is encryption zip file password is $password")
                         val decryptZip = fileRepository.decryptZip(pickCode, password)
@@ -136,7 +138,8 @@ class UnzipAllFileWorker(
 
             // 记录失败日志
             if (!state) {
-                sj.add(fileBeanList[i].first + " 解压失败！原因：" + unzipState.second)
+                sj.add("$fileName 解压失败！原因：" + unzipState.second)
+                unzipFailList.add(fileBean)
             }
 
             //更新解压进度
@@ -159,15 +162,44 @@ class UnzipAllFileWorker(
         }
 
         val addTaskData =
-            Data.Builder().putBoolean("state", result).putString("message", message).build()
+            Data.Builder().putBoolean("state", result).putString("message", message)
 
+        XLog.d(message)
         App.instance.toast(message)
 
-        return if (result) {
-            Result.success(addTaskData)
-        } else {
-            Result.failure(addTaskData)
+        //如果MOVE_FAIL_FILE不为空，则移动失败的文件
+        val data = DataStoreUtil.getData(ConfigKeyUtil.MOVE_FAIL_FILE, "")
+        if (unzipFailList.isNotEmpty() && data.isNotEmpty()) {
+            val moveFailFile = moveFailFile(cid, data, unzipFailList)
+            addTaskData.putString("moveResult", moveFailFile)
         }
+
+        return if (result) {
+            Result.success(addTaskData.build())
+        } else {
+            Result.failure(addTaskData.build())
+        }
+    }
+
+    /**
+     * 解压失败的压缩包移动到某文件
+     */
+    private suspend fun moveFailFile(
+        cid: String,
+        folderName: String,
+        unzipFailList: List<FileBean>
+    ): String {
+        val createFolder = fileRepository.createFolder(cid, folderName)
+        if (!createFolder.state) {
+            XLog.d("UnzipAllFileWorker moveFailFile 创建文件失败！ $createFolder")
+            return "创建文件失败！ $createFolder"
+        }
+        val removeFile = fileRepository.removeFile(createFolder.cid, unzipFailList)
+        if (!removeFile.state) {
+            XLog.d("UnzipAllFileWorker moveFailFile 移动文件失败！ $removeFile")
+            return "移动文件失败！ $removeFile"
+        }
+        return "移动成功！"
     }
 
     @Synchronized
@@ -325,7 +357,7 @@ class UnzipAllFileWorker(
 
         val notificationBuilder =
             NotificationCompat.Builder(applicationContext, "unzip_completion_channel")
-                .setContentTitle(if (success) "解压完成" else "部分文件解压失败")
+                .setContentTitle(if (success) "解压完成" else "⚠️解压报错")
                 .setContentText(message)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentIntent(pendingIntent)

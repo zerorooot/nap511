@@ -557,8 +557,8 @@ fun UnzipAllFile(
             val dataBuilder: Data.Builder = Data.Builder()
             val filter =
                 fileViewModel.fileBeanList.filter { i -> i.isSelect && i.fileIco == R.drawable.zip }
-                    .map { a -> Pair(a.name, a.pickCode) }.toList()
-            val listType = object : TypeToken<List<Pair<String, String>>?>() {}.type
+                    .toList()
+            val listType = object : TypeToken<List<FileBean>>() {}.type
             val listJson = Gson().toJson(filter, listType)
             if (it != "") {
                 dataBuilder.putString("pwd", it)
@@ -576,9 +576,8 @@ fun UnzipAllFile(
                     .addTag("UnzipAllFileWorker").setInputData(dataBuilder.build()).build()
 
             fileViewModel.startUnzipWorker(request, currentCid)
-            fileViewModel.recoverFromLongPress()
-            fileViewModel.unSelect()
-            fileViewModel.saveFileCache()
+            //走isLongClickState为true时的判断
+            fileViewModel.back()
         }
     }
 }

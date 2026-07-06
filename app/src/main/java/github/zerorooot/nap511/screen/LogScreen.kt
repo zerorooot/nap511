@@ -59,7 +59,7 @@ fun LogScreen() {
     val horizontalScrollState = rememberScrollState()
     val coroutine = rememberCoroutineScope()
     val drawerState = LocalDrawerState.current
-    val formatter = DateTimeFormatter.ofPattern("yyyy_MM_dd HH_mm_ss")
+    val formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd/HH/mm/ss")
 
     val appBarOnClick = { name: String ->
         when (name) {

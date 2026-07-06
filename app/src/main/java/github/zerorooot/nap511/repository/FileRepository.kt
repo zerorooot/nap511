@@ -6,6 +6,7 @@ import com.google.gson.JsonObject
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.CreateFolderMessage
+import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileInfo
 import github.zerorooot.nap511.bean.OfflineInfo
 import github.zerorooot.nap511.bean.QuotaBean
@@ -157,6 +158,15 @@ class FileRepository(private val cookie: String) {
         pid: String, folderName: String
     ): CreateFolderMessage {
         return fileService.createFolder(pid, folderName)
+    }
+
+    suspend fun removeFile(currentCid: String, removeFileList: List<FileBean>): BaseReturnMessage {
+        val hashMapOf = hashMapOf<String, String>()
+        hashMapOf["pid"] = currentCid
+        removeFileList.forEachIndexed { index, fileBean ->
+            hashMapOf["fid[$index]"] = fileBean.fileId
+        }
+        return fileService.move(hashMapOf)
     }
 
     suspend fun setDownloadPath(cid: String): BaseReturnMessage {

@@ -50,26 +50,4 @@
         <item>End</item>
         <item>EndOverlay</item>
     </array>
-    <!-- ConfigKeyUtil -->
-    <string name="UID">uid</string>
-    <string name="COOKIE">cookie</string>
-    <string name="PASSWORD">password</string>
-    <string name="ARIA2_URL">aria2Url</string>
-    <string name="ARIA2_URL_DEFAULT_VALUE">http://127.0.0.1:6800/jsonrpc</string>
-    <string name="ARIA2_TOKEN">aria2Token</string>
-    <string name="REQUEST_LIMIT_COUNT">requestLimitCount</string>
-    <string name="DEFAULT_OFFLINE_CID">defaultOfflineCid</string>
-    <string name="FLOATING_ACTION_BUTTON_POSITION">floatingActionButtonPosition</string>
-    <string name="LOG_SCREEN">日志页面</string>
-    <string name="AUTO_ROTATE">autoRotate</string>
-    <string name="HIDE_LOADING_VIEW">hideLoadingView</string>
-    <string name="EARLY_LOADING">EarlyLoading</string>
-    <string name="POSITION_AFTER_AT">PositionAfterAt</string>
-    <string name="TORRENT_SORT">TorrentSort</string>
-    <string name="SAVE_REQUEST_CACHE">SaveRequestCache</string>
-    <string name="OFFLINE_METHOD">offlineMethod</string>
-    <string name="DEFAULT_OFFLINE_TIME">defaultOfflineTime</string>
-    <string name="DEFAULT_OFFLINE_COUNT">defaultOfflineCount</string>
-    <string name="CURRENT_OFFLINE_TASK">currentOfflineTask</string>
-    <string name="CLICK_DOWNLOAD_NOW">clickDownloadNow</string>
 </resources>

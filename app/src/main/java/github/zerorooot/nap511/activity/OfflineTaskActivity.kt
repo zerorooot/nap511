@@ -69,12 +69,9 @@ class OfflineTaskActivity : ComponentActivity() {
                         .toMutableSet()
                 //添加所有
                 currentOfflineTaskList.addAll(urlList)
-                //离线任务缓存方式,true为x分钟后统一下载，false为集满后统一下载
-                if (DataStoreUtil.getData(ConfigKeyUtil.OFFLINE_METHOD, true)) {
-                    addOfflineTaskByTime(currentOfflineTaskList.toList())
-                } else {
-                    addOfflineTaskByCount(currentOfflineTaskList.toList())
-                }
+
+                addOfflineTaskByTime(currentOfflineTaskList.toList())
+
             } else {
                 App.instance.toast("仅支持以http、ftp、magnet、ed2k开头的链接")
             }
@@ -122,42 +119,6 @@ class OfflineTaskActivity : ComponentActivity() {
             )
     }
 
-    private fun addOfflineTaskByCount(currentOfflineTaskList: List<String>) {
-        //检查离线任务缓存数
-        val offlineCount = try {
-            DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_COUNT, "5").toInt()
-        } catch (e: Exception) {
-            5
-        }
-        if (currentOfflineTaskList.size >= offlineCount) {
-            App.instance.toast("${currentOfflineTaskList.size} 个链接添加中......")
-            val listType = object : TypeToken<List<String?>?>() {}.type
-            val list = Gson().toJson(currentOfflineTaskList, listType)
-            val data: Data =
-                Data.Builder().putString("cookie", App.cookie).putString("list", list)
-                    .build()
-            val request: OneTimeWorkRequest =
-                OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java)
-                    .addTag(ConfigKeyUtil.OFFLINE_TASK_WORKER).setInputData(data)
-                    .build()
-//            WorkManager.getInstance(applicationContext).enqueue(request)
-            WorkManager.getInstance(applicationContext)
-                .enqueueUniqueWork(
-                    "addOfflineTaskByCount",
-                    ExistingWorkPolicy.APPEND,
-                    request
-                )
-        } else {
-            val stringJoiner = StringJoiner("\n")
-            currentOfflineTaskList.forEach { stringJoiner.add(it) }
-            //写入缓存
-            DataStoreUtil.putData(
-                ConfigKeyUtil.CURRENT_OFFLINE_TASK,
-                stringJoiner.toString()
-            )
-            App.instance.toast("已添加${currentOfflineTaskList.size}个链接到缓存中，剩余${offlineCount - currentOfflineTaskList.size}个")
-        }
-    }
 }
 
 

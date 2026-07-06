@@ -223,7 +223,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     fun back() {
         if (isLongClickState) {
             recoverFromLongPress()
-//            fileBeanList.forEach { i -> i.isSelect = false }
             //触发compose重组
             for (i in fileBeanList.indices) {
                 fileBeanList[i] = fileBeanList[i].copy(isSelect = false)

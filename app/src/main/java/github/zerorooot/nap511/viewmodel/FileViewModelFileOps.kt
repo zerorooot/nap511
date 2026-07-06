@@ -36,20 +36,14 @@ internal fun FileViewModel.removeFile() {
     val tempCid = currentCid
     isCutState = false
 
-    val fileBean = cutFileList[0]
-    val cid = if (fileBean.isFolder) fileBean.parentId else fileBean.categoryId
-    if (cid == currentCid) {
+    val cid = cutFileList[0].let { if (it.isFolder) it.parentId else it.categoryId }
+    if (cid == tempCid) {
         App.instance.toast("禁止原地移动～")
         return
     }
-    viewModelScope.launch(exceptionHandler) {
-        val hashMapOf = hashMapOf<String, String>()
-        hashMapOf["pid"] = currentCid
-        cutFileList.forEachIndexed { index, fileBean ->
-            hashMapOf["fid[$index]"] = fileBean.fileId
-        }
-        val move = fileService.move(hashMapOf)
 
+    viewModelScope.launch(exceptionHandler) {
+        val move = fileRepository.removeFile(tempCid, cutFileList)
         val message = if (move.state) {
             cutFileList.forEach { i -> i.isSelect = false }
             //移除之前目录下剪切的文件

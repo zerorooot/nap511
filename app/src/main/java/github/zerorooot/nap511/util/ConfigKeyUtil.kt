@@ -1,7 +1,5 @@
 package github.zerorooot.nap511.util
 
-import github.zerorooot.nap511.R
-
 
 /**
  * DataStoreUtil中的key
@@ -11,32 +9,32 @@ class ConfigKeyUtil {
         /**
          * aria2秘钥
          */
-        val ARIA2_TOKEN by lazy { App.instance.getStringRes(R.string.ARIA2_TOKEN) }
+        const val ARIA2_TOKEN = "aria2Token"
 
         /**
          * aria2 url地址
          */
-        val ARIA2_URL by lazy { App.instance.getStringRes(R.string.ARIA2_URL) }
+        const val ARIA2_URL = "aria2Url"
 
         /**
          * aria2默认地址
          */
-        val ARIA2_URL_DEFAULT_VALUE by lazy { App.instance.getStringRes(R.string.ARIA2_URL_DEFAULT_VALUE) }
+        const val ARIA2_URL_DEFAULT_VALUE = "http://127.0.0.1:6800/jsonrpc"
 
         /**
          * cookie
          */
-        val COOKIE by lazy { App.instance.getStringRes(R.string.COOKIE) }
+        const val COOKIE = "cookie"
 
         /**
          * user id
          */
-        val UID by lazy { App.instance.getStringRes(R.string.UID) }
+        const val UID = "uid"
 
         /**
          * 回收站密码
          */
-        val PASSWORD by lazy { App.instance.getStringRes(R.string.PASSWORD) }
+        const val PASSWORD = "password"
 
         /**
          * sha1 service中使用，原本有发送到aria2和获取文件sha1两种，但现sha1废了，仅有发送到aria2
@@ -51,7 +49,7 @@ class ConfigKeyUtil {
         /**
          * 在设置中，视频是否自动旋转
          */
-        val AUTO_ROTATE by lazy { App.instance.getStringRes(R.string.AUTO_ROTATE) }
+        const val AUTO_ROTATE = "autoRotate"
 
 
         /**
@@ -63,69 +61,54 @@ class ConfigKeyUtil {
         /**
          * 默认离线位置
          */
-        val DEFAULT_OFFLINE_CID by lazy { App.instance.getStringRes(R.string.DEFAULT_OFFLINE_CID) }
+        const val DEFAULT_OFFLINE_CID = "defaultOfflineCid"
 
         /**
          * 默认请求个数，默认为100，具体在设置中设置
          */
-        val REQUEST_LIMIT_COUNT by lazy { App.instance.getStringRes(R.string.REQUEST_LIMIT_COUNT) }
-
-        /**
-         * 默认离线个数，默认为5，具体在设置中设置
-         */
-        val DEFAULT_OFFLINE_COUNT by lazy { App.instance.getStringRes(R.string.DEFAULT_OFFLINE_COUNT) }
-
+        const val REQUEST_LIMIT_COUNT = "requestLimitCount"
 
         /**
          * 当前缓存的离线任务
          */
-        val CURRENT_OFFLINE_TASK by lazy { App.instance.getStringRes(R.string.CURRENT_OFFLINE_TASK) }
-
-
-        /**
-         * 离线任务缓存方式,true为x分钟后统一下载，false为集满后统一下载，具体在SettingActivity中设置
-         */
-        val OFFLINE_METHOD by lazy { App.instance.getStringRes(R.string.OFFLINE_METHOD) }
-
-
-        /**
-         * 默认离线时间，默认为5分钟，具体在设置中设置
-         */
-        val DEFAULT_OFFLINE_TIME by lazy { App.instance.getStringRes(R.string.DEFAULT_OFFLINE_TIME) }
-
+        const val CURRENT_OFFLINE_TASK = "currentOfflineTask"
 
         /**
          * 当视频正在加载时，隐藏loadingView
          */
-        val HIDE_LOADING_VIEW by lazy { App.instance.getStringRes(R.string.HIDE_LOADING_VIEW) }
+        const val HIDE_LOADING_VIEW = "hideLoadingView"
 
+        const val DEFAULT_OFFLINE_TIME = "defaultOfflineTime"
 
         /**
          * 提前加载上下两个文件夹，具体在设置中设置
          */
-        val EARLY_LOADING by lazy { App.instance.getStringRes(R.string.EARLY_LOADING) }
+        const val EARLY_LOADING = "EarlyLoading"
 
         /**
          *重命名时，光标定位在@后
          */
-        val POSITION_AFTER_AT by lazy { App.instance.getStringRes(R.string.POSITION_AFTER_AT) }
+        const val POSITION_AFTER_AT = "PositionAfterAt"
 
         /**
          * 保存请求缓存
          */
-        val SAVE_REQUEST_CACHE by lazy { App.instance.getStringRes(R.string.SAVE_REQUEST_CACHE) }
+        const val SAVE_REQUEST_CACHE = "SaveRequestCache"
 
         /**
          * 种子文件按文件大小从大到小排序
          */
-        val TORRENT_SORT by lazy { App.instance.getStringRes(R.string.TORRENT_SORT) }
+        const val TORRENT_SORT = "TorrentSort"
 
-
+        /**
+         * 解压失败存放文件夹
+         */
+        const val MOVE_FAIL_FILE = "moveFailFile"
 
         /**
          * 浮动按钮位置
          */
-        val FLOATING_ACTION_BUTTON_POSITION by lazy { App.instance.getStringRes(R.string.FLOATING_ACTION_BUTTON_POSITION) }
+        const val FLOATING_ACTION_BUTTON_POSITION = "floatingActionButtonPosition"
 
         /**
          * 磁力链接验证
@@ -185,12 +168,13 @@ class ConfigKeyUtil {
         /**
          * 日志页面
          */
-        val LOG_SCREEN by lazy { App.instance.getStringRes(R.string.LOG_SCREEN) }
+        const val LOG_SCREEN = "日志页面"
 
         /**
          * 立刻下载
          */
-        val CLICK_DOWNLOAD_NOW by lazy { App.instance.getStringRes(R.string.CLICK_DOWNLOAD_NOW) }
+        const val CLICK_DOWNLOAD_NOW = "clickDownloadNow"
+
         /**
          * 离线task的标签
          */
