@@ -305,7 +305,7 @@ class UnzipAllFileWorker(
         notificationManager.createNotificationChannel(channel)
 
         val intent = Intent(this.applicationContext, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
 
         if (!success) {
@@ -329,7 +329,7 @@ class UnzipAllFileWorker(
                 .setContentText(message)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentIntent(pendingIntent)
-                .setAutoCancel(false)
+                .setAutoCancel(true)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
         // [新增] 尝试适配 Android 16 (Baklava) 的新特性
         // 注意：目前 SDK 可能还需要预览版支持，这里是一个兼容性写法的示例

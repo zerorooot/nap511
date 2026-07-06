@@ -48,6 +48,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.concurrent.futures.await
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.work.Data
@@ -110,16 +111,19 @@ class MainActivity : AppCompatActivity() {
                     }
                     //初始化
                     Init(cookie)
-                    //允许通知， 方便离线下载交互 OfflineTaskActivity
-                    if (!App.instance.isNotificationEnabled(this)) {
-                        App.instance.toast("检测到未开启通知权限，为保证交互效果，建议开启")
-                        App.instance.goToNotificationSetting(this)
-                    }
 
-                    val isHandle = handleIntent(intent)
-                    //仅没处理intent时才检测未上传的磁力链接
-                    if (!isHandle) {
-                        checkOfflineTask(cookie)
+                    LaunchedEffect(Unit) {
+                        //允许通知， 方便离线下载交互 OfflineTaskActivity
+                        if (!App.instance.isNotificationEnabled(this@MainActivity)) {
+                            App.instance.toast("检测到未开启通知权限，为保证交互效果，建议开启")
+                            App.instance.goToNotificationSetting(this@MainActivity)
+                        }
+
+                        val isHandle = handleIntent(intent)
+                        //仅没处理intent时才检测未上传的磁力链接
+                        if (!isHandle) {
+                            checkOfflineTask(cookie)
+                        }
                     }
 
                 }
@@ -162,7 +166,10 @@ class MainActivity : AppCompatActivity() {
      */
     private fun handleIntent(intent: Intent): Boolean {
         var isHandle = false
-        val fileViewModel: FileViewModel by viewModels()
+        // 动态获取 ViewModel 实例
+        val factory = CookieViewModelFactory(App.cookie, application)
+        val fileViewModel = ViewModelProvider(this, factory)[FileViewModel::class.java]
+
 
         when (intent.action) {
             //直接添加磁力，但提示请验证账号;跳转到验证账号界面

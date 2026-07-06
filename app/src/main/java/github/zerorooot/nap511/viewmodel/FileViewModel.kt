@@ -81,16 +81,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     //页面手势
     var gesturesEnabled by mutableStateOf(true)
 
-
-    private val _currentUnzipWorkId = MutableStateFlow<UUID?>(null)
-    private val _unzipWorkerRefreshCid = MutableStateFlow("0")
-
-
-    fun monitorUnzipWorkForRefresh(id: UUID, cid: String) {
-        _currentUnzipWorkId.value = id
-        _unzipWorkerRefreshCid.value = cid
-    }
-
     /**
      * 打开对话框相关（状态下沉到 ViewModel 本地）
      */
@@ -155,24 +145,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                     is DialogEvent.OpenRecyclePasswordDialog -> { /* ignore */
                     }
                 }
-            }
-
-            _currentUnzipWorkId.collectLatest { id ->
-                if (id == null) return@collectLatest
-                // 将 WorkManager 的 LiveData 转换为 Flow 进行监听
-                WorkManager.getInstance(context)
-                    .getWorkInfoByIdLiveData(id!!)
-                    .asFlow() // 需要引入 androidx.lifecycle:lifecycle-livedata-ktx
-                    .collect { workInfo ->
-                        if (workInfo?.state == WorkInfo.State.SUCCEEDED ||
-                            workInfo?.state == WorkInfo.State.FAILED
-                        ) {
-                            // 核心：直接在这里调用刷新
-                            refresh(_unzipWorkerRefreshCid.value)
-                            // 完毕后重置，防止重复触发
-                            _currentUnzipWorkId.value = null
-                        }
-                    }
             }
         }
     }
