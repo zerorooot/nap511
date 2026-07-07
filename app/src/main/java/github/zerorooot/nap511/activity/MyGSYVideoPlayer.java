@@ -40,7 +40,6 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     private TextView batteryTextView;
     private TextView timeTextView;
 
-    private OrientationUtils orientationUtils;
 
     public MyGSYVideoPlayer(Context context) {
         super(context);
@@ -132,81 +131,6 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         setBatteryAndTime();
     }
 
-    protected void touchSurfaceMove(float deltaX, float deltaY, float y) {
-        int curWidth = 0;
-        int curHeight = 0;
-        if (getActivityContext() != null) {
-            curWidth = CommonUtil.getCurrentScreenLand((Activity) getActivityContext()) ? mScreenHeight : mScreenWidth;
-            curHeight = CommonUtil.getCurrentScreenLand((Activity) getActivityContext()) ? mScreenWidth : mScreenHeight;
-        }
-        //竖屏
-        if (orientationUtils.getScreenType() == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT) {
-            curWidth = mScreenHeight;
-            curHeight = mScreenWidth;
-        }
-        if (mChangePosition) {
-            long totalTimeDuration = getDuration();
-            mSeekTimePosition = (int) (mDownPosition + (deltaX * totalTimeDuration / curWidth) / mSeekRatio);
-            if (mSeekTimePosition < 0) {
-                mSeekTimePosition = 0;
-            }
-            if (mSeekTimePosition > totalTimeDuration) mSeekTimePosition = totalTimeDuration;
-            String seekTime = CommonUtil.stringForTime(mSeekTimePosition);
-            String totalTime = CommonUtil.stringForTime(totalTimeDuration);
-            showProgressDialog(deltaX, seekTime, mSeekTimePosition, totalTime, totalTimeDuration);
-        } else if (mChangeVolume) {
-            deltaY = -deltaY;
-            int max = mAudioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-            int deltaV = (int) (max * deltaY * 3 / curHeight);
-            mAudioManager.setStreamVolume(AudioManager.STREAM_MUSIC, mGestureDownVolume + deltaV, 0);
-            int volumePercent = (int) ((mGestureDownVolume * 100 / max + deltaY * 3 * 100 / curHeight) * 0.5);
-
-            showVolumeDialog(-deltaY, volumePercent);
-        } else if (mBrightness) {
-            if (Math.abs(deltaY) > mThreshold) {
-                float percent = (-deltaY / curHeight);
-                onBrightnessSlide(percent);
-                mDownY = y;
-            }
-        }
-    }
-
-    @Override
-    protected void touchSurfaceMoveFullLogic(float absDeltaX, float absDeltaY) {
-        int curWidth = 0;
-        if (getActivityContext() != null) {
-            curWidth = CommonUtil.getCurrentScreenLand((Activity) getActivityContext()) ? mScreenHeight : mScreenWidth;
-        }
-        //竖屏
-        if (orientationUtils.getScreenType() == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT) {
-            curWidth = mScreenHeight;
-        }
-        if (absDeltaX > mThreshold || absDeltaY > mThreshold) {
-            cancelProgressTimer();
-            if (absDeltaX >= mThreshold) {
-                //防止全屏虚拟按键
-                int screenWidth = CommonUtil.getScreenWidth(getContext());
-                if (Math.abs(screenWidth - mDownX) > mSeekEndOffset) {
-                    mChangePosition = true;
-                    mDownPosition = getCurrentPositionWhenPlaying();
-                } else {
-                    mShowVKey = true;
-                }
-            } else {
-                int screenHeight = CommonUtil.getScreenHeight(getContext());
-                boolean noEnd = Math.abs(screenHeight - mDownY) > mSeekEndOffset;
-                if (mFirstTouch) {
-                    mBrightness = (mDownX < curWidth * 0.5f) && noEnd;
-                    mFirstTouch = false;
-                }
-                if (!mBrightness) {
-                    mChangeVolume = noEnd;
-                    mGestureDownVolume = mAudioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-                }
-                mShowVKey = !noEnd;
-            }
-        }
-    }
 
     @Override
     protected void showDragProgressTextOnSeekBar(boolean fromUser, int progress) {
@@ -232,9 +156,6 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         timeTextView.setText(new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date()));
     }
 
-    public void setOrientationUtils(OrientationUtils orientationUtils) {
-        this.orientationUtils = orientationUtils;
-    }
 
     /**
      * 显示比例
@@ -264,33 +185,6 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         if (mTextureView != null) mTextureView.requestLayout();
     }
 
-    @Override
-    public void touchDoubleUp(MotionEvent event) {
-        float x = event.getX();
-        int screenWidth = mScreenWidth;
-
-        //竖屏
-        if (orientationUtils.getScreenType() == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT) {
-            screenWidth = mScreenHeight;
-        }
-
-        if (x <= screenWidth * 0.3) {
-            //快退
-            forwardOrRewind(forwardRewindIncrementMs * (-1));
-        }
-
-        if (x > screenWidth * 0.3 && x < screenWidth * 0.6) {
-            if (!mHadPlay) {
-                return;
-            }
-            clickStartIcon();
-        }
-        if (x >= screenWidth * 0.6) {
-            //快进
-            forwardOrRewind(forwardRewindIncrementMs);
-        }
-
-    }
 
     public void forwardOrRewind(long time) {
         long totalTimeDuration = getDuration();
