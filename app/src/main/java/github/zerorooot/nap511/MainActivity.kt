@@ -9,7 +9,6 @@ import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
@@ -459,7 +458,7 @@ class MainActivity : AppCompatActivity() {
                 isOpenLoginWebView = true
                 return@CookieDialog
             }
-            if (it.isNotBlank()) {
+            if (it != null && it != "") {
                 val replace = it.replace(" ", "").replace("[\r\n]".toRegex(), "");
                 scope.launch(Dispatchers.IO) {
                     val pair = App().checkLogin(replace)

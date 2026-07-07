@@ -13,6 +13,7 @@ import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
+import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -29,6 +30,7 @@ import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.RemainingSpaceBean
+import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.repository.DialogEvent
 import github.zerorooot.nap511.repository.DialogEventRepository
@@ -39,18 +41,17 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
-import java.util.UUID
 import kotlin.math.roundToInt
 
 @SuppressLint("MutableCollectionMutableState")
-class FileViewModel(internal val cookie: String, internal val context: Context) :
-    ViewModel() {
+class FileViewModel(internal val cookie: String, internal val context: Context) : ViewModel() {
     var fileBeanList = mutableStateListOf<FileBean>()
     var unzipBeanList = mutableStateOf(ZipBeanList())
     var remainingSpace by mutableStateOf(RemainingSpaceBean())
@@ -183,6 +184,8 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         FileRepository.getInstance(cookie)
     }
 
+    internal val _launchVideoEvent = MutableSharedFlow<VideoInfoBean>()
+    val launchVideoEvent = _launchVideoEvent.asSharedFlow()
 
     fun loadCacheFile() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -223,10 +226,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     fun back() {
         if (isLongClickState) {
             recoverFromLongPress()
-            //触发compose重组
-            for (i in fileBeanList.indices) {
-                fileBeanList[i] = fileBeanList[i].copy(isSelect = false)
-            }
+            unSelect()
             return
         }
 
@@ -251,8 +251,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
 
     fun setListLocation(path: String, listState: LazyListState) {
         val locationBean = LocationBean(
-            listState.firstVisibleItemIndex,
-            listState.firstVisibleItemScrollOffset
+            listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset
         )
         currentLocation[path] = locationBean
     }
@@ -273,12 +272,13 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
 
     fun startUnzipWorker(request: OneTimeWorkRequest, cid: String) {
         val workManager = WorkManager.getInstance(context.applicationContext)
-        workManager.enqueue(request)
+        workManager.enqueueUniqueWork(
+            "unzipAllFileWorker", ExistingWorkPolicy.APPEND_OR_REPLACE, request
+        )
         viewModelScope.launch(Dispatchers.IO) {
             // 将 LiveData 转为 Flow 或者直接观察（这里利用 WorkManager 提供的 LiveData 转换为 Flow）
             // 注意：需要引入 androidx.lifecycle:lifecycle-livedata-ktx 依赖
-            workManager.getWorkInfoByIdLiveData(request.id)
-                .asFlow() // 将 LiveData 转换为 Flow
+            workManager.getWorkInfoByIdLiveData(request.id).asFlow() // 将 LiveData 转换为 Flow
                 .collect { workInfo ->
                     if (workInfo != null) {
                         if (workInfo.state == WorkInfo.State.SUCCEEDED || workInfo.state == WorkInfo.State.FAILED) {
@@ -532,13 +532,10 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
 //    }
 
     fun selectReverse() {
-        val a = arrayListOf<FileBean>()
-        fileBeanList.forEach { i ->
-            i.isSelect = !i.isSelect
-            a.add(i)
-        }
+        val updatedList = fileBeanList.map { it.copy(isSelect = !it.isSelect) }
         fileBeanList.clear()
-        fileBeanList.addAll(a)
+        fileBeanList.addAll(updatedList)
+
         appBarTitle = fileBeanList.filter { i -> i.isSelect }.size.toString()
     }
 
@@ -549,17 +546,9 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     }
 
     fun unSelect() {
-        val count = arrayListOf<Int>()
-        fileBeanList.forEachIndexed { index, fileBean ->
-            if (fileBean.isSelect) {
-                count.add(index)
-            }
-        }
-
-        count.forEach { i ->
-            val fileBean = fileBeanList[i]
-            fileBeanList[i] = fileBean.copy(isSelect = false)
-        }
+        val updatedList = fileBeanList.map { it.copy(isSelect = false) }
+        fileBeanList.clear()
+        fileBeanList.addAll(updatedList)
     }
 
     private fun setFiles(files: FilesBean) {

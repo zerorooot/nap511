@@ -67,9 +67,15 @@
         app:summary="打开磁力链接添加异常验证页面"
         app:title="磁力链接验证" />
 
+<!--    <SwitchPreference-->
+<!--        app:defaultValue="false"-->
+<!--        app:key="originVideo"-->
+<!--        app:summary="开启后使用 origin_file_url 播放，关闭则使用 m3u8 格式播放"-->
+<!--        app:title="视频播放源切换" />-->
+
     <SwitchPreference
         app:defaultValue="false"
-        app:key="日志页面"
+        app:key="log"
         app:summary="输出程序中部分关键节点内容，方便调试"
         app:title="日志记录" />
 

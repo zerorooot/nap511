@@ -32,14 +32,14 @@ fun CreateDialogs(
 //    val context = LocalContext.current
     //新建文件夹
     CreateFolderDialog(fileViewModel) {
-        if (it != "") {
+        if (it != null && it != "") {
             fileViewModel.createFolder(it)
         }
         fileViewModel.closeCreateFolderDialog()
     }
     //重命名
     RenameFileDialog(fileViewModel) {
-        if (it != "") {
+        if (it != null && it != "") {
             fileViewModel.rename(it)
         }
         fileViewModel.closeRenameFileDialog()
@@ -88,7 +88,7 @@ fun CreateDialogs(
     }
     //搜索
     SearchDialog(fileViewModel) {
-        if (it != "") {
+        if (it != null && it != "") {
             fileViewModel.search(it)
         }
         fileViewModel.closeSearchDialog()

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
@@ -98,7 +99,7 @@
         </activity> <!-- android:screenOrientation="reverseLandscape" -->
         <activity
             android:name=".activity.VideoActivity"
-            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboardHidden"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
             android:screenOrientation="sensorLandscape"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar.FullScreen" />
         <activity

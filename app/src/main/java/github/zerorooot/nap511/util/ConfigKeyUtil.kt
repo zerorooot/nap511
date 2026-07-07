@@ -101,6 +101,16 @@ class ConfigKeyUtil {
         const val TORRENT_SORT = "TorrentSort"
 
         /**
+         * 是否开启日志
+         */
+        const val LOG = "log"
+
+        /**
+         * 是否查看原视频
+         */
+        const val ORIGIN_VIDEO = "originVideo"
+
+        /**
          * 解压失败存放文件夹
          */
         const val MOVE_FAIL_FILE = "moveFailFile"

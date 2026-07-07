@@ -153,7 +153,9 @@ data class VideoInfoBean(
     @SerializedName("sha1") var sha1: String = "",
     @SerializedName("user_def") var userDef: String = "",
     @SerializedName("user_rotate") var userRotate: Int = 0,
-    @SerializedName("user_turn") var userTurn: Int = 0
+    @SerializedName("user_turn") var userTurn: Int = 0,
+    @SerializedName("origin_file_url") var originFileUrl: String = "",
+    var index: Int = -1
 )
 
 data class FileInfo(

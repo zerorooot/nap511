@@ -73,7 +73,7 @@ class App : Application(), ImageLoaderFactory {
         val build = LogConfiguration.Builder().tag("XLOG")
             .addInterceptor(object : AbstractFilterInterceptor() {
                 override fun reject(log: LogItem?): Boolean {
-                    return !DataStoreUtil.getData(ConfigKeyUtil.LOG_SCREEN, true)
+                    return !DataStoreUtil.getData(ConfigKeyUtil.LOG, true)
                 }
             }).build()
         //todo  日志输出代码位置

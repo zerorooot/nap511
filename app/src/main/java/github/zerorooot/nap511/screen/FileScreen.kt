@@ -32,6 +32,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -44,9 +45,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.gson.Gson
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.screenitem.FileCellItem
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
@@ -60,6 +63,7 @@ import github.zerorooot.nap511.viewmodel.cut
 import github.zerorooot.nap511.viewmodel.delete
 import github.zerorooot.nap511.viewmodel.downloadText
 import github.zerorooot.nap511.viewmodel.getFileInfo
+import github.zerorooot.nap511.viewmodel.getVideoInfo
 import github.zerorooot.nap511.viewmodel.getZipListFile
 import github.zerorooot.nap511.viewmodel.removeFile
 import github.zerorooot.nap511.viewmodel.startSendAria2Service
@@ -116,13 +120,21 @@ fun FileScreen(
             val data = result.data
             val index = data?.getIntExtra("fileBeanIndex", -1) ?: -1
             val duration = data?.getIntExtra("current_time", 0) ?: 0
-            fileViewModel.updateVideoFileBean(fileViewModel.currentCid, index, duration)
+            val pickCode = data?.getStringExtra("pickCode") ?: "0"
+            fileViewModel.updateVideoFileBean(fileViewModel.currentCid, index, duration, pickCode)
         }
     }
 
-    // ============================================================
-    // todo 滑动条时有时消失
-    // ============================================================
+    LaunchedEffect(Unit) {
+        fileViewModel.launchVideoEvent.collect { videoDate ->
+            val videoInfoBeanJson = Gson().toJson(videoDate, VideoInfoBean::class.java)
+            val intent = Intent(context, VideoActivity::class.java).apply {
+                putExtra("fileBeanIndex", videoDate.index)
+                putExtra("bean", videoInfoBeanJson)
+            }
+            videoActivityLauncher.launch(intent)
+        }
+    }
 
     fun handleMultiSelectClick(i: Int) {
         fileViewModel.select(i)
@@ -143,13 +155,7 @@ fun FileScreen(
     }
 
     fun handleVideoClick(i: Int, fileBean: FileBean) {
-        val intent = Intent(context, VideoActivity::class.java).apply {
-            putExtra("cookie", App.cookie)
-            putExtra("title", fileBean.name)
-            putExtra("pick_code", fileBean.pickCode)
-            putExtra("fileBeanIndex", i)
-        }
-        videoActivityLauncher.launch(intent)
+        fileViewModel.getVideoInfo(fileBean.pickCode, i)
     }
 
     fun handlePhotoClick(fileBean: FileBean) {

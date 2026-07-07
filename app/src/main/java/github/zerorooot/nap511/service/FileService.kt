@@ -8,6 +8,7 @@ import github.zerorooot.nap511.bean.FileInfo
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.ImageDate
 import github.zerorooot.nap511.bean.RecycleInfo
+import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.util.App
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -101,6 +102,20 @@ interface FileService {
 
     @GET("files/image")
     suspend fun image(@Query("pickcode") pickCode: String, @Query("_") current: Long): ImageDate
+
+    @GET("files/video")
+    suspend fun video(@Query("pickcode") pickCode: String): VideoInfoBean
+
+    @FormUrlEncoded
+    @POST("files/history")
+    /**
+    builder.add("op", "update")
+    builder.add("pick_code", intent.getStringExtra("pick_code")!!)
+    builder.add("time", "0")
+    builder.add("category", "1")
+    builder.add("format", "json")
+     */
+    suspend fun videoHistory(@FieldMap body: HashMap<String, String>): BaseReturnMessage
 
     @GET("files/search")
     suspend fun search(

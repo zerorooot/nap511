@@ -314,10 +314,11 @@ class FileRepository(private val cookie: String) {
     suspend fun checkZipStatus(pickCode: String): ZipStatus {
         return try {
             val json = fileService.getDecryptZipProcess(pickCode)
-            //正常无加密压缩包 {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
-            //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":0,"progress":0}}}
-            //官网显示正在服务器解压 {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":1,"progress":5}}}
             //加密压缩包 {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":6,"progress":88}}}
+            //正常无加密压缩包 {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
+            //官网显示正在服务器解压 {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":1,"progress":5}}}
+            //官网显示正在服务器解压,意味着加密或者非加密文件{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":0,"progress":0}}}
+            //官网显示正在服务器解压,意味着加密或者非加密文件{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":2,"progress":30}}}
             XLog.d("Get files/push_extract checkZipStatus $json")
 
             // 1. 处理接口返回业务错误（如：暂不支持解压预览20GB以上的压缩包）
@@ -341,8 +342,8 @@ class FileRepository(private val cookie: String) {
 
             // 3. 根据状态码返回对应的密封类状态
             var unzipStatus = unzipStatusElement.asInt
-            //等于0意味着加密或者非加密文件，非加密文件需要再post push_extract一次
-            if (unzipStatus == 0) {
+            //等于0or2意味着加密或者非加密文件，非加密文件需要再post push_extract一次
+            if (unzipStatus == 0 || unzipStatus == 2) {
                 val checkEncryptionStatus = fileService.checkEncryptionStatus(pickCode)
                 //非加密文件 {"state":true,"message":"","code":"","data":{"unzip_status":1}}
                 //加密文件 {"state":true,"message":"","code":"","data":{"unzip_status":6}}
@@ -361,7 +362,7 @@ class FileRepository(private val cookie: String) {
                 1 -> ZipStatus.Loading(extractStatusElement.asJsonObject.get("progress").asInt)
                 4 -> ZipStatus.Normal
                 6 -> ZipStatus.Encrypted
-                else -> ZipStatus.UnsupportedOrError("未知错误，$json")
+                else -> ZipStatus.UnsupportedOrError("未知状态，$json")
             }
         } catch (e: Exception) {
             // 4. 捕获网络异常、Json语法解析异常等，确保不崩溃

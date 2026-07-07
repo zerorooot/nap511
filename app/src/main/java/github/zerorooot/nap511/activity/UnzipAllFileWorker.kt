@@ -46,9 +46,7 @@ class UnzipAllFileWorker(
 
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
-            CHANNEL_ID,
-            "文件解压",
-            NotificationManager.IMPORTANCE_HIGH
+            CHANNEL_ID, "文件解压", NotificationManager.IMPORTANCE_HIGH
         ).apply {
             description = "文件在线解压结果"
             setShowBadge(false) // 进度条不需要应用图标上的小红点
@@ -73,13 +71,11 @@ class UnzipAllFileWorker(
         if (!file.exists()) {
             return Result.failure(
                 Data.Builder().putBoolean("state", false)
-                    .putString("message", "${file.absolutePath}不存在！！")
-                    .build()
+                    .putString("message", "${file.absolutePath}不存在！！").build()
             )
         }
         val jsonString = file.readText()
-        val fileBeanList: List<FileBean> =
-            Gson().fromJson(jsonString, listType)
+        val fileBeanList: List<FileBean> = Gson().fromJson(jsonString, listType)
         file.delete()
 
         val cid = inputData.getString("cid").toString()
@@ -158,11 +154,11 @@ class UnzipAllFileWorker(
         val message = if (result) {
             "${size}个文件解压完成！"
         } else {
-            "${size}个文件解压完成！" + sj.toString()
+            val unzipFailListSize = unzipFailList.size
+            "❎${unzipFailListSize}个文件解压失败！"
         }
 
-        val addTaskData =
-            Data.Builder().putBoolean("state", result).putString("message", message)
+        val addTaskData = Data.Builder().putBoolean("state", result).putString("message", message)
 
         XLog.d(message)
         App.instance.toast(message)
@@ -185,9 +181,7 @@ class UnzipAllFileWorker(
      * 解压失败的压缩包移动到某文件
      */
     private suspend fun moveFailFile(
-        cid: String,
-        folderName: String,
-        unzipFailList: List<FileBean>
+        cid: String, folderName: String, unzipFailList: List<FileBean>
     ): String {
         val createFolder = fileRepository.createFolder(cid, folderName)
         if (!createFolder.state) {
@@ -224,10 +218,7 @@ class UnzipAllFileWorker(
      * 新建文件夹，解压，如果解压失败，则删除创建的空文件夹
      */
     private suspend fun unzipAllAndDeleteFolderIfUnzipError(
-        zipBeanList: ZipBeanList,
-        pickCode: String,
-        cid: String,
-        fileName: String
+        zipBeanList: ZipBeanList, pickCode: String, cid: String, fileName: String
     ): Pair<Boolean, String> {
         val zipFileCid = fileRepository.createFolderAndReturnCid(cid, fileName)
         val dirs = zipBeanList.list.stream().filter { i -> i.fileIco == R.drawable.folder }
@@ -282,20 +273,17 @@ class UnzipAllFileWorker(
         titleString: String, detailedText: String, progress: Int, max: Int
     ): NotificationCompat.Builder {
         val notificationBuilder =
-            NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-                .setContentTitle(titleString)
+            NotificationCompat.Builder(applicationContext, CHANNEL_ID).setContentTitle(titleString)
                 .setContentText(detailedText) // 具体内容
-                .setAutoCancel(false)
-                .setSmallIcon(R.drawable.ic_launcher_foreground).setOnlyAlertOnce(true)
+                .setAutoCancel(false).setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setOnlyAlertOnce(true)
                 // [修改] 明确设置为进度类型，这有助于系统正确渲染进度条样式 CATEGORY_SERVICE CATEGORY_PROGRESS
-                .setCategory(NotificationCompat.CATEGORY_PROGRESS)
-                .setStyle(
+                .setCategory(NotificationCompat.CATEGORY_PROGRESS).setStyle(
                     NotificationCompat.ProgressStyle()
                         .setProgress(((progress.toFloat() / max) * 100).toInt())
                         //true=流动条纹, false=具体百分比
                         .setProgressIndeterminate(progress == 0)
-                )
-                .setPriority(NotificationCompat.PRIORITY_MAX)
+                ).setPriority(NotificationCompat.PRIORITY_MAX)
 
 
         // [新增] 尝试适配 Android 16 (Baklava) 的新特性
@@ -330,9 +318,7 @@ class UnzipAllFileWorker(
      */
     private fun showCompletionNotification(success: Boolean, message: String, cid: String) {
         val channel = NotificationChannel(
-            "unzip_completion_channel",
-            "文件在线解压结果",
-            NotificationManager.IMPORTANCE_HIGH
+            "unzip_completion_channel", "文件在线解压结果", NotificationManager.IMPORTANCE_HIGH
         )
         notificationManager.createNotificationChannel(channel)
 
@@ -357,12 +343,9 @@ class UnzipAllFileWorker(
 
         val notificationBuilder =
             NotificationCompat.Builder(applicationContext, "unzip_completion_channel")
-                .setContentTitle(if (success) "解压完成" else "⚠️解压报错")
-                .setContentText(message)
-                .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentIntent(pendingIntent)
-                .setAutoCancel(true)
-                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setContentTitle(if (success) "解压完成" else "⚠️解压报错").setContentText(message)
+                .setSmallIcon(R.mipmap.ic_launcher).setContentIntent(pendingIntent)
+                .setAutoCancel(true).setPriority(NotificationCompat.PRIORITY_MAX)
         // [新增] 尝试适配 Android 16 (Baklava) 的新特性
         // 注意：目前 SDK 可能还需要预览版支持，这里是一个兼容性写法的示例
         if (Build.VERSION.SDK_INT >= 35) { // 35+ 或 Build.VERSION_CODES.BAKLAVA
@@ -372,8 +355,7 @@ class UnzipAllFileWorker(
         }
 
         notificationManager.notify(
-            System.currentTimeMillis().toInt(),
-            notificationBuilder.build()
+            System.currentTimeMillis().toInt(), notificationBuilder.build()
         )
     }
 

@@ -2,6 +2,7 @@ package github.zerorooot.nap511.viewmodel
 
 import android.content.Intent
 import androidx.lifecycle.viewModelScope
+import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.service.Sha1Service
@@ -38,7 +39,12 @@ internal fun FileViewModel.getImage(fileBeanList: List<FileBean>, indexOf: Int) 
     }
 }
 
-internal fun FileViewModel.updateVideoFileBean(cid: String, index: Int, duration: Int) {
+internal fun FileViewModel.updateVideoFileBean(
+    cid: String,
+    index: Int,
+    duration: Int,
+    pickCode: String
+) {
     viewModelScope.launch {
         val fileBean = fileBeanList[index]
 
@@ -66,6 +72,22 @@ internal fun FileViewModel.updateVideoFileBean(cid: String, index: Int, duration
             fileListCache[cid]?.fileBeanList = arrayListOf
         }
 
+        val map = hashMapOf<String, String>()
+        map["op"] = "update"
+        map["pick_code"] = pickCode
+        map["time"] = duration.toString()
+        map["category"] = "1"
+        map["format"] = "json"
+        val videoHistory = fileService.videoHistory(map)
+        XLog.d("更新视频时间 $videoHistory")
+    }
+}
+
+internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int) {
+    viewModelScope.launch {
+        val video = fileService.video(pickCode).copy(index = fileBeanIndex)
+        _launchVideoEvent.emit(video)
+        setRefreshingStatus(false)
     }
 }
 

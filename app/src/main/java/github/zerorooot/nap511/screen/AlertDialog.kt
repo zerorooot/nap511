@@ -111,14 +111,14 @@ import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
-fun CreateFolderDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
+fun CreateFolderDialog(fileViewModel: FileViewModel, enter: (String?) -> Unit) {
     if (fileViewModel.isOpenCreateFolderDialog) {
         BaseDialog("请输入新建文件名", "文件名", enter = enter)
     }
 }
 
 @Composable
-fun SearchDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
+fun SearchDialog(fileViewModel: FileViewModel, enter: (String?) -> Unit) {
     if (fileViewModel.isOpenSearchDialog) {
         BaseDialog("在当前目录下搜索", "关键字", enter = enter)
     }
@@ -126,7 +126,7 @@ fun SearchDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
 
 
 @Composable
-fun RenameFileDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
+fun RenameFileDialog(fileViewModel: FileViewModel, enter: (String?) -> Unit) {
     if (fileViewModel.isOpenRenameFileDialog) {
         val name = fileViewModel.fileBeanList[fileViewModel.selectIndex].name
         val position = DataStoreUtil.getData(ConfigKeyUtil.POSITION_AFTER_AT, false)
@@ -360,7 +360,7 @@ fun OfflineTaskDialog(
 }
 
 @Composable
-fun RecyclePasswordDialog(recycleViewModel: RecycleViewModel, enter: (String) -> Unit) {
+fun RecyclePasswordDialog(recycleViewModel: RecycleViewModel, enter: (String?) -> Unit) {
     if (recycleViewModel.isOpenRecyclePasswordDialog) {
         BaseDialog(
             title = "请输入6位数字安全密钥",
@@ -495,7 +495,7 @@ fun UnzipDialog(fileViewModel: FileViewModel) {
             title = "云解压-${fileBean.name}", label = "请输入密码", dismissButtonText = "取消"
         ) {
             XLog.d("云解压 ${fileBean.name} password $it")
-            if (it != "") {
+            if (it != null && it != "") {
                 fileViewModel.decryptZip(it)
             } else {
                 fileViewModel.closeUnzipPasswordDialog()
@@ -506,7 +506,15 @@ fun UnzipDialog(fileViewModel: FileViewModel) {
     if (fileViewModel.isOpenUnzipDialog) {
         val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
         val zipBeanList by fileViewModel.unzipBeanList
-        fileViewModel.setRefreshingStatus(false)
+        var initialZipBeanList by remember { mutableStateOf<ZipBeanList?>(null) }
+        LaunchedEffect(Unit) {
+            fileViewModel.setRefreshingStatus(false)
+        }
+        LaunchedEffect(zipBeanList) {
+            if (initialZipBeanList == null && zipBeanList.list.isNotEmpty()) {
+                initialZipBeanList = zipBeanList
+            }
+        }
         UnzipScreen(zipBeanList, fileBean.name) {
             //Pair true is command,false is click event
             if (it.first) {
@@ -528,7 +536,7 @@ fun UnzipDialog(fileViewModel: FileViewModel) {
                     }
 
                     "unzipAll" -> {
-                        fileViewModel.unzipFile(zipBeanList)
+                        fileViewModel.unzipFile(initialZipBeanList!!)
                         fileViewModel.closeUnzipDialog()
                     }
                 }
@@ -549,6 +557,11 @@ fun UnzipAllFile(
 
     if (fileViewModel.isOpenUnzipAllFileDialog) {
         BaseDialog("请输入解压密码", "如无加密，为空即可") {
+            if (it == null) {
+                fileViewModel.closeUnzipAllFileDialog()
+                return@BaseDialog
+            }
+
             val currentCid = fileViewModel.currentCid
 
             fileViewModel.closeUnzipAllFileDialog()
@@ -573,11 +586,13 @@ fun UnzipAllFile(
 
             val request: OneTimeWorkRequest =
                 OneTimeWorkRequest.Builder(UnzipAllFileWorker::class.java)
-                    .addTag("UnzipAllFileWorker").setInputData(dataBuilder.build()).build()
+                    .addTag("UnzipAllFileWorkerOneTimeWorkRequest")
+                    .setInputData(dataBuilder.build()).build()
 
             fileViewModel.startUnzipWorker(request, currentCid)
-            //走isLongClickState为true时的判断
-            fileViewModel.back()
+
+            fileViewModel.recoverFromLongPress()
+            fileViewModel.unSelect()
         }
     }
 }
@@ -712,7 +727,7 @@ fun tt() {
 }
 
 @Composable
-fun CookieDialog(enter: (String) -> Unit) {
+fun CookieDialog(enter: (String?) -> Unit) {
     var isOpen by remember {
         mutableStateOf(true)
     }
@@ -1171,7 +1186,7 @@ private fun BaseDialog(
     confirmButtonText: String = "确认",
     dismissButtonText: String = "取消",
     selection: TextRange = TextRange(context.length),
-    enter: (String) -> Unit,
+    enter: (String?) -> Unit,
 ) {
 
     var text by remember {
@@ -1186,7 +1201,7 @@ private fun BaseDialog(
     AlertDialog(
         modifier = Modifier.width(IntrinsicSize.Max), // 1. 核心修改：让 Dialog 宽度等于子组件的最大固有宽度
         onDismissRequest = {
-            enter.invoke("")
+            enter.invoke(null)
         }, confirmButton = {
             Button(onClick = {
                 enter.invoke(text.text)
@@ -1199,7 +1214,7 @@ private fun BaseDialog(
                 onClick = {
                     enter.invoke(
                         if (dismissButtonText == "取消") {
-                            ""
+                            null
                         } else {
                             dismissButtonText
                         }

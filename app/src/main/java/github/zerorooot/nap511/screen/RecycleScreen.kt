@@ -61,7 +61,7 @@ fun RecycleScreen(recycleViewModel: RecycleViewModel) {
     }
 
     RecyclePasswordDialog(recycleViewModel) {
-        if (it != "") {
+        if (it != null && it != "") {
             DataStoreUtil.putData(ConfigKeyUtil.PASSWORD, it)
 
             if (deleteIndex == -1) {
