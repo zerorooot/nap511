@@ -1,10 +1,16 @@
 package github.zerorooot.nap511.viewmodel
 
+import android.annotation.SuppressLint
+import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.viewModelScope
+import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.RenameBean
 import github.zerorooot.nap511.util.App
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Locale
+import kotlin.math.roundToInt
 
 /**
  * FileViewModel 的扩展函数：文件操作（创建、删除、重命名、剪切、文件信息）
@@ -73,7 +79,7 @@ internal fun FileViewModel.createFolder(folderName: String) {
             refresh(cid)
             "创建文件夹 $folderName 成功"
         } else {
-            "创建失败"
+            "创建失败，${createFolder.error}"
         }
         App.instance.toast(message)
     }
@@ -200,4 +206,67 @@ internal fun FileViewModel.deleteMultiple() {
         }
         App.instance.toast(message)
     }
+}
+
+internal fun FileViewModel.setFileBeanProperty(fileBeanList: ArrayList<FileBean>) {
+    fileBeanList.forEach { fileBean ->
+        fileBean.updateTimeString =
+            SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
+                fileBean.updateTime.toLong() * 1000
+            )
+        fileBean.createTimeString =
+            SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
+                fileBean.createTime.toLong() * 1000
+            )
+        if (fileBean.fileId == "") {
+            fileBean.fileId = fileBean.categoryId
+            fileBean.fileIco = R.drawable.folder
+            fileBean.isFolder = true
+            fileBean.modifiedTimeString =
+                SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
+                    fileBean.modifiedTime.toLong() * 1000
+                )
+        } else {
+            fileBean.sizeString = fileRepository.formatFileSize(fileBean.size.toLong()) + " "
+            fileBean.modifiedTimeString = fileBean.modifiedTime
+            if (fileBean.modifiedTime.isDigitsOnly()) {
+                fileBean.modifiedTime =
+                    (SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).parse(
+                        fileBean.modifiedTime
+                    )!!.time / 1000).toString()
+            }
+            if (fileBean.currentPlayTime != 0 && fileBean.playLong != 0.00) {
+                val playTime =
+                    ((fileBean.currentPlayTime.toFloat() / fileBean.playLong) * 100).roundToInt()
+                fileBean.createTimeString = "▶️ $playTime% ${fileBean.createTimeString}"
+            }
+        }
+        if (fileBean.isVideo == 1) {
+            fileBean.fileIco = R.drawable.mp4
+            //设置视频时间
+            fileBean.playLongString = generateTime(fileBean.playLong.toLong()) + " "
+        }
+        when (fileBean.icoString) {
+            "apk" -> fileBean.fileIco = R.drawable.apk
+            "iso" -> fileBean.fileIco = R.drawable.iso
+            "zip" -> fileBean.fileIco = R.drawable.zip
+            "7z" -> fileBean.fileIco = R.drawable.zip
+            "rar" -> fileBean.fileIco = R.drawable.zip
+            "png" -> fileBean.fileIco = R.drawable.png
+            "jpg" -> fileBean.fileIco = R.drawable.png
+            "mp3" -> fileBean.fileIco = R.drawable.mp3
+            "txt" -> fileBean.fileIco = R.drawable.txt
+            "torrent" -> fileBean.fileIco = R.drawable.torrent
+        }
+    }
+}
+
+@SuppressLint("DefaultLocale")
+private fun generateTime(totalSeconds: Long): String {
+    val seconds = totalSeconds % 60
+    val minutes = totalSeconds / 60 % 60
+    val hours = totalSeconds / 3600
+    return if (hours > 0) String.format(
+        "%02d:%02d:%02d", hours, minutes, seconds
+    ) else String.format("%02d:%02d", minutes, seconds)
 }

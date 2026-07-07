@@ -76,14 +76,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.work.Data
-import androidx.work.OneTimeWorkRequest
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.JsonObject
-import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.activity.UnzipAllFileWorker
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileInfo
 import github.zerorooot.nap511.bean.InfoItem
@@ -99,11 +95,14 @@ import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
+import github.zerorooot.nap511.viewmodel.closeTextBodyDialog
+import github.zerorooot.nap511.viewmodel.closeUnzipAllFileDialog
+import github.zerorooot.nap511.viewmodel.closeUnzipDialog
+import github.zerorooot.nap511.viewmodel.closeUnzipPasswordDialog
 import github.zerorooot.nap511.viewmodel.decryptZip
 import github.zerorooot.nap511.viewmodel.getZipListFile
 import github.zerorooot.nap511.viewmodel.unzipFile
 import kotlinx.coroutines.delay
-import java.io.File
 import java.nio.charset.Charset
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -393,7 +392,7 @@ fun ExitApp() {
 
 @Composable
 fun TextBodyDialog(fileViewModel: FileViewModel) {
-    if (fileViewModel.isOpenTextBodyDialog && fileViewModel.textBodyByteArray != null) {
+    if (fileViewModel.isOpenTextBodyDialog  && fileViewModel.textBodyByteArray != null) {
         val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
         TextBodyDialogScreen(fileBean.name, fileViewModel.textBodyByteArray!!) {
             if (it == "") {
@@ -506,14 +505,8 @@ fun UnzipDialog(fileViewModel: FileViewModel) {
     if (fileViewModel.isOpenUnzipDialog) {
         val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
         val zipBeanList by fileViewModel.unzipBeanList
-        var initialZipBeanList by remember { mutableStateOf<ZipBeanList?>(null) }
         LaunchedEffect(Unit) {
             fileViewModel.setRefreshingStatus(false)
-        }
-        LaunchedEffect(zipBeanList) {
-            if (initialZipBeanList == null && zipBeanList.list.isNotEmpty()) {
-                initialZipBeanList = zipBeanList
-            }
         }
         UnzipScreen(zipBeanList, fileBean.name) {
             //Pair true is command,false is click event
@@ -536,7 +529,7 @@ fun UnzipDialog(fileViewModel: FileViewModel) {
                     }
 
                     "unzipAll" -> {
-                        fileViewModel.unzipFile(initialZipBeanList!!)
+                        fileViewModel.unzipFile()
                         fileViewModel.closeUnzipDialog()
                     }
                 }
@@ -554,10 +547,9 @@ fun UnzipDialog(fileViewModel: FileViewModel) {
 fun UnzipAllFile(
     fileViewModel: FileViewModel
 ) {
-
     if (fileViewModel.isOpenUnzipAllFileDialog) {
-        BaseDialog("请输入解压密码", "如无加密，为空即可") {
-            if (it == null) {
+        BaseDialog("请输入解压密码", "如无加密，为空即可") { pwd ->
+            if (pwd == null) {
                 fileViewModel.closeUnzipAllFileDialog()
                 return@BaseDialog
             }
@@ -565,31 +557,19 @@ fun UnzipAllFile(
             val currentCid = fileViewModel.currentCid
 
             fileViewModel.closeUnzipAllFileDialog()
-            App.instance.toast("后台解压中......")
 
-            val dataBuilder: Data.Builder = Data.Builder()
-            val filter =
-                fileViewModel.fileBeanList.filter { i -> i.isSelect && i.fileIco == R.drawable.zip }
-                    .toList()
-            val listType = object : TypeToken<List<FileBean>>() {}.type
-            val listJson = Gson().toJson(filter, listType)
-            if (it != "") {
-                dataBuilder.putString("pwd", it)
-            }
-            //防止输入太多导致崩溃
-            val cacheFile =
-                File(App.instance.cacheDir, "unzip_tasks_${System.currentTimeMillis()}.json")
-            cacheFile.writeText(listJson)
-            dataBuilder.putString("listPath", cacheFile.absolutePath)
-            dataBuilder.putString("cid", currentCid)
+            val message = fileViewModel.fileBeanList
+                .filter { i -> i.isSelect && i.fileIco == R.drawable.zip }
+                .takeIf { it.isNotEmpty() }
+                ?.let {
+                    fileViewModel.unzipFile(it, currentCid, pwd)
+                    "后台解压中......"
+                } ?: run {
+                    "请选中压缩包解压！"
+                }
+            App.instance.toast(message)
 
 
-            val request: OneTimeWorkRequest =
-                OneTimeWorkRequest.Builder(UnzipAllFileWorker::class.java)
-                    .addTag("UnzipAllFileWorkerOneTimeWorkRequest")
-                    .setInputData(dataBuilder.build()).build()
-
-            fileViewModel.startUnzipWorker(request, currentCid)
 
             fileViewModel.recoverFromLongPress()
             fileViewModel.unSelect()

@@ -65,13 +65,16 @@ import github.zerorooot.nap511.viewmodel.downloadText
 import github.zerorooot.nap511.viewmodel.getFileInfo
 import github.zerorooot.nap511.viewmodel.getVideoInfo
 import github.zerorooot.nap511.viewmodel.getZipListFile
+import github.zerorooot.nap511.viewmodel.openAria2Dialog
+import github.zerorooot.nap511.viewmodel.openCreateFolderDialog
+import github.zerorooot.nap511.viewmodel.openCreateSelectTorrentFileDialog
+import github.zerorooot.nap511.viewmodel.openRenameFileDialog
 import github.zerorooot.nap511.viewmodel.removeFile
 import github.zerorooot.nap511.viewmodel.startSendAria2Service
 import github.zerorooot.nap511.viewmodel.updateVideoFileBean
 import kotlinx.coroutines.launch
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
-
 
 @OptIn(
     ExperimentalFoundationApi::class,

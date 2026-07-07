@@ -1,14 +1,24 @@
 package github.zerorooot.nap511.viewmodel
 
+import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
+import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.elvishew.xlog.XLog
-import github.zerorooot.nap511.R
-import github.zerorooot.nap511.bean.ZipBeanList
+import com.google.common.reflect.TypeToken
+import com.google.gson.Gson
+import github.zerorooot.nap511.activity.UnzipAllFileWorker
+import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.DataStoreUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * FileViewModel 的扩展函数：解压相关
@@ -58,52 +68,73 @@ internal fun FileViewModel.getZipListFile(
     }
 }
 
-internal fun FileViewModel.unzipFile(zipBeanList: ZipBeanList) {
-    val refreshCid = currentCid
 
-    viewModelScope.launch {
-        val unzipFile = withContext(Dispatchers.IO) {
-            val dirs = zipBeanList.list
-                .filter { i -> i.fileIco == R.drawable.folder }
-                .map { a -> a.fileName }
-                .takeIf { it.isNotEmpty() }
+internal fun FileViewModel.unzipFile() {
+    viewModelScope.launch(Dispatchers.IO) {
+        val cid = currentCid
+        val arrayListOf = arrayListOf(fileBeanList[selectIndex])
+        unzipFile(arrayListOf, cid)
+    }
+}
 
-            val files = zipBeanList.list
-                .filter { i -> i.fileIco != R.drawable.folder }
-                .map { a -> a.fileName }
-                .takeIf { it.isNotEmpty() }
+internal fun FileViewModel.unzipFile(fileBeansList: List<FileBean>, cid: String, pwd: String = "") {
+    val listType = object : TypeToken<List<FileBean>>() {}.type
+    val listJson = Gson().toJson(fileBeansList, listType)
+    val dataBuilder: Data.Builder = Data.Builder()
+    //防止输入太多导致崩溃
+    val cacheFile =
+        File(App.instance.cacheDir, "unzip_tasks_${System.currentTimeMillis()}.json")
+    cacheFile.writeText(listJson)
+    dataBuilder.putString("listPath", cacheFile.absolutePath)
+    dataBuilder.putString("cid", cid)
+    if (pwd != "") {
+        dataBuilder.putString("pwd", pwd)
+    }
 
-            val fileBean = fileBeanList[selectIndex]
-            val pickCode = fileBean.pickCode
-            val unzipFolderName = fileBean.name.substringBeforeLast(".")
+    //获取离线失败移动目录cid
+    val errorCid = DataStoreUtil.getData(ConfigKeyUtil.MOVE_FAIL_FILE, "")
+        .takeIf { it.isNotEmpty() }
+        ?.let { data ->
+            fileBeanList.firstOrNull { it.isFolder && it.name == data }?.categoryId
+        }
+        ?.let { errorCid ->
+            XLog.d("FileViewModel.unzipFile设置errorCid $errorCid")
+            dataBuilder.putString("errorCid", errorCid)
+            errorCid
+        }
 
-            //确定当前目录下是否存在同名文件，如果不存在，则新建一个
-            val currentUnzipFolderNameList =
-                fileBeanList.filter { i -> i.isFolder && i.name == unzipFolderName }
-            var zipFileCid = refreshCid
 
-            if (currentUnzipFolderNameList.isEmpty()) {
-                val createFolderMessage = fileRepository.createFolder(
-                    refreshCid, unzipFolderName
-                )
-                XLog.d("fileViewModel.unzipFile $createFolderMessage")
-                //(state=false, error=该目录名称已存在。, errno=20004, aid=0, cid=, cname=, fileId=, fileName=)
-                //(state=true, error=, errno=, aid=1, cid=123123132131321, cname=cname, fileId=1231232131232, fileName=fileName)
-                if (createFolderMessage.state) {
-                    zipFileCid = createFolderMessage.cid
+    val request: OneTimeWorkRequest =
+        OneTimeWorkRequest.Builder(UnzipAllFileWorker::class.java)
+            .addTag("UnzipAllFileWorkerOneTimeWorkRequest")
+            .setInputData(dataBuilder.build()).build()
+
+    startUnzipWorker(request, cid, errorCid)
+}
+
+internal fun FileViewModel.startUnzipWorker(
+    request: OneTimeWorkRequest,
+    cid: String,
+    errorCid: String?
+) {
+    val workManager = WorkManager.getInstance(context.applicationContext)
+    workManager.enqueueUniqueWork(
+        "unzipAllFileWorker", ExistingWorkPolicy.APPEND_OR_REPLACE, request
+    )
+    viewModelScope.launch(Dispatchers.IO) {
+        // 将 LiveData 转为 Flow 或者直接观察（这里利用 WorkManager 提供的 LiveData 转换为 Flow）
+        // 注意：需要引入 androidx.lifecycle:lifecycle-livedata-ktx 依赖
+        workManager.getWorkInfoByIdLiveData(request.id).asFlow() // 将 LiveData 转换为 Flow
+            .collect { workInfo ->
+                if (workInfo != null) {
+                    if (workInfo.state == WorkInfo.State.SUCCEEDED || workInfo.state == WorkInfo.State.FAILED) {
+                        refresh(cid)
+                        errorCid?.let {
+                            refresh(it)
+                        }
+                    }
                 }
-            } else {
-                zipFileCid = currentUnzipFolderNameList[0].categoryId
             }
-
-            fileRepository.unzipFile(pickCode, zipFileCid, files, dirs, unzipFolderName)
-        }
-
-        if (unzipFile.first) {
-            refresh(refreshCid)
-        } else {
-            App.instance.toast(unzipFile.second)
-        }
     }
 }
 

@@ -88,6 +88,9 @@ import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import github.zerorooot.nap511.viewmodel.cut
 import github.zerorooot.nap511.viewmodel.deleteMultiple
+import github.zerorooot.nap511.viewmodel.openFileOrderDialog
+import github.zerorooot.nap511.viewmodel.openSearchDialog
+import github.zerorooot.nap511.viewmodel.openUnzipAllFileDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -181,8 +184,7 @@ class MainActivity : AppCompatActivity() {
             //跳转到默认下载目录
             "jump" -> {
                 val cid = intent.getStringExtra("cid") ?: DataStoreUtil.getData(
-                    ConfigKeyUtil.DEFAULT_OFFLINE_CID,
-                    "0"
+                    ConfigKeyUtil.DEFAULT_OFFLINE_CID, "0"
                 )
                 fileViewModel.getFiles(cid)
 
@@ -227,12 +229,10 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             val workQuery = WorkQuery.Builder.fromStates(
                 listOf(
-                    WorkInfo.State.ENQUEUED,
-                    WorkInfo.State.RUNNING,
+                    WorkInfo.State.ENQUEUED, WorkInfo.State.RUNNING,
 //                WorkInfo.State.SUCCEEDED,
 //                WorkInfo.State.FAILED,
-                    WorkInfo.State.BLOCKED,
-                    WorkInfo.State.CANCELLED
+                    WorkInfo.State.BLOCKED, WorkInfo.State.CANCELLED
                 )
             ).build()
             // 异步挂起等待结果，避免阻塞主线程
@@ -240,11 +240,9 @@ class MainActivity : AppCompatActivity() {
                 WorkManager.getInstance(applicationContext).getWorkInfos(workQuery).await()
             if (workInfos.isNotEmpty()) return@launch
             //size等于0,证明后台没有正在添加离线链接
-            val currentOfflineTask = DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
-                .split("\n")
-                .filter { i -> i != "" && i != " " }
-                .toSet()
-                .toMutableList()
+            val currentOfflineTask =
+                DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "").split("\n")
+                    .filter { i -> i != "" && i != " " }.toSet().toMutableList()
             //currentOfflineTask等于0,证明没有离线链接缓存
             if (currentOfflineTask.isEmpty()) {
                 return@launch
@@ -256,13 +254,10 @@ class MainActivity : AppCompatActivity() {
             val listType = object : TypeToken<List<String?>?>() {}.type
             val list = Gson().toJson(currentOfflineTask, listType)
             val data: Data =
-                Data.Builder().putString("cookie", cookie).putString("list", list)
-                    .build()
+                Data.Builder().putString("cookie", cookie).putString("list", list).build()
             val request: OneTimeWorkRequest =
                 OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java)
-                    .addTag(ConfigKeyUtil.OFFLINE_TASK_WORKER)
-                    .setInputData(data)
-                    .build()
+                    .addTag(ConfigKeyUtil.OFFLINE_TASK_WORKER).setInputData(data).build()
             WorkManager.getInstance(App.instance.applicationContext).enqueue(request)
         }
     }
@@ -305,10 +300,10 @@ class MainActivity : AppCompatActivity() {
                         itemMap.forEach { (t, u) ->
                             NavigationDrawerItem(
                                 icon = {
-                                    Icon(
-                                        painterResource(t), contentDescription = u
-                                    )
-                                },
+                                Icon(
+                                    painterResource(t), contentDescription = u
+                                )
+                            },
                                 label = { Text(u) },
                                 selected = u == fileViewModel.selectedItem,
                                 onClick = {
@@ -316,8 +311,7 @@ class MainActivity : AppCompatActivity() {
                                     scope.launch { drawerState.close() }
                                     fileViewModel.selectedItem = u
                                 },
-                                modifier = Modifier
-                                    .padding(NavigationDrawerItemDefaults.ItemPadding)
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                             )
                         }
                     }
@@ -327,13 +321,11 @@ class MainActivity : AppCompatActivity() {
                         ConfigKeyUtil.LOGIN -> Login()
                         ConfigKeyUtil.MY_FILE -> FileScreen(appBarClick(fileViewModel))
                         ConfigKeyUtil.OFFLINE_DOWNLOAD -> OfflineDownloadScreen(
-                            offlineFileViewModel,
-                            fileViewModel
+                            offlineFileViewModel, fileViewModel
                         )
 
                         ConfigKeyUtil.OFFLINE_LIST -> OfflineFileScreen(
-                            offlineFileViewModel,
-                            fileViewModel
+                            offlineFileViewModel, fileViewModel
                         )
 
                         ConfigKeyUtil.WEB -> WebViewScreen()
@@ -378,8 +370,7 @@ class MainActivity : AppCompatActivity() {
             mutableStateOf(
                 Gson().fromJson(
                     DataStoreUtil.getData(
-                        ConfigKeyUtil.AVATAR_BEAN,
-                        "{}"
+                        ConfigKeyUtil.AVATAR_BEAN, "{}"
                     ), AvatarBean::class.java
                 )
             )
@@ -391,10 +382,8 @@ class MainActivity : AppCompatActivity() {
             //头像
             Image(
                 painter = rememberAsyncImagePainter(
-                    ImageRequest.Builder(LocalContext.current)
-                        .data(avatarBean.value.face)
-                        .memoryCachePolicy(CachePolicy.ENABLED)
-                        .diskCachePolicy(CachePolicy.ENABLED)
+                    ImageRequest.Builder(LocalContext.current).data(avatarBean.value.face)
+                        .memoryCachePolicy(CachePolicy.ENABLED).diskCachePolicy(CachePolicy.ENABLED)
                         .networkCachePolicy(CachePolicy.ENABLED)
                         .memoryCacheKey(avatarBean.value.userId)
                         .diskCacheKey(avatarBean.value.userName)
@@ -414,8 +403,7 @@ class MainActivity : AppCompatActivity() {
             Spacer(Modifier.height(6.dp))
             //用户名
             Text(
-                text = avatarBean.value.userName,
-                style = MaterialTheme.typography.titleMedium
+                text = avatarBean.value.userName, style = MaterialTheme.typography.titleMedium
             )
             //uid
             Text(text = App.uid)

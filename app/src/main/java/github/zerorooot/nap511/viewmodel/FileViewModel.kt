@@ -9,14 +9,8 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
-import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequest
-import androidx.work.WorkInfo
-import androidx.work.WorkManager
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -46,9 +40,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Locale
-import kotlin.math.roundToInt
+
 
 @SuppressLint("MutableCollectionMutableState")
 class FileViewModel(internal val cookie: String, internal val context: Context) : ViewModel() {
@@ -85,7 +77,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     /**
      * 打开对话框相关（状态下沉到 ViewModel 本地）
      */
-    private val dialogEventRepository = DialogEventRepository.getInstance()
+    internal val dialogEventRepository = DialogEventRepository.getInstance()
 
     var isOpenCreateFolderDialog by mutableStateOf(false)
         internal set
@@ -270,24 +262,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         }
     }
 
-    fun startUnzipWorker(request: OneTimeWorkRequest, cid: String) {
-        val workManager = WorkManager.getInstance(context.applicationContext)
-        workManager.enqueueUniqueWork(
-            "unzipAllFileWorker", ExistingWorkPolicy.APPEND_OR_REPLACE, request
-        )
-        viewModelScope.launch(Dispatchers.IO) {
-            // 将 LiveData 转为 Flow 或者直接观察（这里利用 WorkManager 提供的 LiveData 转换为 Flow）
-            // 注意：需要引入 androidx.lifecycle:lifecycle-livedata-ktx 依赖
-            workManager.getWorkInfoByIdLiveData(request.id).asFlow() // 将 LiveData 转换为 Flow
-                .collect { workInfo ->
-                    if (workInfo != null) {
-                        if (workInfo.state == WorkInfo.State.SUCCEEDED || workInfo.state == WorkInfo.State.FAILED) {
-                            refresh(cid)
-                        }
-                    }
-                }
-        }
-    }
 
     fun updateFileCache(cid: String) {
         viewModelScope.launch {
@@ -370,59 +344,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                 App.instance.toast("${e.message}，请重试～")
             } finally {
                 _isRefreshing.value = false
-            }
-        }
-    }
-
-    private fun setFileBeanProperty(fileBeanList: ArrayList<FileBean>) {
-        fileBeanList.forEach { fileBean ->
-            fileBean.updateTimeString =
-                SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
-                    fileBean.updateTime.toLong() * 1000
-                )
-            fileBean.createTimeString =
-                SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
-                    fileBean.createTime.toLong() * 1000
-                )
-            if (fileBean.fileId == "") {
-                fileBean.fileId = fileBean.categoryId
-                fileBean.fileIco = R.drawable.folder
-                fileBean.isFolder = true
-                fileBean.modifiedTimeString =
-                    SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
-                        fileBean.modifiedTime.toLong() * 1000
-                    )
-            } else {
-                fileBean.sizeString = fileRepository.formatFileSize(fileBean.size.toLong()) + " "
-                fileBean.modifiedTimeString = fileBean.modifiedTime
-                if (fileBean.modifiedTime.isDigitsOnly()) {
-                    fileBean.modifiedTime =
-                        (SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).parse(
-                            fileBean.modifiedTime
-                        )!!.time / 1000).toString()
-                }
-                if (fileBean.currentPlayTime != 0 && fileBean.playLong != 0.00) {
-                    val playTime =
-                        ((fileBean.currentPlayTime.toFloat() / fileBean.playLong) * 100).roundToInt()
-                    fileBean.createTimeString = "▶️ $playTime% ${fileBean.createTimeString}"
-                }
-            }
-            if (fileBean.isVideo == 1) {
-                fileBean.fileIco = R.drawable.mp4
-                //设置视频时间
-                fileBean.playLongString = generateTime(fileBean.playLong.toLong()) + " "
-            }
-            when (fileBean.icoString) {
-                "apk" -> fileBean.fileIco = R.drawable.apk
-                "iso" -> fileBean.fileIco = R.drawable.iso
-                "zip" -> fileBean.fileIco = R.drawable.zip
-                "7z" -> fileBean.fileIco = R.drawable.zip
-                "rar" -> fileBean.fileIco = R.drawable.zip
-                "png" -> fileBean.fileIco = R.drawable.png
-                "jpg" -> fileBean.fileIco = R.drawable.png
-                "mp3" -> fileBean.fileIco = R.drawable.mp3
-                "txt" -> fileBean.fileIco = R.drawable.txt
-                "torrent" -> fileBean.fileIco = R.drawable.torrent
             }
         }
     }
@@ -569,105 +490,5 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         }
     }
 
-    @SuppressLint("DefaultLocale")
-    private fun generateTime(totalSeconds: Long): String {
-        val seconds = totalSeconds % 60
-        val minutes = totalSeconds / 60 % 60
-        val hours = totalSeconds / 3600
-        return if (hours > 0) String.format(
-            "%02d:%02d:%02d", hours, minutes, seconds
-        ) else String.format("%02d:%02d", minutes, seconds)
-    }
 
-    // ==================== 公开方法：供外部触发对话框事件 ====================
-
-    fun openCreateFolderDialog() {
-        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenCreateFolder) }
-    }
-
-    fun openSearchDialog() {
-        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenSearch) }
-    }
-
-    fun openRenameFileDialog() {
-        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenRenameFile) }
-    }
-
-    fun openFileInfoDialog() {
-        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenFileInfo) }
-    }
-
-    fun openFileOrderDialog() {
-        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenFileOrder) }
-    }
-
-    fun openAria2Dialog() {
-        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenAria2Dialog) }
-    }
-
-    fun openUnzipAllFileDialog() {
-        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenUnzipAllFileDialog) }
-    }
-
-    fun openCreateSelectTorrentFileDialog() {
-        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenCreateSelectTorrentFileDialog) }
-    }
-
-    fun openUnzipDialog() {
-        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenUnzipDialog) }
-    }
-
-    fun openUnzipPasswordDialog() {
-        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenUnzipPasswordDialog) }
-    }
-
-    fun openTextBodyDialog() {
-        viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenTextBodyDialog) }
-    }
-
-    // ==================== 关闭方法（直接在本地设 false） ====================
-
-    fun closeCreateFolderDialog() {
-        isOpenCreateFolderDialog = false
-    }
-
-    fun closeSearchDialog() {
-        isOpenSearchDialog = false
-    }
-
-    fun closeRenameFileDialog() {
-        isOpenRenameFileDialog = false
-    }
-
-    fun closeFileInfoDialog() {
-        isOpenFileInfoDialog = false
-    }
-
-    fun closeFileOrderDialog() {
-        isOpenFileOrderDialog = false
-    }
-
-    fun closeAria2Dialog() {
-        isOpenAria2Dialog = false
-    }
-
-    fun closeUnzipDialog() {
-        isOpenUnzipDialog = false
-    }
-
-    fun closeUnzipPasswordDialog() {
-        isOpenUnzipPasswordDialog = false
-    }
-
-    fun closeTextBodyDialog() {
-        isOpenTextBodyDialog = false
-    }
-
-    fun closeUnzipAllFileDialog() {
-        isOpenUnzipAllFileDialog = false
-    }
-
-    fun closeCreateSelectTorrentFileDialog() {
-        isOpenCreateSelectTorrentFileDialog = false
-    }
 }

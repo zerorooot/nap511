@@ -106,8 +106,8 @@ fun FileCellItem(
                                         .memoryCachePolicy(CachePolicy.ENABLED)
                                         .diskCachePolicy(CachePolicy.ENABLED)
                                         .networkCachePolicy(CachePolicy.ENABLED)
-                                        .memoryCacheKey(fileBean.sha1)
-                                        .diskCacheKey(fileBean.sha1)
+                                        .memoryCacheKey(fileBean.hashCode().toString())
+                                        .diskCacheKey(fileBean.hashCode().toString())
                                         .apply(block = fun ImageRequest.Builder.() {
                                             scale(coil.size.Scale.FILL)
                                             placeholder(image)
