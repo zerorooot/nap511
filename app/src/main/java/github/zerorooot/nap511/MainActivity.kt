@@ -300,10 +300,10 @@ class MainActivity : AppCompatActivity() {
                         itemMap.forEach { (t, u) ->
                             NavigationDrawerItem(
                                 icon = {
-                                Icon(
-                                    painterResource(t), contentDescription = u
-                                )
-                            },
+                                    Icon(
+                                        painterResource(t), contentDescription = u
+                                    )
+                                },
                                 label = { Text(u) },
                                 selected = u == fileViewModel.selectedItem,
                                 onClick = {
@@ -416,7 +416,7 @@ class MainActivity : AppCompatActivity() {
 //            Spacer(Modifier.height(6.dp))
             //已用空间
             Text(
-                text = "总计${remainingSpaceBean.allTotalString}，已用${remainingSpaceBean.allUseString}，剩余${remainingSpaceBean.allRemainString}",
+                text = "总计${remainingSpaceBean.total.sizeFormat}，已用${remainingSpaceBean.use.sizeFormat}，剩余${remainingSpaceBean.remain.sizeFormat}",
                 style = MaterialTheme.typography.titleSmall
             )
 //            //进度条

@@ -296,17 +296,8 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                 //{"state":false,"error":"登录超时，请重新登录。","errNo":990001,"request":"/files/index_info?count_space_nums=1"}
                 return@launch
             }
-            val spaceInfo = gson.getAsJsonObject("data").getAsJsonObject("space_info")
-            val allUse = spaceInfo.getAsJsonObject("all_use").get("size").asLong
-            val allUseString = spaceInfo.getAsJsonObject("all_use").get("size_format").asString
-            val allTotal = spaceInfo.getAsJsonObject("all_total").get("size").asLong
-            val allTotalString = spaceInfo.getAsJsonObject("all_total").get("size_format").asString
-            val allRemain = spaceInfo.getAsJsonObject("all_remain").get("size").asLong
-            val allRemainString =
-                spaceInfo.getAsJsonObject("all_remain").get("size_format").asString
-            remainingSpace = RemainingSpaceBean(
-                allRemain, allRemainString, allTotal, allTotalString, allUse, allUseString
-            )
+            val spaceInfoJson = gson.getAsJsonObject("data").get("space_info")
+            remainingSpace = Gson().fromJson(spaceInfoJson, RemainingSpaceBean::class.java)
         }
     }
 

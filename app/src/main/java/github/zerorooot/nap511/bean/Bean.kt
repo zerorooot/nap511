@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.bean
 
 import android.os.Parcelable
+import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import github.zerorooot.nap511.R
 import kotlinx.parcelize.Parcelize
@@ -22,6 +23,42 @@ sealed interface ZipStatus {
     data class UnsupportedOrError(val message: String) : ZipStatus
 }
 
+// 统一定义接口返回的包装结构
+data class BaseResponse<T>(
+    val state: Boolean = false,
+    val message: String = "",
+    val code: String = "",
+    val data: T
+) {
+    override fun toString(): String {
+        return Gson().toJson(this)
+    }
+}
+
+data class ExtractData(
+    @SerializedName("extract_status")
+    val extractStatus: ExtractStatus
+)
+
+data class ExtractStatus(
+    @SerializedName("unzip_status")
+    val unzipStatus: Int = -1,
+    val progress: Int = -1
+)
+
+data class EncryptionData(
+    @SerializedName("unzip_status")
+    val unzipStatus: Int = -1
+)
+
+data class ProcessData(
+    @SerializedName("extract_id")
+    val extractId: String,
+    @SerializedName("to_pid")
+    val toPid: String,
+    val percent: Int
+)
+
 data class AvatarBean(
     var expire: Long = 1L,
     var expireString: String = "1970-01-01 08:00:00",
@@ -33,13 +70,15 @@ data class AvatarBean(
 )
 
 data class RemainingSpaceBean(
-    var allRemain: Long = 1L,
-    var allRemainString: String = "1T",
-    var allTotal: Long = 1L,
-    var allTotalString: String = "1T",
-    var allUse: Long = 1L,
-    var allUseString: String = "1T",
-)
+    @SerializedName("all_remain") val remain: SpaceDetails = SpaceDetails(),
+    @SerializedName("all_total") val total: SpaceDetails = SpaceDetails(),
+    @SerializedName("all_use") val use: SpaceDetails = SpaceDetails()
+) {
+    data class SpaceDetails(
+        val size: Long = 0L,
+        @SerializedName("size_format") val sizeFormat: String = ""
+    )
+}
 
 
 data class FilesBean(

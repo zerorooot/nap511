@@ -2,11 +2,15 @@ package github.zerorooot.nap511.service
 
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
+import github.zerorooot.nap511.bean.BaseResponse
 import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.CreateFolderMessage
+import github.zerorooot.nap511.bean.EncryptionData
+import github.zerorooot.nap511.bean.ExtractData
 import github.zerorooot.nap511.bean.FileInfo
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.ImageDate
+import github.zerorooot.nap511.bean.ProcessData
 import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.util.App
@@ -227,12 +231,15 @@ interface FileService {
     ): JsonObject
 
 
+    /**
+     * {"state":true,"message":"","code":"","data":{"unzip_status":4}}
+     */
     @FormUrlEncoded
     @POST("files/push_extract")
     suspend fun decryptZip(
         @Field("pick_code") pickCode: String,
         @Field("secret") secret: String
-    ): JsonObject
+    ): BaseResponse<EncryptionData>
 
     /**
      *非加密文件 {"state":true,"message":"","code":"","data":{"unzip_status":1}}
@@ -243,7 +250,7 @@ interface FileService {
     @POST("files/push_extract")
     suspend fun checkEncryptionStatus(
         @Field("pick_code") pickCode: String
-    ): JsonObject
+    ): BaseResponse<EncryptionData>
 
     /**
      * {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
@@ -251,7 +258,7 @@ interface FileService {
     @GET("files/push_extract")
     suspend fun getDecryptZipProcess(
         @Query("pick_code") pickCode: String
-    ): JsonObject
+    ): BaseResponse<ExtractData>
 
 
     /**
@@ -259,6 +266,7 @@ interface FileService {
      * extract_file[] -> xxxx
      * extract_dir[] -> xxx
      * extract_dir[] -> xxx
+     * return {"state":true,"message":"","code":"","data":{"extract_id":1231231}}
      */
     @FormUrlEncoded
     @POST("files/add_extract_file")
@@ -268,7 +276,7 @@ interface FileService {
         @Field("extract_file[]") files: List<String>?,
         @Field("extract_dir[]") dirs: List<String>?,
         @Field("paths") paths: String = "文件"
-    ): JsonElement
+    ): BaseResponse<ProcessData>
 
     /**
      * {"state":true,"message":"","code":"","data":{"extract_id":"id","to_pid":"pid","percent":100}}
@@ -276,6 +284,6 @@ interface FileService {
     @GET("files/add_extract_file")
     suspend fun unzipFileProcess(
         @Query("extract_id") extractId: Long,
-    ): JsonObject
+    ): BaseResponse<ProcessData>
 }
 
