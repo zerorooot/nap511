@@ -281,7 +281,7 @@ class MainActivity : AppCompatActivity() {
             R.drawable.ic_baseline_delete_24 to ConfigKeyUtil.RECYCLE_BIN,
             R.drawable.baseline_settings_24 to ConfigKeyUtil.ADVANCED_SETTINGS,
         )
-        if (DataStoreUtil.getData(ConfigKeyUtil.LOG_SCREEN, false)) {
+        if (DataStoreUtil.getData(ConfigKeyUtil.LOG, false)) {
             itemMap[R.drawable.baseline_log_24] = ConfigKeyUtil.LOG_SCREEN
         }
         itemMap[R.drawable.android_exit] = ConfigKeyUtil.EXIT_APPLICATION

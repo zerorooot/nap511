@@ -202,7 +202,7 @@ class UnzipAllFileWorker(
         try {
             val createFolderCid = inputData.getString("errorCid")
                 ?: fileRepository.createFolder(cid, folderName)
-                    .run { XLog.d("UnzipAllFileWorker createFolder $this"); cid }
+                    .run { XLog.d("UnzipAllFileWorker createFolder $this"); this.cid }
 
             val removeFile = fileRepository.removeFile(createFolderCid, unzipFailList)
                 .also { XLog.d("UnzipAllFileWorker moveFailFile $it") }
