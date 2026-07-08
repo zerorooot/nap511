@@ -20,6 +20,7 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.Sha1Util
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
@@ -375,6 +376,9 @@ class FileRepository(private val cookie: String) {
                     else -> ZipStatus.UnsupportedOrError("未知状态: $response")
                 }
             }
+        } catch (e: CancellationException) {
+            XLog.d("checkZipStatus 任务被取消 $e")
+            ZipStatus.UnsupportedOrError("任务被取消")
         } catch (e: Exception) {
             // 4. 捕获网络异常、Json语法解析异常等，确保不崩溃
             XLog.e("checkZipStatus 发生异常", e)

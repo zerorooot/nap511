@@ -18,6 +18,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.MainActivity
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.bean.DecompressionLoadingException
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.bean.ZipStatus
@@ -119,30 +120,44 @@ class UnzipAllFileWorker(
                 }
                 updateNotification("解压中", i + 1, size, progressMsg)
             }
+            return@withContext sentMessage(sj.toString(), false, size, unzipFailList)
         } catch (e: CancellationException) {
-            XLog.d("unzipAllFileWorker CancellationException")
+            XLog.e("UnzipAllFileWorker CancellationException 任务被取消: ${e.message}")
         }
 
+        return@withContext sentMessage(sj.toString(), true, size, unzipFailList)
 
-        // 4. 处理最终结果
-        val isAllSuccess = (sj.toString().isEmpty())
-        val message =
-            if (isAllSuccess) "${size}个文件解压完成！" else "❎ ${unzipFailList.size}个文件解压失败！"
+    }
 
-        showCompletionNotification(isAllSuccess, message, sj.toString(), cid)
-        XLog.d(message + "\n" + sj.toString())
+    private suspend fun sentMessage(
+        unzipResult: String,
+        isCancel: Boolean,
+        size: Int,
+        unzipFailList: List<FileBean>
+    ): Result {
+        // 1. 确定状态和提示信息
+        val isAllSuccess = !isCancel && unzipResult.isEmpty()
+        val message = when {
+            isCancel -> "🔙任务被取消"
+            isAllSuccess -> "${size}个文件解压完成！"
+            else -> "❎ ${unzipFailList.size}个文件解压失败！"
+        }
+
+        // 2. 统一处理通知、日志和 Toast
+        showCompletionNotification(isAllSuccess, message, unzipResult, cid)
+        XLog.d("$message\n$unzipResult")
         App.instance.toast(message)
 
-        // 5. 失败文件转移及返回结果
+        // 3. 统一构建返回的 Data
         val moveResultMsg = handleFailedFiles(unzipFailList)
-
         val finalData = Data.Builder()
             .putBoolean("state", isAllSuccess)
             .putString("message", message)
             .apply { moveResultMsg?.let { putString("moveResult", it) } }
             .build()
 
-        return@withContext if (isAllSuccess) Result.success(finalData) else Result.failure(finalData)
+        // 4. 根据状态返回成功或失败
+        return if (isAllSuccess) Result.success(finalData) else Result.failure(finalData)
     }
 
     private suspend fun processSingleZipFile(
@@ -179,6 +194,12 @@ class UnzipAllFileWorker(
                 return Pair(false, "密码错误或提取失败")
             }
 
+        } catch (e: DecompressionLoadingException) {
+            val message = e.message ?: run { "正在进行云解压，请稍等..." }
+            XLog.d("UnzipAllFileWorker DecompressionLoadingException ${fileBean.name} : ${e.message}")
+            return Pair(false, message)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             XLog.e("UnzipAllFileWorker Exception 遇到异常: ${e.message}")
             e.printStackTrace()
@@ -296,8 +317,12 @@ class UnzipAllFileWorker(
         // 调用重构后的方法
         when (val status = fileRepository.checkZipStatus(pickCode)) {
             is ZipStatus.UnsupportedOrError -> {
+                val message = status.message
+                if (message == "任务被取消") {
+                    throw CancellationException(message)
+                }
                 // 遇到限制（如>20GB）或接口错误时，抛出异常中断当前文件的操作，并将 message 抛给外层
-                throw RuntimeException(status.message)
+                throw RuntimeException(message)
             }
 
             is ZipStatus.Encrypted -> {
@@ -307,7 +332,7 @@ class UnzipAllFileWorker(
             }
 
             is ZipStatus.Loading -> {
-                throw RuntimeException("正在进行云解压，请稍等...(${status.progress}%)")
+                throw DecompressionLoadingException("正在进行云解压，请稍等...(${status.progress}%)")
             }
 
             is ZipStatus.Normal -> {
@@ -401,7 +426,7 @@ class UnzipAllFileWorker(
 
         val notificationBuilder =
             NotificationCompat.Builder(applicationContext, "unzip_completion_channel")
-                .setContentTitle(if (success) "解压完成" else "⚠️ 解压失败")
+                .setContentTitle(if (success) "解压完成" else "解压失败")
                 .setContentText(message)
                 .setSmallIcon(R.drawable.ic_launcher_foreground)
                 .setContentIntent(pendingIntent)

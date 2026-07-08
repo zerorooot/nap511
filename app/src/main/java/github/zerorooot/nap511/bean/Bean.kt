@@ -23,6 +23,13 @@ sealed interface ZipStatus {
     data class UnsupportedOrError(val message: String) : ZipStatus
 }
 
+/**
+ * 异常，正在进行云解压
+ */
+class DecompressionLoadingException(
+    message: String,
+    cause: Throwable? = null
+) : Exception(message, cause)
 // 统一定义接口返回的包装结构
 data class BaseResponse<T>(
     val state: Boolean = false,

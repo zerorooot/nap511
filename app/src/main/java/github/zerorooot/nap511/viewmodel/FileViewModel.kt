@@ -320,14 +320,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
             }
 
             try {
-//                fileService.order(
-//                    hashMapOf(
-//                        "user_order" to orderBean.type,
-//                        "user_asc" to orderBean.asc.toString(),
-//                        "file_id" to currentCid,
-//                        "fc_mix" to "0"
-//                    )
-//                )
                 val files =
                     fileService.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
                 setFileBeanProperty(files.fileBeanList)
@@ -336,6 +328,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
 
                 saveFileCache()
             } catch (e: NullPointerException) {
+                fileListCache.clear()
                 App.instance.toast("获取文件列表失败，建议更新您的Cookie")
                 App.cacheFile.delete()
             } catch (e: Exception) {
