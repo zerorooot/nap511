@@ -15,8 +15,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import com.elvishew.xlog.XLog
@@ -24,37 +22,20 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.LocalDrawerState
+import github.zerorooot.nap511.viewmodel.FileViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.io.BufferedInputStream
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.FileInputStream
 import java.io.IOException
-import java.io.InputStream
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
-fun LogScreen() {
-    val log = remember {
-        mutableStateOf(
-            try {
-                readInputStreamAsString(
-                    FileInputStream(
-                        File(
-                            App.instance.cacheDir,
-                            "log"
-                        )
-                    )
-                )
-            } catch (_: Exception) {
-                ""
-            }
-        )
-    }
-
+fun LogScreen(fileViewModel: FileViewModel) {
+    val log = fileViewModel.logValue
     val verticalScrollState = rememberScrollState()
     val horizontalScrollState = rememberScrollState()
     val coroutine = rememberCoroutineScope()
@@ -86,9 +67,15 @@ fun LogScreen() {
             "导出日志" -> {
                 writeToPublicExternalStorage(
                     App.instance,
-                    "${App.instance.getStringRes(R.string.app_name)}_${LocalDateTime.now().format(formatter)}_log.txt",
-                    log.value
+                    "${App.instance.getStringRes(R.string.app_name)}_${
+                        LocalDateTime.now().format(formatter)
+                    }_log.txt",
+                    log.value, coroutine
                 )
+            }
+
+            "刷新日志" -> {
+                fileViewModel.readLogValue()
             }
 
             "ModalNavigationDrawerMenu" -> coroutine.launch { drawerState.open() }
@@ -121,59 +108,45 @@ fun LogScreen() {
 
 }
 
-//private fun checkAndRequestPermissions() {
-//    if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-//        requestPermissions(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), 1)
-//    }
-//}
 
 fun writeToPublicExternalStorage(
     applicationContext: Application,
     fileName: String,
-    content: String
+    content: String,
+    coroutine: CoroutineScope
 ) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        // Scoped Storage for Android 10+
-        val resolver = applicationContext.contentResolver
-        val values = ContentValues().apply {
-            put(MediaStore.Downloads.DISPLAY_NAME, fileName)
-            put(MediaStore.Downloads.MIME_TYPE, "text/plain")
-            put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-        }
-        val uri =
-            resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-        uri?.let {
-            resolver.openOutputStream(it)?.use { outputStream ->
-                outputStream.write(content.toByteArray())
-                App.instance.toast("导出成功，日志文件保存至 Downloads 目录")
-                XLog.d("FileWrite File written to Downloads: $uri")
+    coroutine.launch(Dispatchers.IO) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Scoped Storage for Android 10+
+            val resolver = applicationContext.contentResolver
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+                put(MediaStore.Downloads.MIME_TYPE, "text/plain")
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+            }
+            val uri =
+                resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            uri?.let {
+                resolver.openOutputStream(it)?.use { outputStream ->
+                    outputStream.write(content.toByteArray())
+                    App.instance.toast("导出成功，日志文件保存至 Downloads 目录")
+                    XLog.d("FileWrite File written to Downloads: $uri")
+                }
+            }
+        } else {
+            // Legacy method for Android 9 and below
+            val file = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                fileName
+            )
+            try {
+                file.writeText(content)
+                XLog.d("FileWrite File written to: ${file.absolutePath}")
+            } catch (e: IOException) {
+                e.printStackTrace()
+                XLog.e("FileWrite Error writing file: $e")
             }
         }
-    } else {
-        // Legacy method for Android 9 and below
-        val file = File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-            fileName
-        )
-        try {
-            file.writeText(content)
-            XLog.d("FileWrite File written to: ${file.absolutePath}")
-        } catch (e: IOException) {
-            e.printStackTrace()
-            XLog.e("FileWrite Error writing file: $e")
-        }
     }
 }
 
-
-fun readInputStreamAsString(`in`: InputStream): String {
-    val bis = BufferedInputStream(`in`)
-    val buf = ByteArrayOutputStream()
-    var result = bis.read()
-    while (result != -1) {
-        val b = result.toByte()
-        buf.write(b.toInt())
-        result = bis.read()
-    }
-    return buf.toString()
-}

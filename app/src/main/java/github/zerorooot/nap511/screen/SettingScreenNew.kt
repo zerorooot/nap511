@@ -33,7 +33,7 @@ import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.activity.OfflineTaskWorker
+import github.zerorooot.nap511.worker.OfflineTaskWorker
 import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App

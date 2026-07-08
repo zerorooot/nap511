@@ -10,7 +10,7 @@ import androidx.work.WorkManager
 import com.elvishew.xlog.XLog
 import com.google.common.reflect.TypeToken
 import com.google.gson.Gson
-import github.zerorooot.nap511.activity.UnzipAllFileWorker
+import github.zerorooot.nap511.worker.UnzipAllFileWorker
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.util.App

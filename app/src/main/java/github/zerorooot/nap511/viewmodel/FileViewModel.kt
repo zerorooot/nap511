@@ -40,6 +40,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.io.BufferedInputStream
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileInputStream
 
 
 @SuppressLint("MutableCollectionMutableState")
@@ -73,6 +77,9 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
 
     //页面手势
     var gesturesEnabled by mutableStateOf(true)
+
+    //日志信息
+    var logValue = mutableStateOf("")
 
     /**
      * 打开对话框相关（状态下沉到 ViewModel 本地）
@@ -140,6 +147,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                 }
             }
         }
+        readLogValue()
     }
 
 
@@ -268,14 +276,14 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
             if (fileListCache.containsKey(cid)) {
                 return@launch
             }
-            fileService.order(
-                hashMapOf(
-                    "user_order" to orderBean.type,
-                    "user_asc" to orderBean.asc.toString(),
-                    "file_id" to currentCid,
-                    "fc_mix" to "0"
-                )
-            )
+//            fileService.order(
+//                hashMapOf(
+//                    "user_order" to orderBean.type,
+//                    "user_asc" to orderBean.asc.toString(),
+//                    "file_id" to currentCid,
+//                    "fc_mix" to "0"
+//                )
+//            )
             val files = fileService.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
             setFileBeanProperty(files.fileBeanList)
             fileListCache[cid] = files
@@ -312,14 +320,14 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
             }
 
             try {
-                fileService.order(
-                    hashMapOf(
-                        "user_order" to orderBean.type,
-                        "user_asc" to orderBean.asc.toString(),
-                        "file_id" to currentCid,
-                        "fc_mix" to "0"
-                    )
-                )
+//                fileService.order(
+//                    hashMapOf(
+//                        "user_order" to orderBean.type,
+//                        "user_asc" to orderBean.asc.toString(),
+//                        "file_id" to currentCid,
+//                        "fc_mix" to "0"
+//                    )
+//                )
                 val files =
                     fileService.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
                 setFileBeanProperty(files.fileBeanList)
@@ -481,5 +489,27 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         }
     }
 
-
+     fun readLogValue() {
+        viewModelScope.launch(Dispatchers.IO) {
+            logValue.value = try {
+                val fileInputStream = FileInputStream(
+                    File(
+                        App.instance.cacheDir,
+                        "log"
+                    )
+                )
+                val bis = BufferedInputStream(fileInputStream)
+                val buf = ByteArrayOutputStream()
+                var result = bis.read()
+                while (result != -1) {
+                    val b = result.toByte()
+                    buf.write(b.toInt())
+                    result = bis.read()
+                }
+                buf.toString()
+            } catch (e: Exception) {
+                ""
+            }
+        }
+    }
 }

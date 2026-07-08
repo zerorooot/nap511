@@ -62,7 +62,6 @@ import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.jakewharton.processphoenix.ProcessPhoenix
-import github.zerorooot.nap511.activity.OfflineTaskWorker
 import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.screen.CaptchaVideoWebViewScreen
@@ -91,6 +90,7 @@ import github.zerorooot.nap511.viewmodel.deleteMultiple
 import github.zerorooot.nap511.viewmodel.openFileOrderDialog
 import github.zerorooot.nap511.viewmodel.openSearchDialog
 import github.zerorooot.nap511.viewmodel.openUnzipAllFileDialog
+import github.zerorooot.nap511.worker.OfflineTaskWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -346,7 +346,7 @@ class MainActivity : AppCompatActivity() {
                             CaptchaVideoWebViewScreen()
                         }
 
-                        ConfigKeyUtil.LOG_SCREEN -> LogScreen()
+                        ConfigKeyUtil.LOG_SCREEN -> LogScreen(fileViewModel)
                         ConfigKeyUtil.EXIT_APPLICATION -> ExitApp()
 
                         ConfigKeyUtil.PHOTO -> {

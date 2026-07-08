@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.activity
+package github.zerorooot.nap511.worker
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ForegroundInfo
+import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
@@ -24,6 +25,7 @@ import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -49,7 +51,7 @@ class UnzipAllFileWorker(
     private val cid: String by lazy {
         inputData.getString("cid").toString()
     }
-    private val pendingIntent: PendingIntent by lazy {
+    private val jumpPendingIntent: PendingIntent by lazy {
         val intent = Intent(this.applicationContext, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             action = "jump"
@@ -62,6 +64,10 @@ class UnzipAllFileWorker(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }
+
+    // 1. 创建取消任务的 PendingIntent (这里的 getId() 是 Worker 自带的方法，获取当前任务ID)
+    val cancelPendingIntent = WorkManager.getInstance(applicationContext)
+        .createCancelPendingIntent(id)
 
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
@@ -95,22 +101,26 @@ class UnzipAllFileWorker(
         val unzipFailList = arrayListOf<FileBean>()
 
         // 3. 遍历处理文件
-        fileBeanList.forEachIndexed { i, fileBean ->
-            // 核心解压逻辑抽离到了 processSingleZipFile
-            val (isSuccess, stateMessage) = processSingleZipFile(fileBean, password)
+        try {
+            fileBeanList.forEachIndexed { i, fileBean ->
+                // 核心解压逻辑抽离到了 processSingleZipFile
+                val (isSuccess, stateMessage) = processSingleZipFile(fileBean, password)
 
-            if (!isSuccess) {
-                sj.add("${fileBean.name} 解压失败！原因：$stateMessage")
-                unzipFailList.add(fileBean)
-            }
+                if (!isSuccess) {
+                    sj.add("${fileBean.name} 解压失败！原因：$stateMessage")
+                    unzipFailList.add(fileBean)
+                }
 
-            // 更新解压进度
-            val progressMsg = if (isSuccess) {
-                "${fileBean.name} ${i + 1}/$size"
-            } else {
-                "${fileBean.name} 解压失败！${i + 1}/$size $stateMessage "
+                // 更新解压进度
+                val progressMsg = if (isSuccess) {
+                    "${fileBean.name} ${i + 1}/$size"
+                } else {
+                    "${fileBean.name} 解压失败！${i + 1}/$size $stateMessage "
+                }
+                updateNotification("解压中", i + 1, size, progressMsg)
             }
-            updateNotification("解压中", i + 1, size, progressMsg)
+        } catch (e: CancellationException) {
+            XLog.d("unzipAllFileWorker CancellationException")
         }
 
 
@@ -120,7 +130,7 @@ class UnzipAllFileWorker(
             if (isAllSuccess) "${size}个文件解压完成！" else "❎ ${unzipFailList.size}个文件解压失败！"
 
         showCompletionNotification(isAllSuccess, message, sj.toString(), cid)
-        XLog.d(message)
+        XLog.d(message + "\n" + sj.toString())
         App.instance.toast(message)
 
         // 5. 失败文件转移及返回结果
@@ -241,8 +251,13 @@ class UnzipAllFileWorker(
             XLog.d("updateProgressNotification $content")
             try {
                 val build =
-                    createNotification(titleString, content, progress, max)
-                        .setContentIntent(pendingIntent)
+                    createNotification(titleString, content, "${progress + 1}/$max", progress, max)
+                        .setContentIntent(jumpPendingIntent)
+                        .addAction(
+                            android.R.drawable.ic_menu_close_clear_cancel,
+                            "取消",
+                            cancelPendingIntent
+                        )
                         .build()
                 notificationManager.notify(NOTIFICATION_ID, build)
             } catch (e: Exception) {
@@ -307,13 +322,16 @@ class UnzipAllFileWorker(
      * 创建前台通知
      */
     private fun createNotification(
-        titleString: String, detailedText: String, progress: Int, max: Int
+        titleString: String, detailedText: String, shortCritical: String, progress: Int, max: Int
     ): NotificationCompat.Builder {
         val notificationBuilder =
-            NotificationCompat.Builder(applicationContext, CHANNEL_ID).setContentTitle(titleString)
+            NotificationCompat.Builder(applicationContext, CHANNEL_ID)
+                .setContentTitle(titleString)
                 .setContentText(detailedText) // 具体内容
-                .setAutoCancel(false).setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setAutoCancel(false)
+                .setSmallIcon(R.drawable.ic_launcher_foreground)
                 .setOnlyAlertOnce(true)
+                .setShortCriticalText(shortCritical)
                 // [修改] 明确设置为进度类型，这有助于系统正确渲染进度条样式 CATEGORY_SERVICE CATEGORY_PROGRESS
                 .setCategory(NotificationCompat.CATEGORY_PROGRESS).setStyle(
                     NotificationCompat.ProgressStyle()
@@ -339,7 +357,8 @@ class UnzipAllFileWorker(
     private fun createForegroundInfo(
         titleString: String, detailedText: String, progress: Int, max: Int
     ): ForegroundInfo {
-        val build = createNotification(titleString, detailedText, progress, max).build()
+        val build =
+            createNotification(titleString, detailedText, "⚙\uFE0F初始化", progress, max).build()
         // Android 14 前台服务类型适配
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             return ForegroundInfo(
@@ -382,9 +401,12 @@ class UnzipAllFileWorker(
 
         val notificationBuilder =
             NotificationCompat.Builder(applicationContext, "unzip_completion_channel")
-                .setContentTitle(if (success) "解压完成" else "⚠️ 解压失败").setContentText(message)
-                .setSmallIcon(R.mipmap.ic_launcher).setContentIntent(pendingIntent)
-                .setAutoCancel(true).setPriority(NotificationCompat.PRIORITY_MAX)
+                .setContentTitle(if (success) "解压完成" else "⚠️ 解压失败")
+                .setContentText(message)
+                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .setPriority(NotificationCompat.PRIORITY_MAX)
         if (Build.VERSION.SDK_INT >= 35) { // 35+ 或 Build.VERSION_CODES.BAKLAVA
             // 这一行让系统知道这是一个高优先级的持续任务（胶囊样式）
             notificationBuilder.setOngoing(true)
