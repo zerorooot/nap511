@@ -427,7 +427,7 @@ fun FileScreen(
                         ) {
                             itemsIndexed(
                                 items = fileBeanList,
-                                key = { _, item -> item.hashCode() }
+                                key = { _, item -> item.sha1 }
                             ) { index, item ->
                                 FileCellItem(
                                     item,

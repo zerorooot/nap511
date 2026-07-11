@@ -187,9 +187,9 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     internal val _launchVideoEvent = MutableSharedFlow<VideoInfoBean>()
     val launchVideoEvent = _launchVideoEvent.asSharedFlow()
 
+    private val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
     fun loadCacheFile() {
         viewModelScope.launch(Dispatchers.IO) {
-            val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
             if (fileListCache.isEmpty() && saveRequestCache) {
                 val file = App.cacheFile
                 val content = if (file.exists()) file.readText() else "{}"
@@ -209,7 +209,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     fun saveFileCache() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
                 if (fileListCache.isNotEmpty() && saveRequestCache) {
                     val type = object : TypeToken<HashMap<String, FilesBean>?>() {}.type
                     val json = Gson().toJson(fileListCache, type)
@@ -482,7 +481,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         }
     }
 
-     fun readLogValue() {
+    fun readLogValue() {
         viewModelScope.launch(Dispatchers.IO) {
             logValue.value = try {
                 val fileInputStream = FileInputStream(

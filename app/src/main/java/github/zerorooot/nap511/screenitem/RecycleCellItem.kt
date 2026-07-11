@@ -59,6 +59,8 @@ fun RecycleCellItem(
                                 .memoryCachePolicy(CachePolicy.ENABLED)
                                 .diskCachePolicy(CachePolicy.ENABLED)
                                 .networkCachePolicy(CachePolicy.ENABLED)
+                                .memoryCacheKey(recycleBean.id)
+                                .diskCacheKey(recycleBean.id)
                                 .apply(block = fun ImageRequest.Builder.() {
                                     scale(Scale.FILL)
                                     placeholder(image)

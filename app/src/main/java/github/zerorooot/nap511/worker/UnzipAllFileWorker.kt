@@ -272,7 +272,7 @@ class UnzipAllFileWorker(
             XLog.d("updateProgressNotification $content")
             try {
                 val build =
-                    createNotification(titleString, content, "${progress + 1}/$max", progress, max)
+                    createNotification(titleString, content, "$progress/$max", progress, max)
                         .setContentIntent(jumpPendingIntent)
                         .addAction(
                             android.R.drawable.ic_menu_close_clear_cancel,

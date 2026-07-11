@@ -383,7 +383,8 @@ class MainActivity : AppCompatActivity() {
             Image(
                 painter = rememberAsyncImagePainter(
                     ImageRequest.Builder(LocalContext.current).data(avatarBean.value.face)
-                        .memoryCachePolicy(CachePolicy.ENABLED).diskCachePolicy(CachePolicy.ENABLED)
+                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .diskCachePolicy(CachePolicy.ENABLED)
                         .networkCachePolicy(CachePolicy.ENABLED)
                         .memoryCacheKey(avatarBean.value.userId)
                         .diskCacheKey(avatarBean.value.userName)

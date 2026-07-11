@@ -115,7 +115,7 @@ internal fun FileViewModel.delete(index: Int) {
 
         //删除文件夹内的文件夹
         if (fileBean.isFolder) {
-            val results = mutableListOf<String>()
+            val results = arrayListOf<String>()
             val walk: (String) -> Unit = object : (String) -> Unit {
                 override fun invoke(cid: String) {
                     fileListCache[cid]?.fileBeanList?.stream()?.filter { it.isFolder }
@@ -187,6 +187,20 @@ internal fun FileViewModel.deleteMultiple() {
             mapOf["fid[$index]"] = fileBean.fileId
             //update image cache
             imageBeanCache[cid]?.remove(index)
+            if (fileBean.isFolder) {
+                val results = arrayListOf<String>()
+                val walk: (String) -> Unit = object : (String) -> Unit {
+                    override fun invoke(cid: String) {
+                        fileListCache[cid]?.fileBeanList?.stream()?.filter { it.isFolder }
+                            ?.forEach {
+                                results.add(it.categoryId)
+                                this(it.categoryId)
+                            }
+                    }
+                }
+                walk(fileBean.categoryId)
+                results.forEach { fileListCache.remove(it) }
+            }
         }
         //提前删除，优化速度
         fileBeanList.removeAll(filter)
