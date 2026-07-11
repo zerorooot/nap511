@@ -103,11 +103,13 @@ fun FileCellItem(
                                 rememberAsyncImagePainter(
                                     ImageRequest.Builder(LocalContext.current)
                                         .data(data = fileBean.photoThumb)
+                                        // 强制缓存有效期为 365 天，无视服务端的 max-age
+                                        .addHeader("Cache-Control", "max-stale=31536000")
                                         .memoryCachePolicy(CachePolicy.ENABLED)
                                         .diskCachePolicy(CachePolicy.ENABLED)
                                         .networkCachePolicy(CachePolicy.ENABLED)
-                                        .memoryCacheKey(fileBean.sha1)
-                                        .diskCacheKey(fileBean.sha1)
+                                        .memoryCacheKey(fileBean.fileId)
+                                        .diskCacheKey(fileBean.fileId)
                                         .apply(block = fun ImageRequest.Builder.() {
                                             scale(coil.size.Scale.FILL)
                                             placeholder(image)

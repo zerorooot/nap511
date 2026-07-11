@@ -97,10 +97,10 @@
                 <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\..*\\..*\\..*\\..*\\..*\\..*\\.torrent" />
             </intent-filter>
         </activity> <!-- android:screenOrientation="reverseLandscape" -->
+<!--        android:screenOrientation="sensorLandscape"-->
         <activity
             android:name=".activity.VideoActivity"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
-            android:screenOrientation="sensorLandscape"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar.FullScreen" />
         <activity
             android:name=".MainActivity"

@@ -15,27 +15,34 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.LocalDrawerState
-import github.zerorooot.nap511.viewmodel.FileViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.BufferedInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileInputStream
 import java.io.IOException
+import java.io.InputStream
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
-fun LogScreen(fileViewModel: FileViewModel) {
-    val log = fileViewModel.logValue
+fun LogScreen() {
+    var log by remember { mutableStateOf(readLog()) }
     val verticalScrollState = rememberScrollState()
     val horizontalScrollState = rememberScrollState()
     val coroutine = rememberCoroutineScope()
@@ -61,7 +68,7 @@ fun LogScreen(fileViewModel: FileViewModel) {
                     App.instance.cacheDir,
                     "log"
                 ).delete()
-                log.value = ""
+                log = ""
             }
 
             "导出日志" -> {
@@ -70,12 +77,15 @@ fun LogScreen(fileViewModel: FileViewModel) {
                     "${App.instance.getStringRes(R.string.app_name)}_${
                         LocalDateTime.now().format(formatter)
                     }_log.txt",
-                    log.value, coroutine
+                    log, coroutine
                 )
             }
 
             "刷新日志" -> {
-                fileViewModel.readLogValue()
+                log = readLog()
+                coroutine.launch {
+                    verticalScrollState.animateScrollTo(verticalScrollState.maxValue)
+                }
             }
 
             "ModalNavigationDrawerMenu" -> coroutine.launch { drawerState.open() }
@@ -93,7 +103,7 @@ fun LogScreen(fileViewModel: FileViewModel) {
         ) {
 
             Text(
-                text = log.value,
+                text = log,
                 style = MaterialTheme.typography.bodyLarge
             )
         }
@@ -108,6 +118,20 @@ fun LogScreen(fileViewModel: FileViewModel) {
 
 }
 
+fun readLog(): String {
+    return try {
+        readInputStreamAsString(
+            FileInputStream(
+                File(
+                    App.instance.cacheDir,
+                    "log"
+                )
+            )
+        )
+    } catch (_: Exception) {
+        ""
+    }
+}
 
 fun writeToPublicExternalStorage(
     applicationContext: Application,
@@ -150,3 +174,14 @@ fun writeToPublicExternalStorage(
     }
 }
 
+fun readInputStreamAsString(`in`: InputStream): String {
+    val bis = BufferedInputStream(`in`)
+    val buf = ByteArrayOutputStream()
+    var result = bis.read()
+    while (result != -1) {
+        val b = result.toByte()
+        buf.write(b.toInt())
+        result = bis.read()
+    }
+    return buf.toString()
+}

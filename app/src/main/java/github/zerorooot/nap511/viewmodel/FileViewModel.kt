@@ -40,10 +40,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.io.BufferedInputStream
-import java.io.ByteArrayOutputStream
-import java.io.File
-import java.io.FileInputStream
 
 
 @SuppressLint("MutableCollectionMutableState")
@@ -78,8 +74,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     //页面手势
     var gesturesEnabled by mutableStateOf(true)
 
-    //日志信息
-    var logValue = mutableStateOf("")
 
     /**
      * 打开对话框相关（状态下沉到 ViewModel 本地）
@@ -147,7 +141,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                 }
             }
         }
-        readLogValue()
     }
 
 
@@ -196,6 +189,10 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                 val type = object : TypeToken<HashMap<String, FilesBean>?>() {}.type
                 fileListCache = Gson().fromJson(content, type)
                 XLog.d("loading file list cache ${fileListCache.size}")
+            }
+            //如果不保存，及时删除文件，防止文件越来越大
+            if (!saveRequestCache && App.cacheFile.exists()) {
+                App.cacheFile.delete()
             }
             getFiles(currentCid)
         }
@@ -478,30 +475,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         _currentPath.value = path
         if (!fileListCache.containsKey(currentCid)) {
             fileListCache[currentCid] = files
-        }
-    }
-
-    fun readLogValue() {
-        viewModelScope.launch(Dispatchers.IO) {
-            logValue.value = try {
-                val fileInputStream = FileInputStream(
-                    File(
-                        App.instance.cacheDir,
-                        "log"
-                    )
-                )
-                val bis = BufferedInputStream(fileInputStream)
-                val buf = ByteArrayOutputStream()
-                var result = bis.read()
-                while (result != -1) {
-                    val b = result.toByte()
-                    buf.write(b.toInt())
-                    result = bis.read()
-                }
-                buf.toString()
-            } catch (e: Exception) {
-                ""
-            }
         }
     }
 }

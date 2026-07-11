@@ -346,7 +346,7 @@ class MainActivity : AppCompatActivity() {
                             CaptchaVideoWebViewScreen()
                         }
 
-                        ConfigKeyUtil.LOG_SCREEN -> LogScreen(fileViewModel)
+                        ConfigKeyUtil.LOG_SCREEN -> LogScreen()
                         ConfigKeyUtil.EXIT_APPLICATION -> ExitApp()
 
                         ConfigKeyUtil.PHOTO -> {

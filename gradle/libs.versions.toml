@@ -54,8 +54,10 @@ compose-zoom = { module = "com.github.SmartToolFactory:Compose-Zoom", version.re
 composeprefs = { module = "com.github.JamalMulla:ComposePrefs", version.ref = "composeprefs" }
 converter-gson = { module = "com.squareup.retrofit2:converter-gson", version.ref = "converterGson" }
 gsyvideoplayer-arm64 = { module = "io.github.carguo:gsyvideoplayer-arm64", version.ref = "gsyvideoplayerJava" }
+gsyvideoplayer-compose = { module = "io.github.carguo:gsyvideoplayer-compose", version.ref = "gsyvideoplayerJava" }
 gsyvideoplayer-exo2 = { module = "io.github.carguo:gsyvideoplayer-exo2", version.ref = "gsyvideoplayerJava" }
-    gsyvideoplayer-java = { module = "io.github.carguo:gsyvideoplayer-java", version.ref = "gsyvideoplayerJava" }
+#gsyvideoplayer-java = { module = "io.github.carguo:gsyvideoplayer-java", version.ref = "gsyvideoplayerJava" }
+
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }

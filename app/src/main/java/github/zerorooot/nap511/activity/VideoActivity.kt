@@ -67,6 +67,9 @@ class VideoActivity : AppCompatActivity() {
             VideoInfoBean::class.java
         )
     }
+    private val isAutoRotate by lazy {
+        DataStoreUtil.getData(ConfigKeyUtil.AUTO_ROTATE, false)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -80,36 +83,36 @@ class VideoActivity : AppCompatActivity() {
         videoPlayer = findViewById(R.id.pre_video_player)
 
         orientationUtils = OrientationUtils(this, videoPlayer)
-
+        videoPlayer.setOrientationUtils(orientationUtils)
         PlayerFactory.setPlayManager(Exo2PlayerManager::class.java)
 
-        videoPlayer.setUp(address, false, null, mapOf("Cookie" to cookie), title)
+        videoPlayer.apply {
+            setUp(address, false, null, mapOf("Cookie" to cookie), title)
+            //增加title
+            titleTextView.visibility = View.VISIBLE
+            titleTextView.isSelected = true
+            seekRatio = 5f
+            //设置返回键
+            backButton.visibility = View.VISIBLE
+            isShowFullAnimation = false
 
-        //增加title
-        videoPlayer.titleTextView.visibility = View.VISIBLE
-        videoPlayer.titleTextView.isSelected = true
-        videoPlayer.seekRatio = 10f
-        //设置返回键
-        videoPlayer.backButton.visibility = View.VISIBLE
-
-        videoPlayer.fullscreenButton.setOnClickListener {
-            orientationUtils.resolveByClick()
-        }
-
-        //设置返回按键功能
-        videoPlayer.backButton.setOnClickListener {
-            back()
+            fullscreenButton.setOnClickListener {
+                orientationUtils.resolveByClick()
+            }
+            //设置返回按键功能
+            backButton.setOnClickListener {
+                back()
+            }
         }
 
         videoPlayer.startPlayLogic()
 
-
-        if (DataStoreUtil.getData(ConfigKeyUtil.AUTO_ROTATE, false)) {
-            //设置竖屏
-            lifecycleScope.launch {
+        //设置横屏
+        lifecycleScope.launch {
+            if (isAutoRotate) {
                 val videoHeight = videoInfo.height
                 val videoWidth = videoInfo.width
-                if (videoHeight > videoWidth) {
+                if (videoHeight < videoWidth) {
                     orientationUtils.resolveByClick()
                 }
             }
@@ -184,13 +187,6 @@ class VideoActivity : AppCompatActivity() {
         }
     }
 
-    override fun onConfigurationChanged(newConfig: Configuration) {
-        super.onConfigurationChanged(newConfig)
-        // 配合锁屏键和重力感应，只有在未被锁定且正在播放时才处理旋转
-        if (!videoPlayer.isIfCurrentIsFullscreen) {
-            videoPlayer.onConfigurationChanged(this, newConfig, orientationUtils, false, false)
-        }
-    }
 
     override fun onPause() {
         videoPlayer.onVideoPause()

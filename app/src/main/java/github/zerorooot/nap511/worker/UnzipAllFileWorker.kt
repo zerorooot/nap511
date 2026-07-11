@@ -145,7 +145,7 @@ class UnzipAllFileWorker(
 
         // 2. 统一处理通知、日志和 Toast
         showCompletionNotification(isAllSuccess, message, unzipResult, cid)
-        XLog.d("$message\n$unzipResult")
+        XLog.d("showCompletionNotification $message\n$unzipResult")
         App.instance.toast(message)
 
         // 3. 统一构建返回的 Data
@@ -217,6 +217,9 @@ class UnzipAllFileWorker(
 
     private suspend fun handleFailedFiles(unzipFailList: List<FileBean>): String? {
         val data = DataStoreUtil.getData(ConfigKeyUtil.MOVE_FAIL_FILE, "")
+        if (data.isEmpty()) {
+            XLog.d("handleFailedFiles 不移动解压失败的文件")
+        }
         if (unzipFailList.isNotEmpty() && data.isNotEmpty()) {
             return moveFailFile(cid, data, unzipFailList)
         }

@@ -3,6 +3,7 @@ package github.zerorooot.nap511.screen
 import android.app.Activity
 import android.content.ClipData
 import android.content.Intent
+import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -167,24 +168,22 @@ fun FileScreen(
         fileViewModel.photoFileBeanList.addAll(photoList)
         fileViewModel.photoIndexOf = photoList.indexOf(fileBean)
         fileViewModel.selectedItem = ConfigKeyUtil.PHOTO
+        fileViewModel.setRefreshingStatus(false)
     }
 
 
     fun handleTorrentClick(fileBean: FileBean) {
-        fileViewModel.setRefreshingStatus(true)
         offlineFileViewModel.getTorrentTask(fileBean.sha1)
         fileViewModel.openCreateSelectTorrentFileDialog()
     }
 
     fun handleZipClick(i: Int) {
-        fileViewModel.setRefreshingStatus(true)
         fileViewModel.selectIndex = i
         fileViewModel.getZipListFile()
     }
 
     fun handleTextClick(i: Int, fileBean: FileBean) {
         if (fileBean.size.toLong() < 1 * 1024 * 100) {
-            fileViewModel.setRefreshingStatus(true)
             fileViewModel.selectIndex = i
             fileViewModel.downloadText(fileBean)
         } else {
@@ -192,11 +191,23 @@ fun FileScreen(
         }
     }
 
+// 记录上次点击时间，使用 longArrayOf 避免无意义的重组
+    val lastClickTime = remember { longArrayOf(0L) }
     // Assembled myItemOnClick — routes to focused handlers
     fun myItemOnClick(i: Int) {
         if (fileViewModel.isLongClickState) {
             handleMultiSelectClick(i)
         } else {
+            val currentTime = SystemClock.elapsedRealtime()
+            if (currentTime - lastClickTime[0] < 300L) { // 300ms 内的连点会被忽略
+                return
+            }
+
+            lastClickTime[0] = currentTime
+
+
+            fileViewModel.setRefreshingStatus(true)
+
             //记录上级目录当前的位置
             fileViewModel.setListLocationAndClickCache(i, listState)
             val fileBean = fileBeanList[i]
@@ -427,7 +438,8 @@ fun FileScreen(
                         ) {
                             itemsIndexed(
                                 items = fileBeanList,
-                                key = { _, item -> item.sha1 }
+                                //已经在FileViewModel.setFileBeanProperty对文件夹设置了fileId
+                                key = { index, item -> item.fileId.ifEmpty { "placeholder_$index" } }
                             ) { index, item ->
                                 FileCellItem(
                                     item,

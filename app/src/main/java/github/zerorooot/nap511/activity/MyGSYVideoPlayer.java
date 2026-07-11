@@ -1,11 +1,9 @@
 package github.zerorooot.nap511.activity;
 
-import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
-import android.media.AudioManager;
 import android.os.BatteryManager;
 import android.os.Handler;
 import android.os.Looper;
@@ -40,6 +38,7 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     private TextView batteryTextView;
     private TextView timeTextView;
 
+    private OrientationUtils orientationUtils;
 
     public MyGSYVideoPlayer(Context context) {
         super(context);
@@ -58,6 +57,9 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         initView();
     }
 
+    public void setOrientationUtils(OrientationUtils orientationUtils) {
+        this.orientationUtils = orientationUtils;
+    }
 
     private void initView() {
         batteryTextView = findViewById(R.id.batteryTextView);
@@ -209,6 +211,34 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         setUp(url, mCache, null, title, true);
         mTitleTextView.setText(title);
         startPlayLogic();
+    }
+
+    @Override
+    public void touchDoubleUp(MotionEvent event) {
+        float x = event.getX();
+        int screenWidth = mScreenWidth;
+
+        //竖屏
+        if (orientationUtils.getScreenType() == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) {
+            screenWidth = mScreenHeight;
+        }
+
+        if (x <= screenWidth * 0.3) {
+            //快退
+            forwardOrRewind(forwardRewindIncrementMs * (-1));
+        }
+
+        if (x > screenWidth * 0.3 && x < screenWidth * 0.6) {
+            if (!mHadPlay) {
+                return;
+            }
+            clickStartIcon();
+        }
+        if (x >= screenWidth * 0.6) {
+            //快进
+            forwardOrRewind(forwardRewindIncrementMs);
+        }
+
     }
 
     //todo 视频预览

@@ -68,7 +68,7 @@ dependencies {
     implementation(libs.accompanist.pager.indicators)
     implementation(libs.compose.zoom)
     implementation(libs.accompanist.systemuicontroller)
-    implementation(libs.gsyvideoplayer.java)
+    implementation(libs.gsyvideoplayer.compose)
     implementation(libs.gsyvideoplayer.exo2)
     implementation(libs.gsyvideoplayer.arm64)
 
