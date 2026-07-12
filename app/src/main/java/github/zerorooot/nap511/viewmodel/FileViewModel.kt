@@ -9,8 +9,15 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.concurrent.futures.await
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
+import androidx.work.Data
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import androidx.work.WorkQuery
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -29,10 +36,10 @@ import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.repository.DialogEvent
 import github.zerorooot.nap511.repository.DialogEventRepository
 import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.worker.OfflineTaskWorker
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -169,10 +176,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     //小文件缓存
     internal var textFileCache = hashMapOf<FileBean, ByteArray?>()
     var orderBean = OrderBean(OrderEnum.name, 1)
-    internal val fileService: FileService by lazy {
-        FileService.getInstance(cookie)
-    }
-
     internal val fileRepository: FileRepository by lazy {
         FileRepository.getInstance(cookie)
     }
@@ -272,15 +275,8 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
             if (fileListCache.containsKey(cid)) {
                 return@launch
             }
-//            fileService.order(
-//                hashMapOf(
-//                    "user_order" to orderBean.type,
-//                    "user_asc" to orderBean.asc.toString(),
-//                    "file_id" to currentCid,
-//                    "fc_mix" to "0"
-//                )
-//            )
-            val files = fileService.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
+            val files =
+                fileRepository.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
             setFileBeanProperty(files.fileBeanList)
             fileListCache[cid] = files
         }
@@ -295,7 +291,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
      */
     fun getRemainingSpace() {
         viewModelScope.launch {
-            val gson = fileService.remainingSpace()
+            val gson = fileRepository.remainingSpace()
             if (!gson.get("state").asBoolean) {
                 //{"state":false,"error":"登录超时，请重新登录。","errNo":990001,"request":"/files/index_info?count_space_nums=1"}
                 return@launch
@@ -317,7 +313,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
 
             try {
                 val files =
-                    fileService.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
+                    fileRepository.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
                 setFileBeanProperty(files.fileBeanList)
                 setFiles(files)
                 _isRefreshing.value = false
@@ -351,7 +347,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
             "fc_mix" to "0"
         )
         viewModelScope.launch {
-            val order = fileService.order(map)
+            val order = fileRepository.order(map)
             if (order.state) {
                 refresh(currentCid)
             } else {
@@ -420,7 +416,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     fun search(searchKey: String) {
         viewModelScope.launch {
             isSearchState = true
-            val files = fileService.search(currentCid, searchKey)
+            val files = fileRepository.search(currentCid, searchKey)
             setFileBeanProperty(files.fileBeanList)
             fileBeanList.clear()
             fileBeanList.addAll(files.fileBeanList)
@@ -475,6 +471,78 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         _currentPath.value = path
         if (!fileListCache.containsKey(currentCid)) {
             fileListCache[currentCid] = files
+        }
+    }
+
+
+    fun handleOfflineTask(forceRecreate: Boolean = false) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val workManager = WorkManager.getInstance(context)
+            val workQuery = WorkQuery.Builder.fromStates(
+                listOf(
+                    WorkInfo.State.ENQUEUED, WorkInfo.State.RUNNING,
+//                    WorkInfo.State.SUCCEEDED,
+//                    WorkInfo.State.FAILED,
+                    WorkInfo.State.BLOCKED, WorkInfo.State.CANCELLED
+                )
+            ).build()
+
+            // 统一使用异步挂起，避免阻塞
+            val workInfos = workManager.getWorkInfos(workQuery).await()
+
+            if (workInfos.isNotEmpty()) {
+                if (forceRecreate) {
+                    // 如果是强制重新添加，则取消之前的所有任务
+                    workInfos.forEach { workManager.cancelWorkById(it.id) }
+                } else {
+                    // 如果只是检查，发现已有任务则直接返回
+                    return@launch
+                }
+            }
+
+            // 获取并过滤本地缓存任务
+            val currentOfflineTask = DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
+                .split("\n")
+                .filter { i -> i.isNotBlank() } // 简化过滤逻辑
+                .toSet()
+                .toMutableList()
+
+            if (currentOfflineTask.isEmpty()) {
+                // 如果是主动添加模式且列表为空，弹 Toast 提示
+                if (forceRecreate) {
+                    App.instance.toast("没有离线任务！")
+                }
+                return@launch
+            }
+
+            XLog.d("handleOfflineTask forceRecreate=$forceRecreate, workInfos size=${workInfos.size}, task size=${currentOfflineTask.size}")
+
+            val defaultOfflineCid = DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
+            // 序列化并提交新任务
+            val listType = object : TypeToken<List<String?>?>() {}.type
+            val list = Gson().toJson(currentOfflineTask, listType)
+            val data = Data.Builder()
+                .putString("defaultOfflineCid", defaultOfflineCid)
+                .putString("list", list)
+                .build()
+
+            val request = OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java)
+                .addTag(ConfigKeyUtil.OFFLINE_TASK_WORKER)
+                .setInputData(data)
+                .build()
+
+            workManager.enqueue(request)
+
+
+            // 将 LiveData 转为 Flow 或者直接观察（这里利用 WorkManager 提供的 LiveData 转换为 Flow）
+            workManager.getWorkInfoByIdLiveData(request.id).asFlow() // 将 LiveData 转换为 Flow
+                .collect { workInfo ->
+                    if (workInfo != null) {
+                        if (workInfo.state == WorkInfo.State.SUCCEEDED || workInfo.state == WorkInfo.State.FAILED) {
+                            refresh(defaultOfflineCid)
+                        }
+                    }
+                }
         }
     }
 }

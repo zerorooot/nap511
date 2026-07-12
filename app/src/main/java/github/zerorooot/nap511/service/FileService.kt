@@ -1,6 +1,5 @@
 package github.zerorooot.nap511.service
 
-import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import github.zerorooot.nap511.bean.BaseResponse
 import github.zerorooot.nap511.bean.BaseReturnMessage
@@ -13,7 +12,6 @@ import github.zerorooot.nap511.bean.ImageDate
 import github.zerorooot.nap511.bean.ProcessData
 import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.bean.VideoInfoBean
-import github.zerorooot.nap511.util.App
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
@@ -94,11 +92,11 @@ interface FileService {
     @GET("files")
     suspend fun getFiles(
         @Query("cid") cid: String,
-        @Query("show_dir") showDir: Int = 1,
-        @Query("aid") aid: Int = 1,
-        @Query("asc") asc: Int = 1,
-        @Query("o") order: String = "file_name",
-        @Query("limit") limit: Int = App.requestLimitCount
+        @Query("show_dir") showDir: Int,
+        @Query("aid") aid: Int,
+        @Query("asc") asc: Int,
+        @Query("o") order: String,
+        @Query("limit") limit: Int
     ): FilesBean
 
     @GET("category/get")
@@ -125,9 +123,9 @@ interface FileService {
     suspend fun search(
         @Query("cid") cid: String,
         @Query("search_value") searchValue: String,
-        @Query("aid") aid: Int = 1,
-        @Query("offset") asc: Int = 0,
-        @Query("limit") limit: Int = 999
+        @Query("aid") aid: Int,
+        @Query("offset") asc: Int,
+        @Query("limit") limit: Int
     ): FilesBean
 
 
@@ -220,7 +218,7 @@ interface FileService {
      * 获取剩余空间
      */
     @GET("files/index_info")
-    suspend fun remainingSpace(@Query("count_space_nums") countSpaceNum: Int = 1): JsonObject
+    suspend fun remainingSpace(@Query("count_space_nums") countSpaceNum: Int): JsonObject
 
     @GET("files/extract_info")
     suspend fun getZipListFile(

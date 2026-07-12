@@ -111,8 +111,13 @@ class MainActivity : AppCompatActivity() {
                         Login()
                         return@Surface
                     }
+
                     //初始化
-                    Init(cookie)
+                    val factory = remember { CookieViewModelFactory(cookie, application) }
+                    val fileViewModel: FileViewModel = viewModel(factory = factory)
+                    val offlineFileViewModel: OfflineFileViewModel = viewModel(factory = factory)
+                    val recycleViewModel: RecycleViewModel = viewModel(factory = factory)
+                    Init(fileViewModel, offlineFileViewModel, recycleViewModel)
 
                     LaunchedEffect(Unit) {
                         //允许通知， 方便离线下载交互 OfflineTaskActivity
@@ -124,7 +129,8 @@ class MainActivity : AppCompatActivity() {
                         val isHandle = handleIntent(intent)
                         //仅没处理intent时才检测未上传的磁力链接
                         if (!isHandle) {
-                            checkOfflineTask(cookie)
+                            //检测添加的离线链接。防止因为种种原因，app添加离线链接，但链接没有上传到115
+                            fileViewModel.handleOfflineTask()
                         }
                     }
 
@@ -135,13 +141,11 @@ class MainActivity : AppCompatActivity() {
 
 
     @Composable
-    private fun Init(cookie: String) {
-        val factory = remember { CookieViewModelFactory(cookie, application) }
-        // 正确使用 Compose 作用域的 viewModel 初始化
-        val fileViewModel: FileViewModel = viewModel(factory = factory)
-        val offlineFileViewModel: OfflineFileViewModel = viewModel(factory = factory)
-        val recycleViewModel: RecycleViewModel = viewModel(factory = factory)
-
+    private fun Init(
+        fileViewModel: FileViewModel,
+        offlineFileViewModel: OfflineFileViewModel,
+        recycleViewModel: RecycleViewModel
+    ) {
         LaunchedEffect(Unit) {
             fileViewModel.loadCacheFile()
         }
@@ -218,48 +222,6 @@ class MainActivity : AppCompatActivity() {
         }
         return isHandle
 
-    }
-
-    /**
-     * 检测添加的离线链接。防止因为种种原因，app添加离线链接，但链接没有上传到115
-     * 后台添加离线链接的代码在OfflineTaskActivity
-     *
-     */
-    private fun checkOfflineTask(cookie: String) {
-        lifecycleScope.launch(Dispatchers.IO) {
-            val workQuery = WorkQuery.Builder.fromStates(
-                listOf(
-                    WorkInfo.State.ENQUEUED, WorkInfo.State.RUNNING,
-//                WorkInfo.State.SUCCEEDED,
-//                WorkInfo.State.FAILED,
-                    WorkInfo.State.BLOCKED, WorkInfo.State.CANCELLED
-                )
-            ).build()
-            // 异步挂起等待结果，避免阻塞主线程
-            val workInfos =
-                WorkManager.getInstance(applicationContext).getWorkInfos(workQuery).await()
-            if (workInfos.isNotEmpty()) return@launch
-            //size等于0,证明后台没有正在添加离线链接
-            val currentOfflineTask =
-                DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "").split("\n")
-                    .filter { i -> i != "" && i != " " }.toSet().toMutableList()
-            //currentOfflineTask等于0,证明没有离线链接缓存
-            if (currentOfflineTask.isEmpty()) {
-                return@launch
-            }
-            XLog.d(
-                "checkOfflineTask workManager workInfos $workInfos currentOfflineTask size ${currentOfflineTask.size}"
-            )
-            //添加离线链接
-            val listType = object : TypeToken<List<String?>?>() {}.type
-            val list = Gson().toJson(currentOfflineTask, listType)
-            val data: Data =
-                Data.Builder().putString("cookie", cookie).putString("list", list).build()
-            val request: OneTimeWorkRequest =
-                OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java)
-                    .addTag(ConfigKeyUtil.OFFLINE_TASK_WORKER).setInputData(data).build()
-            WorkManager.getInstance(App.instance.applicationContext).enqueue(request)
-        }
     }
 
     @OptIn(ExperimentalMaterial3Api::class)

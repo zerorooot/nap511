@@ -74,7 +74,7 @@ internal fun FileViewModel.createFolder(folderName: String) {
     viewModelScope.launch {
         //提前保存cid,防止进入其他文件夹后刷新当前目录
         val cid = currentCid
-        val createFolder = fileService.createFolder(cid, folderName)
+        val createFolder = fileRepository.createFolder(cid, folderName)
         val message = if (createFolder.state) {
             refresh(cid)
             "创建文件夹 $folderName 成功"
@@ -209,7 +209,7 @@ internal fun FileViewModel.deleteMultiple() {
 
         recoverFromLongPress()
 
-        val deleteMultiple = fileService.deleteMultiple(mapOf)
+        val deleteMultiple = fileRepository.deleteMultiple(mapOf)
         val message = if (deleteMultiple.state) {
             "成功删除 ${filter.size} 个文件"
         } else {

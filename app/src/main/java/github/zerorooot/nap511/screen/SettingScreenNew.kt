@@ -102,7 +102,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             true
         }
         findPreference<Preference>(ConfigKeyUtil.CLICK_DOWNLOAD_NOW)?.setOnPreferenceClickListener {
-            addOfflineTask(App.cookie)
+            fileViewModel.handleOfflineTask(true)
             true
         }
 
@@ -162,43 +162,5 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
             }
 
-    }
-
-    private fun addOfflineTask(cookie: String) {
-        val workManager = WorkManager.getInstance(requireContext())
-        val workQuery = WorkQuery.Builder.fromStates(
-            listOf(
-                WorkInfo.State.ENQUEUED, WorkInfo.State.RUNNING,
-//                WorkInfo.State.SUCCEEDED,
-//                WorkInfo.State.FAILED,
-                WorkInfo.State.BLOCKED, WorkInfo.State.CANCELLED
-            )
-        ).build()
-        val workInfos: List<WorkInfo> = workManager.getWorkInfos(workQuery).get()
-        //取消所有后台任务
-        if (workInfos.isNotEmpty()) {
-            workInfos.forEach {
-                workManager.cancelWorkById(it.id)
-            }
-        }
-
-        val currentOfflineTask =
-            DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "").split("\n")
-                .filter { i -> i != "" && i != " " }.toSet().toMutableList()
-        //currentOfflineTask等于0,证明没有离线链接缓存
-        if (currentOfflineTask.isEmpty()) {
-            App.instance.toast("没有离线任务！")
-            return
-        }
-        XLog.d(
-            "addOfflineTask workManager workInfos $workInfos currentOfflineTask size ${currentOfflineTask.size}"
-        )
-        //添加离线链接
-        val listType = object : TypeToken<List<String?>?>() {}.type
-        val list = Gson().toJson(currentOfflineTask, listType)
-        val data: Data = Data.Builder().putString("cookie", cookie).putString("list", list).build()
-        val request: OneTimeWorkRequest = OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java)
-            .addTag(ConfigKeyUtil.OFFLINE_TASK_WORKER).setInputData(data).build()
-        workManager.enqueue(request)
     }
 }

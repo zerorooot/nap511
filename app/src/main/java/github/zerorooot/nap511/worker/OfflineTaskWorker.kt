@@ -33,7 +33,7 @@ class OfflineTaskWorker(
     override suspend fun doWork(): Result {
         val listType = object : TypeToken<List<String?>?>() {}.type
         val a: List<String> = Gson().fromJson(inputData.getString("list").toString(), listType)
-        val cid = DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
+        val cid = inputData.getString("defaultOfflineCid").toString()
         val addTaskReturn = fileRepository.addOfflineTask(a, cid) {}
 
         XLog.d("OfflineTaskWorker cid $cid addTaskReturn $addTaskReturn")

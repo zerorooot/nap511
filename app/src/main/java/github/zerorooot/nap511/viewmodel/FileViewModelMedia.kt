@@ -27,7 +27,7 @@ internal fun FileViewModel.getImage(fileBeanList: List<FileBean>, indexOf: Int) 
 
     //获取当前点击的
     viewModelScope.launch {
-        val imageBean = fileService.image(
+        val imageBean = fileRepository.image(
             fileBeanList[indexOf].pickCode, System.currentTimeMillis() / 1000
         ).imageBean
 
@@ -78,14 +78,14 @@ internal fun FileViewModel.updateVideoFileBean(
         map["time"] = duration.toString()
         map["category"] = "1"
         map["format"] = "json"
-        val videoHistory = fileService.videoHistory(map)
+        val videoHistory = fileRepository.videoHistory(map)
         XLog.d("更新视频时间 $videoHistory")
     }
 }
 
 internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int) {
     viewModelScope.launch {
-        val video = fileService.video(pickCode).copy(index = fileBeanIndex)
+        val video = fileRepository.video(pickCode).copy(index = fileBeanIndex)
         _launchVideoEvent.emit(video)
         setRefreshingStatus(false)
     }

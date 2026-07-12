@@ -8,10 +8,13 @@ import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.CreateFolderMessage
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileInfo
+import github.zerorooot.nap511.bean.FilesBean
+import github.zerorooot.nap511.bean.ImageDate
 import github.zerorooot.nap511.bean.OfflineInfo
 import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.bean.SignBean
 import github.zerorooot.nap511.bean.TorrentFileBean
+import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.service.FileService
@@ -150,6 +153,52 @@ class FileRepository(private val cookie: String) {
 
     //-----------------离线下载结束--------------------------------
 
+    suspend fun getFiles(
+        cid: String,
+        showDir: Int = 1,
+        aid: Int = 1,
+        asc: Int = 1,
+        order: String = "file_name",
+        limit: Int = App.requestLimitCount
+    ): FilesBean {
+        return fileService.getFiles(cid, showDir, aid, asc, order, limit)
+    }
+
+    suspend fun remainingSpace(countSpaceNum: Int = 1): JsonObject {
+        return fileService.remainingSpace(countSpaceNum)
+    }
+
+    suspend fun order(body: Map<String, String>): BaseReturnMessage {
+        return fileService.order(body)
+    }
+
+    suspend fun deleteMultiple(data: Map<String, String>): BaseReturnMessage {
+        return fileService.deleteMultiple(data)
+    }
+
+    suspend fun search(
+        cid: String,
+        searchValue: String,
+        aid: Int = 1,
+        asc: Int = 0,
+        limit: Int = 999
+    ): FilesBean {
+        return fileService.search(cid, searchValue, aid, asc, limit)
+    }
+
+    suspend fun image(pickCode: String, current: Long): ImageDate {
+        return fileService.image(pickCode, current)
+    }
+
+
+    suspend fun videoHistory(body: HashMap<String, String>): BaseReturnMessage {
+        return fileService.videoHistory(body)
+    }
+
+    suspend fun video(pickCode: String): VideoInfoBean {
+        return fileService.video(pickCode)
+
+    }
 
     suspend fun getFileInfo(cid: String): FileInfo {
         return fileService.getFileInfo(cid)
