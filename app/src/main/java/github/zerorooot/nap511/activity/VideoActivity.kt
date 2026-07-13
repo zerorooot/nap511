@@ -1,7 +1,7 @@
 package github.zerorooot.nap511.activity
 
 import android.content.Intent
-import android.content.res.Configuration
+import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
@@ -91,7 +91,7 @@ class VideoActivity : AppCompatActivity() {
             //增加title
             titleTextView.visibility = View.VISIBLE
             titleTextView.isSelected = true
-            seekRatio = 5f
+            seekRatio = 10f
             //设置返回键
             backButton.visibility = View.VISIBLE
             isShowFullAnimation = false
@@ -112,7 +112,7 @@ class VideoActivity : AppCompatActivity() {
             if (isAutoRotate) {
                 val videoHeight = videoInfo.height
                 val videoWidth = videoInfo.width
-                if (videoHeight < videoWidth) {
+                if (videoWidth > videoHeight) {
                     orientationUtils.resolveByClick()
                 }
             }

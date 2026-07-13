@@ -26,7 +26,7 @@ internal fun FileViewModel.getImage(fileBeanList: List<FileBean>, indexOf: Int) 
     }
 
     //获取当前点击的
-    viewModelScope.launch {
+    viewModelScope.launch(exceptionHandler) {
         val imageBean = fileRepository.image(
             fileBeanList[indexOf].pickCode, System.currentTimeMillis() / 1000
         ).imageBean
@@ -45,7 +45,7 @@ internal fun FileViewModel.updateVideoFileBean(
     duration: Int,
     pickCode: String
 ) {
-    viewModelScope.launch {
+    viewModelScope.launch(exceptionHandler) {
         val fileBean = fileBeanList[index]
 
         if (fileBean.isVideo != 1) return@launch
@@ -60,31 +60,28 @@ internal fun FileViewModel.updateVideoFileBean(
             SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
                 fileBean.createTime.toLong() * 1000
             )
-        fileBean.createTimeString = "▶️ $playTime% $createTimeString"
-
-        val arrayListOf = arrayListOf<FileBean>()
-        arrayListOf.addAll(fileBeanList)
-        arrayListOf[index] = fileBean
-        fileBeanList.clear()
-        fileBeanList.addAll(arrayListOf)
+        val newTimeString = "▶️ $playTime% $createTimeString"
+        val updatedBean = fileBean.copy(createTimeString = newTimeString)
+        fileBeanList[index] = updatedBean
 
         if (!isSearchState) {
-            fileListCache[cid]?.fileBeanList = arrayListOf
+            fileListCache[cid]?.fileBeanList = ArrayList(fileBeanList.toList())
         }
 
-        val map = hashMapOf<String, String>()
-        map["op"] = "update"
-        map["pick_code"] = pickCode
-        map["time"] = duration.toString()
-        map["category"] = "1"
-        map["format"] = "json"
+        val map = mapOf(
+            "op" to "update",
+            "pick_code" to pickCode,
+            "time" to duration.toString(),
+            "category" to "1",
+            "format" to "json"
+        )
         val videoHistory = fileRepository.videoHistory(map)
         XLog.d("更新视频时间 $videoHistory")
     }
 }
 
 internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int) {
-    viewModelScope.launch {
+    viewModelScope.launch(exceptionHandler) {
         val video = fileRepository.video(pickCode).copy(index = fileBeanIndex)
         _launchVideoEvent.emit(video)
         setRefreshingStatus(false)

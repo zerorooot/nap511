@@ -24,16 +24,8 @@ import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.Preference.SummaryProvider
 import androidx.preference.PreferenceFragmentCompat
-import androidx.work.Data
-import androidx.work.OneTimeWorkRequest
-import androidx.work.WorkInfo
-import androidx.work.WorkManager
-import androidx.work.WorkQuery
-import com.elvishew.xlog.XLog
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.worker.OfflineTaskWorker
 import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
@@ -103,6 +95,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
         findPreference<Preference>(ConfigKeyUtil.CLICK_DOWNLOAD_NOW)?.setOnPreferenceClickListener {
             fileViewModel.handleOfflineTask(true)
+            true
+        }
+
+        findPreference<Preference>(ConfigKeyUtil.REBOOT_NOW)?.setOnPreferenceClickListener {
+            ProcessPhoenix.triggerRebirth(requireActivity().application);
             true
         }
 

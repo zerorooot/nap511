@@ -191,7 +191,7 @@ class FileRepository(private val cookie: String) {
     }
 
 
-    suspend fun videoHistory(body: HashMap<String, String>): BaseReturnMessage {
+    suspend fun videoHistory(body: Map<String, String>): BaseReturnMessage {
         return fileService.videoHistory(body)
     }
 

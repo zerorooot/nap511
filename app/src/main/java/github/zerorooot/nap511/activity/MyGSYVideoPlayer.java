@@ -3,7 +3,7 @@ package github.zerorooot.nap511.activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.ActivityInfo;
+import android.content.res.Configuration;
 import android.os.BatteryManager;
 import android.os.Handler;
 import android.os.Looper;
@@ -217,9 +217,11 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     public void touchDoubleUp(MotionEvent event) {
         float x = event.getX();
         int screenWidth = mScreenWidth;
+        // 直接获取系统当前的屏幕方向配置
+        int currentOrientation = this.getResources().getConfiguration().orientation;
 
-        //竖屏
-        if (orientationUtils.getScreenType() == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) {
+        // 判断当前是否是横屏状态，且视频为竖屏
+        if (currentOrientation == Configuration.ORIENTATION_LANDSCAPE && mScreenHeight > mScreenWidth) {
             screenWidth = mScreenHeight;
         }
 

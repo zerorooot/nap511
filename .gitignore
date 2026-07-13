@@ -15,3 +15,4 @@ local.properties
 修复方案.md
 /app/src/test/
 /app/src/androidTest/
+app/release/

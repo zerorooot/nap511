@@ -193,6 +193,7 @@ fun FileScreen(
 
 // 记录上次点击时间，使用 longArrayOf 避免无意义的重组
     val lastClickTime = remember { longArrayOf(0L) }
+
     // Assembled myItemOnClick — routes to focused handlers
     fun myItemOnClick(i: Int) {
         if (fileViewModel.isLongClickState) {
@@ -202,7 +203,6 @@ fun FileScreen(
             if (currentTime - lastClickTime[0] < 300L) { // 300ms 内的连点会被忽略
                 return
             }
-
             lastClickTime[0] = currentTime
 
 
@@ -235,6 +235,8 @@ fun FileScreen(
             if (fileBean.fileIco == R.drawable.txt) {
                 handleTextClick(i, fileBean)
             }
+
+            fileViewModel.setRefreshingStatus(false)
         }
     }
 

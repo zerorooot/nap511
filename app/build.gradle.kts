@@ -15,8 +15,8 @@ android {
         applicationId = "github.zerorooot.nap511"
         minSdk = 26
         targetSdk = 36
-        versionCode = 8
-        versionName = "1.2.5"
+        versionCode = 9
+        versionName = "1.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -68,9 +68,9 @@ dependencies {
     implementation(libs.accompanist.pager.indicators)
     implementation(libs.compose.zoom)
     implementation(libs.accompanist.systemuicontroller)
-    implementation(libs.gsyvideoplayer.compose)
+    implementation(libs.gsyvideoplayer.java)
     implementation(libs.gsyvideoplayer.exo2)
-    implementation(libs.gsyvideoplayer.arm64)
+//    implementation(libs.gsyvideoplayer.arm64)
 
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)

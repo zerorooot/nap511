@@ -340,7 +340,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         user_asc:1
         fc_mix:0
          */
-        val map = hashMapOf(
+        val map = mapOf(
             "user_order" to orderBean.type,
             "user_asc" to orderBean.asc.toString(),
             "file_id" to currentCid,

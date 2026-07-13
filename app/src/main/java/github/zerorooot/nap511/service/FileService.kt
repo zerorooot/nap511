@@ -117,7 +117,7 @@ interface FileService {
     builder.add("category", "1")
     builder.add("format", "json")
      */
-    suspend fun videoHistory(@FieldMap body: HashMap<String, String>): BaseReturnMessage
+    suspend fun videoHistory(@FieldMap body: Map<String, String>): BaseReturnMessage
 
     @GET("files/search")
     suspend fun search(

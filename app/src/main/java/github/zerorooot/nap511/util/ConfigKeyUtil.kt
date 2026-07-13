@@ -184,6 +184,10 @@ class ConfigKeyUtil {
          * 立刻下载
          */
         const val CLICK_DOWNLOAD_NOW = "clickDownloadNow"
+        /**
+         * 立刻重启
+         */
+        const val REBOOT_NOW = "rebootNow"
 
         /**
          * 离线task的标签

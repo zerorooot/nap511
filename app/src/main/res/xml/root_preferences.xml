@@ -133,5 +133,9 @@
         app:title="离线任务缓存"
         app:useSimpleSummaryProvider="true" />
 
+    <Preference
+        app:key="rebootNow"
+        app:summary="点我重新启动应用"
+        app:title="重启应用" />
 
 </PreferenceScreen>
