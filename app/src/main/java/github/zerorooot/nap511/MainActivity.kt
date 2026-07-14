@@ -45,22 +45,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.concurrent.futures.await
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.work.Data
-import androidx.work.OneTimeWorkRequest
-import androidx.work.WorkInfo
-import androidx.work.WorkManager
-import androidx.work.WorkQuery
 import coil.compose.rememberAsyncImagePainter
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.factory.CookieViewModelFactory
@@ -90,7 +82,6 @@ import github.zerorooot.nap511.viewmodel.deleteMultiple
 import github.zerorooot.nap511.viewmodel.openFileOrderDialog
 import github.zerorooot.nap511.viewmodel.openSearchDialog
 import github.zerorooot.nap511.viewmodel.openUnzipAllFileDialog
-import github.zerorooot.nap511.worker.OfflineTaskWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 

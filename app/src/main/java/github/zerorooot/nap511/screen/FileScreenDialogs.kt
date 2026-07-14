@@ -4,9 +4,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.util.App
@@ -87,7 +87,7 @@ fun CreateDialogs(
     ) {
         fileViewModel.closeAria2Dialog()
         if (it != "") {
-            val jsonObject = Gson().fromJson(it, JsonObject::class.java)
+            val jsonObject = JsonParser.parseString(it).asJsonObject
             val aria2Url = jsonObject.get(ConfigKeyUtil.ARIA2_URL).asString
             val aria2Token = jsonObject.get(ConfigKeyUtil.ARIA2_TOKEN).asString
             scope.launch(Dispatchers.IO) { checkAria2(aria2Url, aria2Token) }
@@ -148,8 +148,7 @@ private fun checkAria2(aria2Url: String, aria2Token: String) {
 
     val message: String = try {
         val body = okHttpClient.newCall(request).execute().body.string()
-        val bodyJson = Gson().fromJson(body, JsonObject::class.java)
-
+        val bodyJson = JsonParser.parseString(body).asJsonObject
 
         if (bodyJson.has("error")) {
             "aria2配置失败," + bodyJson.getAsJsonObject("error").get("message").asString

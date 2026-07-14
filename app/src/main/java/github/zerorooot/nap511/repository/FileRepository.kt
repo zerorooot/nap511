@@ -3,6 +3,7 @@ package github.zerorooot.nap511.repository
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.CreateFolderMessage
@@ -435,10 +436,7 @@ class FileRepository(private val cookie: String) {
         }
     }
 
-
-    fun getDownloadInputStream(
-        pickCode: String, fileId: String
-    ): InputStream {
+    fun getDownloadUrl(pickCode: String, fileId: String): String {
         val sha1Util = Sha1Util()
         val okHttpClient = OkHttpClient()
         val tm = System.currentTimeMillis() / 1000
@@ -455,18 +453,27 @@ class FileRepository(private val cookie: String) {
 
         val response = okHttpClient.newCall(request).execute()
 
-        val returnJson = Gson().fromJson(response.body.string(), JsonObject::class.java)
+        val returnJson = JsonParser.parseString(response.body.string()).asJsonObject
+        XLog.d("FileRepository getDownloadUrl returnJson $returnJson")
+
         val data = returnJson.get("data").asString
         val m115Decode = sha1Util.m115_decode(data, m115Encode.key)
-
+        XLog.d("FileRepository getDownloadUrl m115Decode $m115Decode")
 
         //{"fileId":{"file_name":"a","file_size":"0","pick_code":"pick_code","url":false}}
         val downloadUrl =
-            Gson().fromJson(m115Decode, JsonObject::class.java).getAsJsonObject(fileId)
+            JsonParser.parseString(m115Decode).asJsonObject.getAsJsonObject(fileId)
                 .getAsJsonObject("url").get("url").asString
-        XLog.d("downloadUrl $downloadUrl")
+        XLog.d("FileRepository getDownloadUrl downloadUrl $downloadUrl")
+        return downloadUrl;
+    }
 
+    fun getDownloadInputStream(
+        pickCode: String, fileId: String
+    ): InputStream {
+        val downloadUrl = getDownloadUrl(pickCode, fileId)
 
+        val okHttpClient = OkHttpClient()
         val requestDownload: Request =
             Request.Builder().url(downloadUrl).addHeader("cookie", cookie)
                 .addHeader("Content-Type", "application/x-www-form-urlencoded").addHeader(

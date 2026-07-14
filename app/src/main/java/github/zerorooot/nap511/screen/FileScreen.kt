@@ -73,9 +73,11 @@ import github.zerorooot.nap511.viewmodel.openRenameFileDialog
 import github.zerorooot.nap511.viewmodel.removeFile
 import github.zerorooot.nap511.viewmodel.startSendAria2Service
 import github.zerorooot.nap511.viewmodel.updateVideoFileBean
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(
     ExperimentalFoundationApi::class,
@@ -200,7 +202,7 @@ fun FileScreen(
             handleMultiSelectClick(i)
         } else {
             val currentTime = SystemClock.elapsedRealtime()
-            if (currentTime - lastClickTime[0] < 300L) { // 300ms 内的连点会被忽略
+            if (currentTime - lastClickTime[0] < 200L) { // 200ms 内的连点会被忽略
                 return
             }
             lastClickTime[0] = currentTime
@@ -212,31 +214,16 @@ fun FileScreen(
             fileViewModel.setListLocationAndClickCache(i, listState)
             val fileBean = fileBeanList[i]
 
-            if (fileBean.isFolder) {
-                handleFolderClick(i, fileBean)
+            when {
+                fileBean.isFolder -> handleFolderClick(i, fileBean)
+                fileBean.isVideo == 1 -> handleVideoClick(i, fileBean)
+                fileBean.photoThumb.isNotEmpty() -> handlePhotoClick(fileBean)
+                fileBean.fileIco == R.drawable.torrent -> handleTorrentClick(fileBean)
+                fileBean.fileIco == R.drawable.zip -> handleZipClick(i)
+                fileBean.fileIco == R.drawable.txt -> handleTextClick(i, fileBean)
+                else -> fileViewModel.setRefreshingStatus(false)
             }
 
-            if (fileBean.isVideo == 1) {
-                handleVideoClick(i, fileBean)
-            }
-
-            if (fileBean.photoThumb != "") {
-                handlePhotoClick(fileBean)
-            }
-
-            if (fileBean.fileIco == R.drawable.torrent) {
-                handleTorrentClick(fileBean)
-            }
-
-            if (fileBean.fileIco == R.drawable.zip) {
-                handleZipClick(i)
-            }
-
-            if (fileBean.fileIco == R.drawable.txt) {
-                handleTextClick(i, fileBean)
-            }
-
-            fileViewModel.setRefreshingStatus(false)
         }
     }
 
@@ -278,8 +265,9 @@ fun FileScreen(
     }
 
     fun onMenuAria2Download(index: Int) {
-        val aria2Url = DataStoreUtil.getData(ConfigKeyUtil.ARIA2_URL, "")
-        if (aria2Url == "") {
+        val aria2Url =
+            DataStoreUtil.getData(ConfigKeyUtil.ARIA2_URL, ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE)
+        if (aria2Url == ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE) {
             fileViewModel.openAria2Dialog()
         } else {
             fileViewModel.startSendAria2Service(index)
@@ -320,9 +308,12 @@ fun FileScreen(
             }
 
             "视频时间" -> {
-                fileViewModel.fileBeanList.sortByDescending { fileBean -> fileBean.playLong }
-                //滚动到首行
-                listState.requestScrollToItem(0, 0)
+                scope.launch {
+                    fileViewModel.fileBeanList.sortByDescending { fileBean -> fileBean.playLong }
+                    delay(10.milliseconds)
+                    listState.requestScrollToItem(0, 0)
+                }
+
             }
 
             else -> {

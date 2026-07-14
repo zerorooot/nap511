@@ -12,6 +12,7 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
@@ -25,8 +26,11 @@ import kotlin.concurrent.thread
 
 
 class Sha1Service : Service() {
-    private val sha1Util = Sha1Util()
     private val okHttpClient = OkHttpClient()
+
+    private val fileRepository: FileRepository by lazy {
+        FileRepository.getInstance(App.cookie)
+    }
 
     override fun onBind(intent: Intent?): IBinder? {
         TODO("Not yet implemented")
@@ -36,7 +40,6 @@ class Sha1Service : Service() {
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val command = intent!!.getStringExtra(ConfigKeyUtil.COMMAND)
-        val cookie = intent.getStringExtra("cookie")!!
         thread {
             when (command) {
                 ConfigKeyUtil.SENT_TO_ARIA2 -> {
@@ -47,7 +50,7 @@ class Sha1Service : Service() {
                                 FileBean::class.java
                             )
                         )
-                    val downloadUrl = getDownloadUrl(fileBeanList, cookie)
+                    val downloadUrl = getDownloadUrl(fileBeanList)
                     sendToAria2(downloadUrl)
                 }
             }
@@ -59,50 +62,13 @@ class Sha1Service : Service() {
 
     private fun getDownloadUrl(
         fileBeanList: ArrayList<FileBean>,
-        cookie: String
     ): ArrayList<String> {
         val list = arrayListOf<String>()
         fileBeanList.forEach { fileBean ->
-            val response =
-                getDownloadUrl(fileBean.pickCode, fileBean.fileId, cookie)
+            val response = fileRepository.getDownloadUrl(fileBean.pickCode, fileBean.fileId)
             list.add(response)
         }
         return list
-    }
-
-    private fun getDownloadUrl(
-        pickCode: String,
-        fileId: String,
-        cookie: String
-    ): String {
-        val tm = System.currentTimeMillis() / 1000
-        val m115Encode = sha1Util.m115_encode(pickCode, tm)
-        val map = FormBody.Builder().add("data", m115Encode.data).build()
-
-        val request: Request = Request
-            .Builder()
-            .url("https://proapi.115.com/app/chrome/downurl?t=$tm")
-            .addHeader("cookie", cookie)
-            .addHeader("Content-Type", "application/x-www-form-urlencoded")
-            .addHeader(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
-            )
-            .post(map)
-            .build()
-
-        val response = okHttpClient.newCall(request).execute()
-
-        val returnJson = JsonParser().parse(response.body.string()).asJsonObject
-        val data = returnJson.get("data").asString
-        val m115Decode = sha1Util.m115_decode(data, m115Encode.key)
-
-
-        //{"fileId":{"file_name":"a","file_size":"0","pick_code":"pick_code","url":false}}
-
-        return JsonParser().parse(m115Decode).asJsonObject.getAsJsonObject(fileId)
-            .getAsJsonObject("url").get("url").asString
-
     }
 
     /**
@@ -123,11 +89,6 @@ class Sha1Service : Service() {
     }
      */
     private fun sendToAria2(fileBeanDownloadList: ArrayList<String>) {
-//        val aria2Token = sharedPreferencesUtil.get(ConfigUtil.aria2Token)
-//        val aria2Url = sharedPreferencesUtil.get(
-//            ConfigUtil.aria2Url,
-//            ConfigUtil.aria2UrldefValue
-//        ) + "?tm=${System.currentTimeMillis()}"
         val aria2Token = DataStoreUtil.getData(ConfigKeyUtil.ARIA2_TOKEN, "")
         val aria2Url = DataStoreUtil.getData(
             ConfigKeyUtil.ARIA2_URL,
@@ -171,7 +132,7 @@ class Sha1Service : Service() {
 
         val message = try {
             val response = okHttpClient.newCall(request).execute()
-            val bodyJson = JsonParser().parse(response.body.string()).asJsonObject
+            val bodyJson = JsonParser.parseString(response.body.string()).getAsJsonObject()
             XLog.d("aria2 json $bodyJson")
             if (bodyJson.has("error")) {
                 "下载失败，${

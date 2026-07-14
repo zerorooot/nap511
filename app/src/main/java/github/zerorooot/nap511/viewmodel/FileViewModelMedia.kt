@@ -112,6 +112,5 @@ internal fun FileViewModel.startSendAria2Service(index: Int) {
     val intent = Intent(context, Sha1Service::class.java)
     intent.putExtra(ConfigKeyUtil.COMMAND, ConfigKeyUtil.SENT_TO_ARIA2)
     intent.putExtra("list", Gson().toJson(fileBean))
-    intent.putExtra("cookie", cookie)
     context.startService(intent)
 }
