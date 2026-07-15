@@ -1,5 +1,7 @@
 package github.zerorooot.nap511.activity;
 
+import static androidx.core.content.ContentProviderCompat.requireContext;
+
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -8,6 +10,7 @@ import android.os.BatteryManager;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
+import android.util.DisplayMetrics;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.widget.TextView;
@@ -15,7 +18,6 @@ import android.widget.TextView;
 import com.elvishew.xlog.XLog;
 import com.shuyu.gsyvideoplayer.utils.CommonUtil;
 import com.shuyu.gsyvideoplayer.utils.GSYVideoType;
-import com.shuyu.gsyvideoplayer.utils.OrientationUtils;
 import com.shuyu.gsyvideoplayer.video.StandardGSYVideoPlayer;
 
 import java.text.SimpleDateFormat;
@@ -24,6 +26,7 @@ import java.util.Locale;
 import java.util.Objects;
 
 import github.zerorooot.nap511.R;
+import github.zerorooot.nap511.bean.VideoInfoBean;
 import github.zerorooot.nap511.util.ConfigKeyUtil;
 import github.zerorooot.nap511.util.DataStoreUtil;
 
@@ -34,11 +37,9 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     private int mType = 0;
 
     long forwardRewindIncrementMs = 15000;
-
+    private VideoInfoBean videoInfo;
     private TextView batteryTextView;
     private TextView timeTextView;
-
-    private OrientationUtils orientationUtils;
 
     public MyGSYVideoPlayer(Context context) {
         super(context);
@@ -57,8 +58,8 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         initView();
     }
 
-    public void setOrientationUtils(OrientationUtils orientationUtils) {
-        this.orientationUtils = orientationUtils;
+    public void setVideoInfo(VideoInfoBean videoInfo) {
+        this.videoInfo = videoInfo;
     }
 
     private void initView() {
@@ -216,14 +217,9 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     @Override
     public void touchDoubleUp(MotionEvent event) {
         float x = event.getX();
-        int screenWidth = mScreenWidth;
-        // 直接获取系统当前的屏幕方向配置
-        int currentOrientation = this.getResources().getConfiguration().orientation;
-
-        // 判断当前是否是横屏状态，且视频为竖屏
-        if (currentOrientation == Configuration.ORIENTATION_LANDSCAPE && mScreenHeight > mScreenWidth) {
-            screenWidth = mScreenHeight;
-        }
+        //实时获取当前屏幕的总宽度（自动兼容横竖屏）
+        DisplayMetrics displayMetrics = mContext.getResources().getDisplayMetrics();
+        int screenWidth = displayMetrics.widthPixels;
 
         if (x <= screenWidth * 0.3) {
             //快退

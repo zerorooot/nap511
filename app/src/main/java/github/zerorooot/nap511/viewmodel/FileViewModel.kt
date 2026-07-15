@@ -201,10 +201,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         }
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        saveFileCache()
-    }
 
     fun saveFileCache() {
         viewModelScope.launch(Dispatchers.IO) {

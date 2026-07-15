@@ -1,11 +1,14 @@
 package github.zerorooot.nap511.activity
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
 import androidx.activity.addCallback
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.PlaybackException.CUSTOM_ERROR_CODE_BASE
@@ -48,7 +51,6 @@ import com.google.gson.Gson
 import com.shuyu.gsyvideoplayer.GSYVideoManager
 import com.shuyu.gsyvideoplayer.listener.GSYSampleCallBack
 import com.shuyu.gsyvideoplayer.player.PlayerFactory
-import com.shuyu.gsyvideoplayer.utils.OrientationUtils
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.util.App
@@ -60,18 +62,17 @@ import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
 
 class VideoActivity : AppCompatActivity() {
     private lateinit var videoPlayer: MyGSYVideoPlayer
-    private lateinit var orientationUtils: OrientationUtils
     private val videoInfo: VideoInfoBean by lazy {
         Gson().fromJson(
-            intent.getStringExtra("bean")!!,
-            VideoInfoBean::class.java
+            intent.getStringExtra("bean")!!, VideoInfoBean::class.java
         )
     }
     private val isAutoRotate by lazy {
-        DataStoreUtil.getData(ConfigKeyUtil.AUTO_ROTATE, false)
+        videoInfo.isAutoRotate
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_video)
         val originVideo = DataStoreUtil.getData(
@@ -82,8 +83,8 @@ class VideoActivity : AppCompatActivity() {
         val cookie = App.cookie
         videoPlayer = findViewById(R.id.pre_video_player)
 
-        orientationUtils = OrientationUtils(this, videoPlayer)
-        videoPlayer.setOrientationUtils(orientationUtils)
+        videoPlayer.setVideoInfo(videoInfo)
+
         PlayerFactory.setPlayManager(Exo2PlayerManager::class.java)
 
         videoPlayer.apply {
@@ -97,13 +98,14 @@ class VideoActivity : AppCompatActivity() {
             isShowFullAnimation = false
 
             fullscreenButton.setOnClickListener {
-                orientationUtils.resolveByClick()
+                rotateScreen()
             }
             //设置返回按键功能
             backButton.setOnClickListener {
                 back()
             }
         }
+
 
         videoPlayer.startPlayLogic()
 
@@ -112,8 +114,8 @@ class VideoActivity : AppCompatActivity() {
             if (isAutoRotate) {
                 val videoHeight = videoInfo.height
                 val videoWidth = videoInfo.width
-                if (videoWidth > videoHeight) {
-                    orientationUtils.resolveByClick()
+                if (videoWidth < videoHeight) {
+                    rotateScreen()
                 }
             }
         }
@@ -187,6 +189,18 @@ class VideoActivity : AppCompatActivity() {
         }
     }
 
+    @SuppressLint("SourceLockedOrientationActivity")
+    fun rotateScreen() {
+        // 获取当前屏幕方向
+        val orientation = resources.configuration.orientation
+        if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+            // 当前是竖屏，强制转为横屏
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)
+        } else {
+            // 当前是横屏，强制转为竖屏
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
+        }
+    }
 
     override fun onPause() {
         videoPlayer.onVideoPause()
@@ -200,7 +214,6 @@ class VideoActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         GSYVideoManager.releaseAllVideos()
-        orientationUtils.releaseListener()
         super.onDestroy()
     }
 

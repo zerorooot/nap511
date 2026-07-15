@@ -30,6 +30,7 @@ class DecompressionLoadingException(
     message: String,
     cause: Throwable? = null
 ) : Exception(message, cause)
+
 // 统一定义接口返回的包装结构
 data class BaseResponse<T>(
     val state: Boolean = false,
@@ -83,7 +84,7 @@ data class RemainingSpaceBean(
 ) {
     data class SpaceDetails(
         val size: Long = 0L,
-        @SerializedName("size_format") val sizeFormat: String = ""
+        @SerializedName("size_format") val sizeFormat: String = "0TB"
     )
 }
 
@@ -201,7 +202,8 @@ data class VideoInfoBean(
     @SerializedName("user_rotate") var userRotate: Int = 0,
     @SerializedName("user_turn") var userTurn: Int = 0,
     @SerializedName("origin_file_url") var originFileUrl: String = "",
-    var index: Int = -1
+    var index: Int = -1,
+    var isAutoRotate: Boolean = false
 )
 
 data class FileInfo(

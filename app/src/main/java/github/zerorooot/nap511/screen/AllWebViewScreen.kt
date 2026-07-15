@@ -33,13 +33,13 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.worker.OfflineTaskWorker
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.LocalDrawerState
 import github.zerorooot.nap511.viewmodel.FileViewModel
+import github.zerorooot.nap511.worker.OfflineTaskWorker
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -104,10 +104,9 @@ fun BaseWebViewScreen(
 
 @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
 @Composable
-fun WebViewScreen() {
+fun WebViewScreen(fileViewModel: FileViewModel) {
     val drawerState = LocalDrawerState.current
     val scope = rememberCoroutineScope()
-    val fileViewModel = viewModel<FileViewModel>()
     fileViewModel.gesturesEnabled = false
 
     CookieManager.getInstance().removeAllCookies { }
@@ -183,8 +182,7 @@ fun webViewClient(): WebViewClient {
 }
 
 @Composable
-fun LoginWebViewScreen() {
-    val fileViewModel = viewModel<FileViewModel>()
+fun LoginWebViewScreen(fileViewModel: FileViewModel) {
     fileViewModel.gesturesEnabled = false
 
     val drawerState = LocalDrawerState.current

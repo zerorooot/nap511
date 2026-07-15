@@ -8,9 +8,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.core.app.NotificationManagerCompat
 import coil.ImageLoader
 import coil.ImageLoaderFactory
@@ -35,7 +33,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.time.Instant
-import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.properties.Delegates
@@ -48,8 +45,9 @@ val LocalDrawerState = compositionLocalOf<DrawerState> {
 class App : Application(), ImageLoaderFactory {
     companion object {
         lateinit var instance: App
-        var cookie by mutableStateOf("")
-        var uid by mutableStateOf("0")
+        var cookie = ""
+        var uid = "0"
+
         //每次请求文件数
         var requestLimitCount by Delegates.notNull<Int>()
 
@@ -101,11 +99,12 @@ class App : Application(), ImageLoaderFactory {
 //            uncaughtExceptionHandler?.uncaughtException(t, e)
 //        }
     }
+
     private val toastScope = CoroutineScope(Dispatchers.Main.immediate)
 
     fun toast(text: String) {
         toastScope.launch {
-            Toast.makeText(instance,text, Toast.LENGTH_SHORT).show()
+            Toast.makeText(instance, text, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -168,6 +167,7 @@ class App : Application(), ImageLoaderFactory {
     fun isNotificationEnabled(context: Context): Boolean {
         return NotificationManagerCompat.from(context).areNotificationsEnabled()
     }
+
     /**
      * 跳转到app的设置界面--开启通知
      * @param context

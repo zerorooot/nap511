@@ -99,7 +99,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
 
         findPreference<Preference>(ConfigKeyUtil.REBOOT_NOW)?.setOnPreferenceClickListener {
-            ProcessPhoenix.triggerRebirth(requireActivity().application);
+            App.instance.toast("重启中～")
+            ProcessPhoenix.triggerRebirth(requireActivity().application)
             true
         }
 

@@ -56,6 +56,7 @@ import com.google.gson.Gson
 import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.factory.CookieViewModelFactory
+import github.zerorooot.nap511.screen.BaseWebViewScreen
 import github.zerorooot.nap511.screen.CaptchaVideoWebViewScreen
 import github.zerorooot.nap511.screen.CaptchaWebViewScreen
 import github.zerorooot.nap511.screen.CookieDialog
@@ -69,6 +70,7 @@ import github.zerorooot.nap511.screen.OfflineFileScreen
 import github.zerorooot.nap511.screen.RecycleScreen
 import github.zerorooot.nap511.screen.SettingScreenNew
 import github.zerorooot.nap511.screen.WebViewScreen
+import github.zerorooot.nap511.screen.loginWebViewClient
 import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -97,48 +99,40 @@ class MainActivity : AppCompatActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    val cookie = App.cookie
+                    val cookie = remember { App.cookie }
                     if (cookie == "") {
-                        Login()
-                        return@Surface
+                        Login(null)
+                    } else {
+                        Init(cookie)
                     }
-
-                    //初始化
-                    val factory = remember { CookieViewModelFactory(cookie, application) }
-                    val fileViewModel: FileViewModel = viewModel(factory = factory)
-                    val offlineFileViewModel: OfflineFileViewModel = viewModel(factory = factory)
-                    val recycleViewModel: RecycleViewModel = viewModel(factory = factory)
-                    Init(fileViewModel, offlineFileViewModel, recycleViewModel)
-
-                    LaunchedEffect(Unit) {
-                        //允许通知， 方便离线下载交互 OfflineTaskActivity
-                        if (!App.instance.isNotificationEnabled(this@MainActivity)) {
-                            App.instance.toast("检测到未开启通知权限，为保证交互效果，建议开启")
-                            App.instance.goToNotificationSetting(this@MainActivity)
-                        }
-
-                        val isHandle = handleIntent(intent)
-                        //仅没处理intent时才检测未上传的磁力链接
-                        if (!isHandle) {
-                            //检测添加的离线链接。防止因为种种原因，app添加离线链接，但链接没有上传到115
-                            fileViewModel.handleOfflineTask()
-                        }
-                    }
-
                 }
             }
         }
     }
 
-
     @Composable
-    private fun Init(
-        fileViewModel: FileViewModel,
-        offlineFileViewModel: OfflineFileViewModel,
-        recycleViewModel: RecycleViewModel
-    ) {
+    private fun Init(cookie: String) {
+        //初始化
+        val factory = remember { CookieViewModelFactory(cookie, application) }
+        val fileViewModel: FileViewModel = viewModel(factory = factory)
+        val offlineFileViewModel: OfflineFileViewModel = viewModel(factory = factory)
+        val recycleViewModel: RecycleViewModel = viewModel(factory = factory)
+
         LaunchedEffect(Unit) {
             fileViewModel.loadCacheFile()
+            //允许通知， 方便离线下载交互 OfflineTaskActivity
+            if (!App.instance.isNotificationEnabled(this@MainActivity)) {
+                App.instance.toast("检测到未开启通知权限，为保证交互效果，建议开启")
+                App.instance.goToNotificationSetting(this@MainActivity)
+            }
+
+            val isHandle = handleIntent(intent)
+            //仅没处理intent时才检测未上传的磁力链接
+            if (!isHandle) {
+                //检测添加的离线链接。防止因为种种原因，app添加离线链接，但链接没有上传到115
+                fileViewModel.handleOfflineTask()
+            }
+            fileViewModel.getRemainingSpace()
         }
 
         BackHandler(fileViewModel.selectedItem != ConfigKeyUtil.MY_FILE) {
@@ -149,7 +143,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         MyNavigationDrawer(fileViewModel, offlineFileViewModel, recycleViewModel)
+
     }
+
 
     override fun onNewIntent(intent: Intent, caller: ComponentCaller) {
         super.onNewIntent(intent, caller)
@@ -247,7 +243,7 @@ class MainActivity : AppCompatActivity() {
                     ModalDrawerSheet {
                         Spacer(Modifier.height(6.dp))
                         //头像
-                        Avatar()
+                        Avatar(fileViewModel)
                         //菜单栏
                         Spacer(Modifier.height(6.dp))
                         itemMap.forEach { (t, u) ->
@@ -271,7 +267,7 @@ class MainActivity : AppCompatActivity() {
                 },
                 content = {
                     when (fileViewModel.selectedItem) {
-                        ConfigKeyUtil.LOGIN -> Login()
+                        ConfigKeyUtil.LOGIN -> Login(fileViewModel)
                         ConfigKeyUtil.MY_FILE -> FileScreen(appBarClick(fileViewModel))
                         ConfigKeyUtil.OFFLINE_DOWNLOAD -> OfflineDownloadScreen(
                             offlineFileViewModel, fileViewModel
@@ -281,12 +277,10 @@ class MainActivity : AppCompatActivity() {
                             offlineFileViewModel, fileViewModel
                         )
 
-                        ConfigKeyUtil.WEB -> WebViewScreen()
+                        ConfigKeyUtil.WEB -> WebViewScreen(fileViewModel)
                         ConfigKeyUtil.RECYCLE_BIN -> RecycleScreen(recycleViewModel)
                         ConfigKeyUtil.ADVANCED_SETTINGS -> {
-                            fileViewModel.gesturesEnabled = false
                             SettingScreenNew {
-                                fileViewModel.gesturesEnabled = true
                                 scope.launch { drawerState.open() }
                             }
                         }
@@ -314,9 +308,7 @@ class MainActivity : AppCompatActivity() {
      * 头像、网名、uid、已用空间
      */
     @Composable
-    private fun Avatar() {
-        val fileViewModel = viewModel<FileViewModel>()
-        LaunchedEffect(Unit) { fileViewModel.getRemainingSpace() }
+    private fun Avatar(fileViewModel: FileViewModel) {
         val remainingSpaceBean = fileViewModel.remainingSpace
 
         val avatarBean = remember {
@@ -336,8 +328,7 @@ class MainActivity : AppCompatActivity() {
             Image(
                 painter = rememberAsyncImagePainter(
                     ImageRequest.Builder(LocalContext.current).data(avatarBean.value.face)
-                        .memoryCachePolicy(CachePolicy.ENABLED)
-                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .memoryCachePolicy(CachePolicy.ENABLED).diskCachePolicy(CachePolicy.ENABLED)
                         .networkCachePolicy(CachePolicy.ENABLED)
                         .memoryCacheKey(avatarBean.value.userId)
                         .diskCacheKey(avatarBean.value.userName)
@@ -387,14 +378,27 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("UnrememberedMutableState")
     @Composable
-    private fun Login() {
-        var isOpenLoginWebView by remember {
-            mutableStateOf(false)
-        }
+    private fun Login(fileViewModel: FileViewModel?) {
+        var isOpenLoginWebView by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
-        if (isOpenLoginWebView) {
-            LoginWebViewScreen()
+        val onClick: () -> Unit = {
+            isOpenLoginWebView = false
         }
+
+        if (isOpenLoginWebView) {
+            if (fileViewModel == null) {
+                BaseWebViewScreen(
+                    titleText = "通过网页登陆",
+                    onClick,
+                    webViewClient = { loginWebViewClient(it) },
+                    loadUrl = "https://115.com/"
+                )
+            } else {
+                LoginWebViewScreen(fileViewModel)
+            }
+            return
+        }
+
         CookieDialog {
             if (it == "通过网页登陆") {
                 isOpenLoginWebView = true

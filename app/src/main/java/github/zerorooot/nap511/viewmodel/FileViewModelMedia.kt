@@ -1,13 +1,16 @@
 package github.zerorooot.nap511.viewmodel
 
 import android.content.Intent
+import android.content.res.Configuration
 import androidx.lifecycle.viewModelScope
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.DataStoreUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -80,9 +83,29 @@ internal fun FileViewModel.updateVideoFileBean(
     }
 }
 
+val isAutoRotate by lazy {
+    DataStoreUtil.getData(ConfigKeyUtil.AUTO_ROTATE, false)
+}
+
 internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int) {
     viewModelScope.launch(exceptionHandler) {
-        val video = fileRepository.video(pickCode).copy(index = fileBeanIndex)
+        //仅开启自动旋转才请求，以提升视频打开速度
+        val video = if (isAutoRotate) {
+            fileRepository.video(pickCode).copy(index = fileBeanIndex, isAutoRotate = true)
+        } else {
+            val (width, height) = if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
+                1080 to 1920
+            } else {
+                1920 to 1080
+            }
+            VideoInfoBean(
+                width = width,
+                height = height,
+                index = fileBeanIndex,
+                videoUrl = "http://115.com/api/video/m3u8/${pickCode}.m3u8"
+            )
+        }
+
         _launchVideoEvent.emit(video)
         setRefreshingStatus(false)
     }

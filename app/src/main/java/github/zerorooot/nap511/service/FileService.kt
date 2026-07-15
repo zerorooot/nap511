@@ -177,7 +177,7 @@ interface FileService {
         @Query("aid") aid: String = "7",
         @Query("cid") cid: String = "0",
         @Query("offset") offset: String = "0",
-        @Query("limit") limit: String = "100"
+        @Query("limit") limit: String = "999"
     ): RecycleInfo
 
     @FormUrlEncoded

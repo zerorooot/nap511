@@ -3,6 +3,7 @@ package github.zerorooot.nap511.viewmodel
 import android.annotation.SuppressLint
 import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.viewModelScope
+import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.RenameBean
@@ -108,6 +109,7 @@ internal fun FileViewModel.delete(index: Int) {
         val beforeImageBeanCache =
             imageBeanCache.getOrDefault(currentCid, hashMapOf())
 
+        XLog.d("FileViewModel.delete before fileListCache size ${fileListCache.size}")
         //提前删除，优化速度
         fileBeanList.remove(fileBean)
         fileListCache[currentCid]!!.fileBeanList.remove(fileBean)
@@ -129,6 +131,7 @@ internal fun FileViewModel.delete(index: Int) {
             results.forEach { fileListCache.remove(it) }
         }
 
+        XLog.d("FileViewModel.delete after fileListCache size ${fileListCache.size}")
         //delete image bean
         imageBeanCache[currentCid]?.remove(index)
 
@@ -179,6 +182,8 @@ internal fun FileViewModel.deleteMultiple() {
         val beforeFileListCache = fileListCache[cid]
         val beforeClickMap = clickMap.getOrDefault(cid, 0)
 
+        XLog.d("FileViewModel.deleteMultiple before fileListCache size ${fileListCache.size}")
+
         val mapOf = hashMapOf<String, String>()
         mapOf["ignore_warn"] = "1"
         mapOf["pid"] = cid
@@ -206,6 +211,8 @@ internal fun FileViewModel.deleteMultiple() {
         fileBeanList.removeAll(filter)
         fileListCache[cid]!!.fileBeanList = ArrayList(fileBeanList)
         clickMap[cid] = clickMap.getOrDefault(cid, 0) - filter.size
+
+        XLog.d("FileViewModel.deleteMultiple after fileListCache size ${fileListCache.size}")
 
         recoverFromLongPress()
 
