@@ -161,7 +161,7 @@ fun FileScreen(
     }
 
     fun handleVideoClick(i: Int, fileBean: FileBean) {
-        fileViewModel.getVideoInfo(fileBean.pickCode, i)
+        fileViewModel.getVideoInfo(fileBean.pickCode, i, fileBean.name)
     }
 
     fun handlePhotoClick(fileBean: FileBean) {

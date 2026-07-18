@@ -15,6 +15,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
 import coil.request.CachePolicy
 import coil.request.ImageRequest
@@ -34,6 +35,7 @@ fun RecycleCellItem(
     val size = recycleBean.fileSizeString
     val time = recycleBean.modifiedTimeString
     val parentName = recycleBean.parentName
+    val imageData = recycleBean.photoThumb.ifEmpty { image }
     Surface(
         shape = MaterialTheme.shapes.medium,
         tonalElevation = 10.dp,
@@ -52,25 +54,22 @@ fun RecycleCellItem(
                         .height(60.dp)
                         .align(Alignment.CenterVertically)
                 ) {
-                    Image(
-                        painter = if (recycleBean.photoThumb == "") painterResource(image) else (rememberAsyncImagePainter(
-                            ImageRequest.Builder(LocalContext.current)
-                                .data(data = recycleBean.photoThumb)
-                                .memoryCachePolicy(CachePolicy.ENABLED)
-                                .diskCachePolicy(CachePolicy.ENABLED)
-                                .networkCachePolicy(CachePolicy.ENABLED)
-                                .memoryCacheKey(recycleBean.id)
-                                .diskCacheKey(recycleBean.id)
-                                .apply(block = fun ImageRequest.Builder.() {
-                                    scale(Scale.FILL)
-                                    placeholder(image)
-                                }).build()
-                        )),
-                        modifier = Modifier
-                            .height(60.dp)
-                            .width(60.dp),
-                        contentScale = ContentScale.Fit,
-                        contentDescription = "",
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(imageData)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
+                            .diskCachePolicy(CachePolicy.ENABLED)
+                            .networkCachePolicy(CachePolicy.ENABLED)
+                            .memoryCacheKey(recycleBean.id)
+                            .diskCacheKey(recycleBean.id)
+                            .scale(Scale.FILL)
+                            .placeholder(image)
+                            .error(image) // 加载失败时也显示占位图
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "File Thumbnail",
+                        modifier = Modifier.size(60.dp), // 用 size 替代 height + width
+                        contentScale = ContentScale.Fit
                     )
                 }
 

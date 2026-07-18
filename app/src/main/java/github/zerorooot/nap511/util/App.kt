@@ -8,7 +8,6 @@ import android.util.Log
 import android.widget.Toast
 import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.core.app.NotificationManagerCompat
 import coil.ImageLoader
 import coil.ImageLoaderFactory

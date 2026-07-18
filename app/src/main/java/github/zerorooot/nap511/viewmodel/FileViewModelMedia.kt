@@ -87,7 +87,7 @@ val isAutoRotate by lazy {
     DataStoreUtil.getData(ConfigKeyUtil.AUTO_ROTATE, false)
 }
 
-internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int) {
+internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int, fileName: String) {
     viewModelScope.launch(exceptionHandler) {
         //仅开启自动旋转才请求，以提升视频打开速度
         val video = if (isAutoRotate) {
@@ -102,6 +102,8 @@ internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int) {
                 width = width,
                 height = height,
                 index = fileBeanIndex,
+                fileName = fileName,
+                pickCode = pickCode,
                 videoUrl = "http://115.com/api/video/m3u8/${pickCode}.m3u8"
             )
         }

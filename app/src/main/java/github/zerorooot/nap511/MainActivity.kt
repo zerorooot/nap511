@@ -10,14 +10,13 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -48,7 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.rememberAsyncImagePainter
+import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.elvishew.xlog.XLog
@@ -56,7 +55,6 @@ import com.google.gson.Gson
 import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.factory.CookieViewModelFactory
-import github.zerorooot.nap511.screen.BaseWebViewScreen
 import github.zerorooot.nap511.screen.CaptchaVideoWebViewScreen
 import github.zerorooot.nap511.screen.CaptchaWebViewScreen
 import github.zerorooot.nap511.screen.CookieDialog
@@ -70,7 +68,6 @@ import github.zerorooot.nap511.screen.OfflineFileScreen
 import github.zerorooot.nap511.screen.RecycleScreen
 import github.zerorooot.nap511.screen.SettingScreenNew
 import github.zerorooot.nap511.screen.WebViewScreen
-import github.zerorooot.nap511.screen.loginWebViewClient
 import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -267,7 +264,13 @@ class MainActivity : AppCompatActivity() {
                 },
                 content = {
                     when (fileViewModel.selectedItem) {
-                        ConfigKeyUtil.LOGIN -> Login(fileViewModel)
+                        ConfigKeyUtil.LOGIN -> {
+                            fileViewModel.gesturesEnabled = false
+                            Login {
+                                scope.launch { drawerState.open() }
+                            }
+                        }
+
                         ConfigKeyUtil.MY_FILE -> FileScreen(appBarClick(fileViewModel))
                         ConfigKeyUtil.OFFLINE_DOWNLOAD -> OfflineDownloadScreen(
                             offlineFileViewModel, fileViewModel
@@ -325,25 +328,24 @@ class MainActivity : AppCompatActivity() {
             horizontalAlignment = Alignment.CenterHorizontally, // 水平居中
         ) {
             //头像
-            Image(
-                painter = rememberAsyncImagePainter(
-                    ImageRequest.Builder(LocalContext.current).data(avatarBean.value.face)
-                        .memoryCachePolicy(CachePolicy.ENABLED).diskCachePolicy(CachePolicy.ENABLED)
+            AsyncImage(
+                model =
+                    ImageRequest.Builder(LocalContext.current)
+                        .data(avatarBean.value.face)
+                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .diskCachePolicy(CachePolicy.ENABLED)
                         .networkCachePolicy(CachePolicy.ENABLED)
+                        .scale(coil.size.Scale.FILL)
                         .memoryCacheKey(avatarBean.value.userId)
-                        .diskCacheKey(avatarBean.value.userName)
-                        .apply(block = fun ImageRequest.Builder.() {
-                            scale(coil.size.Scale.FILL)
-                            placeholder(R.drawable.avatar)
-                        }).build()
-                ),
+                        .diskCacheKey(avatarBean.value.userId)
+                        .placeholder(R.drawable.avatar)
+                        .build(),
                 modifier = Modifier
-                    .height(100.dp)
-                    .width(100.dp)
+                    .size(100.dp)
                     //圆形裁剪
                     .clip(CircleShape),
                 contentScale = ContentScale.Crop,
-                contentDescription = "",
+                contentDescription = "Avatar",
             )
             Spacer(Modifier.height(6.dp))
             //用户名
@@ -378,26 +380,22 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("UnrememberedMutableState")
     @Composable
-    private fun Login(fileViewModel: FileViewModel?) {
+    private fun Login(onClick: (() -> Unit)? = null) {
         var isOpenLoginWebView by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
-        val onClick: () -> Unit = {
-            isOpenLoginWebView = false
-        }
 
         if (isOpenLoginWebView) {
-            if (fileViewModel == null) {
-                BaseWebViewScreen(
-                    titleText = "通过网页登陆",
-                    onClick,
-                    webViewClient = { loginWebViewClient(it) },
-                    loadUrl = "https://115.com/"
-                )
+            if (onClick == null) {
+                //首次进入，且选择通过网页登录
+                LoginWebViewScreen {
+                    isOpenLoginWebView = false
+                }
             } else {
-                LoginWebViewScreen(fileViewModel)
+                LoginWebViewScreen(onClick)
             }
             return
         }
+
 
         CookieDialog {
             if (it == "通过网页登陆") {

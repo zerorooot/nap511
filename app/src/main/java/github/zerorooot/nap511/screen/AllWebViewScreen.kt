@@ -182,16 +182,10 @@ fun webViewClient(): WebViewClient {
 }
 
 @Composable
-fun LoginWebViewScreen(fileViewModel: FileViewModel) {
-    fileViewModel.gesturesEnabled = false
-
-    val drawerState = LocalDrawerState.current
-    val scope = rememberCoroutineScope()
+fun LoginWebViewScreen(onClick: () -> Unit) {
     BaseWebViewScreen(
         titleText = "通过网页登陆",
-        topAppBarActionButtonOnClick = {
-            scope.launch { drawerState.open() }
-        },
+        topAppBarActionButtonOnClick = onClick,
         webViewClient = { loginWebViewClient(it) },
         loadUrl = "https://115.com/"
     )

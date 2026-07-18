@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -38,7 +38,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.rememberAsyncImagePainter
+import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import github.zerorooot.nap511.bean.FileBean
@@ -60,12 +60,12 @@ fun FileCellItem(
     onFileInfo: ((Int) -> Unit)? = null,
     onAria2Download: ((Int) -> Unit)? = null,
 ) {
-
     val image = fileBean.fileIco
     val name = fileBean.name
     val size = fileBean.sizeString
     val time = fileBean.createTimeString
     val playLong = fileBean.playLongString
+    val imageData = fileBean.photoThumb.ifEmpty { image }
     Surface(
         shape = MaterialTheme.shapes.medium,
         tonalElevation = 10.dp,
@@ -98,30 +98,32 @@ fun FileCellItem(
                         .height(60.dp)
                         .align(Alignment.CenterVertically)
                 ) {
-                    Image(
-                        painter = if (fileBean.photoThumb == "") painterResource(image) else (
-                                rememberAsyncImagePainter(
-                                    ImageRequest.Builder(LocalContext.current)
-                                        .data(data = fileBean.photoThumb)
-                                        // 强制缓存有效期为 365 天，无视服务端的 max-age
-                                        .addHeader("Cache-Control", "max-stale=31536000")
-                                        .memoryCachePolicy(CachePolicy.ENABLED)
-                                        .diskCachePolicy(CachePolicy.ENABLED)
-                                        .networkCachePolicy(CachePolicy.ENABLED)
-                                        .memoryCacheKey(fileBean.fileId)
-                                        .diskCacheKey(fileBean.fileId)
-                                        .apply(block = fun ImageRequest.Builder.() {
-                                            scale(coil.size.Scale.FILL)
-                                            placeholder(image)
-                                        }).build()
-                                )
-                                ),
-                        modifier = Modifier
-                            .height(60.dp)
-                            .width(60.dp),
-                        contentScale = ContentScale.Fit,
-                        contentDescription = "",
-                    )
+                    if (fileBean.photoThumb == "") {
+                        Image(
+                            painter = painterResource(image),
+                            modifier = Modifier.size(60.dp), // 用 size 替代 height + width
+                            contentScale = ContentScale.Fit,
+                            contentDescription = "File Photo",
+                        )
+                    } else {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(imageData)
+                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                .diskCachePolicy(CachePolicy.ENABLED)
+                                .networkCachePolicy(CachePolicy.ENABLED)
+                                .memoryCacheKey(fileBean.fileId)
+                                .diskCacheKey(fileBean.fileId)
+                                .scale(coil.size.Scale.FILL)
+                                .placeholder(image)
+                                .error(image) // 加载失败时也显示占位图
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "File Thumbnail",
+                            modifier = Modifier.size(60.dp), // 用 size 替代 height + width
+                            contentScale = ContentScale.Fit
+                        )
+                    }
                 }
 
                 Column(
