@@ -218,6 +218,12 @@ class MainActivity : AppCompatActivity() {
         val drawerState = rememberDrawerState(DrawerValue.Closed)
         val scope = rememberCoroutineScope()
 
+        BackHandler( drawerState.isOpen) {
+            scope.launch {
+                drawerState.close()
+            }
+        }
+
         val itemMap = linkedMapOf(
             R.drawable.baseline_login_24 to ConfigKeyUtil.LOGIN,
             R.drawable.baseline_cloud_24 to ConfigKeyUtil.MY_FILE,

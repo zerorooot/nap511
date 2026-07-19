@@ -274,10 +274,19 @@ fun FileScreen(
         }
     }
 
+    val drawerState = LocalDrawerState.current
+    val scope = rememberCoroutineScope()
+
     // ============================================================
     // Phase 2.3: Extract onBackClick
     // ============================================================
     fun onBack() {
+        if (drawerState.isOpen) {
+            scope.launch {
+                drawerState.close()
+            }
+            return
+        }
         if (path != "/根目录" && !fileViewModel.isLongClickState) {
             fileViewModel.setListLocation(path, listState)
         }
@@ -285,8 +294,6 @@ fun FileScreen(
         fileViewModel.back()
     }
 
-    val drawerState = LocalDrawerState.current
-    val scope = rememberCoroutineScope()
 
     fun onBackClick() {
         if (path == "/根目录" && !fileViewModel.isSearchState && !fileViewModel.isLongClickState) {

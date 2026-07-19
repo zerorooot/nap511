@@ -23,23 +23,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.work.Data
-import androidx.work.OneTimeWorkRequest
-import androidx.work.WorkManager
 import com.acsbendi.requestinspectorwebview.RequestInspectorWebViewClient
 import com.acsbendi.requestinspectorwebview.WebViewRequest
 import com.elvishew.xlog.XLog
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.LocalDrawerState
 import github.zerorooot.nap511.viewmodel.FileViewModel
-import github.zerorooot.nap511.worker.OfflineTaskWorker
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -247,7 +240,7 @@ fun CaptchaWebViewScreen() {
             scope.launch { drawerState.open() }
         },
         webViewClient = {
-            captchaWebViewClient(it) { gesture, select ->
+            captchaWebViewClient(fileViewModel, it) { gesture, select ->
                 if (gesture) {
                     fileViewModel.gesturesEnabled = true
                 }
@@ -279,7 +272,7 @@ fun CaptchaVideoWebViewScreen() {
             scope.launch { drawerState.open() }
         },
         webViewClient = {
-            captchaWebViewClient(it) { gesture, select ->
+            captchaWebViewClient(fileViewModel, it) { gesture, select ->
                 if (gesture) {
                     fileViewModel.gesturesEnabled = true
                 }
@@ -293,7 +286,11 @@ fun CaptchaVideoWebViewScreen() {
 
 }
 
-fun captchaWebViewClient(webView: WebView, handle: (Boolean, Boolean) -> Unit): WebViewClient {
+fun captchaWebViewClient(
+    fileViewModel: FileViewModel,
+    webView: WebView,
+    handle: (Boolean, Boolean) -> Unit
+): WebViewClient {
     return object : RequestInspectorWebViewClient(webView) {
         override fun shouldInterceptRequest(
             view: WebView,
@@ -302,7 +299,7 @@ fun captchaWebViewClient(webView: WebView, handle: (Boolean, Boolean) -> Unit): 
             //磁力链接验证
             if ("https://webapi.115.com/user/captcha" == webViewRequest.url) {
                 if (check("https://webapi.115.com/user/captcha", webViewRequest, handle)) {
-                    addTask()
+                    fileViewModel.handleOfflineTask()
                     App.instance.toast("验证账号成功~，重新添加链接中.......")
                 }
             }
@@ -342,22 +339,4 @@ private fun check(
         return true
     }
     return false
-}
-
-private fun addTask() {
-    val currentOfflineTaskList =
-        DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
-            .split("\n")
-            .filter { i -> i != "" && i != " " }
-            .toSet()
-            .toMutableList()
-    val listType = object : TypeToken<List<String?>?>() {}.type
-    val list = Gson().toJson(currentOfflineTaskList, listType)
-    val data: Data =
-        Data.Builder().putString("cookie", App.cookie).putString("list", list)
-            .build()
-    val request: OneTimeWorkRequest =
-        OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java).setInputData(data)
-            .build()
-    WorkManager.getInstance(App.instance.applicationContext).enqueue(request)
 }
