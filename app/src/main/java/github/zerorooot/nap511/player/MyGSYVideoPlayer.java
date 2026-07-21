@@ -34,7 +34,6 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     private int mType = 0;
 
     long forwardRewindIncrementMs = 15000;
-    private VideoInfoBean videoInfo;
     private TextView batteryTextView;
     private TextView timeTextView;
 
@@ -53,10 +52,6 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         //恢复默认播放模式
         GSYVideoType.setShowType(GSYVideoType.SCREEN_TYPE_DEFAULT);
         initView();
-    }
-
-    public void setVideoInfo(VideoInfoBean videoInfo) {
-        this.videoInfo = videoInfo;
     }
 
     private void initView() {

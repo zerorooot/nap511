@@ -84,8 +84,6 @@ class VideoActivity : AppCompatActivity() {
         val cookie = App.cookie
         videoPlayer = findViewById(R.id.pre_video_player)
 
-        videoPlayer.setVideoInfo(videoInfo)
-
         PlayerFactory.setPlayManager(Exo2PlayerManager::class.java)
 
         videoPlayer.apply {

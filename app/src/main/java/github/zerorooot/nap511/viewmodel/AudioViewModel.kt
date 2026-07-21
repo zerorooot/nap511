@@ -22,7 +22,7 @@ import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
 import kotlin.time.Duration.Companion.milliseconds
 
 class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
-
+    private val SEEK_STEP_MS = 15000L
     // 假设你有 Repository 或 Api 实例，也可以通过 Hilt/Koin 注入
     val fileRepository: FileRepository by lazy {
         FileRepository.getInstance(cookie)
@@ -197,6 +197,24 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
         progress = 0f
         videoManger.releaseMediaPlayer()
         stopAudioService()
+    }
+
+    private fun seekRelative(offsetMs: Long) {
+        val current = videoManger.currentPosition
+        val duration = videoManger.duration
+        val target =
+            (current + offsetMs).coerceIn(0, if (duration > 0) duration else Long.MAX_VALUE)
+        videoManger.seekTo(target)
+    }
+
+    fun onRewind() {
+        seekRelative(-SEEK_STEP_MS)
+
+    }
+
+    // 响应快进 15 秒
+    fun onFastForward() {
+        seekRelative(SEEK_STEP_MS)
     }
 
     // 修改轮询进度逻辑：用户拖拽时跳过自动赋值

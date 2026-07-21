@@ -47,6 +47,16 @@ fun MiniPlayerBar(
     } else {
         audioViewModel.progress
     }
+    val onClickEvent: ((String) -> Unit) = {
+        when (it) {
+            "onSeekStart" -> audioViewModel.onSeekStart()
+            "onSeekEnd" -> audioViewModel.onSeekEnd()
+            "onTogglePlay" -> audioViewModel.togglePlayPause()
+            "onClose" -> audioViewModel.stop()
+            "onRewind" -> audioViewModel.onRewind()
+            "onFastForward" -> audioViewModel.onFastForward()
+        }
+    }
 
     MiniPlayerBarContent(
         fileBean = fileBean,
@@ -54,12 +64,9 @@ fun MiniPlayerBar(
         isLoading = audioViewModel.isLoading,
         progress = displayProgress,
         positionText = audioViewModel.currentPositionText,
-        onSeekStart = { audioViewModel.onSeekStart() },
         onSeekChange = { audioViewModel.onSeekChange(it) },
-        onSeekEnd = { audioViewModel.onSeekEnd() },
-        onTogglePlay = { audioViewModel.togglePlayPause() },
-        onClose = { audioViewModel.stop() },
-        modifier = modifier
+        modifier = modifier,
+        onClickEvent = onClickEvent
     )
 }
 
@@ -74,12 +81,9 @@ fun MiniPlayerBarContent(
     isLoading: Boolean,
     progress: Float,
     positionText: String,
-    onSeekStart: () -> Unit,
     onSeekChange: (Float) -> Unit,
-    onSeekEnd: () -> Unit,
-    onTogglePlay: () -> Unit,
-    onClose: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClickEvent: (String) -> Unit
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -106,11 +110,11 @@ fun MiniPlayerBarContent(
                     Slider(
                         value = progress.coerceIn(0f, 1f),
                         onValueChange = {
-                            onSeekStart()
+                            onClickEvent.invoke("onSeekStart")
                             onSeekChange(it)
                         },
                         onValueChangeFinished = {
-                            onSeekEnd()
+                            onClickEvent.invoke("onSeekEnd")
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -158,6 +162,16 @@ fun MiniPlayerBarContent(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
+                // 快退
+                IconButton(onClick = { onClickEvent.invoke("onRewind") }) {
+                    Icon(
+                        painter = painterResource(
+                            R.drawable.outline_arrow_back_ios_24
+                        ),
+                        contentDescription = "onRewind",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
                 // 播放 / 暂停 / Loading 状态切换
                 if (isLoading) {
                     CircularProgressIndicator(
@@ -168,7 +182,7 @@ fun MiniPlayerBarContent(
                         color = MaterialTheme.colorScheme.primary
                     )
                 } else {
-                    IconButton(onClick = onTogglePlay) {
+                    IconButton(onClick = { onClickEvent.invoke("onTogglePlay") }) {
                         Icon(
                             painter = painterResource(
                                 id = if (isPlaying) R.drawable.outline_autopause_24 else R.drawable.outline_autoplay_24
@@ -178,9 +192,19 @@ fun MiniPlayerBarContent(
                         )
                     }
                 }
-
+                // 快进
+                IconButton(onClick = { onClickEvent.invoke("onFastForward") }) {
+                    Icon(
+                        painter = painterResource(
+                            R.drawable.outline_arrow_forward_ios_24
+                        ),
+                        contentDescription = "onFastForward",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
                 // 关闭播放器
-                IconButton(onClick = onClose) {
+                IconButton(onClick = { onClickEvent.invoke("onClose") }) {
                     Icon(
                         imageVector = Icons.Filled.Close,
                         contentDescription = "Close",

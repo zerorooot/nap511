@@ -16,22 +16,26 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.player.AudioGSYManager
 
 /**
- * todo 上一首/下一首按钮灰色。需要启用并改为快进/快退
- * todo 播放/暂停时会显示"暂无歌名"
  */
 class AudioService : Service() {
     private lateinit var mediaSession: MediaSessionCompat
     private val videoManger: AudioGSYManager = AudioGSYManager.instance()
+    /**
+     * 抽取统一的相对跳转函数
+     */
+    private fun seekRelative(offsetMs: Long) {
+        val current = videoManger.currentPosition
+        val duration = videoManger.duration
+        val target = (current + offsetMs).coerceIn(0, if (duration > 0) duration else Long.MAX_VALUE)
+        videoManger.seekTo(target)
+        updateMediaState()
+    }
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
 
         mediaSession = MediaSessionCompat(this, "AudioService").apply {
-            setFlags(
-                MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
-                        MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
-            )
-
             // 监听系统通知栏/锁屏界面的交互回调
             setCallback(object : MediaSessionCompat.Callback() {
                 override fun onPlay() {
@@ -50,20 +54,15 @@ class AudioService : Service() {
                     updateMediaState()
                 }
 
-                // 响应快退 10 秒
-                override fun onRewind() {
-                    val current = videoManger.currentPosition
-                    videoManger.seekTo((current - 10000).coerceAtLeast(0))
-                    updateMediaState()
-                }
+                // 响应快退 15 秒
+                override fun onRewind() = seekRelative(-SEEK_STEP_MS)
 
-                // 响应快进 10 秒
-                override fun onFastForward() {
-                    val current = videoManger.currentPosition
-                    val duration = videoManger.duration
-                    videoManger.seekTo((current + 10000).coerceAtMost(duration))
-                    updateMediaState()
-                }
+                // 响应快进 15 秒
+                override fun onFastForward() = seekRelative(SEEK_STEP_MS)
+
+                // 重写上一首/下一首回调，将其映射为快退/快进
+                override fun onSkipToPrevious() = onRewind()
+                override fun onSkipToNext() = onFastForward()
             })
             isActive = true
         }
@@ -83,14 +82,12 @@ class AudioService : Service() {
             }
 
             ACTION_REWIND -> {
-                val current = videoManger.currentPosition
-                videoManger.seekTo((current - 10000).coerceAtLeast(0))
+                seekRelative(-SEEK_STEP_MS)
             }
 
+
             ACTION_FAST_FORWARD -> {
-                val current = videoManger.currentPosition
-                val duration = videoManger.duration
-                videoManger.seekTo((current + 10000).coerceAtMost(duration))
+                seekRelative(SEEK_STEP_MS)
             }
 
             ACTION_UPDATE_STATE -> {
@@ -129,7 +126,10 @@ class AudioService : Service() {
                         PlaybackStateCompat.ACTION_PLAY_PAUSE or
                         PlaybackStateCompat.ACTION_SEEK_TO or          // 允许拖拽进度条
                         PlaybackStateCompat.ACTION_REWIND or           // 允许快退
-                        PlaybackStateCompat.ACTION_FAST_FORWARD        // 允许快进
+                        PlaybackStateCompat.ACTION_FAST_FORWARD or     // 允许快进
+                        // 显式开启上一首/下一首 Action，使系统播控控件按钮取消置灰
+                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT
             )
             .setState(
                 if (isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED,
@@ -180,7 +180,7 @@ class AudioService : Service() {
             // 按严格顺序添加按钮：[0: 快退], [1: 播放/暂停], [2: 快进]
             .addAction(
                 R.drawable.outline_arrow_back_ios_24,
-                "后退10秒",
+                "后退15秒",
                 rewindIntent
             )          // Index 0
             .addAction(
@@ -190,7 +190,7 @@ class AudioService : Service() {
             )                                                                               // Index 1
             .addAction(
                 R.drawable.outline_arrow_forward_ios_24,
-                "快进10秒",
+                "快进15秒",
                 ffIntent
             )            // Index 2
             .setStyle(
@@ -221,6 +221,8 @@ class AudioService : Service() {
     }
 
     companion object {
+        // 1. 统一定义跳转步长（15秒）
+        private const val SEEK_STEP_MS = 15000L
         const val CHANNEL_ID = "audio_play_channel"
         const val NOTIFICATION_ID = 1001
         const val ACTION_PLAY = "ACTION_PLAY"
