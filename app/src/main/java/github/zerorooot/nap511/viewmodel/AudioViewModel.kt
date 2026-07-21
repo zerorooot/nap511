@@ -1,17 +1,19 @@
 package github.zerorooot.nap511.viewmodel
 
 import android.content.Context
+import android.content.Intent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.shuyu.gsyvideoplayer.GSYVideoManager
 import com.shuyu.gsyvideoplayer.listener.GSYMediaPlayerListener
 import com.shuyu.gsyvideoplayer.player.PlayerFactory
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.player.AudioGSYManager
 import github.zerorooot.nap511.repository.FileRepository
+import github.zerorooot.nap511.service.AudioService
 import github.zerorooot.nap511.util.App
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -51,7 +53,7 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
     var userSeekProgress by mutableFloatStateOf(0f)
         private set
 
-    private var videoManger: GSYVideoManager = GSYVideoManager.instance()
+    private val videoManger: AudioGSYManager = AudioGSYManager.instance()
 
     private val listener = object : GSYMediaPlayerListener {
         override fun onPrepared() {
@@ -60,6 +62,7 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
                 isPlaying = true
                 videoManger.start() // 真正的启动播放
                 startProgressTracker()
+                startAudioService(currentMusic?.name ?: "")
             }
         }
 
@@ -131,7 +134,6 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
             try {
                 val playUrl = fileRepository.music(fileBean.pickCode)
                 if (playUrl.isNotEmpty()) {
-                    // 修正点：使用 GSYVideoManager 的 prepare 方法
                     videoManger.prepare(
                         playUrl,        // url
                         mapOf("Cookie" to cookie),           // headers (Map<String, String>?)
@@ -155,18 +157,36 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
         }
     }
 
+    fun pause() {
+        videoManger.pause()
+        isPlaying = false
+        stopProgressTracker()
+    }
+
     fun togglePlayPause() {
         if (isLoading) return
-
         if (isPlaying) {
-            videoManger.pause()
-            isPlaying = false
-            stopProgressTracker()
+            pause()
         } else {
             videoManger.start()
             isPlaying = true
             startProgressTracker()
         }
+        startAudioService(currentMusic?.name ?: "")
+    }
+
+    private fun startAudioService(title: String) {
+        val intent = Intent(App.instance, AudioService::class.java).apply {
+            putExtra("title", title)
+        }
+        App.instance.startForegroundService(intent)
+    }
+
+    private fun stopAudioService() {
+        val intent = Intent(App.instance, AudioService::class.java).apply {
+            action = AudioService.ACTION_STOP
+        }
+        App.instance.startService(intent)
     }
 
     fun stop() {
@@ -176,6 +196,7 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
         isLoading = false
         progress = 0f
         videoManger.releaseMediaPlayer()
+        stopAudioService()
     }
 
     // 修改轮询进度逻辑：用户拖拽时跳过自动赋值
@@ -185,13 +206,24 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
             while (isPlaying) {
                 val duration = videoManger.duration
                 val current = videoManger.currentPosition
-                if (duration > 0 && !isUserSeeking) { // <--- 增加了 !isUserSeeking 判断
+                if (duration > 0 && !isUserSeeking) {
                     progress = current.toFloat() / duration.toFloat()
                     currentPositionText = "${formatTime(current)}/${formatTime(duration)}"
+
+                    // 保持系统通知栏的 MediaSession 状态与真实播放进度一致
+                    notifyServiceUpdateState()
                 }
-                delay(500.milliseconds)
+                delay(1000.milliseconds)
             }
         }
+    }
+
+    private fun notifyServiceUpdateState() {
+        val intent = Intent(context, AudioService::class.java).apply {
+            action = AudioService.ACTION_UPDATE_STATE
+            putExtra("title", currentMusic?.name ?: "")
+        }
+        context.startService(intent)
     }
 
     private fun stopProgressTracker() {

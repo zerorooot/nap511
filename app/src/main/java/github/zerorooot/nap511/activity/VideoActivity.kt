@@ -53,6 +53,7 @@ import com.shuyu.gsyvideoplayer.listener.GSYSampleCallBack
 import com.shuyu.gsyvideoplayer.player.PlayerFactory
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.VideoInfoBean
+import github.zerorooot.nap511.player.MyGSYVideoPlayer
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil

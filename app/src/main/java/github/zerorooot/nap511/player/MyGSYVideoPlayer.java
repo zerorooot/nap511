@@ -1,11 +1,8 @@
-package github.zerorooot.nap511.activity;
-
-import static androidx.core.content.ContentProviderCompat.requireContext;
+package github.zerorooot.nap511.player;
 
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.res.Configuration;
 import android.os.BatteryManager;
 import android.os.Handler;
 import android.os.Looper;

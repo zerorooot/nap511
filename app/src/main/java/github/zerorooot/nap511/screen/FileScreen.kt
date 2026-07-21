@@ -164,6 +164,7 @@ fun FileScreen(
     }
 
     fun handleVideoClick(i: Int, fileBean: FileBean) {
+        audioViewModel.pause()
         fileViewModel.getVideoInfo(fileBean.pickCode, i, fileBean.name)
     }
 
@@ -173,6 +174,7 @@ fun FileScreen(
     }
 
     fun handlePhotoClick(fileBean: FileBean) {
+        audioViewModel.pause()
         val photoList = fileBeanList.filter { it.photoThumb != "" }
         fileViewModel.photoFileBeanList.clear()
         fileViewModel.photoFileBeanList.addAll(photoList)
