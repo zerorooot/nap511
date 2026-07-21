@@ -74,6 +74,7 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.LocalDrawerState
 import github.zerorooot.nap511.viewmodel.FileViewModel
+import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import github.zerorooot.nap511.viewmodel.cut
@@ -114,6 +115,7 @@ class MainActivity : AppCompatActivity() {
         val fileViewModel: FileViewModel = viewModel(factory = factory)
         val offlineFileViewModel: OfflineFileViewModel = viewModel(factory = factory)
         val recycleViewModel: RecycleViewModel = viewModel(factory = factory)
+        val audioViewModel: AudioViewModel = viewModel(factory = factory)
 
         LaunchedEffect(Unit) {
             fileViewModel.loadCacheFile()
@@ -139,7 +141,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        MyNavigationDrawer(fileViewModel, offlineFileViewModel, recycleViewModel)
+        MyNavigationDrawer(fileViewModel, offlineFileViewModel, recycleViewModel, audioViewModel)
 
     }
 
@@ -213,12 +215,13 @@ class MainActivity : AppCompatActivity() {
     private fun MyNavigationDrawer(
         fileViewModel: FileViewModel,
         offlineFileViewModel: OfflineFileViewModel,
-        recycleViewModel: RecycleViewModel
+        recycleViewModel: RecycleViewModel,
+        audioViewModel: AudioViewModel
     ) {
         val drawerState = rememberDrawerState(DrawerValue.Closed)
         val scope = rememberCoroutineScope()
 
-        BackHandler( drawerState.isOpen) {
+        BackHandler(drawerState.isOpen) {
             scope.launch {
                 drawerState.close()
             }
@@ -277,7 +280,13 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
 
-                        ConfigKeyUtil.MY_FILE -> FileScreen(appBarClick(fileViewModel))
+                        ConfigKeyUtil.MY_FILE -> FileScreen(
+                            fileViewModel,
+                            offlineFileViewModel,
+                            audioViewModel,
+                            appBarClick(fileViewModel)
+                        )
+
                         ConfigKeyUtil.OFFLINE_DOWNLOAD -> OfflineDownloadScreen(
                             offlineFileViewModel, fileViewModel
                         )

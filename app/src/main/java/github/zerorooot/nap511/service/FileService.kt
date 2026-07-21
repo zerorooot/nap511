@@ -9,6 +9,7 @@ import github.zerorooot.nap511.bean.ExtractData
 import github.zerorooot.nap511.bean.FileInfo
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.ImageDate
+import github.zerorooot.nap511.bean.MusicBean
 import github.zerorooot.nap511.bean.ProcessData
 import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.bean.VideoInfoBean
@@ -283,5 +284,13 @@ interface FileService {
     suspend fun unzipFileProcess(
         @Query("extract_id") extractId: Long,
     ): BaseResponse<ProcessData>
+
+    @GET("files/music")
+    suspend fun music(
+        @Query("pick_code") pickCode: String,
+        @Query("platform") platform: String ,
+        @Query("format") format: String
+    ): MusicBean
+
 }
 

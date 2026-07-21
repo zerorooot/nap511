@@ -8,8 +8,11 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -45,7 +48,6 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.gson.Gson
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
@@ -57,6 +59,7 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.LocalDrawerState
+import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.cancelCut
@@ -85,11 +88,11 @@ import kotlin.time.Duration.Companion.milliseconds
 )
 @Composable
 fun FileScreen(
+    fileViewModel: FileViewModel,
+    offlineFileViewModel: OfflineFileViewModel,
+    audioViewModel: AudioViewModel,
     appBarOnClick: (String) -> Unit
 ) {
-    val fileViewModel = viewModel<FileViewModel>()
-    val offlineFileViewModel = viewModel<OfflineFileViewModel>()
-
     val fabPosition by remember {
         mutableStateOf(
             when (DataStoreUtil.getData(ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION, "End")) {
@@ -164,6 +167,11 @@ fun FileScreen(
         fileViewModel.getVideoInfo(fileBean.pickCode, i, fileBean.name)
     }
 
+    fun handleAudioClick(fileBean: FileBean) {
+        fileViewModel.setRefreshingStatus(false)
+        audioViewModel.playAudio(fileBean)
+    }
+
     fun handlePhotoClick(fileBean: FileBean) {
         val photoList = fileBeanList.filter { it.photoThumb != "" }
         fileViewModel.photoFileBeanList.clear()
@@ -221,6 +229,7 @@ fun FileScreen(
                 fileBean.fileIco == R.drawable.torrent -> handleTorrentClick(fileBean)
                 fileBean.fileIco == R.drawable.zip -> handleZipClick(i)
                 fileBean.fileIco == R.drawable.txt -> handleTextClick(i, fileBean)
+                fileBean.fileIco == R.drawable.mp3 -> handleAudioClick(fileBean)
                 else -> fileViewModel.setRefreshingStatus(false)
             }
 
@@ -392,6 +401,15 @@ fun FileScreen(
         }
 
         Scaffold(
+            bottomBar = {
+                AnimatedVisibility(
+                    visible = audioViewModel.currentMusic != null,
+                    enter = slideInVertically(initialOffsetY = { it }),
+                    exit = slideOutVertically(targetOffsetY = { it })
+                ) {
+                    MiniPlayerBar(audioViewModel = audioViewModel)
+                }
+            },
             floatingActionButton = {
                 AnimatedContent(
                     targetState = fileViewModel.isCutState,

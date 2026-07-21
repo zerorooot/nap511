@@ -43,6 +43,13 @@ data class BaseResponse<T>(
     }
 }
 
+data class MusicBean(
+    val state: Boolean = false,
+    val url: String = "",
+    @SerializedName("audio_url")
+    val audioUrl: String = ""
+)
+
 data class ExtractData(
     @SerializedName("extract_status")
     val extractStatus: ExtractStatus

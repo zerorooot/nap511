@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import github.zerorooot.nap511.viewmodel.FileViewModel
+import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 
@@ -38,6 +39,9 @@ class CookieViewModelFactory(
 
             RecycleViewModel::class.java ->
                 RecycleViewModel(cookie) as T
+
+            AudioViewModel::class.java ->
+                AudioViewModel(cookie, context) as T
 
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }

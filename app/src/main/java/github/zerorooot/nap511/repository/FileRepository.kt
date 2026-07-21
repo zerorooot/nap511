@@ -90,9 +90,7 @@ class FileRepository(private val cookie: String) {
     }
 
     suspend fun addOfflineTask(
-        list: List<String>,
-        currentCid: String,
-        handle: (Boolean) -> Unit
+        list: List<String>, currentCid: String, handle: (Boolean) -> Unit
     ): Pair<Boolean, String> {
         val downloadPath = setDownloadPath(currentCid)
         XLog.d("add task downloadPath $downloadPath")
@@ -120,18 +118,14 @@ class FileRepository(private val cookie: String) {
             }
             //把失败的离线链接保存起来
             val currentOfflineTaskList =
-                DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
-                    .split("\n")
-                    .filter { i -> i != "" && i != " " }
-                    .toSet()
-                    .toMutableList()
+                DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "").split("\n")
+                    .filter { i -> i != "" && i != " " }.toSet().toMutableList()
             currentOfflineTaskList.addAll(list)
             val stringJoiner = StringJoiner("\n")
             currentOfflineTaskList.toSet().forEach { stringJoiner.add(it) }
             //写入缓存
             DataStoreUtil.putData(
-                ConfigKeyUtil.CURRENT_OFFLINE_TASK,
-                stringJoiner.toString()
+                ConfigKeyUtil.CURRENT_OFFLINE_TASK, stringJoiner.toString()
             )
             "任务添加失败，${addTask.errorMsg}"
         }
@@ -178,11 +172,7 @@ class FileRepository(private val cookie: String) {
     }
 
     suspend fun search(
-        cid: String,
-        searchValue: String,
-        aid: Int = 1,
-        asc: Int = 0,
-        limit: Int = 999
+        cid: String, searchValue: String, aid: Int = 1, asc: Int = 0, limit: Int = 999
     ): FilesBean {
         return fileService.search(cid, searchValue, aid, asc, limit)
     }
@@ -331,9 +321,7 @@ class FileRepository(private val cookie: String) {
     }
 
     suspend fun getZipListFile(
-        pickCode: String,
-        fileName: String = "",
-        paths: String = "文件"
+        pickCode: String, fileName: String = "", paths: String = "文件"
     ): ZipBeanList {
         val zipListFile = fileService.getZipListFile(pickCode, fileName, paths)
         val data = zipListFile.getAsJsonObject("data")
@@ -341,8 +329,7 @@ class FileRepository(private val cookie: String) {
 
         val zipBeanList = Gson().fromJson(data, ZipBeanList::class.java)
         val sj = StringJoiner("/")
-        data.getAsJsonArray("paths")
-            .forEach { sj.add(it.asJsonObject.get("file_name").asString) }
+        data.getAsJsonArray("paths").forEach { sj.add(it.asJsonObject.get("file_name").asString) }
         zipBeanList.pathString = sj.toString()
         zipBeanList.list.forEach { i ->
             if (i.fileCategory == 0) {
@@ -404,7 +391,6 @@ class FileRepository(private val cookie: String) {
                 ZipStatus.UnsupportedOrError(response.message)
             } else {
                 val status = response.data.extractStatus
-                    ?: return ZipStatus.UnsupportedOrError("提取状态数据缺失")
                 var unzipStatus = status.unzipStatus
 
                 // 2. 特殊状态码二次校验
@@ -461,9 +447,8 @@ class FileRepository(private val cookie: String) {
         XLog.d("FileRepository getDownloadUrl m115Decode $m115Decode")
 
         //{"fileId":{"file_name":"a","file_size":"0","pick_code":"pick_code","url":false}}
-        val downloadUrl =
-            JsonParser.parseString(m115Decode).asJsonObject.getAsJsonObject(fileId)
-                .getAsJsonObject("url").get("url").asString
+        val downloadUrl = JsonParser.parseString(m115Decode).asJsonObject.getAsJsonObject(fileId)
+            .getAsJsonObject("url").get("url").asString
         XLog.d("FileRepository getDownloadUrl downloadUrl $downloadUrl")
         return downloadUrl;
     }
@@ -483,5 +468,10 @@ class FileRepository(private val cookie: String) {
         val responseDownload = okHttpClient.newCall(requestDownload).execute();
         val body = responseDownload.body.byteStream()
         return body
+    }
+
+
+    suspend fun music(pickCode: String): String {
+        return fileService.music(pickCode, "weixin", "json").url
     }
 }
