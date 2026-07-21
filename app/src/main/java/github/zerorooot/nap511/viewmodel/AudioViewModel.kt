@@ -23,6 +23,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
     private val SEEK_STEP_MS = 15000L
+
     // 假设你有 Repository 或 Api 实例，也可以通过 Hilt/Koin 注入
     val fileRepository: FileRepository by lazy {
         FileRepository.getInstance(cookie)
@@ -123,7 +124,7 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
 
     fun playAudio(fileBean: FileBean) {
         // 防止在同一个文件加载中重复点击
-        if (isLoading && currentMusic?.fileId == fileBean.fileId) return
+        if (isLoading || currentMusic?.fileId == fileBean.fileId) return
 
         currentMusic = fileBean
         isLoading = true
