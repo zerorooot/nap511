@@ -30,6 +30,7 @@ class OfflineTaskWorker(
     private val fileRepository: FileRepository by lazy {
         FileRepository.getInstance(App.cookie)
     }
+
     override suspend fun doWork(): Result {
         val listType = object : TypeToken<List<String?>?>() {}.type
         val a: List<String> = Gson().fromJson(inputData.getString("list").toString(), listType)

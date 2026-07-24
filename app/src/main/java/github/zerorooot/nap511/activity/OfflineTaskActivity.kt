@@ -87,11 +87,13 @@ class OfflineTaskActivity : ComponentActivity() {
             stringJoiner.toString()
         )
 
+        val defaultOfflineCid = DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
+
         App.instance.toast("已添加 ${currentOfflineTaskList.size} 个链接，${offlineTime}分钟后开始离线下载")
         val listType = object : TypeToken<List<String?>?>() {}.type
         val list = Gson().toJson(currentOfflineTaskList, listType)
         val data: Data =
-            Data.Builder().putString("cookie", App.cookie).putString("list", list)
+            Data.Builder().putString("defaultOfflineCid", defaultOfflineCid).putString("list", list)
                 .build()
         val request: OneTimeWorkRequest =
             OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java).setInputData(data)
