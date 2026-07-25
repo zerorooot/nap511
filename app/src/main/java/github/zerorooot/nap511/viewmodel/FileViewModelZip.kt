@@ -151,7 +151,11 @@ internal fun FileViewModel.decryptZip(secret: String) {
 
         //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
         if (fileRepository.tryToExtract(pickCode)) {
-            getZipListFile(isCheck = false)
+            //当云解压未完成，加密压缩包随便输入一个密码，会返回1,tryToExtract返回了true,但不代表密码正确。
+            //官网会显示服务器解压中，并继续get push_extract（fileService.getDecryptZipProcess）然后一段时间会返回
+            // {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":6,"progress":88}}}
+            //重新进入输入密码循环中
+            getZipListFile(isCheck = true)
         } else {
             App.instance.toast("服务器解压中～")
         }

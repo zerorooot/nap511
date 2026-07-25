@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
+import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.screen.FileMoreMenu
 
@@ -151,8 +152,8 @@ fun FileCellItem(
                             text = size,
                             style = MaterialTheme.typography.bodyMedium,
                         )
-                        // 视频时长（作为独立 Badge 标签凸显）
-                        if (fileBean.isVideo == 1) {
+                        // 时长（作为独立 Badge 标签凸显）
+                        if (fileBean.isVideo == 1 || fileBean.fileIco == R.drawable.mp3) {
                             Box(
                                 modifier = Modifier
                                     .background(

@@ -264,7 +264,10 @@ internal fun FileViewModel.setFileBeanProperty(fileBeanList: ArrayList<FileBean>
         }
         if (fileBean.isVideo == 1) {
             fileBean.fileIco = R.drawable.mp4
-            //设置视频时间
+            fileBean.playLongString = generateTime(fileBean.playLong.toLong()) + " "
+        }
+        if (fileBean.icoString == "mp3" || fileBean.icoString == "m4a") {
+            fileBean.fileIco = R.drawable.mp3
             fileBean.playLongString = generateTime(fileBean.playLong.toLong()) + " "
         }
         when (fileBean.icoString) {
@@ -275,7 +278,6 @@ internal fun FileViewModel.setFileBeanProperty(fileBeanList: ArrayList<FileBean>
             "rar" -> fileBean.fileIco = R.drawable.zip
             "png" -> fileBean.fileIco = R.drawable.png
             "jpg" -> fileBean.fileIco = R.drawable.png
-            "mp3" -> fileBean.fileIco = R.drawable.mp3
             "txt" -> fileBean.fileIco = R.drawable.txt
             "torrent" -> fileBean.fileIco = R.drawable.torrent
         }

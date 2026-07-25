@@ -140,9 +140,7 @@ fun RenameFileDialog(fileViewModel: FileViewModel, enter: (String?) -> Unit) {
 
 @Composable
 fun FileInfoDialog(
-    fileViewModel: FileViewModel,
-    enter: () -> Unit,
-    fileInfoClick: (String) -> Unit
+    fileViewModel: FileViewModel, enter: () -> Unit, fileInfoClick: (String) -> Unit
 ) {
     if (fileViewModel.isOpenFileInfoDialog) {
         val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
@@ -167,16 +165,15 @@ private fun FileInfoDialog(
     if (fileBean.isFolder) {
         baseItems.add(
             InfoItem(
-                "包含内容",
-                "${fileInfo.count} 个文件, ${fileInfo.folderCount} 个文件夹"
+                "包含内容", "${fileInfo.count} 个文件, ${fileInfo.folderCount} 个文件夹"
             )
         )
     }
     baseItems.add(
         InfoItem(
-            "总大小",
-            fileInfo.size.ifEmpty { fileBean.sizeString.ifEmpty { "0 B" } })
+            "总大小", fileInfo.size.ifEmpty { fileBean.sizeString.ifEmpty { "0 B" } })
     )
+
     sections.add(InfoSection(title = "基础信息", items = baseItems))
 
     // 区块二：位置与共享
@@ -184,9 +181,11 @@ private fun FileInfoDialog(
     val locationItems = listOf(
         InfoItem(
             "文件路径",
-            pathString.ifEmpty { "根目录" }
-        ) { fileInfoClick.invoke(fileBean.categoryId) },
-        InfoItem("提取码", fileBean.pickCode.ifEmpty { "无" })
+            pathString.ifEmpty { "根目录" }) { fileInfoClick.invoke(fileBean.categoryId) },
+        InfoItem("提取码", fileBean.pickCode.ifEmpty { "无" }),
+        InfoItem(
+            "sha1", fileBean.sha1
+        )
     )
     sections.add(InfoSection(title = "位置与共享", items = locationItems))
 
@@ -198,112 +197,100 @@ private fun FileInfoDialog(
     sections.add(InfoSection(title = "时间信息", items = timeItems))
 
     BaseDetailDialog(
-        title = fileBean.name,
-        icon = icon,
-        sections = sections,
-        onDismissRequest = onDismissRequest
+        title = fileBean.name, icon = icon, sections = sections, onDismissRequest = onDismissRequest
     )
 }
 
 @Composable
 fun BaseDetailDialog(
-    title: String,
-    icon: Int,
-    sections: List<InfoSection>,
-    onDismissRequest: () -> Unit
+    title: String, icon: Int, sections: List<InfoSection>, onDismissRequest: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismissRequest,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(
-                    painter = painterResource(icon),
-                    modifier = Modifier.size(28.dp),
-                    contentScale = ContentScale.Fit,
-                    contentDescription = "",
-                )
-                Spacer(modifier = Modifier.width(12.dp))
+    AlertDialog(onDismissRequest = onDismissRequest, title = {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Image(
+                painter = painterResource(icon),
+                modifier = Modifier.size(28.dp),
+                contentScale = ContentScale.Fit,
+                contentDescription = "",
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 2, // 离线任务名字通常较长，放宽到3行
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = MaterialTheme.typography.titleMedium.lineHeight
+            )
+        }
+    }, text = {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            sections.forEachIndexed { index, section ->
+                // 区块标题
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    maxLines = 2, // 离线任务名字通常较长，放宽到3行
-                    overflow = TextOverflow.Ellipsis,
-                    lineHeight = MaterialTheme.typography.titleMedium.lineHeight
+                    text = section.title,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = if (index == 0) 0.dp else 8.dp)
                 )
-            }
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                sections.forEachIndexed { index, section ->
-                    // 区块标题
-                    Text(
-                        text = section.title,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = if (index == 0) 0.dp else 8.dp)
-                    )
 
-                    // 区块内容
-                    section.items.forEach { item ->
-                        Row(
+                // 区块内容
+                section.items.forEach { item ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { item.onClick?.let { it() } } // 绑定点击事件
+                            .padding(vertical = 4.dp), // 增加一点垂直内边距，让点击区域更大、更跟手,
+                        horizontalArrangement = Arrangement.SpaceBetween) {
+                        // 左侧：标签 (占 1 份)
+                        Text(
+                            text = item.label,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { item.onClick?.let { it() } } // 绑定点击事件
-                                .padding(vertical = 4.dp), // 增加一点垂直内边距，让点击区域更大、更跟手,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            // 左侧：标签 (占 1 份)
-                            Text(
-                                text = item.label,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(top = 2.dp) // 微调，使其与右侧第一行文本视觉对齐
-                            )
+                                .weight(1f)
+                                .padding(top = 2.dp) // 微调，使其与右侧第一行文本视觉对齐
+                        )
 
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Box(
-                                modifier = Modifier.weight(2f),
-                                contentAlignment = Alignment.TopEnd // 确保内容靠右
-                            ) {
-                                Text(
-                                    text = item.value.ifEmpty { "-" },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    textAlign = TextAlign.End,
-                                    minLines = 1,
-                                    color = if (item.onClick != null) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurface
-                                    },
-                                    modifier = Modifier.fillMaxWidth() // 填满 Box，遇到边界自动强制换行
-                                )
-                            }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Box(
+                            modifier = Modifier.weight(2f),
+                            contentAlignment = Alignment.TopEnd // 确保内容靠右
+                        ) {
+                            Text(
+                                text = item.value.ifEmpty { "-" },
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.End,
+                                minLines = 1,
+                                color = if (item.onClick != null) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                                modifier = Modifier.fillMaxWidth() // 填满 Box，遇到边界自动强制换行
+                            )
                         }
                     }
+                }
 
-                    // 分割线 (最后一个区块不显示)
-                    if (index < sections.lastIndex) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(top = 4.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    }
+                // 分割线 (最后一个区块不显示)
+                if (index < sections.lastIndex) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(top = 4.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    )
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismissRequest) {
-                Text("关闭")
-            }
         }
-    )
+    }, confirmButton = {
+        TextButton(onClick = onDismissRequest) {
+            Text("关闭")
+        }
+    })
 }
 
 
@@ -320,31 +307,22 @@ fun OfflineFileInfoDialog(
 
 @Composable
 fun OfflineTaskDialog(
-    task: OfflineTask,
-    onDismissRequest: () -> Unit,
-    urlCopy: (String) -> Unit
+    task: OfflineTask, onDismissRequest: () -> Unit, urlCopy: (String) -> Unit
 ) {
     val sections = listOf(
         InfoSection(
-            title = "任务信息",
-            items = listOf(
+            title = "任务信息", items = listOf(
                 InfoItem("状态", task.percentString),
                 InfoItem("总大小", task.sizeString),
                 InfoItem("下载进度", "${task.percentDone}%")
             )
-        ),
-        InfoSection(
-            title = "链接与哈希",
-            items = listOf(
-                InfoItem("哈希值", task.infoHash),
-                InfoItem("链接", task.url) {
+        ), InfoSection(
+            title = "链接与哈希", items = listOf(
+                InfoItem("哈希值", task.infoHash), InfoItem("链接", task.url) {
                     urlCopy.invoke(task.url)
-                }
-            )
-        ),
-        InfoSection(
-            title = "时间信息",
-            items = listOf(
+                })
+        ), InfoSection(
+            title = "时间信息", items = listOf(
                 InfoItem("添加时间", task.timeString)
             )
         )
@@ -392,7 +370,7 @@ fun ExitApp() {
 
 @Composable
 fun TextBodyDialog(fileViewModel: FileViewModel) {
-    if (fileViewModel.isOpenTextBodyDialog  && fileViewModel.textBodyByteArray != null) {
+    if (fileViewModel.isOpenTextBodyDialog && fileViewModel.textBodyByteArray != null) {
         val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
         TextBodyDialogScreen(fileBean.name, fileViewModel.textBodyByteArray!!) {
             if (it == "") {
@@ -558,13 +536,12 @@ fun UnzipAllFile(
 
             fileViewModel.closeUnzipAllFileDialog()
 
-            val message = fileViewModel.fileBeanList
-                .filter { i -> i.isSelect && i.fileIco == R.drawable.zip }
-                .takeIf { it.isNotEmpty() }
-                ?.let {
-                    fileViewModel.unzipFile(it, currentCid, pwd)
-                    "后台解压中......"
-                } ?: run {
+            val message =
+                fileViewModel.fileBeanList.filter { i -> i.isSelect && i.fileIco == R.drawable.zip }
+                    .takeIf { it.isNotEmpty() }?.let {
+                        fileViewModel.unzipFile(it, currentCid, pwd)
+                        "后台解压中......"
+                    } ?: run {
                     "请选中压缩包解压！"
                 }
             App.instance.toast(message)
@@ -1004,8 +981,7 @@ private fun SelectTorrentFileDialog(
 
     AlertDialog(onDismissRequest = ::cancel, confirmButton = {
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.offset(y = (-20).dp)
+            verticalAlignment = Alignment.CenterVertically, modifier = Modifier.offset(y = (-20).dp)
         ) {
             TextButton(
                 onClick = ::default,
@@ -1037,8 +1013,7 @@ private fun SelectTorrentFileDialog(
         }
     }, title = { Text(text = "选择要下载的文件") }, text = {
         Column(
-            modifier = Modifier
-                .heightIn(max = maxDialogHeight) // 限制最大高度，防止文件极多时超出屏幕，变成滚动模式
+            modifier = Modifier.heightIn(max = maxDialogHeight) // 限制最大高度，防止文件极多时超出屏幕，变成滚动模式
         ) {
             AutoSizableTextField(
                 value = "已经选择${selectMap.size}/${fileCount}个，总计：${
