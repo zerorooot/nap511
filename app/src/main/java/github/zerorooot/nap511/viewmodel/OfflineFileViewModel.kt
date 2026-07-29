@@ -11,8 +11,8 @@ import github.zerorooot.nap511.bean.OfflineInfo
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.bean.TorrentFileBean
-import github.zerorooot.nap511.repository.DialogEvent
-import github.zerorooot.nap511.repository.DialogEventRepository
+import github.zerorooot.nap511.util.DialogEvent
+import github.zerorooot.nap511.util.DialogEventBus
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -38,14 +38,14 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
 
     lateinit var offlineTask: OfflineTask
 
-    private val dialogEventRepository = DialogEventRepository.getInstance()
+    private val dialogEventBus = DialogEventBus.getInstance()
 
     var isOpenOfflineDialog by mutableStateOf(false)
         private set
 
     init {
         viewModelScope.launch {
-            dialogEventRepository.events.collect { event ->
+            dialogEventBus.events.collect { event ->
                 when (event) {
                     is DialogEvent.OpenOfflineDialog -> isOpenOfflineDialog = true
                     else -> { /* ignore */

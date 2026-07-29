@@ -1,57 +1,54 @@
 package github.zerorooot.nap511.viewmodel
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewModelScope
-import github.zerorooot.nap511.repository.DialogEvent
+import github.zerorooot.nap511.util.DialogEvent
 import kotlinx.coroutines.launch
 
 
 // ==================== 公开方法：供外部触发对话框事件 ====================
 
 internal fun FileViewModel.openCreateFolderDialog() {
-    viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenCreateFolder) }
+    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenCreateFolder) }
 }
 
 internal fun FileViewModel.openSearchDialog() {
-    viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenSearch) }
+    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenSearch) }
 }
 
 internal fun FileViewModel.openRenameFileDialog() {
-    viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenRenameFile) }
+    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenRenameFile) }
 }
 
 internal fun FileViewModel.openFileInfoDialog() {
-    viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenFileInfo) }
+    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenFileInfo) }
 }
 
 internal fun FileViewModel.openFileOrderDialog() {
-    viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenFileOrder) }
+    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenFileOrder) }
 }
 
 internal fun FileViewModel.openAria2Dialog() {
-    viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenAria2Dialog) }
+    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenAria2Dialog) }
 }
 
 internal fun FileViewModel.openUnzipAllFileDialog() {
-    viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenUnzipAllFileDialog) }
+    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenUnzipAllFileDialog) }
 }
 
 internal fun FileViewModel.openCreateSelectTorrentFileDialog() {
-    viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenCreateSelectTorrentFileDialog) }
+    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenCreateSelectTorrentFileDialog) }
 }
 
 internal fun FileViewModel.openUnzipDialog() {
-    viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenUnzipDialog) }
+    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenUnzipDialog) }
 }
 
 internal fun FileViewModel.openUnzipPasswordDialog() {
-    viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenUnzipPasswordDialog) }
+    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenUnzipPasswordDialog) }
 }
 
 internal fun FileViewModel.openTextBodyDialog() {
-    viewModelScope.launch { dialogEventRepository.emit(DialogEvent.OpenTextBodyDialog) }
+    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenTextBodyDialog) }
 }
 
 // ==================== 关闭方法（直接在本地设 false） ====================

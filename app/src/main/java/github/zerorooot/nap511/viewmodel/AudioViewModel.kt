@@ -15,6 +15,8 @@ import github.zerorooot.nap511.player.AudioGSYManager
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.service.AudioService
 import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.AudioEvent
+import github.zerorooot.nap511.util.AudioEventBus
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -120,6 +122,42 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
         videoManger.initContext(context)
         PlayerFactory.setPlayManager(Exo2PlayerManager::class.java)
         videoManger.setListener(listener)
+        // 监听来自 Service 的状态同步事件
+        viewModelScope.launch {
+            AudioEventBus.events.collect { event ->
+                when (event) {
+                    is AudioEvent.SyncState -> syncFromManager()
+                    is AudioEvent.Stop -> {
+                        stopProgressTracker()
+                        isPlaying = false
+                        currentMusic = null
+                        progress = 0f
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 从单例播放器拉取最新状态，更新 ViewModel Compose State
+     */
+    private fun syncFromManager() {
+        val playing = videoManger.isPlaying
+        val duration = videoManger.duration
+        val current = videoManger.currentPosition
+
+        isPlaying = playing
+
+        if (playing) {
+            startProgressTracker()
+        } else {
+            stopProgressTracker()
+        }
+
+        if (duration > 0 && !isUserSeeking) {
+            progress = current.toFloat() / duration.toFloat()
+            currentPositionText = "${formatTime(current)}/${formatTime(duration)}"
+        }
     }
 
     fun playAudio(fileBean: FileBean) {
@@ -200,17 +238,18 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
         stopAudioService()
     }
 
-    private fun seekRelative(offsetMs: Long) {
+    fun seekRelative(offsetMs: Long) {
         val current = videoManger.currentPosition
         val duration = videoManger.duration
         val target =
             (current + offsetMs).coerceIn(0, if (duration > 0) duration else Long.MAX_VALUE)
         videoManger.seekTo(target)
+        progress = target.toFloat() / duration.toFloat()
+        currentPositionText = "${formatTime(target)}/${formatTime(duration)}"
     }
 
     fun onRewind() {
         seekRelative(-SEEK_STEP_MS)
-
     }
 
     // 响应快进 15 秒

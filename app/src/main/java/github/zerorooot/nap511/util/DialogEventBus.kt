@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.repository
+package github.zerorooot.nap511.util
 
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -55,15 +55,15 @@ sealed interface DialogEvent {
     data object OpenRecyclePasswordDialog : DialogEvent
 }
 
-class DialogEventRepository private constructor() {
+class DialogEventBus private constructor() {
 
     companion object {
         @Volatile
-        private var INSTANCE: DialogEventRepository? = null
+        private var INSTANCE: DialogEventBus? = null
 
-        fun getInstance(): DialogEventRepository {
+        fun getInstance(): DialogEventBus {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: DialogEventRepository().also { INSTANCE = it }
+                INSTANCE ?: DialogEventBus().also { INSTANCE = it }
             }
         }
     }

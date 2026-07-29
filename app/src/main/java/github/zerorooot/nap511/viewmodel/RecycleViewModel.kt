@@ -10,8 +10,8 @@ import androidx.lifecycle.viewModelScope
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
-import github.zerorooot.nap511.repository.DialogEvent
-import github.zerorooot.nap511.repository.DialogEventRepository
+import github.zerorooot.nap511.util.DialogEvent
+import github.zerorooot.nap511.util.DialogEventBus
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -31,7 +31,7 @@ class RecycleViewModel(private val cookie: String) :
 
     var recycleFileList = mutableStateListOf<RecycleBean>()
 
-    private val dialogEventRepository = DialogEventRepository.getInstance()
+    private val dialogEventBus = DialogEventBus.getInstance()
 
     var isOpenRecyclePasswordDialog by mutableStateOf(false)
         private set
@@ -42,7 +42,7 @@ class RecycleViewModel(private val cookie: String) :
 
     init {
         viewModelScope.launch {
-            dialogEventRepository.events.collect { event ->
+            dialogEventBus.events.collect { event ->
                 when (event) {
                     is DialogEvent.OpenRecyclePasswordDialog -> isOpenRecyclePasswordDialog = true
                     else -> { /* ignore */

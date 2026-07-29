@@ -33,8 +33,8 @@ import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.RemainingSpaceBean
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.bean.ZipBeanList
-import github.zerorooot.nap511.repository.DialogEvent
-import github.zerorooot.nap511.repository.DialogEventRepository
+import github.zerorooot.nap511.util.DialogEvent
+import github.zerorooot.nap511.util.DialogEventBus
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -85,7 +85,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     /**
      * 打开对话框相关（状态下沉到 ViewModel 本地）
      */
-    internal val dialogEventRepository = DialogEventRepository.getInstance()
+    internal val dialogEventBus = DialogEventBus.getInstance()
 
     var isOpenCreateFolderDialog by mutableStateOf(false)
         internal set
@@ -127,7 +127,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
 
     init {
         viewModelScope.launch {
-            dialogEventRepository.events.collect { event ->
+            dialogEventBus.events.collect { event ->
                 when (event) {
                     is DialogEvent.OpenCreateFolder -> isOpenCreateFolderDialog = true
                     is DialogEvent.OpenSearch -> isOpenSearchDialog = true

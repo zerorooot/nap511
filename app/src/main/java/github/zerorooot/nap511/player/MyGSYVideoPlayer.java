@@ -23,7 +23,6 @@ import java.util.Locale;
 import java.util.Objects;
 
 import github.zerorooot.nap511.R;
-import github.zerorooot.nap511.bean.VideoInfoBean;
 import github.zerorooot.nap511.util.ConfigKeyUtil;
 import github.zerorooot.nap511.util.DataStoreUtil;
 
@@ -36,6 +35,7 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     long forwardRewindIncrementMs = 15000;
     private TextView batteryTextView;
     private TextView timeTextView;
+    public static String TAG = "MyGSYVideoPlayer";
 
     public MyGSYVideoPlayer(Context context) {
         super(context);
@@ -45,6 +45,10 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         super(context, attrs);
     }
 
+    @Override
+    public String getPlayTag() {
+        return TAG;
+    }
 
     @Override
     protected void init(Context context) {

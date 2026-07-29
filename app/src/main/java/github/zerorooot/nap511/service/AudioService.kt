@@ -14,21 +14,25 @@ import androidx.core.app.NotificationCompat
 import androidx.media.app.NotificationCompat.MediaStyle
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.player.AudioGSYManager
+import github.zerorooot.nap511.util.AudioEvent
+import github.zerorooot.nap511.util.AudioEventBus
 
 /**
  */
 class AudioService : Service() {
     private lateinit var mediaSession: MediaSessionCompat
     private val videoManger: AudioGSYManager = AudioGSYManager.instance()
+
     /**
      * 抽取统一的相对跳转函数
      */
     private fun seekRelative(offsetMs: Long) {
         val current = videoManger.currentPosition
         val duration = videoManger.duration
-        val target = (current + offsetMs).coerceIn(0, if (duration > 0) duration else Long.MAX_VALUE)
+        val target =
+            (current + offsetMs).coerceIn(0, if (duration > 0) duration else Long.MAX_VALUE)
         videoManger.seekTo(target)
-        updateMediaState()
+        updateMediaState(notifyUi = true)
     }
 
     override fun onCreate() {
@@ -40,25 +44,29 @@ class AudioService : Service() {
             setCallback(object : MediaSessionCompat.Callback() {
                 override fun onPlay() {
                     videoManger.start()
-                    updateMediaState()
+                    updateMediaState(notifyUi = true)
                 }
 
                 override fun onPause() {
                     videoManger.pause()
-                    updateMediaState()
+                    updateMediaState(notifyUi = true)
                 }
 
                 // 解决问题 2：响应系统通知栏拖拽进度条
                 override fun onSeekTo(pos: Long) {
                     videoManger.seekTo(pos)
-                    updateMediaState()
+                    updateMediaState(notifyUi = true)
                 }
 
                 // 响应快退 15 秒
-                override fun onRewind() = seekRelative(-SEEK_STEP_MS)
+                override fun onRewind() {
+                    seekRelative(-SEEK_STEP_MS)
+                }
 
                 // 响应快进 15 秒
-                override fun onFastForward() = seekRelative(SEEK_STEP_MS)
+                override fun onFastForward() {
+                    seekRelative(SEEK_STEP_MS)
+                }
 
                 // 重写上一首/下一首回调，将其映射为快退/快进
                 override fun onSkipToPrevious() = onRewind()
@@ -91,20 +99,21 @@ class AudioService : Service() {
             }
 
             ACTION_UPDATE_STATE -> {
-                // 仅更新状态（如定时轮询进度）
-                updateMediaState(title)
+                // 来自 ViewModel 定时器轮询：仅更新通知栏 MediaSession，不反向通知 UI
+                updateMediaState(title, notifyUi = false)
                 return START_STICKY
             }
 
             ACTION_STOP -> {
                 videoManger.releaseMediaPlayer()
                 stopForeground(STOP_FOREGROUND_REMOVE)
+                AudioEventBus.sendEvent(AudioEvent.Stop)
                 stopSelf()
                 return START_NOT_STICKY
             }
         }
 
-        updateMediaState(title)
+        updateMediaState(title, notifyUi = true)
         startForeground(NOTIFICATION_ID, buildNotification(title))
         return START_STICKY
     }
@@ -113,7 +122,7 @@ class AudioService : Service() {
      * 核心关键：同步系统 MediaSession 的状态与元数据
      * 解锁通知栏进度条拖拽，并修复按钮置灰问题
      */
-    private fun updateMediaState(title: String? = null) {
+    private fun updateMediaState(title: String? = null, notifyUi: Boolean) {
         val isPlaying = videoManger.isPlaying
         val currentPos = videoManger.currentPosition
         val duration = videoManger.duration
@@ -148,6 +157,9 @@ class AudioService : Service() {
                 metadataBuilder.putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration)
             }
             mediaSession.setMetadata(metadataBuilder.build())
+        }
+        if (notifyUi) {
+            AudioEventBus.sendEvent(AudioEvent.SyncState)
         }
     }
 

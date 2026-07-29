@@ -3,7 +3,7 @@ package github.zerorooot.nap511.player
 import com.shuyu.gsyvideoplayer.GSYVideoBaseManager
 
 /*
-不复用GSYVideoBaseManager，因为视频也用了。容易产生冲突
+不复用GSYVideoManager，因为视频也用了。容易产生冲突
  */
 class AudioGSYManager private constructor() : GSYVideoBaseManager() {
     init {
