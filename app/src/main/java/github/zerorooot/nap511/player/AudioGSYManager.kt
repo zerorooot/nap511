@@ -16,6 +16,17 @@ class AudioGSYManager private constructor() : GSYVideoBaseManager() {
         return TAG
     }
 
+    /**
+     * 抽取统一的相对跳转函数
+     */
+    fun seekRelative(offsetMs: Long) {
+        val current = this.currentPosition
+        val duration = this.duration
+        val target =
+            (current + offsetMs).coerceIn(0, if (duration > 0) duration else Long.MAX_VALUE)
+        this.seekTo(target)
+    }
+
     companion object {
         const val TAG = "AudioGSYManager"
 

@@ -52,7 +52,7 @@ fun MiniPlayerBar(
             "onSeekStart" -> audioViewModel.onSeekStart()
             "onSeekEnd" -> audioViewModel.onSeekEnd()
             "onTogglePlay" -> audioViewModel.togglePlayPause()
-            "onClose" -> audioViewModel.stop()
+            "onClose" -> audioViewModel.stopAudioAndService()
             "onRewind" -> audioViewModel.onRewind()
             "onFastForward" -> audioViewModel.onFastForward()
         }

@@ -33,12 +33,12 @@ import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.RemainingSpaceBean
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.bean.ZipBeanList
-import github.zerorooot.nap511.util.DialogEvent
-import github.zerorooot.nap511.util.DialogEventBus
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.DialogEvent
+import github.zerorooot.nap511.util.DialogEventBus
 import github.zerorooot.nap511.worker.OfflineTaskWorker
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
@@ -410,6 +410,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     }
 
     fun search(searchKey: String) {
+        _isRefreshing.value = true
         viewModelScope.launch {
             isSearchState = true
             val files = fileRepository.search(currentCid, searchKey)
@@ -417,6 +418,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
             fileBeanList.clear()
             fileBeanList.addAll(files.fileBeanList)
             appBarTitle = "搜索 - $searchKey"
+            _isRefreshing.value = false
         }
     }
 

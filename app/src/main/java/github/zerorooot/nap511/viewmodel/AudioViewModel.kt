@@ -79,9 +79,7 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
 
         override fun onError(what: Int, extra: Int) {
             viewModelScope.launch {
-                isLoading = false
-                isPlaying = false
-                stopProgressTracker()
+                stopAudioAndService()
                 App.instance.toast("播放失败 ($what)")
             }
         }
@@ -114,6 +112,7 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
             val targetMs = (userSeekProgress * duration).toLong()
             videoManger.seekTo(targetMs)
             progress = userSeekProgress
+            currentPositionText = "${formatTime(targetMs)}/${formatTime(duration)}"
         }
         isUserSeeking = false
     }
@@ -128,10 +127,7 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
                 when (event) {
                     is AudioEvent.SyncState -> syncFromManager()
                     is AudioEvent.Stop -> {
-                        stopProgressTracker()
-                        isPlaying = false
-                        currentMusic = null
-                        progress = 0f
+                        stop()
                     }
                 }
             }
@@ -142,21 +138,11 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
      * 从单例播放器拉取最新状态，更新 ViewModel Compose State
      */
     private fun syncFromManager() {
-        val playing = videoManger.isPlaying
-        val duration = videoManger.duration
-        val current = videoManger.currentPosition
-
-        isPlaying = playing
-
-        if (playing) {
+        isPlaying = videoManger.isPlaying
+        if (isPlaying) {
             startProgressTracker()
         } else {
             stopProgressTracker()
-        }
-
-        if (duration > 0 && !isUserSeeking) {
-            progress = current.toFloat() / duration.toFloat()
-            currentPositionText = "${formatTime(current)}/${formatTime(duration)}"
         }
     }
 
@@ -168,6 +154,7 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
         isLoading = true
         isPlaying = false
         progress = 0f
+        currentPositionText = "00:00"
 
         viewModelScope.launch {
             try {
@@ -228,33 +215,39 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
         App.instance.startService(intent)
     }
 
-    fun stop() {
+    fun stopAudioAndService() {
+        stop()
+        stopAudioService()
+    }
+
+    private fun stop() {
         stopProgressTracker()
         currentMusic = null
         isPlaying = false
         isLoading = false
         progress = 0f
+        currentPositionText = "00:00"
         videoManger.releaseMediaPlayer()
-        stopAudioService()
     }
 
-    fun seekRelative(offsetMs: Long) {
-        val current = videoManger.currentPosition
+    fun updateAudioTime() {
         val duration = videoManger.duration
-        val target =
-            (current + offsetMs).coerceIn(0, if (duration > 0) duration else Long.MAX_VALUE)
-        videoManger.seekTo(target)
-        progress = target.toFloat() / duration.toFloat()
-        currentPositionText = "${formatTime(target)}/${formatTime(duration)}"
+        val current = videoManger.currentPosition
+        if (duration > 0 && !isUserSeeking) {
+            progress = current.toFloat() / duration.toFloat()
+            currentPositionText = "${formatTime(current)}/${formatTime(duration)}"
+        }
     }
 
     fun onRewind() {
-        seekRelative(-SEEK_STEP_MS)
+        videoManger.seekRelative(-SEEK_STEP_MS)
+        updateAudioTime()
     }
 
     // 响应快进 15 秒
     fun onFastForward() {
-        seekRelative(SEEK_STEP_MS)
+        videoManger.seekRelative(SEEK_STEP_MS)
+        updateAudioTime()
     }
 
     // 修改轮询进度逻辑：用户拖拽时跳过自动赋值
@@ -262,15 +255,9 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
         stopProgressTracker()
         progressJob = viewModelScope.launch {
             while (isPlaying) {
-                val duration = videoManger.duration
-                val current = videoManger.currentPosition
-                if (duration > 0 && !isUserSeeking) {
-                    progress = current.toFloat() / duration.toFloat()
-                    currentPositionText = "${formatTime(current)}/${formatTime(duration)}"
-
-                    // 保持系统通知栏的 MediaSession 状态与真实播放进度一致
-                    notifyServiceUpdateState()
-                }
+                updateAudioTime()
+                // 保持系统通知栏的 MediaSession 状态与真实播放进度一致
+                notifyServiceUpdateState()
                 delay(1000.milliseconds)
             }
         }
@@ -297,7 +284,7 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
     }
 
     override fun onCleared() {
-        stop()
+        stopAudioAndService()
         super.onCleared()
     }
 }

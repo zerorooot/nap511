@@ -23,17 +23,6 @@ class AudioService : Service() {
     private lateinit var mediaSession: MediaSessionCompat
     private val videoManger: AudioGSYManager = AudioGSYManager.instance()
 
-    /**
-     * 抽取统一的相对跳转函数
-     */
-    private fun seekRelative(offsetMs: Long) {
-        val current = videoManger.currentPosition
-        val duration = videoManger.duration
-        val target =
-            (current + offsetMs).coerceIn(0, if (duration > 0) duration else Long.MAX_VALUE)
-        videoManger.seekTo(target)
-        updateMediaState(notifyUi = true)
-    }
 
     override fun onCreate() {
         super.onCreate()
@@ -60,12 +49,14 @@ class AudioService : Service() {
 
                 // 响应快退 15 秒
                 override fun onRewind() {
-                    seekRelative(-SEEK_STEP_MS)
+                    videoManger.seekRelative(-SEEK_STEP_MS)
+                    updateMediaState(notifyUi = true)
                 }
 
                 // 响应快进 15 秒
                 override fun onFastForward() {
-                    seekRelative(SEEK_STEP_MS)
+                    videoManger.seekRelative(SEEK_STEP_MS)
+                    updateMediaState(notifyUi = true)
                 }
 
                 // 重写上一首/下一首回调，将其映射为快退/快进
@@ -90,12 +81,12 @@ class AudioService : Service() {
             }
 
             ACTION_REWIND -> {
-                seekRelative(-SEEK_STEP_MS)
+                videoManger.seekRelative(-SEEK_STEP_MS)
             }
 
 
             ACTION_FAST_FORWARD -> {
-                seekRelative(SEEK_STEP_MS)
+                videoManger.seekRelative(SEEK_STEP_MS)
             }
 
             ACTION_UPDATE_STATE -> {
@@ -105,7 +96,6 @@ class AudioService : Service() {
             }
 
             ACTION_STOP -> {
-                videoManger.releaseMediaPlayer()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 AudioEventBus.sendEvent(AudioEvent.Stop)
                 stopSelf()
