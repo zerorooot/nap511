@@ -39,6 +39,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -129,7 +130,7 @@ fun RenameFileDialog(fileViewModel: FileViewModel, enter: (String?) -> Unit) {
     if (fileViewModel.isOpenRenameFileDialog) {
         val name = fileViewModel.fileBeanList[fileViewModel.selectIndex].name
         val position = DataStoreUtil.getData(ConfigKeyUtil.POSITION_AFTER_AT, false)
-        val atPosition = name.lastIndexOf("@") + 1
+        val atPosition = kotlin.math.max(name.lastIndexOf("@"), name.lastIndexOf(" ")) + 1
         BaseDialog(
             "重命名文件", "新文件名", name, enter = enter, selection = TextRange(
                 if (!position || atPosition == 0) name.length else atPosition
@@ -1132,7 +1133,7 @@ fun InfoDialog(
 }
 
 @Composable
-private fun BaseDialog(
+fun BaseDialog(
     title: String,
     label: String,
     context: String = "",
@@ -1143,7 +1144,6 @@ private fun BaseDialog(
     selection: TextRange = TextRange(context.length),
     enter: (String?) -> Unit,
 ) {
-
     var text by remember {
         mutableStateOf(
             TextFieldValue(
@@ -1194,13 +1194,12 @@ private fun BaseDialog(
                 label = { Text(text = label) },
                 trailingIcon = {
                     if (!readOnly) {
-                        Icon(
-                            imageVector = Icons.Filled.Delete,
-                            "clear",
-                            modifier = Modifier.clickable(onClick = {
-                                text = TextFieldValue("")
-                            })
-                        )
+                        IconButton(onClick = { text = TextFieldValue("") }) {
+                            Icon(
+                                imageVector = Icons.Filled.Delete,
+                                contentDescription = "clear"
+                            )
+                        }
                     }
                 },
                 onValueChange = {

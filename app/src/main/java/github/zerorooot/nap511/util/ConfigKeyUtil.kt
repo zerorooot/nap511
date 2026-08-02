@@ -19,7 +19,7 @@ class ConfigKeyUtil {
         /**
          * aria2默认地址
          */
-        const val ARIA2_URL_DEFAULT_VALUE = "http://127.0.0.1:6800/jsonrpc"
+        const val ARIA2_URL_DEFAULT_VALUE = "http://0.0.0.0:6800/jsonrpc"
 
         /**
          * cookie

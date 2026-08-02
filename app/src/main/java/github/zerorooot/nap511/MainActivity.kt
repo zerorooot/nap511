@@ -66,15 +66,15 @@ import github.zerorooot.nap511.screen.MyPhotoScreen
 import github.zerorooot.nap511.screen.OfflineDownloadScreen
 import github.zerorooot.nap511.screen.OfflineFileScreen
 import github.zerorooot.nap511.screen.RecycleScreen
-import github.zerorooot.nap511.screen.SettingScreenNew
+import github.zerorooot.nap511.screen.SettingScreen
 import github.zerorooot.nap511.screen.WebViewScreen
 import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.LocalDrawerState
-import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.AudioViewModel
+import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import github.zerorooot.nap511.viewmodel.cut
@@ -298,7 +298,7 @@ class MainActivity : AppCompatActivity() {
                         ConfigKeyUtil.WEB -> WebViewScreen(fileViewModel)
                         ConfigKeyUtil.RECYCLE_BIN -> RecycleScreen(recycleViewModel)
                         ConfigKeyUtil.ADVANCED_SETTINGS -> {
-                            SettingScreenNew {
+                            SettingScreen(fileViewModel) {
                                 scope.launch { drawerState.open() }
                             }
                         }

@@ -13,6 +13,8 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
 import com.elvishew.xlog.LogConfiguration
 import com.elvishew.xlog.LogItem
 import com.elvishew.xlog.XLog
@@ -191,6 +193,19 @@ class App : Application(), ImageLoaderFactory {
                     add(GifDecoder.Factory())
                 }
             }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(cacheDir.resolve("thumbnail_cache"))
+                    .maxSizePercent(0.20) // 占用 20% 的可用磁盘空间
+                    .build()
+            }
+            .memoryCache {
+                MemoryCache.Builder(this)
+                    .maxSizePercent(0.25)
+                    .build()
+            }
+            // 忽略服务器的 Cache-Control 限制，强制使用本地磁盘缓存
+            .respectCacheHeaders(false)
             // 你也可以在这里配置全局的淡入淡出效果、默认占位图等
             .crossfade(true)
             .build()

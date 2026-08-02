@@ -14,7 +14,7 @@ android {
     defaultConfig {
         applicationId = "github.zerorooot.nap511"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 9
         versionName = "1.3"
 
@@ -61,13 +61,9 @@ dependencies {
     implementation(libs.xlog)
     implementation(libs.lazycolumnscrollbar)
     implementation(libs.process.phoenix)
-    implementation(libs.composeprefs)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.android.request.inspector.webview)
-    implementation(libs.accompanist.pager)
-    implementation(libs.accompanist.pager.indicators)
     implementation(libs.compose.zoom)
-    implementation(libs.accompanist.systemuicontroller)
     implementation(libs.gsyvideoplayer.java)
     implementation(libs.gsyvideoplayer.exo2)
 //    implementation(libs.gsyvideoplayer.arm64)
@@ -84,7 +80,6 @@ dependencies {
 
 
     implementation(libs.androidx.navigation.compose)
-    implementation(libs.androidx.preference.ktx)
 
 
     implementation(libs.androidx.work.runtime.ktx)
