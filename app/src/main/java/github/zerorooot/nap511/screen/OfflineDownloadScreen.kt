@@ -32,24 +32,22 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.ui.theme.Purple80
-import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.LocalDrawerState
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
-import kotlinx.coroutines.launch
 
 
 @ExperimentalMaterial3Api
 @Composable
 fun OfflineDownloadScreen(
     offlineFileViewModel: OfflineFileViewModel,
-    fileViewModel: FileViewModel
+    fileViewModel: FileViewModel,
+    onClick: () -> Unit,
+    onNav: (Route) -> Unit
 ) {
     val containerSize = LocalWindowInfo.current.containerSize
     val density = LocalDensity.current
-    val drawerState = LocalDrawerState.current
-    val scope = rememberCoroutineScope()
 
     val screenWidthDp = with(density) { containerSize.width.toDp() }
     val screenHeightDp = with(density) { containerSize.height.toDp() }
@@ -69,7 +67,7 @@ fun OfflineDownloadScreen(
                 }.toList()
                 offlineFileViewModel.addTask(urlList, fileViewModel.currentCid) {
                     if (it) {
-                        fileViewModel.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
+                        onNav.invoke(Route.VerifyMagnetLinkAccount)
                     }
                 }
             }
@@ -96,7 +94,7 @@ fun OfflineDownloadScreen(
                     imageVector = Icons.Rounded.Menu,
                     description = "navigationIcon"
                 ) {
-                    scope.launch { drawerState.open() }
+                    onClick.invoke()
                 }
             },
         )

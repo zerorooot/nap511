@@ -76,7 +76,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     var isRefreshing = _isRefreshing.asStateFlow()
 
     //页面导航
-    var selectedItem by mutableStateOf(ConfigKeyUtil.MY_FILE)
+//    var selectedItem by mutableStateOf(ConfigKeyUtil.MY_FILE)
 
     //页面手势
     var gesturesEnabled by mutableStateOf(true)

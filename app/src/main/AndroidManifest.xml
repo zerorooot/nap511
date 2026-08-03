@@ -115,6 +115,19 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Deep Link Intent Filter -->
+            <intent-filter>
+                <!-- 必须添加 ACTION_VIEW -->
+                <action android:name="android.intent.action.VIEW" />
+                <!-- DEFAULT 允许隐式 Intent 触发；BROWSABLE 允许从浏览器/网页链接触发 -->
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <!-- 配置 Schema 和 Host (nap511://detail) -->
+                <data
+                    android:host="detail"
+                    android:scheme="nap511" />
+            </intent-filter>
         </activity>
 
         <service

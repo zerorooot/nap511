@@ -10,6 +10,7 @@ import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.net.toUri
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.WorkerParameters
@@ -90,21 +91,22 @@ class OfflineTaskWorker(
 
         val intent = Intent(this.applicationContext, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            action = Intent.ACTION_VIEW
         }
         //flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         if (message.contains("任务添加失败")) {
             if (message.contains("请验证账号")) {
-                intent.action = "check"
+                intent.data = "nap511://detail/check".toUri()
                 notification.setContentText("$message。点我跳转验证账号页面")
             } else {
-                intent.action = "copy"
                 val stringJoiner = StringJoiner("\n")
                 urlList.forEach { stringJoiner.add(it) }
+                intent.data = "nap511://detail/copy?param=$stringJoiner".toUri()
                 intent.putExtra("link", stringJoiner.toString())
                 notification.setContentText("$message。点我复制链接")
             }
         } else {
-            intent.action = "jump"
+            intent.data = "nap511://detail/jump?param=$cid".toUri()
             intent.putExtra("cid", cid)
             notification.setContentText(message)
         }

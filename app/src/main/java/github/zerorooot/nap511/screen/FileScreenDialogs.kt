@@ -3,12 +3,12 @@ package github.zerorooot.nap511.screen
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
+import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
@@ -33,8 +33,9 @@ import okhttp3.RequestBody.Companion.toRequestBody
 @ExperimentalMaterial3Api
 @Composable
 fun CreateDialogs(
-    fileViewModel: FileViewModel = viewModel<FileViewModel>(),
-    offlineFileViewModel: OfflineFileViewModel = viewModel<OfflineFileViewModel>()
+    fileViewModel: FileViewModel,
+    offlineFileViewModel: OfflineFileViewModel,
+    onNav: (Route) -> Unit
 ) {
 //    val context = LocalContext.current
     //新建文件夹
@@ -113,7 +114,7 @@ fun CreateDialogs(
             infoHash, savePath, wanted
         ) {
             if (it) {
-                fileViewModel.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
+                onNav.invoke(Route.VerifyMagnetLinkAccount)
             }
         }
     }

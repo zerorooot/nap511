@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.core.net.toUri
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ForegroundInfo
@@ -410,13 +411,14 @@ class UnzipAllFileWorker(
 
         val intent = Intent(this.applicationContext, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            action = Intent.ACTION_VIEW
         }
 
         if (!success) {
-            intent.action = "unzipError"
+            intent.data = "nap511://detail/unzipError?param=$info".toUri()
             intent.putExtra("message", info)
         } else {
-            intent.action = "jump"
+            intent.data = "nap511://detail/jump?param=$cid".toUri()
             intent.putExtra("cid", cid)
         }
 

@@ -9,12 +9,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
@@ -24,20 +24,20 @@ import androidx.core.content.ContextCompat.getSystemService
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.screenitem.OfflineCellItem
+import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.LocalDrawerState
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
-import kotlinx.coroutines.launch
+import my.nanihadesuka.compose.LazyColumnScrollbar
+import my.nanihadesuka.compose.ScrollbarSettings
 import java.util.StringJoiner
 
 @Composable
 fun OfflineFileScreen(
     offlineFileViewModel: OfflineFileViewModel,
     fileViewModel: FileViewModel,
+    onClick: (String) -> Unit,
 ) {
-
     LaunchedEffect(Unit) {
         offlineFileViewModel.getOfflineFileList()
     }
@@ -47,8 +47,8 @@ fun OfflineFileScreen(
     val offlineList by offlineFileViewModel.offlineFile.collectAsState()
     val context = LocalContext.current
     val clipboardManager = LocalClipboard.current
-    val drawerState = LocalDrawerState.current
-    val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
+
 
     OfflineFileInfoDialog(offlineFileViewModel, {
         offlineFileViewModel.closeOfflineDialog()
@@ -62,7 +62,7 @@ fun OfflineFileScreen(
     val itemOnClick = { i: Int ->
         val offlineTask = offlineList[i]
         val cid = if (offlineTask.fileId == "") offlineTask.wpPathId else offlineTask.fileId
-        fileViewModel.selectedItem = ConfigKeyUtil.MY_FILE
+        onClick.invoke("MyFile")
         fileViewModel.getFiles(cid)
     }
     val menuOnClick = { name: String, index: Int ->
@@ -83,7 +83,7 @@ fun OfflineFileScreen(
                 copyDownloadUrl(context, stringJoiner.toString())
             }
 
-            "ModalNavigationDrawerMenu" -> scope.launch { drawerState.open() }
+            "ModalNavigationDrawerMenu" -> onClick.invoke("ModalNavigationDrawerMenu")
         }
     }
 
@@ -99,18 +99,26 @@ fun OfflineFileScreen(
             isRefreshing = refreshing,
             onRefresh = { offlineFileViewModel.refresh() }
         ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+            LazyColumnScrollbar(
+                state = listState,
+                settings = ScrollbarSettings.Default.copy(
+                    thumbUnselectedColor = Purple80
+                )
             ) {
-                itemsIndexed(items = offlineList, key = { _, item ->
-                    item.hashCode()
-                }) { index, item ->
-                    OfflineCellItem(
-                        offlineTask = item,
-                        index = index,
-                        itemOnClick = itemOnClick,
-                        menuOnClick = menuOnClick
-                    )
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    state = listState
+                ) {
+                    itemsIndexed(items = offlineList, key = { _, item ->
+                        item.infoHash
+                    }) { index, item ->
+                        OfflineCellItem(
+                            offlineTask = item,
+                            index = index,
+                            itemOnClick = itemOnClick,
+                            menuOnClick = menuOnClick
+                        )
+                    }
                 }
             }
         }

@@ -2,8 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     id("kotlin-parcelize")
-
-
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
@@ -89,4 +88,5 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
 
     implementation(libs.material)
+    implementation(libs.kotlinx.serialization.json)
 }

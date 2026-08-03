@@ -1,11 +1,20 @@
 package github.zerorooot.nap511.service
 
-import github.zerorooot.nap511.bean.*
+import github.zerorooot.nap511.bean.BaseReturnMessage
+import github.zerorooot.nap511.bean.OfflineInfo
+import github.zerorooot.nap511.bean.QuotaBean
+import github.zerorooot.nap511.bean.SignBean
+import github.zerorooot.nap511.bean.TorrentFileBean
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import retrofit2.http.*
+import retrofit2.http.Field
+import retrofit2.http.FieldMap
+import retrofit2.http.FormUrlEncoded
+import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.Query
 
 interface OfflineService {
     companion object {
@@ -49,6 +58,8 @@ interface OfflineService {
         @Field("uid") uid: String = "",
         @Field("sign") sign: String = "",
         @Field("page") page: Int = 1,
+        //9是下载失败，11是下载完成，12是正在下载
+        @Field("stat") stat: Int = 12,
         @Field("time") time: Long = System.currentTimeMillis() / 1000
     ): OfflineInfo
 

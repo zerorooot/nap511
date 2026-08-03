@@ -22,7 +22,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.acsbendi.requestinspectorwebview.RequestInspectorWebViewClient
 import com.acsbendi.requestinspectorwebview.WebViewRequest
 import com.elvishew.xlog.XLog
@@ -30,8 +29,6 @@ import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.LocalDrawerState
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
@@ -97,9 +94,7 @@ fun BaseWebViewScreen(
 
 @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
 @Composable
-fun WebViewScreen(fileViewModel: FileViewModel) {
-    val drawerState = LocalDrawerState.current
-    val scope = rememberCoroutineScope()
+fun WebViewScreen(fileViewModel: FileViewModel,onClick: () -> Unit) {
     fileViewModel.gesturesEnabled = false
 
     CookieManager.getInstance().removeAllCookies { }
@@ -108,9 +103,7 @@ fun WebViewScreen(fileViewModel: FileViewModel) {
     setRawCookieString("https://115.com/", App.cookie)
     BaseWebViewScreen(
         titleText = "网页版",
-        topAppBarActionButtonOnClick = {
-            scope.launch { drawerState.open() }
-        },
+        topAppBarActionButtonOnClick = onClick,
         webViewClient = { webViewClient() },
         loadUrl = "https://115.com/"
     )
@@ -223,7 +216,7 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
 }
 
 @Composable
-fun CaptchaWebViewScreen() {
+fun CaptchaWebViewScreen(fileViewModel: FileViewModel, onNav: (String) -> Unit) {
     val cookieManager = CookieManager.getInstance()
     App.cookie.split(";").forEach { a ->
         cookieManager.setCookie("https://captchaapi.115.com", a)
@@ -231,13 +224,11 @@ fun CaptchaWebViewScreen() {
         cookieManager.setCookie("https://webapi.115.com/user/captcha", a)
     }
     cookieManager.flush()
-    val drawerState = LocalDrawerState.current
-    val scope = rememberCoroutineScope()
-    val fileViewModel = viewModel<FileViewModel>()
+
     BaseWebViewScreen(
         titleText = "磁力链接验证码",
         topAppBarActionButtonOnClick = {
-            scope.launch { drawerState.open() }
+            onNav.invoke("topAppBarActionButtonOnClick")
         },
         webViewClient = {
             captchaWebViewClient(fileViewModel, it) { gesture, select ->
@@ -245,7 +236,7 @@ fun CaptchaWebViewScreen() {
                     fileViewModel.gesturesEnabled = true
                 }
                 if (select) {
-                    fileViewModel.selectedItem = ConfigKeyUtil.MY_FILE
+                    onNav.invoke("select")
                 }
             }
         },
@@ -255,11 +246,8 @@ fun CaptchaWebViewScreen() {
 }
 
 @Composable
-fun CaptchaVideoWebViewScreen() {
-    val drawerState = LocalDrawerState.current
-    val scope = rememberCoroutineScope()
+fun CaptchaVideoWebViewScreen(fileViewModel: FileViewModel, onNav: (String) -> Unit) {
     val cookieManager = CookieManager.getInstance()
-    val fileViewModel = viewModel<FileViewModel>()
 
     App.cookie.split(";").forEach { a ->
         cookieManager.setCookie("https://115vod.com/captchaapi/", a)
@@ -269,7 +257,7 @@ fun CaptchaVideoWebViewScreen() {
     BaseWebViewScreen(
         titleText = "视频播放验证码",
         topAppBarActionButtonOnClick = {
-            scope.launch { drawerState.open() }
+            onNav.invoke("topAppBarActionButtonOnClick")
         },
         webViewClient = {
             captchaWebViewClient(fileViewModel, it) { gesture, select ->
@@ -277,7 +265,7 @@ fun CaptchaVideoWebViewScreen() {
                     fileViewModel.gesturesEnabled = true
                 }
                 if (select) {
-                    fileViewModel.selectedItem = ConfigKeyUtil.MY_FILE
+                    onNav.invoke("select")
                 }
             }
         },

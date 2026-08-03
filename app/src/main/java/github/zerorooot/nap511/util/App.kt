@@ -38,11 +38,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.properties.Delegates
 
-val LocalDrawerState = compositionLocalOf<DrawerState> {
-    error("DrawerState not provided! Ensure you wrapped your content in CompositionLocalProvider.")
-}
-
-
 class App : Application(), ImageLoaderFactory {
     companion object {
         lateinit var instance: App

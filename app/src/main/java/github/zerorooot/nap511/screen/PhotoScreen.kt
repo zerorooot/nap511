@@ -56,13 +56,13 @@ import com.smarttoolfactory.zoom.enhancedZoom
 import com.smarttoolfactory.zoom.rememberEnhancedZoomState
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ImageBean
-import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.getImage
 
 @Composable
 fun MyPhotoScreen(
     fileViewModel: FileViewModel,
+    onNav: () -> Unit
 ) {
     val view = LocalView.current
     DisposableEffect(Unit) {
@@ -99,7 +99,7 @@ fun MyPhotoScreen(
             fileViewModel.getImage(photoList, pageIndex)
         },
         onBack = {
-            fileViewModel.selectedItem = ConfigKeyUtil.MY_FILE
+            onNav.invoke()
         })
 }
 

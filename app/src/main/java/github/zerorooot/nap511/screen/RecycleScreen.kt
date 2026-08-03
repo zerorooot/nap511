@@ -20,13 +20,12 @@ import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.screenitem.RecycleCellItem
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import github.zerorooot.nap511.util.LocalDrawerState
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun RecycleScreen(recycleViewModel: RecycleViewModel) {
+fun RecycleScreen(recycleViewModel: RecycleViewModel, onClick: () -> Unit) {
     LaunchedEffect(Unit) {
         recycleViewModel.getRecycleFileList()
     }
@@ -37,7 +36,7 @@ fun RecycleScreen(recycleViewModel: RecycleViewModel) {
 
     val refreshing by recycleViewModel.isRefreshing.collectAsState()
     val recycleFileList = recycleViewModel.recycleFileList
-    val drawerState = LocalDrawerState.current
+
     val scope = rememberCoroutineScope()
 
 
@@ -55,7 +54,7 @@ fun RecycleScreen(recycleViewModel: RecycleViewModel) {
         when (name) {
             "清空所有文件" -> recycleViewModel.deleteAll()
             "ModalNavigationDrawerMenu" -> {
-                scope.launch { drawerState.open() }
+              onClick.invoke()
             }
         }
     }

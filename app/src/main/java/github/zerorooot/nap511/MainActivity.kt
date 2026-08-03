@@ -1,10 +1,8 @@
 package github.zerorooot.nap511
 
 import android.annotation.SuppressLint
-import android.app.ComponentCaller
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -30,7 +28,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,8 +42,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navDeepLink
+import androidx.navigation.toRoute
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
@@ -54,10 +58,14 @@ import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.bean.AvatarBean
+import github.zerorooot.nap511.bean.DetailRoute
+import github.zerorooot.nap511.bean.DrawerMenuItem
+import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.screen.CaptchaVideoWebViewScreen
 import github.zerorooot.nap511.screen.CaptchaWebViewScreen
 import github.zerorooot.nap511.screen.CookieDialog
+import github.zerorooot.nap511.screen.CreateDialogs
 import github.zerorooot.nap511.screen.ExitApp
 import github.zerorooot.nap511.screen.FileScreen
 import github.zerorooot.nap511.screen.LogScreen
@@ -72,7 +80,6 @@ import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import github.zerorooot.nap511.util.LocalDrawerState
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
@@ -108,6 +115,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     private fun Init(cookie: String) {
         //初始化
@@ -116,6 +124,7 @@ class MainActivity : AppCompatActivity() {
         val offlineFileViewModel: OfflineFileViewModel = viewModel(factory = factory)
         val recycleViewModel: RecycleViewModel = viewModel(factory = factory)
         val audioViewModel: AudioViewModel = viewModel(factory = factory)
+        val navController = rememberNavController()
 
         LaunchedEffect(Unit) {
             fileViewModel.loadCacheFile()
@@ -124,91 +133,25 @@ class MainActivity : AppCompatActivity() {
                 App.instance.toast("检测到未开启通知权限，为保证交互效果，建议开启")
                 App.instance.goToNotificationSetting(this@MainActivity)
             }
+            //检测添加的离线链接。防止因为种种原因，app添加离线链接，但链接没有上传到115
+            fileViewModel.handleOfflineTask()
 
-            val isHandle = handleIntent(intent)
-            //仅没处理intent时才检测未上传的磁力链接
-            if (!isHandle) {
-                //检测添加的离线链接。防止因为种种原因，app添加离线链接，但链接没有上传到115
-                fileViewModel.handleOfflineTask()
-            }
             fileViewModel.getRemainingSpace()
         }
 
-        BackHandler(fileViewModel.selectedItem != ConfigKeyUtil.MY_FILE) {
-            fileViewModel.selectedItem = ConfigKeyUtil.MY_FILE
-            if (!fileViewModel.gesturesEnabled) {
-                fileViewModel.gesturesEnabled = true
-            }
+        MyNavigationDrawer(
+            fileViewModel,
+            offlineFileViewModel,
+            recycleViewModel,
+            audioViewModel,
+            navController
+        )
+        CreateDialogs(fileViewModel, offlineFileViewModel) {
+            navController.navigate(it)
         }
 
-        MyNavigationDrawer(fileViewModel, offlineFileViewModel, recycleViewModel, audioViewModel)
-
     }
 
-
-    override fun onNewIntent(intent: Intent, caller: ComponentCaller) {
-        super.onNewIntent(intent, caller)
-        XLog.d("onNewIntent $intent")
-        setIntent(intent) // 更新 Intent
-        handleIntent(intent)
-    }
-
-    /**
-     * 处理验证磁力账号、跳转默认下载目录、复制失败的磁力链接的intent
-     */
-    private fun handleIntent(intent: Intent): Boolean {
-        var isHandle = false
-        // 动态获取 ViewModel 实例
-        val factory = CookieViewModelFactory(App.cookie, application)
-        val fileViewModel = ViewModelProvider(this, factory)[FileViewModel::class.java]
-
-
-        when (intent.action) {
-            //直接添加磁力，但提示请验证账号;跳转到验证账号界面
-            "check" -> {
-                fileViewModel.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
-                XLog.d("handleIntent check $intent")
-                intent.action = ""
-                isHandle = true
-            }
-            //跳转到默认下载目录
-            "jump" -> {
-                val cid = intent.getStringExtra("cid") ?: DataStoreUtil.getData(
-                    ConfigKeyUtil.DEFAULT_OFFLINE_CID, "0"
-                )
-                fileViewModel.getFiles(cid)
-
-                XLog.d("handleIntent jump $intent $cid $fileViewModel")
-                //清除action,不然会一直跳转到默认下载目录
-                intent.action = ""
-                isHandle = true
-            }
-
-            "copy" -> {
-                val clipboard = ContextCompat.getSystemService(this, ClipboardManager::class.java)
-                val clip = ClipData.newPlainText("label", intent.getStringExtra("link"))
-                clipboard?.setPrimaryClip(clip)
-                XLog.d("handleIntent copy $intent")
-                intent.action = ""
-                isHandle = true
-                App.instance.toast("复制磁力链接成功!")
-            }
-
-            "unzipError" -> {
-                val message = intent.getStringExtra("message")
-                val clipboard = ContextCompat.getSystemService(this, ClipboardManager::class.java)
-                val clip = ClipData.newPlainText("unzipError", message)
-                clipboard?.setPrimaryClip(clip)
-                XLog.d("handleIntent unzipError $intent $message")
-                App.instance.toast("解压失败信息已复制到剪切板!")
-                intent.action = ""
-                isHandle = true
-
-            }
-        }
-        return isHandle
-
-    }
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
@@ -216,110 +159,259 @@ class MainActivity : AppCompatActivity() {
         fileViewModel: FileViewModel,
         offlineFileViewModel: OfflineFileViewModel,
         recycleViewModel: RecycleViewModel,
-        audioViewModel: AudioViewModel
+        audioViewModel: AudioViewModel,
+        navController: NavHostController
     ) {
+
         val drawerState = rememberDrawerState(DrawerValue.Closed)
         val scope = rememberCoroutineScope()
 
+        // 监听当前导航栈顶的路由，用于高亮显示 Drawer 中选中的 Item
+        val navBackStackEntry by navController.currentBackStackEntryAsState()
+        val currentDestination = navBackStackEntry?.destination
+
+        // 拦截返回键：如果 Drawer 展开则关闭 Drawer；若已关闭则由 NavController 自动处理返回栈
         BackHandler(drawerState.isOpen) {
-            scope.launch {
-                drawerState.close()
+            scope.launch { drawerState.close() }
+        }
+
+        val menuItems = remember {
+            arrayListOf(
+                DrawerMenuItem(R.drawable.baseline_login_24, ConfigKeyUtil.LOGIN, Route.Login),
+                DrawerMenuItem(R.drawable.baseline_cloud_24, ConfigKeyUtil.MY_FILE, Route.MyFile),
+                DrawerMenuItem(
+                    R.drawable.baseline_cloud_download_24,
+                    ConfigKeyUtil.OFFLINE_DOWNLOAD,
+                    Route.OfflineDownload
+                ),
+                DrawerMenuItem(
+                    R.drawable.baseline_cloud_done_24, ConfigKeyUtil.OFFLINE_LIST, Route.OfflineList
+                ),
+                //       DrawerMenuItem(R.drawable.baseline_web_24, ConfigKeyUtil.WEB, Route.Web),
+                DrawerMenuItem(
+                    R.drawable.ic_baseline_delete_24, ConfigKeyUtil.RECYCLE_BIN, Route.RecycleBin
+                ),
+                DrawerMenuItem(
+                    R.drawable.baseline_settings_24,
+                    ConfigKeyUtil.ADVANCED_SETTINGS,
+                    Route.AdvancedSettings
+                ),
+            ).apply {
+                if (DataStoreUtil.getData(ConfigKeyUtil.LOG, false)) {
+                    this.add(
+                        DrawerMenuItem(
+                            R.drawable.baseline_log_24, ConfigKeyUtil.LOG_SCREEN, Route.LogScreen
+                        )
+                    )
+                }
+                this.add(
+                    DrawerMenuItem(
+                        R.drawable.android_exit, ConfigKeyUtil.EXIT_APPLICATION, Route.ExitApp
+                    )
+                )
             }
+
         }
 
-        val itemMap = linkedMapOf(
-            R.drawable.baseline_login_24 to ConfigKeyUtil.LOGIN,
-            R.drawable.baseline_cloud_24 to ConfigKeyUtil.MY_FILE,
-            R.drawable.baseline_cloud_download_24 to ConfigKeyUtil.OFFLINE_DOWNLOAD,
-            R.drawable.baseline_cloud_done_24 to ConfigKeyUtil.OFFLINE_LIST,
-//            R.drawable.baseline_web_24 to ConfigKeyUtil.WEB,
-            R.drawable.ic_baseline_delete_24 to ConfigKeyUtil.RECYCLE_BIN,
-            R.drawable.baseline_settings_24 to ConfigKeyUtil.ADVANCED_SETTINGS,
-        )
-        if (DataStoreUtil.getData(ConfigKeyUtil.LOG, false)) {
-            itemMap[R.drawable.baseline_log_24] = ConfigKeyUtil.LOG_SCREEN
-        }
-        itemMap[R.drawable.android_exit] = ConfigKeyUtil.EXIT_APPLICATION
+        ModalNavigationDrawer(
+            gesturesEnabled = fileViewModel.gesturesEnabled,
+            drawerState = drawerState,
+            drawerContent = {
+                ModalDrawerSheet {
+                    Spacer(Modifier.height(6.dp))
+                    Avatar(fileViewModel)
+                    Spacer(Modifier.height(6.dp))
 
-        CompositionLocalProvider(LocalDrawerState provides drawerState) {
-            ModalNavigationDrawer(
-                gesturesEnabled = fileViewModel.gesturesEnabled,
-                drawerState = drawerState,
-                drawerContent = {
-                    ModalDrawerSheet {
-                        Spacer(Modifier.height(6.dp))
-                        //头像
-                        Avatar(fileViewModel)
-                        //菜单栏
-                        Spacer(Modifier.height(6.dp))
-                        itemMap.forEach { (t, u) ->
-                            NavigationDrawerItem(
-                                icon = {
-                                    Icon(
-                                        painterResource(t), contentDescription = u
-                                    )
-                                },
-                                label = { Text(u) },
-                                selected = u == fileViewModel.selectedItem,
-                                onClick = {
-                                    fileViewModel.gesturesEnabled = true
-                                    scope.launch { drawerState.close() }
-                                    fileViewModel.selectedItem = u
-                                },
-                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                            )
+                    menuItems.forEach { item ->
+                        // 判断当前路由是否匹配该 Item 的路由类型
+                        val isSelected = currentDestination?.hasRoute(item.route::class) == true
+
+                        NavigationDrawerItem(
+                            icon = {
+                                Icon(
+                                    painterResource(item.iconRes), contentDescription = item.label
+                                )
+                            }, label = { Text(item.label) }, selected = isSelected, onClick = {
+                                fileViewModel.gesturesEnabled = true
+                                scope.launch { drawerState.close() }
+
+                                // 切换 Drawer 顶级页面的标准导航写法
+                                navController.navigate(item.route) {
+                                    // 弹出到起始页，避免生成无限多的返回栈
+                                    popUpTo(navController.graph.startDestinationId) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true // 避免重复创建同一个页面
+                                    restoreState = true   // 恢复之前保存的状态
+                                }
+                            }, modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+                    }
+                }
+            },
+            content = {
+                // 使用 NavHost 管理页面切换
+                NavHost(
+                    navController, startDestination = Route.MyFile
+                ) {
+                    composable<Route.Login> {
+                        fileViewModel.gesturesEnabled = false
+                        Login({ scope.launch { drawerState.open() } }) {
+                            navController.popBackStack()
                         }
                     }
-                },
-                content = {
-                    when (fileViewModel.selectedItem) {
-                        ConfigKeyUtil.LOGIN -> {
-                            fileViewModel.gesturesEnabled = false
-                            Login {
-                                scope.launch { drawerState.open() }
-                            }
-                        }
 
-                        ConfigKeyUtil.MY_FILE -> FileScreen(
+                    composable<Route.MyFile> {
+                        fileViewModel.gesturesEnabled = true
+                        FileScreen(
                             fileViewModel,
                             offlineFileViewModel,
                             audioViewModel,
+                            { navController.navigate(it) },
                             appBarClick(fileViewModel)
                         )
+                    }
 
-                        ConfigKeyUtil.OFFLINE_DOWNLOAD -> OfflineDownloadScreen(
-                            offlineFileViewModel, fileViewModel
+                    composable<Route.OfflineDownload> {
+                        OfflineDownloadScreen(
+                            offlineFileViewModel,
+                            fileViewModel,
+                            { scope.launch { drawerState.open() } },
+                            { navController.navigate(it) }
                         )
 
-                        ConfigKeyUtil.OFFLINE_LIST -> OfflineFileScreen(
-                            offlineFileViewModel, fileViewModel
-                        )
+                    }
 
-                        ConfigKeyUtil.WEB -> WebViewScreen(fileViewModel)
-                        ConfigKeyUtil.RECYCLE_BIN -> RecycleScreen(recycleViewModel)
-                        ConfigKeyUtil.ADVANCED_SETTINGS -> {
-                            SettingScreen(fileViewModel) {
-                                scope.launch { drawerState.open() }
+                    composable<Route.OfflineList> {
+                        OfflineFileScreen(
+                            offlineFileViewModel,
+                            fileViewModel
+                        ) {
+                            when (it) {
+                                "ModalNavigationDrawerMenu" -> {
+                                    scope.launch { drawerState.open() }
+                                }
+
+                                "MyFile" -> {
+                                    // 弹出栈顶页面，返回上一个页面
+                                    navController.popBackStack()
+                                }
+                            }
+                        }
+                    }
+
+                    composable<Route.WebScreen> {
+                        WebViewScreen(fileViewModel) {
+                            scope.launch { drawerState.open() }
+                        }
+                    }
+
+                    composable<Route.AdvancedSettings> {
+                        SettingScreen(fileViewModel, { scope.launch { drawerState.open() } }) {
+                            navController.navigate(it)
+                        }
+                    }
+                    composable<Route.RecycleBin> {
+                        RecycleScreen(recycleViewModel) {
+                            scope.launch { drawerState.open() }
+                        }
+                    }
+
+                    composable<Route.VerifyMagnetLinkAccount> {
+                        CaptchaWebViewScreen(fileViewModel) {
+                            when (it) {
+                                "topAppBarActionButtonOnClick" -> {
+                                    scope.launch { drawerState.open() }
+                                }
+
+                                "select" -> {
+                                    // 弹出页面，直到返回到 Route.MyFile（保留 MyFile）
+                                    //navController.popBackStack(Route.MyFile, inclusive = false)
+                                    navController.popBackStack()
+                                }
                             }
                         }
 
-                        ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT -> {
-                            CaptchaWebViewScreen()
-                        }
+                    }
+                    composable<Route.VerifyVideoAccount> {
+                        CaptchaVideoWebViewScreen(fileViewModel) {
+                            when (it) {
+                                "topAppBarActionButtonOnClick" -> {
+                                    scope.launch { drawerState.open() }
+                                }
 
-                        ConfigKeyUtil.VERIFY_VIDEO_ACCOUNT -> {
-                            CaptchaVideoWebViewScreen()
-                        }
-
-                        ConfigKeyUtil.LOG_SCREEN -> LogScreen()
-                        ConfigKeyUtil.EXIT_APPLICATION -> ExitApp()
-
-                        ConfigKeyUtil.PHOTO -> {
-                            MyPhotoScreen(fileViewModel)
+                                "select" -> {
+                                    // 弹出页面，直到返回到 Route.MyFile（保留 MyFile）
+                                    //navController.popBackStack(Route.MyFile, inclusive = false)
+                                    navController.popBackStack()
+                                }
+                            }
                         }
                     }
-                })
-        }
+                    composable<Route.ExitApp> {
+                        ExitApp {
+                            navController.popBackStack()
+                        }
+                    }
+                    composable<Route.LogScreen> {
+                        LogScreen() {
+                            scope.launch { drawerState.open() }
+                        }
+                    }
+
+                    composable<Route.Photo> {
+                        MyPhotoScreen(fileViewModel) {
+                            navController.popBackStack()
+                        }
+                    }
+
+                    composable<DetailRoute>(
+                        deepLinks = listOf(
+                            // 库会自动解析 URL 中的路径和查询参数，并填入 DetailRoute 实例中
+                            navDeepLink<DetailRoute>(basePath = "nap511://detail")
+                        )
+                    ) { backStackEntry ->
+                        // 直接转为强类型的 DetailRoute 对象
+                        val args: DetailRoute = backStackEntry.toRoute()
+                        val param = args.param
+                        when (args.command) {
+                            //直接添加磁力，但提示请验证账号;跳转到验证账号界面
+                            "check" -> {
+                                navController.navigate(Route.VerifyMagnetLinkAccount)
+                                XLog.d("handleIntent check $intent")
+                            }
+                            //跳转到默认下载目录
+                            "jump" -> {
+                                val cid = intent.getStringExtra("cid") ?: DataStoreUtil.getData(
+                                    ConfigKeyUtil.DEFAULT_OFFLINE_CID, "0"
+                                )
+                                fileViewModel.getFiles(cid)
+                                XLog.d("handleIntent jump $intent $cid $fileViewModel")
+                            }
+
+                            "copy" -> {
+                                val clipboard = ContextCompat.getSystemService(
+                                    this@MainActivity, ClipboardManager::class.java
+                                )
+                                val clip = ClipData.newPlainText("label", param)
+                                clipboard?.setPrimaryClip(clip)
+                                XLog.d("handleIntent copy $intent $param")
+                                App.instance.toast("复制磁力链接成功!")
+                            }
+
+                            "unzipError" -> {
+                                val clipboard = ContextCompat.getSystemService(
+                                    this@MainActivity, ClipboardManager::class.java
+                                )
+                                val clip = ClipData.newPlainText("unzipError", param)
+                                clipboard?.setPrimaryClip(clip)
+                                XLog.d("handleIntent unzipError $intent $param")
+                                App.instance.toast("解压失败信息已复制到剪切板!")
+                            }
+                        }
+                    }
+                }
+            })
     }
 
     /**
@@ -344,17 +436,11 @@ class MainActivity : AppCompatActivity() {
         ) {
             //头像
             AsyncImage(
-                model =
-                    ImageRequest.Builder(LocalContext.current)
-                        .data(avatarBean.value.face)
-                        .memoryCachePolicy(CachePolicy.ENABLED)
-                        .diskCachePolicy(CachePolicy.ENABLED)
-                        .networkCachePolicy(CachePolicy.ENABLED)
-                        .scale(coil.size.Scale.FILL)
-                        .memoryCacheKey(avatarBean.value.userId)
-                        .diskCacheKey(avatarBean.value.userId)
-                        .placeholder(R.drawable.avatar)
-                        .build(),
+                model = ImageRequest.Builder(LocalContext.current).data(avatarBean.value.face)
+                    .memoryCachePolicy(CachePolicy.ENABLED).diskCachePolicy(CachePolicy.ENABLED)
+                    .networkCachePolicy(CachePolicy.ENABLED).scale(coil.size.Scale.FILL)
+                    .memoryCacheKey(avatarBean.value.userId).diskCacheKey(avatarBean.value.userId)
+                    .placeholder(R.drawable.avatar).build(),
                 modifier = Modifier
                     .size(100.dp)
                     //圆形裁剪
@@ -395,7 +481,7 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("UnrememberedMutableState")
     @Composable
-    private fun Login(onClick: (() -> Unit)? = null) {
+    private fun Login(onClick: (() -> Unit)? = null, onNav: (() -> Unit)? = null) {
         var isOpenLoginWebView by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
 
@@ -428,6 +514,7 @@ class MainActivity : AppCompatActivity() {
                 }
             } else {
                 App.instance.toast("请输入cookie")
+                onNav?.invoke()
             }
         }
     }
@@ -457,7 +544,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-
 }
 
 

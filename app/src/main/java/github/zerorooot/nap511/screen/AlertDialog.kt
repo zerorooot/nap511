@@ -76,7 +76,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.JsonObject
@@ -350,15 +349,15 @@ fun RecyclePasswordDialog(recycleViewModel: RecycleViewModel, enter: (String?) -
 }
 
 @Composable
-fun ExitApp() {
+fun ExitApp(onDismissRequest: () -> Unit) {
     var isOpen by remember {
         mutableStateOf(true)
     }
-    val fileViewModel = viewModel<FileViewModel>()
     if (isOpen) {
         InfoDialog(
             onDismissRequest = {
-                fileViewModel.selectedItem = ConfigKeyUtil.MY_FILE
+                isOpen = false
+                onDismissRequest.invoke()
             },
             onConfirmation = {
                 Process.killProcess(Process.myPid());
@@ -805,7 +804,7 @@ fun Aria2Dialog(fileViewModel: FileViewModel, context: String, enter: (String) -
         )
     )
     LaunchedEffect(Unit) {
-        delay(10)
+        delay(10.milliseconds)
         focusRequester.requestFocus()
     }
 }

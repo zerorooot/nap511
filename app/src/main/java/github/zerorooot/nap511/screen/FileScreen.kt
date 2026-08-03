@@ -52,13 +52,13 @@ import com.google.gson.Gson
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.screenitem.FileCellItem
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import github.zerorooot.nap511.util.LocalDrawerState
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
@@ -91,6 +91,7 @@ fun FileScreen(
     fileViewModel: FileViewModel,
     offlineFileViewModel: OfflineFileViewModel,
     audioViewModel: AudioViewModel,
+    onNav: (Route) -> Unit,
     appBarOnClick: (String) -> Unit
 ) {
     val fabPosition by remember {
@@ -119,8 +120,6 @@ fun FileScreen(
     val refreshing by fileViewModel.isRefreshing.collectAsState()
 
     val context = LocalContext.current
-
-    CreateDialogs()
 
     val videoActivityLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -179,7 +178,7 @@ fun FileScreen(
         fileViewModel.photoFileBeanList.clear()
         fileViewModel.photoFileBeanList.addAll(photoList)
         fileViewModel.photoIndexOf = photoList.indexOf(fileBean)
-        fileViewModel.selectedItem = ConfigKeyUtil.PHOTO
+        onNav.invoke(Route.Photo)
         fileViewModel.setRefreshingStatus(false)
     }
 
@@ -285,19 +284,12 @@ fun FileScreen(
         }
     }
 
-    val drawerState = LocalDrawerState.current
     val scope = rememberCoroutineScope()
 
     // ============================================================
     // Phase 2.3: Extract onBackClick
     // ============================================================
     fun onBack() {
-        if (drawerState.isOpen) {
-            scope.launch {
-                drawerState.close()
-            }
-            return
-        }
         if (path != "/根目录" && !fileViewModel.isLongClickState) {
             fileViewModel.setListLocation(path, listState)
         }
@@ -306,13 +298,6 @@ fun FileScreen(
     }
 
 
-    fun onBackClick() {
-        if (path == "/根目录" && !fileViewModel.isSearchState && !fileViewModel.isLongClickState) {
-            scope.launch { drawerState.open() }
-        } else {
-            onBack()
-        }
-    }
 
     BackHandler(
         path != "/根目录" || fileViewModel.isLongClickState || fileViewModel.isSearchState,
@@ -322,7 +307,7 @@ fun FileScreen(
     fun myAppBarOnClick(name: String) {
         when (name) {
             "back" -> {
-                onBackClick()
+                onBack()
             }
 
             "视频时间" -> {

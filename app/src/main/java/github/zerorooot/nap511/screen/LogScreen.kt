@@ -6,7 +6,6 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,12 +41,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.LocalDrawerState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import my.nanihadesuka.compose.LazyColumnScrollbar
+import my.nanihadesuka.compose.ScrollbarSettings
 import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -120,14 +121,13 @@ object LogParser {
 
 // ==================== UI 界面 ====================
 @Composable
-fun LogScreen() {
+fun LogScreen(onClick: () -> Unit) {
     var rawLogText by remember { mutableStateOf(readLog()) }
     val parsedLogs by remember(rawLogText) { derivedStateOf { LogParser.parse(rawLogText) } }
 
     val lazyListState = rememberLazyListState()
     val horizontalScrollState = rememberScrollState()
     val coroutine = rememberCoroutineScope()
-    val drawerState = LocalDrawerState.current
     val formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd/HH/mm/ss")
 
     val appBarOnClick = { name: String ->
@@ -167,7 +167,7 @@ fun LogScreen() {
                 }
             }
 
-            "ModalNavigationDrawerMenu" -> coroutine.launch { drawerState.open() }
+            "ModalNavigationDrawerMenu" -> onClick
             else -> {}
         }
     }
@@ -191,10 +191,15 @@ fun LogScreen() {
                 )
             }
         } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .horizontalScroll(horizontalScrollState)
+            // Box(
+            //                modifier = Modifier
+            //                    .fillMaxSize()
+            //                    .horizontalScroll(horizontalScrollState)
+            LazyColumnScrollbar(
+                state = lazyListState,
+                settings = ScrollbarSettings.Default.copy(
+                    thumbUnselectedColor = Purple80
+                )
             ) {
                 LazyColumn(
                     state = lazyListState,
