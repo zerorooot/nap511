@@ -44,7 +44,7 @@ fun OfflineDownloadScreen(
     offlineFileViewModel: OfflineFileViewModel,
     fileViewModel: FileViewModel,
     onClick: () -> Unit,
-    onNav: (Route) -> Unit
+    onNav: () -> Unit
 ) {
     val containerSize = LocalWindowInfo.current.containerSize
     val density = LocalDensity.current
@@ -67,7 +67,7 @@ fun OfflineDownloadScreen(
                 }.toList()
                 offlineFileViewModel.addTask(urlList, fileViewModel.currentCid) {
                     if (it) {
-                        onNav.invoke(Route.VerifyMagnetLinkAccount)
+                        onNav.invoke()
                     }
                 }
             }

@@ -126,7 +126,7 @@ fun LogScreen(onClick: () -> Unit) {
     val parsedLogs by remember(rawLogText) { derivedStateOf { LogParser.parse(rawLogText) } }
 
     val lazyListState = rememberLazyListState()
-    val horizontalScrollState = rememberScrollState()
+//    val horizontalScrollState = rememberScrollState()
     val coroutine = rememberCoroutineScope()
     val formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd/HH/mm/ss")
 

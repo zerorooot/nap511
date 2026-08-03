@@ -52,7 +52,6 @@ import com.google.gson.Gson
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
 import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.screenitem.FileCellItem
 import github.zerorooot.nap511.ui.theme.Purple80
@@ -91,8 +90,9 @@ fun FileScreen(
     fileViewModel: FileViewModel,
     offlineFileViewModel: OfflineFileViewModel,
     audioViewModel: AudioViewModel,
-    onNav: (Route) -> Unit,
-    appBarOnClick: (String) -> Unit
+    onNav: () -> Unit,
+    appBarOnClick: (String) -> Unit,
+    drawerState: () -> Boolean
 ) {
     val fabPosition by remember {
         mutableStateOf(
@@ -178,7 +178,7 @@ fun FileScreen(
         fileViewModel.photoFileBeanList.clear()
         fileViewModel.photoFileBeanList.addAll(photoList)
         fileViewModel.photoIndexOf = photoList.indexOf(fileBean)
-        onNav.invoke(Route.Photo)
+        onNav.invoke()
         fileViewModel.setRefreshingStatus(false)
     }
 
@@ -271,7 +271,6 @@ fun FileScreen(
     fun onMenuFileInfo(index: Int) {
         fileViewModel.selectIndex = index
         fileViewModel.getFileInfo(index)
-//        fileViewModel.openFileInfoDialog()
     }
 
     fun onMenuAria2Download(index: Int) {
@@ -290,6 +289,9 @@ fun FileScreen(
     // Phase 2.3: Extract onBackClick
     // ============================================================
     fun onBack() {
+        if (drawerState.invoke()) {
+            return
+        }
         if (path != "/根目录" && !fileViewModel.isLongClickState) {
             fileViewModel.setListLocation(path, listState)
         }

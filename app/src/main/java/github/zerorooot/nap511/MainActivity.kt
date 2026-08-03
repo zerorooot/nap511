@@ -3,11 +3,19 @@ package github.zerorooot.nap511
 import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Intent
 import android.os.Bundle
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,6 +36,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +51,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.util.Consumer
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
@@ -125,6 +135,8 @@ class MainActivity : AppCompatActivity() {
         val recycleViewModel: RecycleViewModel = viewModel(factory = factory)
         val audioViewModel: AudioViewModel = viewModel(factory = factory)
         val navController = rememberNavController()
+        val localActivity = LocalActivity.current
+
 
         LaunchedEffect(Unit) {
             fileViewModel.loadCacheFile()
@@ -150,6 +162,20 @@ class MainActivity : AppCompatActivity() {
             navController.navigate(it)
         }
 
+        // 监听 Activity 的 onNewIntent 事件
+        DisposableEffect(navController) {
+            val activity = localActivity as? ComponentActivity
+            val listener = Consumer<Intent> { intent ->
+                // 收到新的 Deep Link 时，手动让 NavController 响应
+                navController.handleDeepLink(intent)
+            }
+
+            activity?.addOnNewIntentListener(listener)
+
+            onDispose {
+                activity?.removeOnNewIntentListener(listener)
+            }
+        }
     }
 
 
@@ -252,7 +278,31 @@ class MainActivity : AppCompatActivity() {
             content = {
                 // 使用 NavHost 管理页面切换
                 NavHost(
-                    navController, startDestination = Route.MyFile
+                    navController, startDestination = Route.MyFile,
+                    enterTransition = {
+                        fadeIn(animationSpec = tween(300)) + scaleIn(
+                            initialScale = 0.95f,
+                            animationSpec = tween(300)
+                        )
+                    },
+                    exitTransition = {
+                        fadeOut(animationSpec = tween(300)) + scaleOut(
+                            targetScale = 1.05f,
+                            animationSpec = tween(300)
+                        )
+                    },
+                    popEnterTransition = {
+                        fadeIn(animationSpec = tween(300)) + scaleIn(
+                            initialScale = 1.05f,
+                            animationSpec = tween(300)
+                        )
+                    },
+                    popExitTransition = {
+                        fadeOut(animationSpec = tween(300)) + scaleOut(
+                            targetScale = 0.95f,
+                            animationSpec = tween(300)
+                        )
+                    }
                 ) {
                     composable<Route.Login> {
                         fileViewModel.gesturesEnabled = false
@@ -267,9 +317,15 @@ class MainActivity : AppCompatActivity() {
                             fileViewModel,
                             offlineFileViewModel,
                             audioViewModel,
-                            { navController.navigate(it) },
+                            { navController.navigate(Route.Photo) },
                             appBarClick(fileViewModel)
-                        )
+                        ) {
+                            val open = drawerState.isOpen
+                            if (open) {
+                                scope.launch { drawerState.close() }
+                            }
+                            return@FileScreen open
+                        }
                     }
 
                     composable<Route.OfflineDownload> {
@@ -277,7 +333,7 @@ class MainActivity : AppCompatActivity() {
                             offlineFileViewModel,
                             fileViewModel,
                             { scope.launch { drawerState.open() } },
-                            { navController.navigate(it) }
+                            { navController.navigate(Route.VerifyMagnetLinkAccount) }
                         )
 
                     }
@@ -325,14 +381,20 @@ class MainActivity : AppCompatActivity() {
                                 }
 
                                 "select" -> {
-                                    // 弹出页面，直到返回到 Route.MyFile（保留 MyFile）
-                                    //navController.popBackStack(Route.MyFile, inclusive = false)
-                                    navController.popBackStack()
+                                    scope.launch(Dispatchers.Main) {
+                                        navController.navigate(Route.MyFile) {
+                                            // 将 VerifyMagnetLinkAccount 中转页从返回栈中彻底弹出，用户返回时，就会直接退回首页，而不会退回中转页
+                                            popUpTo<Route.VerifyMagnetLinkAccount> {
+                                                inclusive = true
+                                            }
+                                        }
+                                    }
+
                                 }
                             }
                         }
-
                     }
+
                     composable<Route.VerifyVideoAccount> {
                         CaptchaVideoWebViewScreen(fileViewModel) {
                             when (it) {
@@ -341,9 +403,14 @@ class MainActivity : AppCompatActivity() {
                                 }
 
                                 "select" -> {
-                                    // 弹出页面，直到返回到 Route.MyFile（保留 MyFile）
-                                    //navController.popBackStack(Route.MyFile, inclusive = false)
-                                    navController.popBackStack()
+                                    scope.launch(Dispatchers.Main) {
+                                        navController.navigate(Route.MyFile) {
+                                            // 将 VerifyVideoAccount 中转页从返回栈中彻底弹出，用户返回时，就会直接退回首页，而不会退回中转页
+                                            popUpTo<Route.VerifyVideoAccount> {
+                                                inclusive = true
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -354,7 +421,7 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                     composable<Route.LogScreen> {
-                        LogScreen() {
+                        LogScreen {
                             scope.launch { drawerState.open() }
                         }
                     }
@@ -367,46 +434,62 @@ class MainActivity : AppCompatActivity() {
 
                     composable<DetailRoute>(
                         deepLinks = listOf(
-                            // 库会自动解析 URL 中的路径和查询参数，并填入 DetailRoute 实例中
+                            // 解析 URL 中的路径和查询参数，并填入 DetailRoute 实例中
                             navDeepLink<DetailRoute>(basePath = "nap511://detail")
                         )
                     ) { backStackEntry ->
                         // 直接转为强类型的 DetailRoute 对象
                         val args: DetailRoute = backStackEntry.toRoute()
                         val param = args.param
-                        when (args.command) {
-                            //直接添加磁力，但提示请验证账号;跳转到验证账号界面
-                            "check" -> {
-                                navController.navigate(Route.VerifyMagnetLinkAccount)
-                                XLog.d("handleIntent check $intent")
-                            }
-                            //跳转到默认下载目录
-                            "jump" -> {
-                                val cid = intent.getStringExtra("cid") ?: DataStoreUtil.getData(
-                                    ConfigKeyUtil.DEFAULT_OFFLINE_CID, "0"
-                                )
-                                fileViewModel.getFiles(cid)
-                                XLog.d("handleIntent jump $intent $cid $fileViewModel")
-                            }
+                        //用 LaunchedEffect 包裹导航逻辑，确保它只在首次加载或参数变化时执行一次，重构时不重新触发
+                        LaunchedEffect(args) {
+                            when (args.command) {
+                                //直接添加磁力，但提示请验证账号;跳转到验证账号界面
+                                //adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/check?param=3213" github.zerorooot.nap511
+                                "check" -> {
+                                    navController.navigate(Route.VerifyMagnetLinkAccount) {
+                                        // 将 DetailRoute 中转页从返回栈中彻底弹出，用户返回时，就会直接退回首页，而不会退回中转页
+                                        popUpTo<DetailRoute> {
+                                            inclusive = true
+                                        }
+                                    }
 
-                            "copy" -> {
-                                val clipboard = ContextCompat.getSystemService(
-                                    this@MainActivity, ClipboardManager::class.java
-                                )
-                                val clip = ClipData.newPlainText("label", param)
-                                clipboard?.setPrimaryClip(clip)
-                                XLog.d("handleIntent copy $intent $param")
-                                App.instance.toast("复制磁力链接成功!")
-                            }
+                                    XLog.d("handleIntent check $intent")
+                                }
+                                //跳转到默认下载目录
+                                //adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/jump?param=0" github.zerorooot.nap511
+                                "jump" -> {
+                                    navController.popBackStack()
+                                    // 弹出页面，直到返回到 Route.MyFile（保留 MyFile）
+                                    //navController.popBackStack(Route.MyFile, inclusive = false)
+                                    fileViewModel.getFiles(param)
+                                    XLog.d("handleIntent jump $intent $param ")
 
-                            "unzipError" -> {
-                                val clipboard = ContextCompat.getSystemService(
-                                    this@MainActivity, ClipboardManager::class.java
-                                )
-                                val clip = ClipData.newPlainText("unzipError", param)
-                                clipboard?.setPrimaryClip(clip)
-                                XLog.d("handleIntent unzipError $intent $param")
-                                App.instance.toast("解压失败信息已复制到剪切板!")
+                                }
+                                //adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/copy?param=copy_test" github.zerorooot.nap511
+                                "copy" -> {
+                                    val clipboard = ContextCompat.getSystemService(
+                                        this@MainActivity, ClipboardManager::class.java
+                                    )
+                                    val clip = ClipData.newPlainText("label", param)
+                                    clipboard?.setPrimaryClip(clip)
+                                    XLog.d("handleIntent copy $intent $param")
+                                    App.instance.toast("复制磁力链接成功!")
+                                    // 冷启动下会自动露出栈底的 MyFile；热启动下会返回原页面
+                                    navController.popBackStack()
+                                }
+
+                                "unzipError" -> {
+                                    val clipboard = ContextCompat.getSystemService(
+                                        this@MainActivity, ClipboardManager::class.java
+                                    )
+                                    val clip = ClipData.newPlainText("unzipError", param)
+                                    clipboard?.setPrimaryClip(clip)
+                                    XLog.d("handleIntent unzipError $intent $param")
+                                    App.instance.toast("解压失败信息已复制到剪切板!")
+                                    // 冷启动下会自动露出栈底的 MyFile；热启动下会返回原页面
+                                    navController.popBackStack()
+                                }
                             }
                         }
                     }
@@ -519,6 +602,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // 重点：当 Activity 被复用时，新的 Intent 会走这里
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent) // 更新 Activity 的 intent 引用，确保 NavController 能捕获最新的 Deep Link
+    }
 
     private fun appBarClick(fileViewModel: FileViewModel) = fun(name: String) {
         when (name) {
