@@ -12,9 +12,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 // 导航配置项辅助类
 data class DrawerMenuItem(val iconRes: Int, val label: String, val route: Route)
-//导航路由类
-@Serializable
-data class DetailRoute(val command: String, val param: String = "unknown")
 
 sealed interface Route {
     // 抽屉导航页面
@@ -44,6 +41,7 @@ sealed interface Route {
 
     @Serializable
     data object WebScreen : Route
+
     @Serializable
     data object ExitApp : Route
 
@@ -56,6 +54,11 @@ sealed interface Route {
     // 假设在别的 Screen 中跳转的“详情页”或“子页面”（带参数示例）
 //    @Serializable
 //    data class FileDetail(val fileId: String, val fileName: String) : Route
+}
+
+// 定义导航事件
+sealed interface NavEvent {
+    data class NavigateToScreen(val route: Route) : NavEvent
 }
 
 sealed interface ZipStatus {
@@ -339,6 +342,18 @@ data class RenameBean(var fid: String, var newName: String) {
     }
 }
 
+data class OfflineListCount(
+    @SerializedName("total_count") val totalCount: Int = 0,
+    @SerializedName("failed_count") val failedCount: Int = 0,
+    @SerializedName("finished_count") val finishedCount: Int = 0,
+    @SerializedName("downloading_count") val downloadingCount: Int = 0,
+    @SerializedName("state") val state: Boolean = false,
+    @SerializedName("errtype") val errtype: String = "",
+    @SerializedName("errcode") val errcode: Int = 0,
+    var quota: Int = -1,
+    var total: Int = -1,
+)
+
 data class OfflineInfo(
     @SerializedName("page") var page: Int = -1,
     @SerializedName("page_count") var pageCount: Int = -1,
@@ -346,10 +361,23 @@ data class OfflineInfo(
     @SerializedName("count") var count: Int = -1,
     @SerializedName("quota") var quota: Int = -1,
     @SerializedName("total") var total: Int = -1,
-    @SerializedName("tasks") var tasks: ArrayList<OfflineTask> = arrayListOf(),
+    @SerializedName("tasks") private var _tasks: ArrayList<OfflineTask>? = null,
     @SerializedName("state") var state: Boolean = false,
 //    @SerializedName("errtype") var errtype: String = ""
-)
+) {
+    // 对外暴露的 tasks 变量：如果 _tasks 为 null，自动初始化并返回一个空的 ArrayList
+    var tasks: ArrayList<OfflineTask>
+        get() = _tasks ?: arrayListOf<OfflineTask>().also { _tasks = it }
+        set(value) {
+            _tasks = value
+        }
+}
+
+enum class OfflineTaskType(val stat: Int) {
+    DownloadingList(12),
+    FailedList(9),
+    CompletedList(11)
+}
 
 data class OfflineTask(
     @SerializedName("info_hash") var infoHash: String = "",

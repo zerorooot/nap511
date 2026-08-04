@@ -12,6 +12,8 @@ import github.zerorooot.nap511.bean.FileInfo
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.ImageDate
 import github.zerorooot.nap511.bean.OfflineInfo
+import github.zerorooot.nap511.bean.OfflineListCount
+import github.zerorooot.nap511.bean.OfflineTaskType
 import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.bean.SignBean
 import github.zerorooot.nap511.bean.TorrentFileBean
@@ -63,9 +65,19 @@ class FileRepository(private val cookie: String) {
         return offlineService.getSign()
     }
 
-    suspend fun getOfflineTaskList(uid: String = "", sign: String = ""): OfflineInfo {
-        return offlineService.taskList(uid, sign)
+    suspend fun getOfflineTaskCount(): OfflineListCount {
+        return offlineService.taskCount()
     }
+
+    suspend fun getOfflineTaskList(
+        uid: String,
+        sign: String,
+        page: Int,
+        offlineTaskType: OfflineTaskType
+    ): OfflineInfo {
+        return offlineService.taskList(uid, sign, page, offlineTaskType.stat)
+    }
+
 
     suspend fun getOfflineTorrentTaskList(
         sha1: String = "",

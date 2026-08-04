@@ -2,6 +2,7 @@ package github.zerorooot.nap511.service
 
 import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.OfflineInfo
+import github.zerorooot.nap511.bean.OfflineListCount
 import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.bean.SignBean
 import github.zerorooot.nap511.bean.TorrentFileBean
@@ -49,17 +50,21 @@ interface OfflineService {
     @GET("?ct=offline&ac=space")
     suspend fun getSign(@Query("_") currentTime: Long = System.currentTimeMillis() / 1000): SignBean
 
+
+    @POST("web/lixian/?ct=lixian&ac=task_count")
+    suspend fun taskCount(): OfflineListCount
+
     /**
      *
      */
     @FormUrlEncoded
     @POST("web/lixian/?ct=lixian&ac=task_lists")
     suspend fun taskList(
-        @Field("uid") uid: String = "",
-        @Field("sign") sign: String = "",
-        @Field("page") page: Int = 1,
+        @Field("uid") uid: String,
+        @Field("sign") sign: String ,
+        @Field("page") page: Int,
         //9是下载失败，11是下载完成，12是正在下载
-        @Field("stat") stat: Int = 12,
+        @Field("stat") stat: Int ,
         @Field("time") time: Long = System.currentTimeMillis() / 1000
     ): OfflineInfo
 

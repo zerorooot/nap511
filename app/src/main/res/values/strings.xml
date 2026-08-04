@@ -14,7 +14,7 @@
     </array>
     <array name="offlineFileAppBarMenu">
         <item>刷新文件</item>
-        <item>复制所有下载链接</item>
+        <item>复制本页链接</item>
         <item>清空已完成</item>
         <item>清空已失败</item>
     </array>

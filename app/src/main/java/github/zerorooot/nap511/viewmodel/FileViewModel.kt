@@ -1,7 +1,10 @@
 package github.zerorooot.nap511.viewmodel
 
 import android.annotation.SuppressLint
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -10,6 +13,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.concurrent.futures.await
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
@@ -27,10 +31,12 @@ import github.zerorooot.nap511.bean.FileInfo
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.ImageBean
 import github.zerorooot.nap511.bean.LocationBean
+import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.RemainingSpaceBean
+import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.repository.FileRepository
@@ -39,14 +45,18 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.DialogEvent
 import github.zerorooot.nap511.util.DialogEventBus
+import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.worker.OfflineTaskWorker
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import java.io.File
 
 
 @SuppressLint("MutableCollectionMutableState")
@@ -66,7 +76,12 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     //当前cid下的文件数量
     private var count: Int by mutableIntStateOf(0)
 
-    internal var fileListCache = hashMapOf<String, FilesBean>()
+    internal val fileCacheManager by lazy {
+        FileCacheManager<FilesBean>(
+            cacheDir = File(context.cacheDir, "file_list_cache"),
+            classType = FilesBean::class.java
+        )
+    }
     private var pathList = emptyList<PathBean>()
 
     internal var cutFileList = emptyList<FileBean>()
@@ -183,35 +198,84 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     internal val _launchVideoEvent = MutableSharedFlow<VideoInfoBean>()
     val launchVideoEvent = _launchVideoEvent.asSharedFlow()
 
-    private val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
+    private val _navigationEvent = Channel<NavEvent>()
+    val navigationEvent = _navigationEvent.receiveAsFlow()
+
+    internal val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
+
+
+    // 统一处理传入的 Deep Link Intent
+    fun handleDeepLink(intent: Intent?) {
+        val uri = intent?.data ?: return
+
+        // 解析 Scheme 和 Host: nap511://detail/check?param=3213
+        if (uri.scheme == "nap511" && uri.host == "detail") {
+            val command = uri.lastPathSegment // "check" 或 "copy"
+            val param = uri.getQueryParameter("param") ?: ""
+
+            when (command) {
+                //  adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/check?param=3213" github.zerorooot.nap511
+                "check" -> {
+                    viewModelScope.launch {
+                        _navigationEvent.send(NavEvent.NavigateToScreen(Route.VerifyMagnetLinkAccount))
+                    }
+                }
+                //adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/jump?param=0" github.zerorooot.nap511
+                "jump" -> {
+                    getFiles(param)
+                }
+
+                // adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/copy?param=copy_test" github.zerorooot.nap511
+                "copy" -> {
+                    val clipboard =
+                        ContextCompat.getSystemService(context, ClipboardManager::class.java)
+                    val clip = ClipData.newPlainText("label", param)
+                    clipboard?.setPrimaryClip(clip)
+
+                    XLog.d("handleIntent copy $param")
+                    App.instance.toast("复制磁力链接成功!")
+                }
+
+                "unzipError" -> {
+                    val clipboard =
+                        ContextCompat.getSystemService(context, ClipboardManager::class.java)
+                    val clip = ClipData.newPlainText("unzipError", param)
+                    clipboard?.setPrimaryClip(clip)
+                    XLog.d("handleIntent unzipError $intent $param")
+                    App.instance.toast("解压失败信息已复制到剪切板!")
+                }
+            }
+        }
+    }
+
     fun loadCacheFile() {
         viewModelScope.launch(Dispatchers.IO) {
-            if (fileListCache.isEmpty() && saveRequestCache) {
-                val file = App.cacheFile
-                val content = if (file.exists()) file.readText() else "{}"
-                val type = object : TypeToken<HashMap<String, FilesBean>?>() {}.type
-                fileListCache = Gson().fromJson(content, type)
-                XLog.d("loading file list cache ${fileListCache.size}")
-            }
-            //如果不保存，及时删除文件，防止文件越来越大
-            if (!saveRequestCache && App.cacheFile.exists()) {
-                App.cacheFile.delete()
+            if (!saveRequestCache) {
+                // 不保存磁盘缓存时，仅清理硬盘旧文件，保留内存缓存
+                fileCacheManager.clearDiskOnly()
+            } else {
+                // 开启磁盘保存时，在后台检查清理过期的硬盘缓存
+                fileCacheManager.cleanExpiredDiskCache()
             }
             getFiles(currentCid)
         }
     }
 
-
-    fun saveFileCache() {
-        viewModelScope.launch(Dispatchers.IO) {
+    /**
+     * 预加载指定 cid 的缓存
+     */
+    fun updateFileCache(cid: String) {
+        viewModelScope.launch {
+            // 无论 saveRequestCache 为何值，只要内存或硬盘上有缓存就跳过网络请求
+            if (fileCacheManager.get(cid, readDisk = saveRequestCache) != null) {
+                return@launch
+            }
             try {
-                if (fileListCache.isNotEmpty() && saveRequestCache) {
-                    val type = object : TypeToken<HashMap<String, FilesBean>?>() {}.type
-                    val json = Gson().toJson(fileListCache, type)
-                    val file = App.cacheFile
-                    file.writeText(json)
-                    XLog.d("save file list cache ${fileListCache.size}")
-                }
+                val files =
+                    fileRepository.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
+                setFileBeanProperty(files.fileBeanList)
+                // 写入缓存：内存必保存，磁盘视 saveRequestCache 决定
+                fileCacheManager.put(cid, files, saveToDisk = saveRequestCache)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -227,7 +291,10 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
 
         if (isSearchState) {
             fileBeanList.clear()
-            setFiles(fileListCache[currentCid]!!)
+            viewModelScope.launch {
+                val cached = fileCacheManager.get(currentCid)!!
+                setFiles(cached, updateCacheManager = false)
+            }
             appBarTitle = context.getString(R.string.app_name)
             isSearchState = false
             return
@@ -266,18 +333,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     }
 
 
-    fun updateFileCache(cid: String) {
-        viewModelScope.launch {
-            if (fileListCache.containsKey(cid)) {
-                return@launch
-            }
-            val files =
-                fileRepository.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
-            setFileBeanProperty(files.fileBeanList)
-            fileListCache[cid] = files
-        }
-    }
-
     fun setRefreshingStatus(status: Boolean) {
         _isRefreshing.value = status
     }
@@ -297,28 +352,32 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         }
     }
 
+    /**
+     * 获取文件列表
+     */
     fun getFiles(cid: String) {
-        saveFileCache()
         viewModelScope.launch {
             _isRefreshing.value = true
-            if (fileListCache.containsKey(cid)) {
-                setFiles(fileListCache[cid]!!)
+
+            // 1. 尝试读取缓存
+            // saveRequestCache 只传给 readDisk 参数。如果内存中有，不用读磁盘，依然能命中内存！
+            val cachedFiles = fileCacheManager.get(cid, readDisk = saveRequestCache)
+            if (cachedFiles != null) {
+                setFiles(cachedFiles, updateCacheManager = false)
                 _isRefreshing.value = false
                 return@launch
             }
 
+            // 2. 缓存未命中，发起网络请求
             try {
                 val files =
                     fileRepository.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
                 setFileBeanProperty(files.fileBeanList)
-                setFiles(files)
-                _isRefreshing.value = false
-
-                saveFileCache()
+                // 3. 网络请求成功后写入缓存
+                setFiles(files, updateCacheManager = true)
             } catch (e: NullPointerException) {
-                fileListCache.clear()
+                fileCacheManager.clearAll()
                 App.instance.toast("获取文件列表失败，建议更新您的Cookie")
-                App.cacheFile.delete()
             } catch (e: Exception) {
                 e.printStackTrace()
                 App.instance.toast("${e.message}，请重试～")
@@ -385,14 +444,17 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     internal fun refresh(cid: String) {
         isSearchState = false
         recoverFromLongPress()
-        fileListCache.remove(cid)
-        // XLog.d("fileViewModel.refresh cid $cid, currentCid $currentCid")
-        if (cid == currentCid) {
-            getFiles(currentCid)
-        } else {
-            updateFileCache(cid)
+
+        viewModelScope.launch {
+            fileCacheManager.remove(cid)
+            if (cid == currentCid) {
+                getFiles(currentCid)
+            } else {
+                updateFileCache(cid)
+            }
         }
-        //图片缓存
+
+        // 图片缓存清理
         imageBeanCache.remove(cid)
     }
 
@@ -454,7 +516,24 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         fileBeanList.addAll(updatedList)
     }
 
-    private fun setFiles(files: FilesBean) {
+    //    private fun setFiles(files: FilesBean) {
+//        fileBeanList.clear()
+//        fileBeanList.addAll(files.fileBeanList)
+//
+//        currentCid = files.cid
+//        count = files.count
+//        pathList = files.path
+//
+//        var path = ""
+//        pathList.forEach { i ->
+//            path = "$path/${i.name}"
+//        }
+//        _currentPath.value = path
+//        if (!fileListCache.containsKey(currentCid)) {
+//            fileListCache[currentCid] = files
+//        }
+//    }
+    private fun setFiles(files: FilesBean, updateCacheManager: Boolean = true) {
         fileBeanList.clear()
         fileBeanList.addAll(files.fileBeanList)
 
@@ -467,8 +546,12 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
             path = "$path/${i.name}"
         }
         _currentPath.value = path
-        if (!fileListCache.containsKey(currentCid)) {
-            fileListCache[currentCid] = files
+
+        if (updateCacheManager) {
+            viewModelScope.launch {
+                // put 方法内部会【无条件写入内存】，saveToDisk 参数仅控制【是否保存到磁盘】
+                fileCacheManager.put(files.cid, files, saveToDisk = saveRequestCache)
+            }
         }
     }
 
@@ -513,7 +596,10 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                 return@launch
             }
 
-            XLog.d("handleOfflineTask forceRecreate=$forceRecreate, workInfos size=${workInfos.size}, task size=${currentOfflineTask.size}")
+            XLog.d(
+                "handleOfflineTask forceRecreate=$forceRecreate, workInfos size=${workInfos.size}, task size=${currentOfflineTask.size} " +
+                        "currentOfflineTask:\n $currentOfflineTask"
+            )
 
             val defaultOfflineCid = DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
             // 序列化并提交新任务

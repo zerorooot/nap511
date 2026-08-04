@@ -12,10 +12,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.bean.Route
@@ -27,6 +26,7 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
+import kotlinx.coroutines.launch
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 
@@ -38,101 +38,63 @@ fun SettingScreen(
     onNav: (Route) -> Unit
 ) {
     val listState = rememberLazyListState()
-    var logEnabled by remember { mutableStateOf(DataStoreUtil.getData(ConfigKeyUtil.LOG, false)) }
-    var autoRotateEnabled by remember {
-        mutableStateOf(
-            DataStoreUtil.getData(
-                ConfigKeyUtil.AUTO_ROTATE,
-                false
-            )
-        )
-    }
-    var hideLoadingView by remember {
-        mutableStateOf(
-            DataStoreUtil.getData(
-                ConfigKeyUtil.HIDE_LOADING_VIEW,
-                false
-            )
-        )
-    }
-    var earlyLoading by remember {
-        mutableStateOf(
-            DataStoreUtil.getData(
-                ConfigKeyUtil.EARLY_LOADING,
-                false
-            )
-        )
-    }
-    var saveRequestCache by remember {
-        mutableStateOf(
-            DataStoreUtil.getData(
-                ConfigKeyUtil.SAVE_REQUEST_CACHE,
-                true
-            )
-        )
-    }
-    var positionAfterAt by remember {
-        mutableStateOf(
-            DataStoreUtil.getData(
-                ConfigKeyUtil.POSITION_AFTER_AT,
-                false
-            )
-        )
-    }
-    var torrentSort by remember {
-        mutableStateOf(
-            DataStoreUtil.getData(
-                ConfigKeyUtil.TORRENT_SORT,
-                false
-            )
-        )
-    }
+    val coroutineScope = rememberCoroutineScope()
 
+    val logEnabled by DataStoreUtil.getDataFlow(ConfigKeyUtil.LOG, false)
+        .collectAsState(initial = false)
+    val aria2Url by DataStoreUtil.getDataFlow(
+        ConfigKeyUtil.ARIA2_URL,
+        ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
+    ).collectAsState(initial = ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE)
+    val autoRotateEnabled by DataStoreUtil.getDataFlow(ConfigKeyUtil.AUTO_ROTATE, false)
+        .collectAsState(initial = false)
+
+    val hideLoadingView by DataStoreUtil.getDataFlow(ConfigKeyUtil.HIDE_LOADING_VIEW, false)
+        .collectAsState(initial = false)
+
+    val earlyLoading by DataStoreUtil.getDataFlow(ConfigKeyUtil.EARLY_LOADING, false)
+        .collectAsState(initial = false)
+
+    val saveRequestCache by DataStoreUtil.getDataFlow(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
+        .collectAsState(initial = true)
+
+    val positionAfterAt by DataStoreUtil.getDataFlow(ConfigKeyUtil.POSITION_AFTER_AT, false)
+        .collectAsState(initial = false)
+
+    val torrentSort by DataStoreUtil.getDataFlow(ConfigKeyUtil.TORRENT_SORT, false)
+        .collectAsState(initial = false)
+    val currentOfflineTask by DataStoreUtil.getDataFlow(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
+        .collectAsState(initial = "")
     // EditText 变量状态管理
-    var uid by remember { mutableStateOf(DataStoreUtil.getData(ConfigKeyUtil.UID, "0")) }
-    var cookie by remember { mutableStateOf(DataStoreUtil.getData(ConfigKeyUtil.COOKIE, "cookie")) }
-    var password by remember { mutableStateOf(DataStoreUtil.getData(ConfigKeyUtil.PASSWORD, "")) }
-    var aria2Url by remember {
-        mutableStateOf(
-            DataStoreUtil.getData(
-                ConfigKeyUtil.ARIA2_URL,
-                ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
-            )
-        )
-    }
-    var requestLimitCount by remember {
-        mutableStateOf(
-            DataStoreUtil.getData(
-                ConfigKeyUtil.REQUEST_LIMIT_COUNT,
-                "200"
-            )
-        )
-    }
-    var defaultOfflineCid by remember {
-        mutableStateOf(
-            DataStoreUtil.getData(
-                ConfigKeyUtil.DEFAULT_OFFLINE_CID,
-                ""
-            )
-        )
-    }
-    var moveFailFile by remember {
-        mutableStateOf(
-            DataStoreUtil.getData(
-                ConfigKeyUtil.MOVE_FAIL_FILE,
-                ""
-            )
-        )
-    }
-    var defaultOfflineTime by remember {
-        mutableStateOf(
-            DataStoreUtil.getData(
-                ConfigKeyUtil.DEFAULT_OFFLINE_TIME,
-                "5"
-            )
-        )
-    }
+    val uid by DataStoreUtil.getDataFlow(ConfigKeyUtil.UID, "0")
+        .collectAsState(initial = "0")
 
+    val cookie by DataStoreUtil.getDataFlow(ConfigKeyUtil.COOKIE, "cookie")
+        .collectAsState(initial = "cookie")
+
+    val password by DataStoreUtil.getDataFlow(ConfigKeyUtil.PASSWORD, "")
+        .collectAsState(initial = "")
+
+    val requestLimitCount by DataStoreUtil.getDataFlow(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200")
+        .collectAsState(initial = "200")
+
+    val defaultOfflineCid by DataStoreUtil.getDataFlow(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
+        .collectAsState(initial = "")
+
+    val moveFailFile by DataStoreUtil.getDataFlow(ConfigKeyUtil.MOVE_FAIL_FILE, "")
+        .collectAsState(initial = "")
+
+    val defaultOfflineTime by DataStoreUtil.getDataFlow(ConfigKeyUtil.DEFAULT_OFFLINE_TIME, "5")
+        .collectAsState(initial = "5")
+
+    fun <T : Any> saveDate(key: String, newValue: T) {
+        coroutineScope.launch {
+            DataStoreUtil.putDataSuspend(
+                key,
+                newValue
+            ) // 保存后 logEnabled 会自动刷新 UI
+        }
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -178,8 +140,7 @@ fun SettingScreen(
                         summary = "点击更改",
                         value = cookie,
                         onValueSave = {
-                            cookie = it
-                            DataStoreUtil.putData("cookie", it)
+                            saveDate(ConfigKeyUtil.COOKIE, it)
                         }
                     )
                 }
@@ -190,8 +151,7 @@ fun SettingScreen(
                         value = password,
                         isNumber = true,
                         onValueSave = {
-                            password = it
-                            DataStoreUtil.putData(ConfigKeyUtil.PASSWORD, it)
+                            saveDate(ConfigKeyUtil.PASSWORD, it)
                         }
                     )
                 }
@@ -203,8 +163,7 @@ fun SettingScreen(
                         summary = aria2Url,
                         value = aria2Url,
                         onValueSave = {
-                            aria2Url = it
-                            DataStoreUtil.putData(ConfigKeyUtil.ARIA2_URL, it)
+                            saveDate(ConfigKeyUtil.ARIA2_URL, it)
                         }
                     )
                 }
@@ -217,8 +176,7 @@ fun SettingScreen(
                         value = requestLimitCount,
                         isNumber = true,
                         onValueSave = {
-                            requestLimitCount = it
-                            DataStoreUtil.putData(ConfigKeyUtil.REQUEST_LIMIT_COUNT, it)
+                            saveDate(ConfigKeyUtil.REQUEST_LIMIT_COUNT, it)
                         }
                     )
                 }
@@ -232,8 +190,7 @@ fun SettingScreen(
                         summary = summaryText,
                         value = defaultOfflineCid,
                         onValueSave = {
-                            defaultOfflineCid = it
-                            DataStoreUtil.putData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, it)
+                            saveDate(ConfigKeyUtil.DEFAULT_OFFLINE_CID, it)
                         }
                     )
                 }
@@ -250,8 +207,7 @@ fun SettingScreen(
                         summary = summaryText,
                         value = moveFailFile,
                         onValueSave = {
-                            moveFailFile = it
-                            DataStoreUtil.putData(ConfigKeyUtil.MOVE_FAIL_FILE, it)
+                            saveDate(ConfigKeyUtil.MOVE_FAIL_FILE, it)
                         }
                     )
                 }
@@ -283,9 +239,9 @@ fun SettingScreen(
                         summary = "输出程序中部分关键节点内容，方便调试",
                         checked = logEnabled,
                         onCheckedChange = {
-                            logEnabled = it
-                            DataStoreUtil.putData("log", it)
+                            saveDate(ConfigKeyUtil.LOG, it)
                         }
+
                     )
                 }
                 item {
@@ -294,8 +250,7 @@ fun SettingScreen(
                         summary = "根据视频横竖自动旋转屏幕",
                         checked = autoRotateEnabled,
                         onCheckedChange = {
-                            autoRotateEnabled = it
-                            DataStoreUtil.putData("autoRotate", it)
+                            saveDate(ConfigKeyUtil.AUTO_ROTATE, it)
                         }
                     )
                 }
@@ -305,8 +260,7 @@ fun SettingScreen(
                         summary = "当视频正在加载时，隐藏加载提示",
                         checked = hideLoadingView,
                         onCheckedChange = {
-                            hideLoadingView = it
-                            DataStoreUtil.putData("hideLoadingView", it)
+                            saveDate(ConfigKeyUtil.HIDE_LOADING_VIEW, it)
                         }
                     )
                 }
@@ -316,8 +270,7 @@ fun SettingScreen(
                         summary = "进入下级目录时，提前加载当前文件夹上下两个文件夹内的文件",
                         checked = earlyLoading,
                         onCheckedChange = {
-                            earlyLoading = it
-                            DataStoreUtil.putData("EarlyLoading", it)
+                            saveDate(ConfigKeyUtil.EARLY_LOADING, it)
                         }
                     )
                 }
@@ -327,8 +280,7 @@ fun SettingScreen(
                         summary = "保存请求文件缓存到application.cacheDir/fileListCache.json中，便于提升加载速度",
                         checked = saveRequestCache,
                         onCheckedChange = {
-                            saveRequestCache = it
-                            DataStoreUtil.putData("SaveRequestCache", it)
+                            saveDate(ConfigKeyUtil.SAVE_REQUEST_CACHE, it)
                         }
                     )
                 }
@@ -338,8 +290,7 @@ fun SettingScreen(
                         summary = "重命名时，光标定位在'@'或'空格'后",
                         checked = positionAfterAt,
                         onCheckedChange = {
-                            positionAfterAt = it
-                            DataStoreUtil.putData("PositionAfterAt", it)
+                            saveDate(ConfigKeyUtil.POSITION_AFTER_AT, it)
                         }
                     )
                 }
@@ -349,8 +300,7 @@ fun SettingScreen(
                         summary = "种子文件按文件大小从大到小排序",
                         checked = torrentSort,
                         onCheckedChange = {
-                            torrentSort = it
-                            DataStoreUtil.putData("TorrentSort", it)
+                            saveDate(ConfigKeyUtil.TORRENT_SORT, it)
                         }
                     )
                 }
@@ -363,12 +313,20 @@ fun SettingScreen(
                         value = defaultOfflineTime,
                         isNumber = true,
                         onValueSave = {
-                            defaultOfflineTime = it
-                            DataStoreUtil.putData(ConfigKeyUtil.DEFAULT_OFFLINE_TIME, it)
+                            saveDate(ConfigKeyUtil.DEFAULT_OFFLINE_TIME, it)
                         }
                     )
                 }
-
+                item {
+                    EditTextPreferenceItem(
+                        title = "离线任务缓存",
+                        summary = currentOfflineTask.ifEmpty { "当前尚未添加离线任务的链接" },
+                        value = currentOfflineTask,
+                        onValueSave = {
+                            saveDate(ConfigKeyUtil.CURRENT_OFFLINE_TASK, it)
+                        }
+                    )
+                }
                 // 10. 立即下载与重启应用
                 item {
                     PreferenceItem(

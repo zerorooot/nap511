@@ -1,6 +1,5 @@
 package github.zerorooot.nap511.viewmodel
 
-
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -8,17 +7,21 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.OfflineInfo
+import github.zerorooot.nap511.bean.OfflineListCount
 import github.zerorooot.nap511.bean.OfflineTask
+import github.zerorooot.nap511.bean.OfflineTaskType
 import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.bean.TorrentFileBean
-import github.zerorooot.nap511.util.DialogEvent
-import github.zerorooot.nap511.util.DialogEventBus
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.DialogEvent
+import github.zerorooot.nap511.util.DialogEventBus
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -27,10 +30,20 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
     private val _isRefreshing = MutableStateFlow(false)
     var isRefreshing = _isRefreshing.asStateFlow()
 
-    private val _offlineFile = MutableStateFlow(arrayListOf<OfflineTask>())
-    var offlineFile = _offlineFile.asStateFlow()
+    private var downloadingTask by mutableStateOf(OfflineInfo())
+    private val _downloadingList = MutableStateFlow<List<OfflineTask>>(emptyList())
+    val downloadingList = _downloadingList.asStateFlow()
 
-    private val _offlineInfo = MutableStateFlow(OfflineInfo())
+    private var failedTask by mutableStateOf(OfflineInfo())
+    private val _failedList = MutableStateFlow<List<OfflineTask>>(emptyList())
+    val failedList = _failedList.asStateFlow()
+
+    private var completedTask by mutableStateOf(OfflineInfo())
+    private val _completedList = MutableStateFlow<List<OfflineTask>>(emptyList())
+    val completedList = _completedList.asStateFlow()
+
+
+    private val _offlineInfo = MutableStateFlow(OfflineListCount())
     var offlineInfo = _offlineInfo.asStateFlow()
 
     private val _quotaBean = MutableStateFlow(QuotaBean(1500, 1500))
@@ -62,22 +75,158 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
         FileRepository.getInstance(cookie)
     }
 
-
+    /**
+     * 首次进入页面时加载（若三项均为空则触发请求）
+     */
     fun getOfflineFileList() {
-        if (_offlineFile.value.isNotEmpty()) {
+        if (_downloadingList.value.isNotEmpty() ||
+            _failedList.value.isNotEmpty() ||
+            _completedList.value.isNotEmpty()
+        ) {
             return
         }
+        refresh()
+    }
+
+    /**
+     * 并行请求获取三类列表数据
+     */
+    fun refresh() {
         viewModelScope.launch {
             _isRefreshing.value = true
-//            val uid = sharedPreferencesUtil.get(ConfigUtil.uid)!!
-            val uid = App.uid
-            val sign = fileRepository.getOfflineSign().sign
-            _offlineInfo.value = fileRepository.getOfflineTaskList(uid, sign)
-            setTaskInfo(_offlineInfo.value.tasks)
-            _offlineFile.value = _offlineInfo.value.tasks
-            _isRefreshing.value = false
+            try {
+                val uid = App.uid
+                val sign = fileRepository.getOfflineSign().sign
+
+                // 1. 并行发起网络请求并直接在内部处理格式化，减少 refresh 函数内的重置逻辑
+                val infoDeferred = async { fileRepository.getOfflineTaskCount() }
+                val downloadingDeferred =
+                    async { fetchTaskListAndProcess(uid, sign, OfflineTaskType.DownloadingList) }
+                val failedDeferred =
+                    async { fetchTaskListAndProcess(uid, sign, OfflineTaskType.FailedList) }
+                val completedDeferred =
+                    async { fetchTaskListAndProcess(uid, sign, OfflineTaskType.CompletedList) }
+
+                // 2. 集中等待结果
+                val downloadingRes = downloadingDeferred.await()
+                val failedRes = failedDeferred.await()
+                val completedRes = completedDeferred.await()
+                val infoRes = infoDeferred.await()
+
+                // 3. 分离并统一更新 UI 状态
+                updateTasksState(downloadingRes, failedRes, completedRes)
+
+                _offlineInfo.value = infoRes.apply {
+                    quota = completedRes.quota
+                    total = completedRes.total
+                }
+            } catch (e: Exception) {
+                XLog.e("刷新离线任务列表失败", e)
+            } finally {
+                _isRefreshing.value = false
+            }
         }
     }
+
+    /**
+     * 拆分提取：拉取指定类型任务列表并格式化数据
+     */
+    private suspend fun fetchTaskListAndProcess(
+        uid: String,
+        sign: String,
+        type: OfflineTaskType
+    ): OfflineInfo {
+        val result = fileRepository.getOfflineTaskList(uid, sign, 1, type)
+        setTaskInfo(result.tasks)
+        return result
+    }
+
+    /**
+     * 拆分提取：更新各项列表的状态
+     */
+    private fun updateTasksState(
+        downloading: OfflineInfo,
+        failed: OfflineInfo,
+        completed: OfflineInfo
+    ) {
+        downloadingTask = downloading
+        _downloadingList.value = downloading.tasks
+
+        failedTask = failed
+        _failedList.value = failed.tasks
+
+        completedTask = completed
+        _completedList.value = completed.tasks
+    }
+
+    /**
+     * 分页加载更多任务列表（通用函数）
+     */
+    fun getMoreTaskList(offlineInfo: OfflineInfo, type: OfflineTaskType) {
+        // 1. 读取对应类型的分页状态
+        val (currentPage, maxPage) = Pair(
+            offlineInfo.page,
+            offlineInfo.pageCount
+        )
+        if (maxPage == 1 || _isRefreshing.value) {
+            return
+        }
+        if (currentPage == maxPage) {
+            App.instance.toast("已全部加载！")
+            return
+        }
+
+        _isRefreshing.value = true
+        viewModelScope.launch {
+            try {
+                val uid = App.uid
+                val sign = fileRepository.getOfflineSign().sign
+                val nextPage = currentPage + 1
+                val res = fileRepository.getOfflineTaskList(uid, sign, nextPage, type)
+                if (res.state) {
+                    // 仅处理新拉取的数据，降低重复格式化开销
+                    setTaskInfo(res.tasks)
+                    // 5. 追加新数据并更新页码
+                    applyTaskResult(type, res)
+                }
+            } catch (e: Exception) {
+                XLog.e("加载下一页失败", e)
+            } finally {
+                _isRefreshing.value = false
+            }
+        }
+    }
+
+    // 辅助方法：更新对应的 List StateFlow 与页数状态
+    private fun applyTaskResult(
+        type: OfflineTaskType,
+        offlineInfo: OfflineInfo
+    ) {
+        val newTasks = offlineInfo.tasks
+        when (type) {
+            OfflineTaskType.DownloadingList -> {
+                downloadingTask = offlineInfo
+                _downloadingList.update { it + newTasks }
+            }
+
+            OfflineTaskType.FailedList -> {
+                failedTask = offlineInfo
+                _failedList.update { it + newTasks }
+            }
+
+            OfflineTaskType.CompletedList -> {
+                completedTask = offlineInfo
+                _completedList.update { it + newTasks }
+            }
+        }
+    }
+
+    // 供外部快捷调用的 3 个方法
+    fun loadMoreDownloadingTasks() =
+        getMoreTaskList(downloadingTask, OfflineTaskType.DownloadingList)
+
+    fun loadMoreFailedTasks() = getMoreTaskList(failedTask, OfflineTaskType.FailedList)
+    fun loadMoreCompletedTasks() = getMoreTaskList(completedTask, OfflineTaskType.CompletedList)
 
     fun getTorrentTask(sha1: String) {
         //clear torrent bean
@@ -127,11 +276,10 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
                 infoHash, wanted, savePath, App.uid, sign
             )
             val message = if (addTorrentTask.state) {
+                refresh() // 添加成功后刷新列表
                 "任务添加成功，文件已保存至 /云下载/${savePath}"
             } else {
                 if (addTorrentTask.errorMsg.contains("请验证账号")) {
-                    //打开验证页面
-//                    fv.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
                     handle.invoke(true)
                 }
                 "任务添加失败，${addTorrentTask.errorMsg}"
@@ -140,7 +288,7 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
         }
     }
 
-    private fun setTaskInfo(tasks: ArrayList<OfflineTask>) {
+    private fun setTaskInfo(tasks: List<OfflineTask>) {
         tasks.forEach { offlineTask ->
             offlineTask.timeString =
                 SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
@@ -149,20 +297,28 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
             offlineTask.sizeString = android.text.format.Formatter.formatFileSize(
                 App.instance, if (offlineTask.size == -1L) 0L else offlineTask.size
             )
-            offlineTask.percentString =
-                if (offlineTask.status == -1) "❎下载失败" else "⬇${offlineTask.percentDone.toInt()}%"
-        }
-    }
+            offlineTask.percentString = when (offlineTask.status) {
+                2 -> {
+                    //下载成功
+                    "✅下载成功"
+                }
 
-    fun refresh() {
-        _offlineFile.value = arrayListOf()
-        getOfflineFileList()
+                -1 -> {
+                    "❎下载失败"
+                }
+
+                else -> {
+                    "⬇${offlineTask.percentDone.toInt()}%"
+                }
+            }
+        }
     }
 
     fun clearFinish() {
         viewModelScope.launch {
             val clearFinish = fileRepository.clearOfflineFinish()
             val message = if (clearFinish.state) {
+                refresh()
                 "清除成功"
             } else {
                 "清除失败，${clearFinish.errorMsg}"
@@ -175,6 +331,7 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
         viewModelScope.launch {
             val clearError = fileRepository.clearOfflineError()
             val message = if (clearError.state) {
+                refresh()
                 "清除成功"
             } else {
                 "清除失败，${clearError.errorMsg}"
@@ -189,25 +346,18 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
         }
     }
 
-
-    /**
-     * savepath:
-    wp_path_id:currentCid
-    url[0]:xxxxx
-    url[1]:xxxxx
-    uid:xxxx
-    sign:xxxxxxx
-    time:1675155957
-     */
     fun addTask(list: List<String>, currentCid: String, handle: (Boolean) -> Unit) {
         viewModelScope.launch {
             fileRepository.addOfflineTask(list, currentCid, handle)
         }
     }
 
-    fun openOfflineDialog(index: Int) {
+    /**
+     * 3. 支持直接传入 OfflineTask 打开详情弹窗
+     */
+    fun openOfflineDialog(task: OfflineTask) {
         isOpenOfflineDialog = true
-        offlineTask = _offlineFile.value[index]
+        offlineTask = task
     }
 
     fun closeOfflineDialog() {
@@ -217,7 +367,6 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
     fun delete(offlineTask: OfflineTask) {
         viewModelScope.launch {
             val map = hashMapOf("hash[0]" to offlineTask.infoHash)
-//            map["uid"] = sharedPreferencesUtil.get(ConfigUtil.uid)!!
             map["uid"] = DataStoreUtil.getData(ConfigKeyUtil.UID, "")
             map["sign"] = fileRepository.getOfflineSign().sign
             map["time"] = (System.currentTimeMillis() / 1000).toString()

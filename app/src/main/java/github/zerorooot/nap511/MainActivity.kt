@@ -1,13 +1,10 @@
 package github.zerorooot.nap511
 
 import android.annotation.SuppressLint
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -50,7 +47,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.core.util.Consumer
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -59,17 +55,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navDeepLink
-import androidx.navigation.toRoute
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
-import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.bean.AvatarBean
-import github.zerorooot.nap511.bean.DetailRoute
 import github.zerorooot.nap511.bean.DrawerMenuItem
+import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.screen.CaptchaVideoWebViewScreen
@@ -135,7 +128,7 @@ class MainActivity : AppCompatActivity() {
         val recycleViewModel: RecycleViewModel = viewModel(factory = factory)
         val audioViewModel: AudioViewModel = viewModel(factory = factory)
         val navController = rememberNavController()
-        val localActivity = LocalActivity.current
+        val context = LocalContext.current
 
 
         LaunchedEffect(Unit) {
@@ -149,6 +142,17 @@ class MainActivity : AppCompatActivity() {
             fileViewModel.handleOfflineTask()
 
             fileViewModel.getRemainingSpace()
+//冷启动处理
+            fileViewModel.handleDeepLink(intent)
+
+            fileViewModel.navigationEvent.collect { event ->
+                when (event) {
+                    is NavEvent.NavigateToScreen -> {
+                        // 直接导航到真正的 UI 目标页面
+                        navController.navigate(event.route)
+                    }
+                }
+            }
         }
 
         MyNavigationDrawer(
@@ -158,16 +162,17 @@ class MainActivity : AppCompatActivity() {
             audioViewModel,
             navController
         )
+
         CreateDialogs(fileViewModel, offlineFileViewModel) {
             navController.navigate(it)
         }
 
         // 监听 Activity 的 onNewIntent 事件
-        DisposableEffect(navController) {
-            val activity = localActivity as? ComponentActivity
-            val listener = Consumer<Intent> { intent ->
-                // 收到新的 Deep Link 时，手动让 NavController 响应
-                navController.handleDeepLink(intent)
+        DisposableEffect(context) {
+            val activity = context as? ComponentActivity
+            val listener = Consumer<Intent> { newIntent ->
+                activity?.intent = newIntent // 更新 Activity 绑定的 intent
+                fileViewModel.handleDeepLink(newIntent)
             }
 
             activity?.addOnNewIntentListener(listener)
@@ -188,7 +193,6 @@ class MainActivity : AppCompatActivity() {
         audioViewModel: AudioViewModel,
         navController: NavHostController
     ) {
-
         val drawerState = rememberDrawerState(DrawerValue.Closed)
         val scope = rememberCoroutineScope()
 
@@ -432,67 +436,6 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
 
-                    composable<DetailRoute>(
-                        deepLinks = listOf(
-                            // 解析 URL 中的路径和查询参数，并填入 DetailRoute 实例中
-                            navDeepLink<DetailRoute>(basePath = "nap511://detail")
-                        )
-                    ) { backStackEntry ->
-                        // 直接转为强类型的 DetailRoute 对象
-                        val args: DetailRoute = backStackEntry.toRoute()
-                        val param = args.param
-                        //用 LaunchedEffect 包裹导航逻辑，确保它只在首次加载或参数变化时执行一次，重构时不重新触发
-                        LaunchedEffect(args) {
-                            when (args.command) {
-                                //直接添加磁力，但提示请验证账号;跳转到验证账号界面
-                                //adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/check?param=3213" github.zerorooot.nap511
-                                "check" -> {
-                                    navController.navigate(Route.VerifyMagnetLinkAccount) {
-                                        // 将 DetailRoute 中转页从返回栈中彻底弹出，用户返回时，就会直接退回首页，而不会退回中转页
-                                        popUpTo<DetailRoute> {
-                                            inclusive = true
-                                        }
-                                    }
-
-                                    XLog.d("handleIntent check $intent")
-                                }
-                                //跳转到默认下载目录
-                                //adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/jump?param=0" github.zerorooot.nap511
-                                "jump" -> {
-                                    navController.popBackStack()
-                                    // 弹出页面，直到返回到 Route.MyFile（保留 MyFile）
-                                    //navController.popBackStack(Route.MyFile, inclusive = false)
-                                    fileViewModel.getFiles(param)
-                                    XLog.d("handleIntent jump $intent $param ")
-
-                                }
-                                //adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/copy?param=copy_test" github.zerorooot.nap511
-                                "copy" -> {
-                                    val clipboard = ContextCompat.getSystemService(
-                                        this@MainActivity, ClipboardManager::class.java
-                                    )
-                                    val clip = ClipData.newPlainText("label", param)
-                                    clipboard?.setPrimaryClip(clip)
-                                    XLog.d("handleIntent copy $intent $param")
-                                    App.instance.toast("复制磁力链接成功!")
-                                    // 冷启动下会自动露出栈底的 MyFile；热启动下会返回原页面
-                                    navController.popBackStack()
-                                }
-
-                                "unzipError" -> {
-                                    val clipboard = ContextCompat.getSystemService(
-                                        this@MainActivity, ClipboardManager::class.java
-                                    )
-                                    val clip = ClipData.newPlainText("unzipError", param)
-                                    clipboard?.setPrimaryClip(clip)
-                                    XLog.d("handleIntent unzipError $intent $param")
-                                    App.instance.toast("解压失败信息已复制到剪切板!")
-                                    // 冷启动下会自动露出栈底的 MyFile；热启动下会返回原页面
-                                    navController.popBackStack()
-                                }
-                            }
-                        }
-                    }
                 }
             })
     }
@@ -605,7 +548,7 @@ class MainActivity : AppCompatActivity() {
     // 重点：当 Activity 被复用时，新的 Intent 会走这里
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        setIntent(intent) // 更新 Activity 的 intent 引用，确保 NavController 能捕获最新的 Deep Link
+        setIntent(intent) // 更新 Activity 的 intent 引用，确保 fileViewModel 能捕获最新的 Deep Link
     }
 
     private fun appBarClick(fileViewModel: FileViewModel) = fun(name: String) {

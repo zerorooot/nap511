@@ -156,9 +156,9 @@ class ConfigKeyUtil {
         const val WEB = "网页版"
 
         /**
-         * 回收站
+         * 最近删除
          */
-        const val RECYCLE_BIN = "回收站"
+        const val RECYCLE_BIN = "最近删除"
 
         /**
          * 高级设置

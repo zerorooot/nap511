@@ -19,11 +19,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,7 +32,6 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
@@ -46,12 +45,16 @@ fun OfflineDownloadScreen(
     onClick: () -> Unit,
     onNav: () -> Unit
 ) {
+    LaunchedEffect(Unit) {
+        offlineFileViewModel.quota()
+    }
+
     val containerSize = LocalWindowInfo.current.containerSize
     val density = LocalDensity.current
 
     val screenWidthDp = with(density) { containerSize.width.toDp() }
     val screenHeightDp = with(density) { containerSize.height.toDp() }
-    offlineFileViewModel.quota()
+
 
     val quotaBean by offlineFileViewModel.quotaBean.collectAsState()
     val path by fileViewModel.currentPath.collectAsState()

@@ -39,7 +39,7 @@ internal fun FileViewModel.removeFile() {
         isCutState = false
         return
     }
-    //提前保存cid,防止进入其他文件夹后刷新当前目录
+    // 提前保存cid,防止进入其他文件夹后刷新当前目录
     val tempCid = currentCid
     isCutState = false
 
@@ -53,15 +53,22 @@ internal fun FileViewModel.removeFile() {
         val move = fileRepository.removeFile(tempCid, cutFileList)
         val message = if (move.state) {
             cutFileList.forEach { i -> i.isSelect = false }
-            //移除之前目录下剪切的文件
-            fileListCache[cid]?.fileBeanList?.removeAll(cutFileList.toSet())
-            //移除被剪切文件夹的缓存，防止路径未更改
+
+            // 1. 获取源目录 cid 的缓存，剔除已移走的文件并写回缓存
+            val sourceFilesBean = fileCacheManager.get(cid, readDisk = saveRequestCache)
+            if (sourceFilesBean != null) {
+                sourceFilesBean.fileBeanList.removeAll(cutFileList.toSet())
+                fileCacheManager.put(cid, sourceFilesBean, saveToDisk = saveRequestCache)
+            }
+
+            // 2. 移除被剪切文件夹本身的缓存，防止路径等元数据未刷新
             cutFileList.forEach { i ->
                 if (i.isFolder) {
-                    fileListCache.remove(i.categoryId)
+                    fileCacheManager.remove(i.categoryId)
                 }
             }
 
+            // 3. 刷新目标目录（内部已适配清除目标 cid 缓存并重新读取）
             refresh(tempCid)
             "移动${cutFileList.size}个文件成功"
         } else {
@@ -103,50 +110,67 @@ internal fun FileViewModel.getFileInfo(index: Int) {
 internal fun FileViewModel.delete(index: Int) {
     val fileBean = fileBeanList[index]
     viewModelScope.launch(exceptionHandler) {
-        val beforeList = fileBeanList
-        val beforeFileListCache = fileListCache[currentCid]
-        val beforeClickMap = clickMap.getOrDefault(currentCid, 0)
-        val beforeImageBeanCache =
-            imageBeanCache.getOrDefault(currentCid, hashMapOf())
+        val cid = currentCid
+        val beforeList = ArrayList(fileBeanList)
 
-        XLog.d("FileViewModel.delete before fileListCache size ${fileListCache.size}")
-        //提前删除，优化速度
+        // 备份当前目录缓存（浅拷贝 list 避免引用被修改导致无法回滚）
+        val beforeFileListCache = fileCacheManager.get(cid, readDisk = saveRequestCache)?.let {
+            it.copy(fileBeanList = ArrayList(it.fileBeanList))
+        }
+        val beforeClickMap = clickMap.getOrDefault(cid, 0)
+        val beforeImageBeanCache = imageBeanCache.getOrDefault(cid, hashMapOf())
+
+        // 1. 乐观更新：优先移除 UI 与当前 CID 缓存
         fileBeanList.remove(fileBean)
-        fileListCache[currentCid]!!.fileBeanList.remove(fileBean)
-        clickMap[currentCid] = clickMap.getOrDefault(currentCid, 0) - 1
 
-        //删除文件夹内的文件夹
-        if (fileBean.isFolder) {
-            val results = arrayListOf<String>()
-            val walk: (String) -> Unit = object : (String) -> Unit {
-                override fun invoke(cid: String) {
-                    fileListCache[cid]?.fileBeanList?.stream()?.filter { it.isFolder }
-                        ?.forEach {
-                            results.add(it.categoryId)
-                            this(it.categoryId)
-                        }
-                }
-            }
-            walk(fileBean.categoryId)
-            results.forEach { fileListCache.remove(it) }
+        val currentCache = fileCacheManager.get(cid, readDisk = saveRequestCache)
+        if (currentCache != null) {
+            currentCache.fileBeanList.remove(fileBean)
+            fileCacheManager.put(cid, currentCache, saveToDisk = saveRequestCache)
         }
 
-        XLog.d("FileViewModel.delete after fileListCache size ${fileListCache.size}")
-        //delete image bean
-        imageBeanCache[currentCid]?.remove(index)
+        clickMap[cid] = clickMap.getOrDefault(cid, 0) - 1
 
+        // 2. 如果是文件夹，递归递归清除其子文件夹在 CacheManager 中的缓存
+        if (fileBean.isFolder) {
+            val removeFolderCids = mutableListOf<String>()
+
+            suspend fun walk(targetCid: String) {
+                val cached = fileCacheManager.get(targetCid, readDisk = saveRequestCache)
+                cached?.fileBeanList?.filter { it.isFolder }?.forEach { subFolder ->
+                    removeFolderCids.add(subFolder.categoryId)
+                    walk(subFolder.categoryId)
+                }
+            }
+
+            walk(fileBean.categoryId)
+            removeFolderCids.add(fileBean.categoryId)
+
+            // 批量移除缓存
+            removeFolderCids.forEach { folderCid ->
+                fileCacheManager.remove(folderCid)
+            }
+        }
+
+        imageBeanCache[cid]?.remove(index)
+
+        // 3. 发起网络请求
         val fid = fileBean.fileId
-        val pid = currentCid
-
+        val pid = cid
         val delete = fileRepository.delete(pid, fid)
 
         val message = if (delete.state) {
             "删除 ${fileBean.name} 成功"
         } else {
-            fileBeanList = beforeList
-            fileListCache[currentCid] = beforeFileListCache!!
-            clickMap[currentCid] = beforeClickMap
-            imageBeanCache[currentCid] = beforeImageBeanCache
+            // 4. 失败回滚
+            fileBeanList.clear()
+            fileBeanList.addAll(beforeList)
+
+            if (beforeFileListCache != null) {
+                fileCacheManager.put(cid, beforeFileListCache, saveToDisk = saveRequestCache)
+            }
+            clickMap[cid] = beforeClickMap
+            imageBeanCache[cid] = beforeImageBeanCache
             "删除 ${fileBean.name} 失败~${delete.errorMsg}"
         }
         App.instance.toast(message)
@@ -157,18 +181,44 @@ internal fun FileViewModel.rename(name: String) {
     viewModelScope.launch(exceptionHandler) {
         val cid = currentCid
         val fileBean = fileBeanList[selectIndex]
-        val beforeList = fileBeanList
-        val beforeFileListCache = fileListCache[cid]
-        //提前重命名，提升相应速度
-        fileBeanList[selectIndex] = fileBean.copy(name = name)
-        fileListCache[cid]!!.fileBeanList[selectIndex] = fileBean.copy(name = name)
-        fileListCache[fileBean.categoryId]?.let { it.path.last().name = name }
+        val beforeList = ArrayList(fileBeanList)
+
+        // 备份当前目录缓存
+        val beforeFileListCache = fileCacheManager.get(cid, readDisk = saveRequestCache)?.let {
+            it.copy(fileBeanList = ArrayList(it.fileBeanList))
+        }
+
+        // 1. 乐观更新 UI State 与 当前 Cid 缓存
+        val updatedFileBean = fileBean.copy(name = name)
+        fileBeanList[selectIndex] = updatedFileBean
+
+        val currentCache = fileCacheManager.get(cid, readDisk = saveRequestCache)
+        if (currentCache != null && selectIndex in currentCache.fileBeanList.indices) {
+            currentCache.fileBeanList[selectIndex] = updatedFileBean
+            fileCacheManager.put(cid, currentCache, saveToDisk = saveRequestCache)
+        }
+
+        // 2. 如果重命名的是文件夹，更新该文件夹自身缓存中的 path 路径名称
+        if (fileBean.isFolder) {
+            val targetFolderCache = fileCacheManager.get(fileBean.categoryId, readDisk = saveRequestCache)
+            if (targetFolderCache != null && targetFolderCache.path.isNotEmpty()) {
+                targetFolderCache.path.last().name = name
+                fileCacheManager.put(fileBean.categoryId, targetFolderCache, saveToDisk = saveRequestCache)
+            }
+        }
+
+        // 3. 请求网络
         val rename = fileRepository.rename(RenameBean(fileBean.fileId, name).toRequestBody())
         val message = if (rename.state) {
             "重命名成功"
         } else {
-            fileBeanList = beforeList
-            fileListCache[cid] = beforeFileListCache!!
+            // 4. 失败回滚
+            fileBeanList.clear()
+            fileBeanList.addAll(beforeList)
+
+            if (beforeFileListCache != null) {
+                fileCacheManager.put(cid, beforeFileListCache, saveToDisk = saveRequestCache)
+            }
             "重命名失败"
         }
         App.instance.toast(message)
@@ -178,50 +228,69 @@ internal fun FileViewModel.rename(name: String) {
 internal fun FileViewModel.deleteMultiple() {
     viewModelScope.launch(exceptionHandler) {
         val cid = currentCid
-        val beforeList = fileBeanList
-        val beforeFileListCache = fileListCache[cid]
-        val beforeClickMap = clickMap.getOrDefault(cid, 0)
+        val beforeList = ArrayList(fileBeanList)
 
-        XLog.d("FileViewModel.deleteMultiple before fileListCache size ${fileListCache.size}")
+        // 备份当前目录缓存
+        val beforeFileListCache = fileCacheManager.get(cid, readDisk = saveRequestCache)?.let {
+            it.copy(fileBeanList = ArrayList(it.fileBeanList))
+        }
+        val beforeClickMap = clickMap.getOrDefault(cid, 0)
 
         val mapOf = hashMapOf<String, String>()
         mapOf["ignore_warn"] = "1"
         mapOf["pid"] = cid
         val filter = fileBeanList.filter { i -> i.isSelect }
+
+        // 1. 递归收集并清理被选中文件夹的子文件夹缓存
         filter.forEachIndexed { index: Int, fileBean: FileBean ->
             mapOf["fid[$index]"] = fileBean.fileId
-            //update image cache
             imageBeanCache[cid]?.remove(index)
+
             if (fileBean.isFolder) {
-                val results = arrayListOf<String>()
-                val walk: (String) -> Unit = object : (String) -> Unit {
-                    override fun invoke(cid: String) {
-                        fileListCache[cid]?.fileBeanList?.stream()?.filter { it.isFolder }
-                            ?.forEach {
-                                results.add(it.categoryId)
-                                this(it.categoryId)
-                            }
+                val removeFolderCids = mutableListOf<String>()
+
+                suspend fun walk(targetCid: String) {
+                    val cached = fileCacheManager.get(targetCid, readDisk = saveRequestCache)
+                    cached?.fileBeanList?.filter { it.isFolder }?.forEach { subFolder ->
+                        removeFolderCids.add(subFolder.categoryId)
+                        walk(subFolder.categoryId)
                     }
                 }
+
                 walk(fileBean.categoryId)
-                results.forEach { fileListCache.remove(it) }
+                removeFolderCids.add(fileBean.categoryId)
+
+                removeFolderCids.forEach { folderCid ->
+                    fileCacheManager.remove(folderCid)
+                }
             }
         }
-        //提前删除，优化速度
-        fileBeanList.removeAll(filter)
-        fileListCache[cid]!!.fileBeanList = ArrayList(fileBeanList)
-        clickMap[cid] = clickMap.getOrDefault(cid, 0) - filter.size
 
-        XLog.d("FileViewModel.deleteMultiple after fileListCache size ${fileListCache.size}")
+        // 2. 乐观更新：同步更新 UI 列表与当前 Cid 的缓存
+        fileBeanList.removeAll(filter.toSet())
+
+        val currentCache = fileCacheManager.get(cid, readDisk = saveRequestCache)
+        if (currentCache != null) {
+            currentCache.fileBeanList = ArrayList(fileBeanList)
+            fileCacheManager.put(cid, currentCache, saveToDisk = saveRequestCache)
+        }
+
+        clickMap[cid] = clickMap.getOrDefault(cid, 0) - filter.size
 
         recoverFromLongPress()
 
+        // 3. 请求网络
         val deleteMultiple = fileRepository.deleteMultiple(mapOf)
         val message = if (deleteMultiple.state) {
             "成功删除 ${filter.size} 个文件"
         } else {
-            fileBeanList = beforeList
-            fileListCache[cid] = beforeFileListCache!!
+            // 4. 失败回滚
+            fileBeanList.clear()
+            fileBeanList.addAll(beforeList)
+
+            if (beforeFileListCache != null) {
+                fileCacheManager.put(cid, beforeFileListCache, saveToDisk = saveRequestCache)
+            }
             clickMap[cid] = beforeClickMap
             "删除 ${filter.size} 个文件失败~"
         }
