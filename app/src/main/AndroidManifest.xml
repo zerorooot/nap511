@@ -44,9 +44,24 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data android:scheme="magnet" />
-                <!-- <data android:scheme="http" /> -->
                 <data android:scheme="ftp" />
                 <data android:scheme="ed2k" />
+
+                <!--                <data android:scheme="http" />-->
+                <!--                <data android:host="*" />-->
+            </intent-filter>
+            <!-- Deep Link Intent Filter -->
+            <intent-filter>
+                <!-- 必须添加 ACTION_VIEW -->
+                <action android:name="android.intent.action.VIEW" />
+                <!-- DEFAULT 允许隐式 Intent 触发；BROWSABLE 允许从浏览器/网页链接触发 -->
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <!-- 配置 Schema 和 Host (nap511://command) -->
+                <data
+                    android:host="command"
+                    android:scheme="nap511" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.PROCESS_TEXT" />

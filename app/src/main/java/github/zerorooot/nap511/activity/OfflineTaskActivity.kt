@@ -2,12 +2,14 @@ package github.zerorooot.nap511.activity
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
+import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.util.App
@@ -28,47 +30,73 @@ class OfflineTaskActivity : ComponentActivity() {
     @SuppressLint("EnqueueWork")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (intent.action == Intent.ACTION_VIEW || intent.action == Intent.ACTION_PROCESS_TEXT) {
-            val urlList = (intent.dataString ?: run {
-                intent.getStringExtra(Intent.EXTRA_PROCESS_TEXT)
-            } ?: run { "" }).split("\n").map { i ->
-                //支持复制无头磁力链接
-                val a = i.replace(Regex("&dn=.*"), "").trim()
-                if (HEX_40_PATTERN.matcher(a).matches() || BASE32_32_PATTERN.matcher(a).matches()) {
-                    "magnet:?xt=urn:btih:$a"
-                } else {
-                    a
-                }
-            }.filter { i ->
-                i.startsWith("http", true) || i.startsWith(
-                    "ftp", true
-                ) || i.startsWith("magnet", true) || i.startsWith("ed2k", true)
-            }.toSet()
-//            App.instance.toast(urlList.toString())
-            println(urlList.toString())
-            //非空列表
-            if (urlList.isNotEmpty()) {
-                val currentOfflineTaskList =
-                    DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
-                        .split("\n")
-                        .filter { i -> i != "" && i != " " }
-                        .toSet()
-                        .toMutableSet()
-                //添加所有
-                currentOfflineTaskList.addAll(urlList)
 
-                addOfflineTaskByTime(currentOfflineTaskList.toList())
+        val dataUri: Uri? = intent?.data
+        if (dataUri == null && intent.action != Intent.ACTION_PROCESS_TEXT) {
+            XLog.d("OfflineTaskActivity 未接收到任何链接数据 intent: $intent")
+            finishAndRemoveTask()
+            return
+        }
+        val scheme = dataUri?.scheme ?: "未知"
+        when (scheme) {
+            "magnet", "ftp", "ed2k" -> {
+                val fullLink = dataUri.toString()
+                handleText(fullLink, scheme)
+            }
 
-            } else {
-                App.instance.toast("仅支持以http、ftp、magnet、ed2k开头的链接")
+            "nap511" -> {
+                val encoded = dataUri?.getQueryParameter("param") ?: ""
+                val param = Uri.decode(encoded)
+                handleText(param, scheme)
+            }
+        }
+
+        if (intent.action == Intent.ACTION_PROCESS_TEXT) {
+            intent.getStringExtra(Intent.EXTRA_PROCESS_TEXT)?.let {
+                handleText(it, "EXTRA_PROCESS_TEXT")
             }
         }
         //通过ACTION_PROCESS_TEXT添加磁力链接时，如果moveTaskToBack(true)，当前应用会回到桌面
         if (intent.action != Intent.ACTION_PROCESS_TEXT) {
-            moveTaskToBack(true);
+            moveTaskToBack(true)
         }
 
         finishAndRemoveTask()
+    }
+
+    private fun handleText(text: String, tag: String) {
+        val urlList = text.split("\n").map { i ->
+            //支持复制无头磁力链接
+            val a = i.replace(Regex("&dn=.*"), "").trim()
+            if (HEX_40_PATTERN.matcher(a).matches() || BASE32_32_PATTERN.matcher(a).matches()) {
+                "magnet:?xt=urn:btih:$a"
+            } else {
+                a
+            }
+        }.filter { i ->
+            i.startsWith("http", true) || i.startsWith(
+                "ftp", true
+            ) || i.startsWith("magnet", true) || i.startsWith("ed2k", true)
+        }.toSet()
+
+        XLog.d("OfflineTaskActivity $tag urlList:\n${urlList}")
+
+        //非空列表
+        if (urlList.isNotEmpty()) {
+            val currentOfflineTaskList =
+                DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
+                    .split("\n")
+                    .filter { i -> i != "" && i != " " }
+                    .toSet()
+                    .toMutableSet()
+            //添加所有
+            currentOfflineTaskList.addAll(urlList)
+
+            addOfflineTaskByTime(currentOfflineTaskList.toList())
+
+        } else {
+            App.instance.toast("仅支持以http、ftp、magnet、ed2k开头的链接")
+        }
     }
 
     @SuppressLint("EnqueueWork")

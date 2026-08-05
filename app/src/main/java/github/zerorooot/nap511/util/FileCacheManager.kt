@@ -1,13 +1,15 @@
 package github.zerorooot.nap511.util
 
-import androidx.collection.LruCache
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 data class CacheWrapper<T>(
     val data: T,
@@ -18,14 +20,13 @@ class FileCacheManager<T>(
     private val cacheDir: File,
     private val classType: java.lang.reflect.Type,
     private val saveRequestCache: Boolean,
-    maxMemoryEntries: Int = 300,                  // 内存 LRU 保留容量
     private val ttlMillis: Long = 7 * 24 * 3600 * 1000L // 7 天过期
 ) {
     private val gson = Gson()
     private val mutex = Mutex()
 
     // 内存 LRU 缓存：只要 App 运行，始终存在且有效
-    private val memoryCache = object : LruCache<String, CacheWrapper<T>>(maxMemoryEntries) {}
+    private val memoryCache = ConcurrentHashMap<String, CacheWrapper<T>>(30)
 
     init {
         if (!cacheDir.exists()) {
@@ -33,10 +34,24 @@ class FileCacheManager<T>(
         }
     }
 
-    fun containsKey(key: String): Boolean = memoryCache[key] != null
+    fun containsKey(key: String): Boolean = memoryCache.containsKey(key)
 
-    fun getDate(key: String): T? {
-        return memoryCache[key]?.data
+    fun getDate(key: String): T? = memoryCache[key]?.data
+
+    suspend fun loadAllCache() = withContext(Dispatchers.IO) {
+        // 立即异步启动加载 "0"
+        async { getDiskCache("0") }.await()?.let {
+            memoryCache["0"] = it
+        }
+        // 4. 并发加载其他文件
+        cacheDir.listFiles()?.map { file ->
+            async {
+                val key = file.name.substringBeforeLast(".")
+                getDiskCache(key)?.let {
+                    memoryCache[key] = it
+                }
+            }
+        }?.awaitAll()
     }
 
     /**
@@ -61,35 +76,43 @@ class FileCacheManager<T>(
 
             // 2. 内存未命中，当允许读磁盘时，才查【磁盘缓存】
             if (saveRequestCache) {
-                val diskFile = getDiskFile(key)
-                if (diskFile.exists()) {
-                    try {
-                        val json = diskFile.readText()
-                        val wrapperType =
-                            TypeToken.getParameterized(CacheWrapper::class.java, classType).type
-                        val diskEntry: CacheWrapper<T>? = gson.fromJson(json, wrapperType)
-
-                        if (diskEntry != null) {
-                            if (now - diskEntry.timestamp > ttlMillis) {
-                                diskFile.delete()
-                                return@withContext null
-                            }
-                            // 磁盘读取成功后，同步一份到内存，下次直接走内存
-                            memoryCache.put(key, diskEntry)
-                            return@withContext diskEntry.data
-                        }
-                    } catch (e: Exception) {
-                        diskFile.delete()
-                    }
-                }
+                val diskEntry = getDiskCache(key, now) ?: return@withContext null
+                memoryCache[key] = diskEntry
+                return@withContext diskEntry.data
             }
             return@withContext null
         }
     }
 
-    suspend operator fun set(key: String, value: T) {
-        put(key, value)
+
+    fun getDiskCache(key: String, now: Long = System.currentTimeMillis()): CacheWrapper<T>? {
+        val diskFile = getDiskFile(key)
+        if (!diskFile.exists()) {
+            return null
+        }
+        try {
+            val json = diskFile.readText()
+            val wrapperType =
+                TypeToken.getParameterized(CacheWrapper::class.java, classType).type
+            val diskEntry: CacheWrapper<T>? = gson.fromJson(json, wrapperType)
+
+            if (diskEntry != null) {
+                if (now - diskEntry.timestamp > ttlMillis) {
+                    diskFile.delete()
+                    return null
+                }
+                // 磁盘读取成功后，同步一份到内存，下次直接走内存
+                //    memoryCache[key] = diskEntry
+                return diskEntry
+            }
+        } catch (e: Exception) {
+            diskFile.delete()
+        }
+        return null
     }
+
+    suspend operator fun set(key: String, value: T) = put(key, value)
+
 
     /**
      * 写入/更新缓存：
@@ -102,7 +125,7 @@ class FileCacheManager<T>(
                 val entry = CacheWrapper(data = value)
 
                 // 1. 内存中无论如何都要保存
-                memoryCache.put(key, entry)
+                memoryCache[key] = entry
 
                 // 2. 根据开关控制是否落盘
                 if (saveRequestCache) {
@@ -118,6 +141,7 @@ class FileCacheManager<T>(
                 }
             }
         }
+
 
     /**
      * 删除某个 Key 的缓存（内存 + 磁盘）
@@ -143,7 +167,7 @@ class FileCacheManager<T>(
      */
     suspend fun clearAll() = withContext(Dispatchers.IO) {
         mutex.withLock {
-            memoryCache.evictAll()
+            memoryCache.clear()
             cacheDir.listFiles()?.forEach { it.delete() }
         }
     }

@@ -263,6 +263,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                 // 开启磁盘保存时，在后台检查清理过期的硬盘缓存
                 fileListCache.cleanExpiredDiskCache()
             }
+            fileListCache.loadAllCache()
             getFiles(currentCid)
         }
     }
@@ -520,11 +521,9 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         count = files.count
         pathList = files.path
 
-        _currentPath.value = pathList.joinToString("/") { it.name }
+        _currentPath.value = "/" + pathList.joinToString("/") { it.name }
 
-        if (!fileListCache.containsKey(currentCid)) {
-            viewModelScope.launch { fileListCache[currentCid] = files }
-        }
+        viewModelScope.launch { fileListCache[currentCid] = files }
     }
 
 
