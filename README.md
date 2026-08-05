@@ -1,4 +1,5 @@
 #  nap511
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/zerorooot/nap511)![Workflows](https://github.com/zerorooot/nap511/actions/workflows/generate-apk-release.yml/badge.svg)![License](https://img.shields.io/github/license/zerorooot/nap511.svg)
 
 一个Android自用的[115网盘](https://115.com/)客户端，用于[Jetpack Compose](https://developer.android.com/jetpack/compose)练手
 

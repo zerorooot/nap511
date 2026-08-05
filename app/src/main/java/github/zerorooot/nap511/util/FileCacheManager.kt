@@ -8,7 +8,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.security.MessageDigest
 
 data class CacheWrapper<T>(
     val data: T,
@@ -18,6 +17,7 @@ data class CacheWrapper<T>(
 class FileCacheManager<T>(
     private val cacheDir: File,
     private val classType: java.lang.reflect.Type,
+    private val saveRequestCache: Boolean,
     maxMemoryEntries: Int = 300,                  // 内存 LRU 保留容量
     private val ttlMillis: Long = 7 * 24 * 3600 * 1000L // 7 天过期
 ) {
@@ -33,12 +33,18 @@ class FileCacheManager<T>(
         }
     }
 
+    fun containsKey(key: String): Boolean = memoryCache[key] != null
+
+    fun getDate(key: String): T? {
+        return memoryCache[key]?.data
+    }
+
     /**
      * 读取缓存：
      * 1. 优先查【内存缓存】（无视 readDisk 参数，只要内存有就直接返回）
      * 2. 内存未命中且 readDisk == true 时，才查【磁盘文件】
      */
-    suspend fun get(key: String, readDisk: Boolean = true): T? = withContext(Dispatchers.IO) {
+    suspend operator fun get(key: String): T? = withContext(Dispatchers.IO) {
         mutex.withLock {
             val now = System.currentTimeMillis()
 
@@ -54,12 +60,13 @@ class FileCacheManager<T>(
             }
 
             // 2. 内存未命中，当允许读磁盘时，才查【磁盘缓存】
-            if (readDisk) {
+            if (saveRequestCache) {
                 val diskFile = getDiskFile(key)
                 if (diskFile.exists()) {
                     try {
                         val json = diskFile.readText()
-                        val wrapperType = TypeToken.getParameterized(CacheWrapper::class.java, classType).type
+                        val wrapperType =
+                            TypeToken.getParameterized(CacheWrapper::class.java, classType).type
                         val diskEntry: CacheWrapper<T>? = gson.fromJson(json, wrapperType)
 
                         if (diskEntry != null) {
@@ -80,34 +87,37 @@ class FileCacheManager<T>(
         }
     }
 
+    suspend operator fun set(key: String, value: T) {
+        put(key, value)
+    }
+
     /**
      * 写入/更新缓存：
      * 1. 【内存缓存】：无条件写入！保证运行时始终有缓存
      * 2. 【磁盘缓存】：仅当 saveToDisk == true 时写入文件；若为 false，则同步清理对应磁盘旧文件
      */
-    suspend fun put(key: String, value: T, saveToDisk: Boolean = true) = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            val entry = CacheWrapper(data = value)
+    suspend fun put(key: String, value: T) =
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                val entry = CacheWrapper(data = value)
 
-            // 1. 内存中无论如何都要保存
-            memoryCache.put(key, entry)
+                // 1. 内存中无论如何都要保存
+                memoryCache.put(key, entry)
 
-            // 2. 根据开关控制是否落盘
-            if (saveToDisk) {
-                try {
-                    val diskFile = getDiskFile(key)
-                    val wrapperType = TypeToken.getParameterized(CacheWrapper::class.java, classType).type
-                    val json = gson.toJson(entry, wrapperType)
-                    diskFile.writeText(json)
-                } catch (e: Exception) {
-                    e.printStackTrace()
+                // 2. 根据开关控制是否落盘
+                if (saveRequestCache) {
+                    try {
+                        val diskFile = getDiskFile(key)
+                        val wrapperType =
+                            TypeToken.getParameterized(CacheWrapper::class.java, classType).type
+                        val json = gson.toJson(entry, wrapperType)
+                        diskFile.writeText(json)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
-            } else {
-                // 如果用户不保存磁盘缓存，顺便清理可能存在的磁盘文件
-                deleteDiskFile(key)
             }
         }
-    }
 
     /**
      * 删除某个 Key 的缓存（内存 + 磁盘）
@@ -161,15 +171,10 @@ class FileCacheManager<T>(
         }
     }
 
-    private fun getDiskFile(key: String): File = File(cacheDir, "${md5(key)}.json")
+    private fun getDiskFile(key: String): File = File(cacheDir, "${key}.json")
 
     private fun deleteDiskFile(key: String) {
         val file = getDiskFile(key)
         if (file.exists()) file.delete()
-    }
-
-    private fun md5(input: String): String {
-        val bytes = MessageDigest.getInstance("MD5").digest(input.toByteArray())
-        return bytes.joinToString("") { "%02x".format(it) }
     }
 }

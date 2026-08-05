@@ -144,6 +144,11 @@ fun OfflineFileScreen(
     Column {
         AppTopBarOfflineFile(stringResource(R.string.app_name), appBarOnClick)
 
+//        MiddleEllipsisText(
+//            text = "当前下载量：${offlineInfo.totalCount}，配额：${offlineInfo.quota}/${offlineInfo.total}",
+//            modifier = Modifier.padding(8.dp, 4.dp)
+//        )
+
         Surface(
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             shape = RoundedCornerShape(10.dp),

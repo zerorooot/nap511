@@ -43,7 +43,7 @@ class OfflineTaskWorker(
         val message = addTaskReturn.second
         if (state) {
             //清空缓存
-            DataStoreUtil.putData(
+            DataStoreUtil.putDataSuspend(
                 ConfigKeyUtil.CURRENT_OFFLINE_TASK,
                 ""
             )

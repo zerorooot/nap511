@@ -68,12 +68,7 @@ internal fun FileViewModel.updateVideoFileBean(
         fileBeanList[index] = updatedBean
 
         if (!isSearchState) {
-            // fileListCache[cid]?.fileBeanList = ArrayList(fileBeanList.toList())
-            val cacheBean = fileCacheManager.get(cid, readDisk = saveRequestCache)
-            if (cacheBean != null) {
-                cacheBean.fileBeanList = ArrayList(fileBeanList)
-                fileCacheManager.put(cid, cacheBean, saveToDisk = saveRequestCache)
-            }
+            fileListCache[cid]?.fileBeanList = ArrayList(fileBeanList.toList())
         }
 
         val map = mapOf(

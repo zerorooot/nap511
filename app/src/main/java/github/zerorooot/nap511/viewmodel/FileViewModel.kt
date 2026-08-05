@@ -76,10 +76,13 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     //当前cid下的文件数量
     private var count: Int by mutableIntStateOf(0)
 
-    internal val fileCacheManager by lazy {
+    internal val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
+
+    internal val fileListCache by lazy {
         FileCacheManager<FilesBean>(
             cacheDir = File(context.cacheDir, "file_list_cache"),
-            classType = FilesBean::class.java
+            classType = FilesBean::class.java,
+            saveRequestCache
         )
     }
     private var pathList = emptyList<PathBean>()
@@ -201,8 +204,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     private val _navigationEvent = Channel<NavEvent>()
     val navigationEvent = _navigationEvent.receiveAsFlow()
 
-    internal val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
-
 
     // 统一处理传入的 Deep Link Intent
     fun handleDeepLink(intent: Intent?) {
@@ -212,8 +213,13 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         if (uri.scheme == "nap511" && uri.host == "detail") {
             val command = uri.lastPathSegment // "check" 或 "copy"
             val param = uri.getQueryParameter("param") ?: ""
-
+            XLog.d("FileViewModel handleDeepLink $uri")
             when (command) {
+                "addTask" -> {
+                    XLog.d(param)
+//                    DataStoreUtil.putData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, param)
+//                    handleOfflineTask(true)
+                }
                 //  adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/check?param=3213" github.zerorooot.nap511
                 "check" -> {
                     viewModelScope.launch {
@@ -252,10 +258,10 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         viewModelScope.launch(Dispatchers.IO) {
             if (!saveRequestCache) {
                 // 不保存磁盘缓存时，仅清理硬盘旧文件，保留内存缓存
-                fileCacheManager.clearDiskOnly()
+                fileListCache.clearDiskOnly()
             } else {
                 // 开启磁盘保存时，在后台检查清理过期的硬盘缓存
-                fileCacheManager.cleanExpiredDiskCache()
+                fileListCache.cleanExpiredDiskCache()
             }
             getFiles(currentCid)
         }
@@ -266,19 +272,13 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
      */
     fun updateFileCache(cid: String) {
         viewModelScope.launch {
-            // 无论 saveRequestCache 为何值，只要内存或硬盘上有缓存就跳过网络请求
-            if (fileCacheManager.get(cid, readDisk = saveRequestCache) != null) {
+            if (fileListCache.containsKey(cid)) {
                 return@launch
             }
-            try {
-                val files =
-                    fileRepository.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
-                setFileBeanProperty(files.fileBeanList)
-                // 写入缓存：内存必保存，磁盘视 saveRequestCache 决定
-                fileCacheManager.put(cid, files, saveToDisk = saveRequestCache)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            val files =
+                fileRepository.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
+            setFileBeanProperty(files.fileBeanList)
+            fileListCache[cid] = files
         }
     }
 
@@ -291,10 +291,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
 
         if (isSearchState) {
             fileBeanList.clear()
-            viewModelScope.launch {
-                val cached = fileCacheManager.get(currentCid)!!
-                setFiles(cached, updateCacheManager = false)
-            }
+            setFiles(fileListCache.getDate(currentCid)!!)
             appBarTitle = context.getString(R.string.app_name)
             isSearchState = false
             return
@@ -358,12 +355,10 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     fun getFiles(cid: String) {
         viewModelScope.launch {
             _isRefreshing.value = true
-
             // 1. 尝试读取缓存
             // saveRequestCache 只传给 readDisk 参数。如果内存中有，不用读磁盘，依然能命中内存！
-            val cachedFiles = fileCacheManager.get(cid, readDisk = saveRequestCache)
-            if (cachedFiles != null) {
-                setFiles(cachedFiles, updateCacheManager = false)
+            if (fileListCache.containsKey(cid)) {
+                setFiles(fileListCache[cid]!!)
                 _isRefreshing.value = false
                 return@launch
             }
@@ -374,9 +369,9 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                     fileRepository.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
                 setFileBeanProperty(files.fileBeanList)
                 // 3. 网络请求成功后写入缓存
-                setFiles(files, updateCacheManager = true)
+                setFiles(files)
             } catch (e: NullPointerException) {
-                fileCacheManager.clearAll()
+                fileListCache.clearAll()
                 App.instance.toast("获取文件列表失败，建议更新您的Cookie")
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -446,7 +441,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         recoverFromLongPress()
 
         viewModelScope.launch {
-            fileCacheManager.remove(cid)
+            fileListCache.remove(cid)
             if (cid == currentCid) {
                 getFiles(currentCid)
             } else {
@@ -516,24 +511,8 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         fileBeanList.addAll(updatedList)
     }
 
-    //    private fun setFiles(files: FilesBean) {
-//        fileBeanList.clear()
-//        fileBeanList.addAll(files.fileBeanList)
-//
-//        currentCid = files.cid
-//        count = files.count
-//        pathList = files.path
-//
-//        var path = ""
-//        pathList.forEach { i ->
-//            path = "$path/${i.name}"
-//        }
-//        _currentPath.value = path
-//        if (!fileListCache.containsKey(currentCid)) {
-//            fileListCache[currentCid] = files
-//        }
-//    }
-    private fun setFiles(files: FilesBean, updateCacheManager: Boolean = true) {
+
+    private fun setFiles(files: FilesBean) {
         fileBeanList.clear()
         fileBeanList.addAll(files.fileBeanList)
 
@@ -541,17 +520,10 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         count = files.count
         pathList = files.path
 
-        var path = ""
-        pathList.forEach { i ->
-            path = "$path/${i.name}"
-        }
-        _currentPath.value = path
+        _currentPath.value = pathList.joinToString("/") { it.name }
 
-        if (updateCacheManager) {
-            viewModelScope.launch {
-                // put 方法内部会【无条件写入内存】，saveToDisk 参数仅控制【是否保存到磁盘】
-                fileCacheManager.put(files.cid, files, saveToDisk = saveRequestCache)
-            }
+        if (!fileListCache.containsKey(currentCid)) {
+            viewModelScope.launch { fileListCache[currentCid] = files }
         }
     }
 
@@ -582,11 +554,12 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
             }
 
             // 获取并过滤本地缓存任务
-            val currentOfflineTask = DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
-                .split("\n")
-                .filter { i -> i.isNotBlank() } // 简化过滤逻辑
-                .toSet()
-                .toMutableList()
+            val currentOfflineTask =
+                DataStoreUtil.getDataSuspend(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
+                    .split("\n")
+                    .filter { i -> i.isNotBlank() } // 简化过滤逻辑
+                    .toSet()
+                    .toMutableList()
 
             if (currentOfflineTask.isEmpty()) {
                 // 如果是主动添加模式且列表为空，弹 Toast 提示
@@ -595,13 +568,14 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                 }
                 return@launch
             }
-
+            App.instance.toast("开始下载！")
             XLog.d(
                 "handleOfflineTask forceRecreate=$forceRecreate, workInfos size=${workInfos.size}, task size=${currentOfflineTask.size} " +
                         "currentOfflineTask:\n $currentOfflineTask"
             )
 
-            val defaultOfflineCid = DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
+            val defaultOfflineCid =
+                DataStoreUtil.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
             // 序列化并提交新任务
             val listType = object : TypeToken<List<String?>?>() {}.type
             val list = Gson().toJson(currentOfflineTask, listType)

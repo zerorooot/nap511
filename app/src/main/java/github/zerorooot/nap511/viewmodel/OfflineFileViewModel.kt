@@ -172,7 +172,7 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
             return
         }
         if (currentPage == maxPage) {
-            App.instance.toast("已全部加载！")
+            App.instance.toast("无更多内容")
             return
         }
 

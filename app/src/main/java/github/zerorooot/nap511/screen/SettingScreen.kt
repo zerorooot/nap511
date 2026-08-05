@@ -16,9 +16,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringArrayResource
 import com.jakewharton.processphoenix.ProcessPhoenix
+import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.screenitem.EditTextPreferenceItem
+import github.zerorooot.nap511.screenitem.ListPreferenceItem
 import github.zerorooot.nap511.screenitem.PreferenceItem
 import github.zerorooot.nap511.screenitem.SwitchPreferenceItem
 import github.zerorooot.nap511.ui.theme.Purple80
@@ -46,6 +49,8 @@ fun SettingScreen(
         ConfigKeyUtil.ARIA2_URL,
         ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
     ).collectAsState(initial = ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE)
+    val aria2Token by DataStoreUtil.getDataFlow(ConfigKeyUtil.ARIA2_TOKEN, "")
+        .collectAsState(initial = "")
     val autoRotateEnabled by DataStoreUtil.getDataFlow(ConfigKeyUtil.AUTO_ROTATE, false)
         .collectAsState(initial = false)
 
@@ -80,6 +85,12 @@ fun SettingScreen(
 
     val defaultOfflineCid by DataStoreUtil.getDataFlow(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
         .collectAsState(initial = "")
+    val fabPosition by DataStoreUtil.getDataFlow(
+        ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION,
+        "End"
+    ).collectAsState(initial = "End")
+
+    val fabArray = stringArrayResource(R.array.floatingActionButtonPosition)
 
     val moveFailFile by DataStoreUtil.getDataFlow(ConfigKeyUtil.MOVE_FAIL_FILE, "")
         .collectAsState(initial = "")
@@ -167,7 +178,16 @@ fun SettingScreen(
                         }
                     )
                 }
-
+                item {
+                    EditTextPreferenceItem(
+                        title = "aria2秘钥",
+                        summary = aria2Token.ifEmpty { "没有留空即可" },
+                        value = aria2Token,
+                        onValueSave = {
+                            saveDate(ConfigKeyUtil.ARIA2_TOKEN, it)
+                        }
+                    )
+                }
                 // 4. 请求限制数
                 item {
                     EditTextPreferenceItem(
@@ -194,7 +214,17 @@ fun SettingScreen(
                         }
                     )
                 }
-
+                item {
+                    ListPreferenceItem(
+                        title = "浮动按钮位置",
+                        value = fabPosition,
+                        entries = fabArray,
+                        entryValues = fabArray,
+                        onValueSave = {
+                            saveDate(ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION, it)
+                        }
+                    )
+                }
                 // 6. 移动失败文件文件夹
                 item {
                     val summaryText = if (moveFailFile.isEmpty()) {
@@ -317,6 +347,14 @@ fun SettingScreen(
                         }
                     )
                 }
+                // 10. 立即下载与重启应用
+                item {
+                    PreferenceItem(
+                        title = "立即下载",
+                        summary = "立刻下载缓存的离线任务",
+                        onClick = { fileViewModel.handleOfflineTask(true) }
+                    )
+                }
                 item {
                     EditTextPreferenceItem(
                         title = "离线任务缓存",
@@ -325,14 +363,6 @@ fun SettingScreen(
                         onValueSave = {
                             saveDate(ConfigKeyUtil.CURRENT_OFFLINE_TASK, it)
                         }
-                    )
-                }
-                // 10. 立即下载与重启应用
-                item {
-                    PreferenceItem(
-                        title = "立即下载",
-                        summary = "立刻下载缓存的离线任务",
-                        onClick = { fileViewModel.handleOfflineTask(true) }
                     )
                 }
                 item {

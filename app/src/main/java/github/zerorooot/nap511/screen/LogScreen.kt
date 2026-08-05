@@ -167,7 +167,7 @@ fun LogScreen(onClick: () -> Unit) {
                 }
             }
 
-            "ModalNavigationDrawerMenu" -> onClick
+            "ModalNavigationDrawerMenu" -> onClick.invoke()
             else -> {}
         }
     }
