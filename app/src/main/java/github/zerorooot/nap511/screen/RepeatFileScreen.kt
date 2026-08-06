@@ -2,6 +2,7 @@ package github.zerorooot.nap511.screen
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -12,15 +13,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -46,6 +43,7 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.CategoryDetailResponse
 import github.zerorooot.nap511.screenitem.RepeatFileCardItem
 import github.zerorooot.nap511.ui.theme.Purple80
+import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.viewmodel.RepeatFileViewModel
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
@@ -113,6 +111,11 @@ fun RepeatFileScreen(
                 viewModel.triggerForceRefresh()
             }
 
+            "刷新页面" -> {
+                App.instance.toast("页面刷新中～")
+                viewModel.refreshList(true)
+            }
+
             "ModalNavigationDrawerMenu" -> {
                 onClick.invoke()
             }
@@ -120,33 +123,40 @@ fun RepeatFileScreen(
     }
 
 
-
-
     Column(
         modifier = Modifier
             .fillMaxSize()
     ) {
         AppTopBarRepeatFile("文件去重", appBarOnClick)
-        MiddleEllipsisText(
-            text = "共${count}个重复文件，占用空间${formattedSize}",
-            modifier = Modifier.padding(8.dp, 4.dp)
-        )
-        PullToRefreshBox(
-            isRefreshing = uiState.isRefreshing,
-            onRefresh = { viewModel.refreshList() }) {
-            LazyColumnScrollbar(
-                state = listState, settings = ScrollbarSettings.Default.copy(
-                    thumbUnselectedColor = Purple80
-                )
+        if (uiState.totalCount == 0) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
             ) {
-                LazyColumn(
-                    state = listState, modifier = Modifier.fillMaxSize()
+                Text(text = "暂无重复文件，点击右上角刷新页面")
+            }
+        } else {
+            MiddleEllipsisText(
+                text = "共${count}个重复文件，占用空间${formattedSize}",
+                modifier = Modifier.padding(8.dp, 4.dp)
+            )
+            PullToRefreshBox(
+                isRefreshing = uiState.isRefreshing,
+                onRefresh = { viewModel.refreshList() }) {
+                LazyColumnScrollbar(
+                    state = listState, settings = ScrollbarSettings.Default.copy(
+                        thumbUnselectedColor = Purple80
+                    )
                 ) {
-                    items(uiState.fileList, key = { it.fileId }) { item ->
-                        RepeatFileCardItem(
-                            item = item,
-                            onPathClick = { onPathClick(item.parentId) }
-                        )
+                    LazyColumn(
+                        state = listState, modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(uiState.fileList, key = { it.fileId }) { item ->
+                            RepeatFileCardItem(
+                                item = item,
+                                onPathClick = { onPathClick(item.parentId) }
+                            )
+                        }
                     }
                 }
             }

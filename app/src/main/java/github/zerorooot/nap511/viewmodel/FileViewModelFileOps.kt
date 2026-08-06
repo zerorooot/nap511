@@ -109,7 +109,7 @@ internal fun FileViewModel.delete(index: Int) {
         val beforeImageBeanCache =
             imageBeanCache.getOrDefault(currentCid, hashMapOf())
 
-       // XLog.d("FileViewModel.delete before fileListCache size ${fileListCache.size}")
+        // XLog.d("FileViewModel.delete before fileListCache size ${fileListCache.size}")
         //提前删除，优化速度
         fileBeanList.remove(fileBean)
         fileListCache[currentCid]!!.fileBeanList.remove(fileBean)
@@ -117,23 +117,22 @@ internal fun FileViewModel.delete(index: Int) {
 
         //删除文件夹内的文件夹
         if (fileBean.isFolder) {
-            val results = arrayListOf<String>()
-
             // 声明为挂起递归函数
             suspend fun walk(cid: String) {
+                XLog.d("DebugWalk delete 真实 cid 值: $cid")
                 val folderList =
                     fileListCache[cid]?.fileBeanList?.filter { it.isFolder } ?: emptyList()
                 for (item in folderList) {
-                    results.add(item.categoryId)
+                    fileListCache.remove(item.categoryId)
                     walk(item.categoryId)   // 递归调用
                 }
             }
 
             walk(fileBean.categoryId)
-            results.forEach { fileListCache.remove(it) }
+            fileListCache.remove(fileBean.categoryId)
         }
 
-    //    XLog.d("FileViewModel.delete after fileListCache size ${fileListCache.size}")
+        //    XLog.d("FileViewModel.delete after fileListCache size ${fileListCache.size}")
         //delete image bean
         imageBeanCache[currentCid]?.remove(index)
 
@@ -195,17 +194,18 @@ internal fun FileViewModel.deleteMultiple() {
             //update image cache
             imageBeanCache[cid]?.remove(index)
             if (fileBean.isFolder) {
-                val results = arrayListOf<String>()
                 // 声明为挂起递归函数
                 suspend fun walk(cid: String) {
-                    val folderList = fileListCache[cid]?.fileBeanList?.filter { it.isFolder } ?: emptyList()
+                    XLog.d("DebugWalk deleteMultiple 真实 cid 值: $cid")
+                    val folderList =
+                        fileListCache[cid]?.fileBeanList?.filter { it.isFolder } ?: emptyList()
                     for (item in folderList) {
-                        results.add(item.categoryId)
+                        fileListCache.remove(item.categoryId)
                         walk(item.categoryId)   // 递归调用
                     }
                 }
                 walk(fileBean.categoryId)
-                results.forEach { fileListCache.remove(it) }
+                fileListCache.remove(fileBean.categoryId)
             }
         }
         //提前删除，优化速度
@@ -213,7 +213,7 @@ internal fun FileViewModel.deleteMultiple() {
         fileListCache[cid]!!.fileBeanList = ArrayList(fileBeanList)
         clickMap[cid] = clickMap.getOrDefault(cid, 0) - filter.size
 
-      //  XLog.d("FileViewModel.deleteMultiple after fileListCache size ${fileListCache.size}")
+        //  XLog.d("FileViewModel.deleteMultiple after fileListCache size ${fileListCache.size}")
 
         recoverFromLongPress()
 

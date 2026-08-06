@@ -61,7 +61,7 @@ class RepeatFileViewModel(
 
 
     // 3. 刷新列表（重置 offset 并拉取首页）
-    fun refreshList() {
+    fun refreshList(showToast: Boolean = false) {
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -75,6 +75,9 @@ class RepeatFileViewModel(
             XLog.d("repeatList: $repeatList")
             val list = repeatList.data
             val total = repeatList.count.toIntOrNull() ?: 0
+            if (showToast && total == 0) {
+                App.instance.toast("暂无重复文件")
+            }
             _uiState.update {
                 it.copy(
                     fileList = list,
@@ -88,7 +91,6 @@ class RepeatFileViewModel(
         }
 
     }
-
 
 
     // 4. 触底加载下一页（分页）
@@ -128,7 +130,7 @@ class RepeatFileViewModel(
             val forceRefresh = repeatService.forceRefresh()
             XLog.d("forceRefresh: $forceRefresh")
             val message = if (forceRefresh.state) {
-                "已提交全盘排重请求"
+                "已提交全盘排重请求，请稍后手动刷新"
             } else {
                 forceRefresh.message
             }
@@ -138,8 +140,6 @@ class RepeatFileViewModel(
                     isRefreshing = false
                 )
             }
-            // 刷新完成后尝试重新拉取状态与列表
-            loadData()
         }
     }
 

@@ -1,7 +1,8 @@
 package github.zerorooot.nap511.util
 
+import com.elvishew.xlog.XLog
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import github.zerorooot.nap511.bean.FilesBean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -11,22 +12,22 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
-data class CacheWrapper<T>(
-    val data: T,
+data class CacheWrapper(
+    val data: FilesBean,
     val timestamp: Long = System.currentTimeMillis()
 )
 
-class FileCacheManager<T>(
+class FileCacheManager(
     private val cacheDir: File,
-    private val classType: java.lang.reflect.Type,
     private val saveRequestCache: Boolean,
     private val ttlMillis: Long = 7 * 24 * 3600 * 1000L // 7 天过期
 ) {
     private val gson = Gson()
     private val mutex = Mutex()
+    private val wrapperType = CacheWrapper::class.java
 
     // 内存 LRU 缓存：只要 App 运行，始终存在且有效
-    private val memoryCache = ConcurrentHashMap<String, CacheWrapper<T>>(30)
+    private val memoryCache = ConcurrentHashMap<String, CacheWrapper>(30)
 
     init {
         if (!cacheDir.exists()) {
@@ -36,7 +37,7 @@ class FileCacheManager<T>(
 
     fun containsKey(key: String): Boolean = memoryCache.containsKey(key)
 
-    fun getDate(key: String): T? = memoryCache[key]?.data
+    fun getDate(key: String): FilesBean? = memoryCache[key]?.data
 
     suspend fun loadAllCache() = withContext(Dispatchers.IO) {
         // 立即异步启动加载 "0"
@@ -52,6 +53,48 @@ class FileCacheManager<T>(
                 }
             }
         }?.awaitAll()
+
+//        async { deleteIndividualFile() }.await()
+    }
+
+    suspend fun deleteIndividualFile() = withContext(Dispatchers.IO) {
+        val diskCache = getDiskCache("0") ?: return@withContext
+        val fileList =
+            cacheDir.listFiles()?.map { i -> i.name.substringBeforeLast(".") }?.toMutableList()
+                ?: return@withContext
+        fileList.remove("0")
+
+        fun walk(cid: String) {
+            fileList.remove(cid)
+            val folderList =
+                getDiskCache(cid)?.data?.fileBeanList?.filter { it.isFolder } ?: emptyList()
+            for (item in folderList) {
+                fileList.remove(item.categoryId)
+                walk(item.categoryId)   // 递归调用
+            }
+        }
+        diskCache.data.fileBeanList.forEach {
+            if (it.isFolder) {
+                walk(it.categoryId)
+            }
+        }
+        val length = fileList.size
+        if (length == 0) {
+            return@withContext
+        }
+
+        val arrayListOf = arrayListOf<String>()
+        fileList.forEach { i ->
+            memoryCache[i]?.data?.path?.last()?.name?.let {
+                arrayListOf.add("cid: $i; name: $it")
+            }
+            deleteDiskFile(i)
+        }
+
+        App.instance.toast("删除 $length 个单一文件！")
+        XLog.d("deleteIndividualFile 删除 $length 个单一文件\n$arrayListOf")
+
+
     }
 
     /**
@@ -59,7 +102,7 @@ class FileCacheManager<T>(
      * 1. 优先查【内存缓存】（无视 readDisk 参数，只要内存有就直接返回）
      * 2. 内存未命中且 readDisk == true 时，才查【磁盘文件】
      */
-    suspend operator fun get(key: String): T? = withContext(Dispatchers.IO) {
+    suspend operator fun get(key: String): FilesBean? = withContext(Dispatchers.IO) {
         mutex.withLock {
             val now = System.currentTimeMillis()
 
@@ -85,16 +128,14 @@ class FileCacheManager<T>(
     }
 
 
-    fun getDiskCache(key: String, now: Long = System.currentTimeMillis()): CacheWrapper<T>? {
+    fun getDiskCache(key: String, now: Long = System.currentTimeMillis()): CacheWrapper? {
         val diskFile = getDiskFile(key)
         if (!diskFile.exists()) {
             return null
         }
         try {
             val json = diskFile.readText()
-            val wrapperType =
-                TypeToken.getParameterized(CacheWrapper::class.java, classType).type
-            val diskEntry: CacheWrapper<T>? = gson.fromJson(json, wrapperType)
+            val diskEntry: CacheWrapper? = gson.fromJson(json, wrapperType)
 
             if (diskEntry != null) {
                 if (now - diskEntry.timestamp > ttlMillis) {
@@ -111,7 +152,7 @@ class FileCacheManager<T>(
         return null
     }
 
-    suspend operator fun set(key: String, value: T) = put(key, value)
+    suspend operator fun set(key: String, value: FilesBean) = put(key, value)
 
 
     /**
@@ -119,7 +160,7 @@ class FileCacheManager<T>(
      * 1. 【内存缓存】：无条件写入！保证运行时始终有缓存
      * 2. 【磁盘缓存】：仅当 saveToDisk == true 时写入文件；若为 false，则同步清理对应磁盘旧文件
      */
-    suspend fun put(key: String, value: T) =
+    suspend fun put(key: String, value: FilesBean) =
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 val entry = CacheWrapper(data = value)
@@ -131,8 +172,6 @@ class FileCacheManager<T>(
                 if (saveRequestCache) {
                     try {
                         val diskFile = getDiskFile(key)
-                        val wrapperType =
-                            TypeToken.getParameterized(CacheWrapper::class.java, classType).type
                         val json = gson.toJson(entry, wrapperType)
                         diskFile.writeText(json)
                     } catch (e: Exception) {
@@ -179,12 +218,12 @@ class FileCacheManager<T>(
         mutex.withLock {
             val files = cacheDir.listFiles() ?: return@withContext
             val now = System.currentTimeMillis()
-            val wrapperType = TypeToken.getParameterized(CacheWrapper::class.java, classType).type
+
 
             for (file in files) {
                 try {
                     val json = file.readText()
-                    val entry: CacheWrapper<T>? = gson.fromJson(json, wrapperType)
+                    val entry: CacheWrapper? = gson.fromJson(json, wrapperType)
                     if (entry == null || (now - entry.timestamp > ttlMillis)) {
                         file.delete()
                     }

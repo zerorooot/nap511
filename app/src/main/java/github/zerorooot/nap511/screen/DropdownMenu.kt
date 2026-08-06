@@ -136,7 +136,7 @@ fun RecycleAppTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
 
 @Composable
 fun RepeatFileTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
-    val listOf = listOf("开始查重", "一键去重")
+    val listOf = listOf("开始查重", "一键去重", "刷新页面")
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }
 

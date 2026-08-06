@@ -79,9 +79,8 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     internal val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
 
     internal val fileListCache by lazy {
-        FileCacheManager<FilesBean>(
+        FileCacheManager(
             cacheDir = File(context.cacheDir, "file_list_cache"),
-            classType = FilesBean::class.java,
             saveRequestCache
         )
     }

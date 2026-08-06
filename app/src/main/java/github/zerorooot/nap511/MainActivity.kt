@@ -244,11 +244,6 @@ class MainActivity : AppCompatActivity() {
                         R.drawable.android_exit, ConfigKeyUtil.EXIT_APPLICATION, Route.ExitApp
                     )
                 )
-//                this.add(
-//                    DrawerMenuItem(
-//                        R.drawable.android_exit, "文件排重", Route.RepeatFile
-//                    )
-//                )
             }
 
         }
@@ -275,14 +270,20 @@ class MainActivity : AppCompatActivity() {
                                 fileViewModel.gesturesEnabled = true
                                 scope.launch { drawerState.close() }
 
-                                // 切换 Drawer 顶级页面的标准导航写法
-                                navController.navigate(item.route) {
-                                    // 弹出到起始页，避免生成无限多的返回栈
-                                    popUpTo(navController.graph.startDestinationId) {
-                                        saveState = true
+                                // 优先尝试直接弹出回目标顶级页面（如果当前正处于该页面的子页面中）
+                                val isPopped = navController.popBackStack(item.route, inclusive = false)
+
+                                // 如果栈中没有该目标页面（即从其他 Tab 切过来），则执行标准的顶级导航
+                                if (!isPopped) {
+                                    // 切换 Drawer 顶级页面的标准导航写法
+                                    navController.navigate(item.route) {
+                                        // 弹出到起始页，避免生成无限多的返回栈
+                                        popUpTo(navController.graph.startDestinationId) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true  // 避免重复创建同一个页面
+                                        restoreState = true // 恢复之前保存的状态
                                     }
-                                    launchSingleTop = true // 避免重复创建同一个页面
-                                    restoreState = true   // 恢复之前保存的状态
                                 }
                             }, modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                         )
