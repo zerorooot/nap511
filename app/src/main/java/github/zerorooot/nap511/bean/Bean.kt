@@ -363,6 +363,7 @@ data class OfflineInfo(
     @SerializedName("total") var total: Int = -1,
     @SerializedName("tasks") private var _tasks: ArrayList<OfflineTask>? = null,
     @SerializedName("state") var state: Boolean = false,
+    var isLoadedComplete: Boolean = false
 //    @SerializedName("errtype") var errtype: String = ""
 ) {
     // 对外暴露的 tasks 变量：如果 _tasks 为 null，自动初始化并返回一个空的 ArrayList

@@ -178,7 +178,7 @@ class VideoActivity : AppCompatActivity() {
                         "UNKNOWN_ERROR"
                     }
                 XLog.d("$title 播放失败 $errorStatus")
-                Toast.makeText(baseContext, "$errorStatus 播放失败~", Toast.LENGTH_SHORT).show()
+                Toast.makeText(baseContext, errorStatus, Toast.LENGTH_SHORT).show()
                 finish()
             }
         })

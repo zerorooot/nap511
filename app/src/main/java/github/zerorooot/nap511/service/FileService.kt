@@ -288,7 +288,7 @@ interface FileService {
     @GET("files/music")
     suspend fun music(
         @Query("pick_code") pickCode: String,
-        @Query("platform") platform: String ,
+        @Query("platform") platform: String,
         @Query("format") format: String
     ): MusicBean
 

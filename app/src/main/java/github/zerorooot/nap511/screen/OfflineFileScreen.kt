@@ -43,6 +43,7 @@ import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.screenitem.OfflineCellItem
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import kotlinx.coroutines.launch
@@ -142,7 +143,7 @@ fun OfflineFileScreen(
     }
 
     Column {
-        AppTopBarOfflineFile(stringResource(R.string.app_name), appBarOnClick)
+        AppTopBarOfflineFile(ConfigKeyUtil.OFFLINE_LIST, appBarOnClick)
 
 //        MiddleEllipsisText(
 //            text = "当前下载量：${offlineInfo.totalCount}，配额：${offlineInfo.quota}/${offlineInfo.total}",

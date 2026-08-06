@@ -163,6 +163,7 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
      * 分页加载更多任务列表（通用函数）
      */
     fun getMoreTaskList(offlineInfo: OfflineInfo, type: OfflineTaskType) {
+        if (offlineInfo.isLoadedComplete) return
         // 1. 读取对应类型的分页状态
         val (currentPage, maxPage) = Pair(
             offlineInfo.page,
@@ -173,6 +174,7 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
         }
         if (currentPage == maxPage) {
             App.instance.toast("加载完毕")
+            offlineInfo.isLoadedComplete = true
             return
         }
 

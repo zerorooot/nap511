@@ -29,10 +29,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import github.zerorooot.nap511.R
 import github.zerorooot.nap511.ui.theme.Purple80
+import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 
@@ -89,7 +88,7 @@ fun OfflineDownloadScreen(
     Column {
         TopAppBar(
             title = {
-                Text(text = stringResource(R.string.app_name))
+                Text(text = ConfigKeyUtil.OFFLINE_DOWNLOAD)
             },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
             navigationIcon = {
