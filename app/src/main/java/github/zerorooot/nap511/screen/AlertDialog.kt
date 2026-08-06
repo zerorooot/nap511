@@ -10,6 +10,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -85,6 +87,7 @@ import github.zerorooot.nap511.bean.FileInfo
 import github.zerorooot.nap511.bean.InfoItem
 import github.zerorooot.nap511.bean.InfoSection
 import github.zerorooot.nap511.bean.OfflineTask
+import github.zerorooot.nap511.bean.PathsBean
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.TorrentFileListWeb
 import github.zerorooot.nap511.bean.ZipBeanList
@@ -173,19 +176,27 @@ private fun FileInfoDialog(
         InfoItem(
             "总大小", fileInfo.size.ifEmpty { fileBean.sizeString.ifEmpty { "0 B" } })
     )
-
     sections.add(InfoSection(title = "基础信息", items = baseItems))
 
     // 区块二：位置与共享
-    val pathString = fileInfo.paths.joinToString("/") { it.fileName } + "/${fileBean.name}"
     val locationItems = listOf(
         InfoItem(
-            "文件路径",
-            pathString.ifEmpty { "根目录" }) { fileInfoClick.invoke(fileBean.categoryId) },
+            label = "文件路径",
+            value = "",
+            customContent = {
+                // 渲染可点击的层级面包屑
+                BreadcrumbPath(
+                    paths = fileInfo.paths,
+                    currentFileName = fileBean.name,
+                    onPathClick = { categoryId ->
+                        fileInfoClick(categoryId)
+                        onDismissRequest() // 点击路径跳转后通常关闭弹窗
+                    }
+                )
+            }
+        ),
         InfoItem("提取码", fileBean.pickCode.ifEmpty { "无" }),
-        InfoItem(
-            "sha1", fileBean.sha1
-        )
+        InfoItem("sha1", fileBean.sha1)
     )
     sections.add(InfoSection(title = "位置与共享", items = locationItems))
 
@@ -199,6 +210,60 @@ private fun FileInfoDialog(
     BaseDetailDialog(
         title = fileBean.name, icon = icon, sections = sections, onDismissRequest = onDismissRequest
     )
+}
+
+/**
+ * 面包屑路径组件
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun BreadcrumbPath(
+    paths: List<PathsBean>,
+    currentFileName: String,
+    onPathClick: (String) -> Unit
+) {
+    // 假设每个 path 对象有 categoryId 和 fileName 属性（根据你的数据模型修改对应字段名）
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End, // 整体靠右对齐
+        verticalArrangement = Arrangement.Center
+    ) {
+        // 1. 如果路径列表为空，默认显示“根目录”
+        if (paths.isEmpty()) {
+            Text(
+                text = "根目录",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable { onPathClick("0") } // "0" 通常为根目录 id
+            )
+        } else {
+            // 2. 循环遍历各级目录
+            paths.forEach { path ->
+                Text(
+                    text = path.fileName.ifEmpty { "根目录" },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable { onPathClick(path.fileId) } // 传入当前层级的 ID
+                )
+
+                // 间隔符
+                Text(
+                    text = " > ",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // 3. 当前文件/文件夹名称（末尾，不可点击或作为终点展示）
+            Text(
+                text = currentFileName,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
 }
 
 @Composable
@@ -243,9 +308,9 @@ fun BaseDetailDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { item.onClick?.let { it() } } // 绑定点击事件
                             .padding(vertical = 4.dp), // 增加一点垂直内边距，让点击区域更大、更跟手,
-                        horizontalArrangement = Arrangement.SpaceBetween) {
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
                         // 左侧：标签 (占 1 份)
                         Text(
                             text = item.label,
@@ -261,18 +326,19 @@ fun BaseDetailDialog(
                             modifier = Modifier.weight(2f),
                             contentAlignment = Alignment.TopEnd // 确保内容靠右
                         ) {
-                            Text(
-                                text = item.value.ifEmpty { "-" },
-                                style = MaterialTheme.typography.bodyMedium,
-                                textAlign = TextAlign.End,
-                                minLines = 1,
-                                color = if (item.onClick != null) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                },
-                                modifier = Modifier.fillMaxWidth() // 填满 Box，遇到边界自动强制换行
-                            )
+                            if (item.customContent != null) {
+                                // 如果提供了自定义布局（如面包屑），直接渲染
+                                item.customContent.invoke()
+                            } else {
+                                Text(
+                                    text = item.value.ifEmpty { "-" },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    textAlign = TextAlign.End,
+                                    minLines = 1,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.fillMaxWidth() // 填满 Box，遇到边界自动强制换行
+                                )
+                            }
                         }
                     }
                 }

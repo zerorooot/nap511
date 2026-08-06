@@ -1,65 +1,15 @@
 package github.zerorooot.nap511.bean
 
 import android.os.Parcelable
+import androidx.compose.runtime.Composable
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import github.zerorooot.nap511.R
 import kotlinx.parcelize.Parcelize
-import kotlinx.serialization.Serializable
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 
-// 导航配置项辅助类
-data class DrawerMenuItem(val iconRes: Int, val label: String, val route: Route)
-
-sealed interface Route {
-    // 抽屉导航页面
-    @Serializable
-    data object Login : Route
-
-    @Serializable
-    data object MyFile : Route
-
-    @Serializable
-    data object OfflineDownload : Route
-
-    @Serializable
-    data object OfflineList : Route
-
-    @Serializable
-    data object RecycleBin : Route
-
-    @Serializable
-    data object AdvancedSettings : Route
-
-    @Serializable
-    data object LogScreen : Route
-
-    @Serializable
-    data object Photo : Route
-
-    @Serializable
-    data object WebScreen : Route
-
-    @Serializable
-    data object ExitApp : Route
-
-    @Serializable
-    data object VerifyMagnetLinkAccount : Route
-
-    @Serializable
-    data object VerifyVideoAccount : Route
-
-    // 假设在别的 Screen 中跳转的“详情页”或“子页面”（带参数示例）
-//    @Serializable
-//    data class FileDetail(val fileId: String, val fileName: String) : Route
-}
-
-// 定义导航事件
-sealed interface NavEvent {
-    data class NavigateToScreen(val route: Route) : NavEvent
-}
 
 sealed interface ZipStatus {
     /** 正常未加密的压缩包，可以直接预览 */
@@ -84,16 +34,16 @@ class DecompressionLoadingException(
 ) : Exception(message, cause)
 
 // 统一定义接口返回的包装结构
-data class BaseResponse<T>(
-    val state: Boolean = false,
-    val message: String = "",
-    val code: String = "",
-    val data: T
+open class BaseResponse(
+    @SerializedName("state") val state: Boolean = false,
+    @SerializedName("msg") val message: String = "",
+    @SerializedName("msg_code") val msgCode: Int = 0
 ) {
     override fun toString(): String {
         return Gson().toJson(this)
     }
 }
+
 
 data class MusicBean(
     val state: Boolean = false,
@@ -105,7 +55,7 @@ data class MusicBean(
 data class ExtractData(
     @SerializedName("extract_status")
     val extractStatus: ExtractStatus
-)
+) : BaseResponse()
 
 data class ExtractStatus(
     @SerializedName("unzip_status")
@@ -116,7 +66,7 @@ data class ExtractStatus(
 data class EncryptionData(
     @SerializedName("unzip_status")
     val unzipStatus: Int = -1
-)
+) : BaseResponse()
 
 data class ProcessData(
     @SerializedName("extract_id")
@@ -124,7 +74,7 @@ data class ProcessData(
     @SerializedName("to_pid")
     val toPid: String,
     val percent: Int
-)
+) : BaseResponse()
 
 data class AvatarBean(
     var expire: Long = 1L,
@@ -290,7 +240,7 @@ data class InfoSection(
 data class InfoItem(
     val label: String,
     val value: String,
-    val onClick: (() -> Unit)? = null // 改为可空类型
+    val customContent: (@Composable () -> Unit)? = null // 新增：自定义内容槽位
 )
 
 data class PathsBean(
@@ -515,4 +465,57 @@ data class ZipBean(
     var fileCategory: Int = 1,
     var time: String = "",
     var timeString: String = ""
+)
+
+
+//----------------文件查重--------------------------
+
+// 1. 重复文件状态响应
+data class RepeatStatusResponse(
+    @SerializedName("data") val data: RepeatStatusData? = null
+) : BaseResponse()
+
+data class RepeatStatusData(
+    // 兼容 API 返回字符串或数值类型
+    @SerializedName("group_count") val groupCount: String = "0",
+    @SerializedName("file_count") val fileCount: String = "0",
+    @SerializedName("file_size") val fileSize: String = "0"
+)
+
+// 2. 重复文件列表响应
+data class RepeatListResponse(
+    @SerializedName("data") val data: List<RepeatFileItem> = emptyList(),
+    @SerializedName("s") val offset: Int = 0,
+    @SerializedName("l") val limit: String = "100",
+    @SerializedName("count") val count: String = "0"
+) : BaseResponse()
+
+data class RepeatFileItem(
+    @SerializedName("sha1") val sha1: String = "",
+    @SerializedName("file_id") val fileId: String = "",
+    @SerializedName("file_name") val fileName: String = "",
+    @SerializedName("ico") val ico: String = "",
+    @SerializedName("file_size") val fileSize: String = "",
+    @SerializedName("user_utime") val userUtime: String = "",
+    @SerializedName("user_utime_str") val userUtimeStr: String = "",
+    @SerializedName("parent_id") val parentId: String = "",
+    @SerializedName("path") val path: String = "",
+    var fileIco: Int = R.drawable.other,
+    var fileSizeString: String = ""
+)
+
+// 分类/文件详情响应
+data class CategoryDetailResponse(
+    @SerializedName("state") val state: Boolean = false,
+    @SerializedName("file_name") val fileName: String = "",
+    @SerializedName("size") val size: String = "",
+    @SerializedName("file_category") val fileCategory: String = "",
+    @SerializedName("ctime") val ctime: String = "", // 创建时间戳
+    @SerializedName("utime") val utime: String = "", // 修改时间戳
+    @SerializedName("paths") val paths: List<CategoryPathItem> = emptyList()
+)
+
+data class CategoryPathItem(
+    @SerializedName("file_id") val fileId: String = "0",
+    @SerializedName("file_name") val fileName: String = ""
 )

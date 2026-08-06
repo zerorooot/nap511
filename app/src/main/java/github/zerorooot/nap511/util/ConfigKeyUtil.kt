@@ -120,15 +120,6 @@ class ConfigKeyUtil {
          */
         const val FLOATING_ACTION_BUTTON_POSITION = "floatingActionButtonPosition"
 
-        /**
-         * 磁力链接验证
-         */
-        const val VERIFY_MAGNET_LINK_ACCOUNT = "磁力链接验证"
-
-        /**
-         * 视频播放验证
-         */
-        const val VERIFY_VIDEO_ACCOUNT = "视频播放验证"
 
         /**
          * 登录
@@ -179,15 +170,6 @@ class ConfigKeyUtil {
          * 日志页面
          */
         const val LOG_SCREEN = "日志页面"
-
-        /**
-         * 立刻下载
-         */
-        const val CLICK_DOWNLOAD_NOW = "clickDownloadNow"
-        /**
-         * 立刻重启
-         */
-        const val REBOOT_NOW = "rebootNow"
 
         /**
          * 离线task的标签

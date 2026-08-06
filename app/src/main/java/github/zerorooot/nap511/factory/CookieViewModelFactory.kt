@@ -3,10 +3,11 @@ package github.zerorooot.nap511.factory
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.AudioViewModel
+import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
+import github.zerorooot.nap511.viewmodel.RepeatFileViewModel
 
 //class CookieViewModelFactory(
 //    private val cookie: String,
@@ -39,6 +40,9 @@ class CookieViewModelFactory(
 
             RecycleViewModel::class.java ->
                 RecycleViewModel(cookie) as T
+
+            RepeatFileViewModel::class.java ->
+                RepeatFileViewModel(cookie) as T
 
             AudioViewModel::class.java ->
                 AudioViewModel(cookie, context) as T

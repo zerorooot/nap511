@@ -18,7 +18,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
@@ -30,7 +29,6 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.viewmodel.FileViewModel
-import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -94,9 +92,7 @@ fun BaseWebViewScreen(
 
 @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
 @Composable
-fun WebViewScreen(fileViewModel: FileViewModel,onClick: () -> Unit) {
-    fileViewModel.gesturesEnabled = false
-
+fun WebViewScreen(onClick: () -> Unit) {
     CookieManager.getInstance().removeAllCookies { }
     CookieManager.getInstance().setAcceptCookie(true)
     WebView.setWebContentsDebuggingEnabled(true)

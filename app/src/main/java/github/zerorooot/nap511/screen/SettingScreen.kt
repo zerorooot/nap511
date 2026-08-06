@@ -17,9 +17,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.tooling.preview.Preview
 import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.screenitem.EditTextPreferenceItem
 import github.zerorooot.nap511.screenitem.ListPreferenceItem
 import github.zerorooot.nap511.screenitem.PreferenceItem
@@ -28,7 +28,6 @@ import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import github.zerorooot.nap511.viewmodel.FileViewModel
 import kotlinx.coroutines.launch
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
@@ -36,9 +35,7 @@ import my.nanihadesuka.compose.ScrollbarSettings
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingScreen(
-    fileViewModel: FileViewModel,
-    topAppBarActionButtonOnClick: () -> Unit,
-    onNav: (Route) -> Unit
+    onClick: (String) -> Unit
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -115,7 +112,7 @@ fun SettingScreen(
                     TopAppBarActionButton(
                         imageVector = Icons.Rounded.Menu,
                         description = "navigationIcon",
-                        onClick = topAppBarActionButtonOnClick
+                        onClick = { onClick.invoke("topAppBarActionButtonOnClick") }
                     )
                 }
             )
@@ -248,7 +245,7 @@ fun SettingScreen(
                         title = "视频播放验证",
                         summary = "打开视频播放异常验证页面",
                         onClick = {
-                            onNav.invoke(Route.VerifyVideoAccount)
+                            onClick.invoke("VerifyVideoAccount")
                         }
                     )
                 }
@@ -257,7 +254,7 @@ fun SettingScreen(
                         title = "磁力链接验证",
                         summary = "打开磁力链接添加异常验证页面",
                         onClick = {
-                            onNav.invoke(Route.VerifyMagnetLinkAccount)
+                            onClick.invoke("VerifyMagnetLinkAccount")
                         }
                     )
                 }
@@ -334,7 +331,15 @@ fun SettingScreen(
                         }
                     )
                 }
-
+                item {
+                    PreferenceItem(
+                        title = "文件查重",
+                        summary = "排查重复文件",
+                        onClick = {
+                            onClick.invoke("RepeatFile")
+                        }
+                    )
+                }
                 // 9. 离线延迟时间
                 item {
                     EditTextPreferenceItem(
@@ -352,7 +357,7 @@ fun SettingScreen(
                     PreferenceItem(
                         title = "立即下载",
                         summary = "立刻下载缓存的离线任务",
-                        onClick = { fileViewModel.handleOfflineTask(true) }
+                        onClick = { onClick.invoke("handleOfflineTask") }
                     )
                 }
                 item {

@@ -6,8 +6,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -112,15 +120,23 @@ fun OfflineFileAppTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
     val listOf = stringArrayResource(id = R.array.offlineFileAppBarMenu).toList()
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }
+
 @Composable
 fun LogScreenTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
     val listOf = stringArrayResource(id = R.array.logScreenAppBarMenu).toList()
 //    val listOf = listOf("滚动顶部", "滚动底部", "清空日志","导出日志")
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }
+
 @Composable
 fun RecycleAppTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
     val listOf = listOf("清空所有文件")
+    BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
+}
+
+@Composable
+fun RepeatFileTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
+    val listOf = listOf("开始查重", "一键去重")
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }
 

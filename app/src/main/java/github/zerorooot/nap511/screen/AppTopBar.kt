@@ -162,6 +162,29 @@ fun AppTopBarLogScreen(title: String, onClick: (name: String) -> Unit) {
         }
     )
 }
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AppTopBarRepeatFile(title: String, onClick: (name: String) -> Unit) {
+    TopAppBar(
+        title = {
+            Text(text = title)
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
+        navigationIcon = {
+            TopAppBarActionButton(
+                imageVector = Icons.Rounded.Menu,
+                description = "navigationIcon"
+            ) {
+                onClick.invoke("ModalNavigationDrawerMenu")
+            }
+        },
+        actions = {
+            RepeatFileTopBarDropdownMenu(onClick = { itemValue, _ ->
+                onClick.invoke(itemValue)
+            })
+        }
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

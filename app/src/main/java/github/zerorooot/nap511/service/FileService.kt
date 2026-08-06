@@ -238,7 +238,7 @@ interface FileService {
     suspend fun decryptZip(
         @Field("pick_code") pickCode: String,
         @Field("secret") secret: String
-    ): BaseResponse<EncryptionData>
+    ): EncryptionData
 
     /**
      *非加密文件 {"state":true,"message":"","code":"","data":{"unzip_status":1}}
@@ -249,7 +249,7 @@ interface FileService {
     @POST("files/push_extract")
     suspend fun checkEncryptionStatus(
         @Field("pick_code") pickCode: String
-    ): BaseResponse<EncryptionData>
+    ): EncryptionData
 
     /**
      * {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
@@ -257,7 +257,7 @@ interface FileService {
     @GET("files/push_extract")
     suspend fun getDecryptZipProcess(
         @Query("pick_code") pickCode: String
-    ): BaseResponse<ExtractData>
+    ): ExtractData
 
 
     /**
@@ -275,7 +275,7 @@ interface FileService {
         @Field("extract_file[]") files: List<String>?,
         @Field("extract_dir[]") dirs: List<String>?,
         @Field("paths") paths: String = "文件"
-    ): BaseResponse<ProcessData>
+    ): ProcessData
 
     /**
      * {"state":true,"message":"","code":"","data":{"extract_id":"id","to_pid":"pid","percent":100}}
@@ -283,7 +283,7 @@ interface FileService {
     @GET("files/add_extract_file")
     suspend fun unzipFileProcess(
         @Query("extract_id") extractId: Long,
-    ): BaseResponse<ProcessData>
+    ): ProcessData
 
     @GET("files/music")
     suspend fun music(

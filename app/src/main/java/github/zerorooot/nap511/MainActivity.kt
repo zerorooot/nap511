@@ -77,6 +77,7 @@ import github.zerorooot.nap511.screen.MyPhotoScreen
 import github.zerorooot.nap511.screen.OfflineDownloadScreen
 import github.zerorooot.nap511.screen.OfflineFileScreen
 import github.zerorooot.nap511.screen.RecycleScreen
+import github.zerorooot.nap511.screen.RepeatFileScreen
 import github.zerorooot.nap511.screen.SettingScreen
 import github.zerorooot.nap511.screen.WebViewScreen
 import github.zerorooot.nap511.ui.theme.Nap511Theme
@@ -87,6 +88,7 @@ import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
+import github.zerorooot.nap511.viewmodel.RepeatFileViewModel
 import github.zerorooot.nap511.viewmodel.cut
 import github.zerorooot.nap511.viewmodel.deleteMultiple
 import github.zerorooot.nap511.viewmodel.openFileOrderDialog
@@ -127,6 +129,7 @@ class MainActivity : AppCompatActivity() {
         val offlineFileViewModel: OfflineFileViewModel = viewModel(factory = factory)
         val recycleViewModel: RecycleViewModel = viewModel(factory = factory)
         val audioViewModel: AudioViewModel = viewModel(factory = factory)
+        val repeatViewModel: RepeatFileViewModel = viewModel(factory = factory)
         val navController = rememberNavController()
         val context = LocalContext.current
 
@@ -160,6 +163,7 @@ class MainActivity : AppCompatActivity() {
             offlineFileViewModel,
             recycleViewModel,
             audioViewModel,
+            repeatViewModel,
             navController
         )
 
@@ -191,6 +195,7 @@ class MainActivity : AppCompatActivity() {
         offlineFileViewModel: OfflineFileViewModel,
         recycleViewModel: RecycleViewModel,
         audioViewModel: AudioViewModel,
+        repeatViewModel: RepeatFileViewModel,
         navController: NavHostController
     ) {
         val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -239,6 +244,11 @@ class MainActivity : AppCompatActivity() {
                         R.drawable.android_exit, ConfigKeyUtil.EXIT_APPLICATION, Route.ExitApp
                     )
                 )
+//                this.add(
+//                    DrawerMenuItem(
+//                        R.drawable.android_exit, "文件排重", Route.RepeatFile
+//                    )
+//                )
             }
 
         }
@@ -361,14 +371,35 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     composable<Route.WebScreen> {
-                        WebViewScreen(fileViewModel) {
+                        fileViewModel.gesturesEnabled = false
+                        WebViewScreen() {
                             scope.launch { drawerState.open() }
                         }
                     }
 
                     composable<Route.AdvancedSettings> {
-                        SettingScreen(fileViewModel, { scope.launch { drawerState.open() } }) {
-                            navController.navigate(it)
+                        SettingScreen {
+                            when (it) {
+                                "topAppBarActionButtonOnClick" -> {
+                                    scope.launch { drawerState.open() }
+                                }
+
+                                "VerifyVideoAccount" -> {
+                                    navController.navigate(Route.VerifyVideoAccount)
+                                }
+
+                                "VerifyMagnetLinkAccount" -> {
+                                    navController.navigate(Route.VerifyMagnetLinkAccount)
+                                }
+
+                                "handleOfflineTask" -> {
+                                    fileViewModel.handleOfflineTask(true)
+                                }
+
+                                "RepeatFile" -> {
+                                    navController.navigate(Route.RepeatFile)
+                                }
+                            }
                         }
                     }
                     composable<Route.RecycleBin> {
@@ -432,6 +463,12 @@ class MainActivity : AppCompatActivity() {
 
                     composable<Route.Photo> {
                         MyPhotoScreen(fileViewModel) {
+                            navController.popBackStack()
+                        }
+                    }
+                    composable<Route.RepeatFile> {
+                        RepeatFileScreen(repeatViewModel, { scope.launch { drawerState.open() } }) {
+                            fileViewModel.getFiles(it)
                             navController.popBackStack()
                         }
                     }

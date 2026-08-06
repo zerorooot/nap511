@@ -1,15 +1,18 @@
 package github.zerorooot.nap511.screenitem
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -26,22 +29,21 @@ import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Scale
-import github.zerorooot.nap511.bean.RecycleBean
-import github.zerorooot.nap511.screen.RecycleMoreMenu
+import github.zerorooot.nap511.bean.RepeatFileItem
+import kotlin.text.ifEmpty
 
 @Composable
-fun RecycleCellItem(
-    recycleBean: RecycleBean, //删除会有动画
-    modifier: Modifier,
-    index: Int,
-    menuOnClick: (String, Int) -> Unit
+fun RepeatFileCardItem(
+    item: RepeatFileItem,
+    modifier: Modifier = Modifier,
+    onPathClick: () -> Unit
 ) {
-    val image = recycleBean.fileIco
-    val name = recycleBean.fileName
-    val size = recycleBean.fileSizeString
-    val time = recycleBean.modifiedTimeString
-    val parentName = recycleBean.parentName
-    val imageData = recycleBean.photoThumb.ifEmpty { image }
+    val context = LocalContext.current
+    val image = item.fileIco
+    val name = item.fileName
+    val size = item.fileSizeString
+    val time = item.userUtimeStr
+    val parentName = item.path.ifEmpty { "根目录" }
     Surface(
         shape = MaterialTheme.shapes.medium,
         tonalElevation = 10.dp,
@@ -50,41 +52,42 @@ fun RecycleCellItem(
         Card(
             modifier = Modifier
                 .padding(4.dp, 4.dp)
-                .height(85.dp),
+                .height(85.dp)
         ) {
             Row(
-                Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize()
             ) {
+                // 左侧文件图标 / 缩略图
                 Box(
-                    Modifier
+                    modifier = Modifier
                         .height(60.dp)
                         .align(Alignment.CenterVertically)
                 ) {
                     AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(imageData)
+                        model = ImageRequest.Builder(context)
+                            .data(image)
                             .memoryCachePolicy(CachePolicy.ENABLED)
                             .diskCachePolicy(CachePolicy.ENABLED)
                             .networkCachePolicy(CachePolicy.ENABLED)
-                            .memoryCacheKey(recycleBean.id)
-                            .diskCacheKey(recycleBean.id)
+                            .memoryCacheKey(item.fileId)
+                            .diskCacheKey(item.fileId)
                             .scale(Scale.FILL)
-                            .placeholder(image)
-                            .error(image) // 加载失败时也显示占位图
                             .crossfade(true)
                             .build(),
                         contentDescription = "File Thumbnail",
-                        modifier = Modifier.size(60.dp), // 用 size 替代 height + width
+                        modifier = Modifier.size(60.dp),
                         contentScale = ContentScale.Fit
                     )
                 }
 
+                // 右侧文件属性信息
                 Column(
                     verticalArrangement = Arrangement.SpaceEvenly,
                     modifier = Modifier
                         .fillMaxHeight()
                         .weight(0.7f)
                 ) {
+                    // 文件名（支持自适应字体/多行展示）
                     AutoSizableTextField(
                         value = name,
                         modifier = Modifier
@@ -94,12 +97,15 @@ fun RecycleCellItem(
                         maxLines = 2
                     )
                     Text(
-                        modifier = Modifier.padding(start = 4.dp, top = 4.dp),
+                        modifier = Modifier.padding(start = 4.dp, top = 4.dp)  .clickable { onPathClick() },
                         text = parentName,
                         overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
                         maxLines = 1
                     )
+
+                    // 文件大小与修改时间
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -116,18 +122,9 @@ fun RecycleCellItem(
                             modifier = Modifier.weight(0.7f)
 
                         )
-
                     }
                 }
-
-                RecycleMoreMenu() { itemName, _ ->
-                    menuOnClick.invoke(itemName, index)
-                }
-
             }
-
         }
-
-
     }
 }
