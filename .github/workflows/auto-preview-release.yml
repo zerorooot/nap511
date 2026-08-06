@@ -1,0 +1,135 @@
+name: Generate APK Release
+
+on:
+  push:
+    branches: [ "main" ]
+    # 仅在相关代码或配置文件变动时触发
+    paths:
+      - 'app/**'
+      - 'build.gradle.kts'
+      - 'build.gradle'
+      - 'settings.gradle.kts'
+      - 'settings.gradle'
+      - 'gradle.properties'
+      - 'gradle/**'
+      - '.github/workflows/generate-apk-release.yml'
+
+jobs:
+  build:
+    # 过滤特定 Commit（如版本更新或明确标记 [skip release] 的提交）
+    if: |
+      !startsWith(github.event.head_commit.message, 'chore: bump version') &&
+      !startsWith(github.event.head_commit.message, 'chore(release)') &&
+      !contains(github.event.head_commit.message, '[skip release]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get commit short SHA & Date
+        id: vars
+        run: |
+          echo "SHORT_SHA=$(git rev-parse --short=7 HEAD)" >> $GITHUB_OUTPUT
+          echo "DATE_TODAY=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+          echo "YY_MM=$(date +'%y.%m')" >> $GITHUB_OUTPUT
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          build-scan-terms-of-use-url: "https://gradle.com/help/legal-terms-of-use"
+          build-scan-terms-of-use-agree: "yes"
+          build-scan-publish: false
+          cache-read-only: false
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew assembleRelease
+
+      - name: Sign Android APK
+        uses: ilharp/sign-android-release@v1
+        id: sign_app
+        with:
+          releaseDir: app/build/outputs/apk/release
+          signingKey: ${{ secrets.ANDROID_SIGNING_KEY }}
+          keyAlias: ${{ secrets.ANDROID_KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          buildToolsVersion: 35.0.0
+
+      - name: Find and Rename Signed APK
+        id: rename_apk
+        run: |
+          SIGNED_APK="${{ steps.sign_app.outputs.signedFile }}"
+          if [ -z "$SIGNED_APK" ] || [ ! -f "$SIGNED_APK" ]; then
+            echo "ERROR: Signed APK file not found!"
+            exit 1
+          fi
+
+          VERSION_TAG="${{ steps.vars.outputs.YY_MM }}.${{ steps.vars.outputs.SHORT_SHA }}"
+          DIR=$(dirname "$SIGNED_APK")
+          NEW_APK_NAME="app-release-${VERSION_TAG}.apk"
+          NEW_APK_PATH="${DIR}/${NEW_APK_NAME}"
+
+          mv "$SIGNED_APK" "$NEW_APK_PATH"
+
+          echo "signed_apk=${NEW_APK_PATH}" >> $GITHUB_OUTPUT
+          echo "version_tag=${VERSION_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git tag --list | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)?$' | sort -Vr | head -n 1)
+          CURR_TAG="${{ steps.rename_apk.outputs.version_tag }}"
+
+          if [ -z "$PREV_TAG" ]; then
+            LOG_RANGE=""
+          else
+            LOG_RANGE="$PREV_TAG..HEAD"
+          fi
+
+          CHANGELOG_LIST=$(git log $LOG_RANGE --pretty=format:"- %s (%an)" | grep -v '^-\s*Merge' | head -n 10)
+          
+          if [ -z "$CHANGELOG_LIST" ]; then
+            CHANGELOG_BODY_OUTPUT="No changes listed."
+          else
+            CHANGELOG_BODY_OUTPUT="$CHANGELOG_LIST"
+          fi
+
+          {
+            echo "changelog_body<<EOF"
+            echo -e "$CHANGELOG_BODY_OUTPUT"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          name: "Release (${{ steps.vars.outputs.DATE_TODAY }} - ${{ steps.vars.outputs.SHORT_SHA }})"
+          tag_name: "v${{ steps.rename_apk.outputs.version_tag }}"
+          target_commitish: ${{ github.sha }}
+          body: |
+            ## Release Build (${{ steps.vars.outputs.DATE_TODAY }})
+            
+            **更新日志（Changelog）:**
+            ${{ steps.changelog.outputs.changelog_body }}
+          files: ${{ steps.rename_apk.outputs.signed_apk }}
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.vars.outputs.DATE_TODAY }} - Release APK
+          path: ${{ steps.rename_apk.outputs.signed_apk }}
