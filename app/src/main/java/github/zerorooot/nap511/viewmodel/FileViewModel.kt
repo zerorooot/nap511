@@ -263,7 +263,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                 fileListCache.cleanExpiredDiskCache()
             }
             fileListCache.loadAllCache()
-            getFiles(currentCid)
+            getFiles("0")
         }
     }
 
@@ -367,10 +367,18 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
             try {
                 val files =
                     fileRepository.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
+                //请求的cid不是0,但返回的cid是0。证明请求的cid不存在,返回当前文件列表
+                if (cid != "0" && files.cid == "0") {
+                    val bean = fileListCache[currentCid]!!
+                    val deletedFileBean = bean.fileBeanList.last { i -> i.categoryId == cid }
+                    bean.fileBeanList.remove(deletedFileBean)
+                    App.instance.toast("${deletedFileBean.name} 文件被删除，请刷新列表！")
+                    return@launch
+                }
                 setFileBeanProperty(files.fileBeanList)
                 // 3. 网络请求成功后写入缓存
                 setFiles(files)
-            } catch (e: NullPointerException) {
+            } catch (_: NullPointerException) {
                 fileListCache.clearAll()
                 App.instance.toast("获取文件列表失败，建议更新您的Cookie")
             } catch (e: Exception) {

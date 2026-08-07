@@ -13,6 +13,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringArrayResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -38,12 +41,17 @@ fun SettingScreen(
     onClick: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var lastClick by remember { mutableStateOf(false) }
 
     SettingContent(
         uiState = uiState,
         onSaveConfig = { key, value -> viewModel.saveData(key, value) },
         onActionClick = onClick,
         onRestartApp = {
+            if (lastClick) { // 连点会被忽略
+                return@SettingContent
+            }
+            lastClick = true
             App.instance.toast("重启中～")
             ProcessPhoenix.triggerRebirth(App.instance)
         }
@@ -162,7 +170,11 @@ fun SettingContent(
                 item {
                     EditTextPreferenceItem(
                         title = "离线任务缓存",
-                        summary = uiState.currentOfflineTask.ifEmpty { "当前尚未添加离线任务的链接" },
+                        summary = if (uiState.currentOfflineTask.isEmpty()) {
+                            "尚未添加离线任务"
+                        } else {
+                            "共有${uiState.currentOfflineTask.split("\n").size}个离线任务连接"
+                        },
                         value = uiState.currentOfflineTask,
                         onValueSave = { onSaveConfig(ConfigKeyUtil.CURRENT_OFFLINE_TASK, it) }
                     )

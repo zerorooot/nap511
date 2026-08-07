@@ -129,7 +129,7 @@ class RecycleViewModel(private val cookie: String) :
                 recycleFileList.removeAt(index)
                 "恢复成功"
             } else {
-                "恢复失败，${revert.errorMsg}"
+                "恢复失败，${revert.error}"
             }
             App.instance.toast(message)
         }
