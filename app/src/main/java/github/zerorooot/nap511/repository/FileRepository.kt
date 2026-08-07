@@ -269,7 +269,7 @@ class FileRepository(private val cookie: String) {
             return Pair(false, message)
         }
         //解压
-        val extractId = unzipFile.extractId.toLong()
+        val extractId = unzipFile.data.extractId.toLong()
 
         if (showToast) {
             App.instance.toast(message)
@@ -285,7 +285,7 @@ class FileRepository(private val cookie: String) {
                 message = json.message
                 break
             }
-            val process = json.percent
+            val process = json.data.percent
             if (process == 100) {
                 state = true
                 message = "${unzipFolderName}后台解压完成～"
@@ -305,7 +305,7 @@ class FileRepository(private val cookie: String) {
     suspend fun tryToExtract(pickCode: String): Boolean {
         //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
         val checkDecryptZip = fileService.getDecryptZipProcess(pickCode)
-        val asInt = checkDecryptZip.extractStatus.unzipStatus
+        val asInt = checkDecryptZip.data.extractStatus.unzipStatus
         XLog.d("Get files/push_extract tryToExtract.checkDecryptZip $checkDecryptZip")
         //之前解压过，密码在115缓存中
         if (asInt == 1) {
@@ -319,7 +319,7 @@ class FileRepository(private val cookie: String) {
         //等待解压中
         for (i in 1..100) {
             val json = fileService.getDecryptZipProcess(pickCode)
-            val process = json.extractStatus.progress
+            val process = json.data.extractStatus.progress
             XLog.d("tryToExtract zip $i $json")
             if (process == 100) {
                 return true
@@ -381,7 +381,7 @@ class FileRepository(private val cookie: String) {
         //{"state":true,"message":"","code":"","data":{"unzip_status":4}}
         val json = fileService.decryptZip(pickCode, secret)
         XLog.d("Post files/push_extract decryptZip $json")
-        val asInt = json.unzipStatus
+        val asInt = json.data.unzipStatus
         //4 is success,6 is decrypt error,1 is having been done
         return asInt != 6
     }
@@ -399,7 +399,7 @@ class FileRepository(private val cookie: String) {
             if (!response.state) {
                 ZipStatus.UnsupportedOrError(response.message)
             } else {
-                val status = response.extractStatus
+                val status = response.data.extractStatus
                 var unzipStatus = status.unzipStatus
 
                 // 2. 特殊状态码二次校验
@@ -410,7 +410,7 @@ class FileRepository(private val cookie: String) {
                     if (!encryptResponse.state) {
                         return ZipStatus.UnsupportedOrError(encryptResponse.message)
                     }
-                    unzipStatus = encryptResponse.unzipStatus
+                    unzipStatus = encryptResponse.data.unzipStatus
                 }
 
                 // 3. 映射到密封类

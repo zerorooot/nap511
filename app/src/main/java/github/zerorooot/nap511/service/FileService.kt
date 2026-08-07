@@ -5,12 +5,15 @@ import github.zerorooot.nap511.bean.BaseResponse
 import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.CreateFolderMessage
 import github.zerorooot.nap511.bean.EncryptionData
+import github.zerorooot.nap511.bean.EncryptionDataResponse
 import github.zerorooot.nap511.bean.ExtractData
+import github.zerorooot.nap511.bean.ExtractResponse
 import github.zerorooot.nap511.bean.FileInfo
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.ImageDate
 import github.zerorooot.nap511.bean.MusicBean
 import github.zerorooot.nap511.bean.ProcessData
+import github.zerorooot.nap511.bean.ProcessDataResponse
 import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.bean.VideoInfoBean
 import okhttp3.Interceptor
@@ -238,7 +241,7 @@ interface FileService {
     suspend fun decryptZip(
         @Field("pick_code") pickCode: String,
         @Field("secret") secret: String
-    ): EncryptionData
+    ): EncryptionDataResponse
 
     /**
      *非加密文件 {"state":true,"message":"","code":"","data":{"unzip_status":1}}
@@ -249,7 +252,7 @@ interface FileService {
     @POST("files/push_extract")
     suspend fun checkEncryptionStatus(
         @Field("pick_code") pickCode: String
-    ): EncryptionData
+    ): EncryptionDataResponse
 
     /**
      * {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
@@ -257,7 +260,7 @@ interface FileService {
     @GET("files/push_extract")
     suspend fun getDecryptZipProcess(
         @Query("pick_code") pickCode: String
-    ): ExtractData
+    ): ExtractResponse
 
 
     /**
@@ -275,7 +278,7 @@ interface FileService {
         @Field("extract_file[]") files: List<String>?,
         @Field("extract_dir[]") dirs: List<String>?,
         @Field("paths") paths: String = "文件"
-    ): ProcessData
+    ): ProcessDataResponse
 
     /**
      * {"state":true,"message":"","code":"","data":{"extract_id":"id","to_pid":"pid","percent":100}}
@@ -283,7 +286,7 @@ interface FileService {
     @GET("files/add_extract_file")
     suspend fun unzipFileProcess(
         @Query("extract_id") extractId: Long,
-    ): ProcessData
+    ): ProcessDataResponse
 
     @GET("files/music")
     suspend fun music(

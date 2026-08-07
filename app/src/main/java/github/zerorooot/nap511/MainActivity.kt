@@ -470,7 +470,12 @@ class MainActivity : AppCompatActivity() {
                     composable<Route.RepeatFile> {
                         RepeatFileScreen(repeatViewModel, { scope.launch { drawerState.open() } }) {
                             fileViewModel.getFiles(it)
-                            navController.popBackStack()
+                            navController.navigate(Route.MyFile) {
+                                // 将 RepeatFile 中转页从返回栈中彻底弹出，用户返回时，就会直接退回首页，而不会退回中转页
+                                popUpTo<Route.RepeatFile> {
+                                    inclusive = true
+                                }
+                            }
                         }
                     }
 

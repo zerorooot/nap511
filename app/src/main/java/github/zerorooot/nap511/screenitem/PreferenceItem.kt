@@ -27,6 +27,17 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.screen.BaseDialog
 
+// 分组标题组件
+@Composable
+fun PreferenceCategoryHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
+    )
+}
+
 // 1. 普通点击项（如：重启应用、离线下载验证）
 @Composable
 fun PreferenceItem(
@@ -133,8 +144,14 @@ fun ListPreferenceItem(
 ) {
     var showDialog by remember { mutableStateOf(false) }
     val disabledAlpha = 0.38f
-    val headlineColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = disabledAlpha)
-    val supportingColor = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = disabledAlpha)
+    val headlineColor =
+        if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(
+            alpha = disabledAlpha
+        )
+    val supportingColor =
+        if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(
+            alpha = disabledAlpha
+        )
 
     ListItem(
         headlineContent = { Text(text = title) },

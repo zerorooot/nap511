@@ -36,7 +36,7 @@ class DecompressionLoadingException(
 // 统一定义接口返回的包装结构
 open class BaseResponse(
     @SerializedName("state") val state: Boolean = false,
-    @SerializedName("msg") val message: String = "",
+    @SerializedName("msg", alternate = ["message"]) val message: String = "",
     @SerializedName("msg_code") val msgCode: Int = 0
 ) {
     override fun toString(): String {
@@ -52,10 +52,15 @@ data class MusicBean(
     val audioUrl: String = ""
 )
 
+data class ExtractResponse(
+    @SerializedName("data")
+    val data: ExtractData
+) : BaseResponse()
+
 data class ExtractData(
     @SerializedName("extract_status")
     val extractStatus: ExtractStatus
-) : BaseResponse()
+)
 
 data class ExtractStatus(
     @SerializedName("unzip_status")
@@ -63,9 +68,21 @@ data class ExtractStatus(
     val progress: Int = -1
 )
 
+// {"state":true,"message":"","code":"","data":{"unzip_status":4}}
+data class EncryptionDataResponse(
+    @SerializedName("data")
+    val data: EncryptionData
+) : BaseResponse()
+
 data class EncryptionData(
     @SerializedName("unzip_status")
     val unzipStatus: Int = -1
+)
+
+// {"state":true,"message":"","code":"","data":{"extract_id":1231231}}
+data class ProcessDataResponse(
+    @SerializedName("data")
+    val data: ProcessData
 ) : BaseResponse()
 
 data class ProcessData(
@@ -74,7 +91,7 @@ data class ProcessData(
     @SerializedName("to_pid")
     val toPid: String,
     val percent: Int
-) : BaseResponse()
+)
 
 data class AvatarBean(
     var expire: Long = 1L,
@@ -469,7 +486,8 @@ data class ZipBean(
 
 
 //----------------文件查重--------------------------
-
+//{"state":false,"msg":"","msg_code":0,"data":{"group_count":0,"file_count":0,"file_size":0}}
+//{"state":true,"msg":"","msg_code":0,"data":{"group_count":"766","file_count":"1632","file_size":"216379446654"}}
 // 1. 重复文件状态响应
 data class RepeatStatusResponse(
     @SerializedName("data") val data: RepeatStatusData? = null

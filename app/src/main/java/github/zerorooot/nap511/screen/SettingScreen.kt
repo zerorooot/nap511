@@ -12,107 +12,65 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringArrayResource
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.screenitem.EditTextPreferenceItem
 import github.zerorooot.nap511.screenitem.ListPreferenceItem
+import github.zerorooot.nap511.screenitem.PreferenceCategoryHeader
 import github.zerorooot.nap511.screenitem.PreferenceItem
 import github.zerorooot.nap511.screenitem.SwitchPreferenceItem
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
-import kotlinx.coroutines.launch
+import github.zerorooot.nap511.viewmodel.SettingViewModel
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingScreen(
+    viewModel: SettingViewModel = viewModel(),
     onClick: (String) -> Unit
 ) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    SettingContent(
+        uiState = uiState,
+        onSaveConfig = { key, value -> viewModel.saveData(key, value) },
+        onActionClick = onClick,
+        onRestartApp = {
+            App.instance.toast("重启中～")
+            ProcessPhoenix.triggerRebirth(App.instance)
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingContent(
+    uiState: SettingUiState,
+    onSaveConfig: (String, Any) -> Unit,
+    onActionClick: (String) -> Unit,
+    onRestartApp: () -> Unit
+) {
     val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
-
-    val logEnabled by DataStoreUtil.getDataFlow(ConfigKeyUtil.LOG, false)
-        .collectAsState(initial = false)
-    val aria2Url by DataStoreUtil.getDataFlow(
-        ConfigKeyUtil.ARIA2_URL,
-        ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
-    ).collectAsState(initial = ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE)
-    val aria2Token by DataStoreUtil.getDataFlow(ConfigKeyUtil.ARIA2_TOKEN, "")
-        .collectAsState(initial = "")
-    val autoRotateEnabled by DataStoreUtil.getDataFlow(ConfigKeyUtil.AUTO_ROTATE, false)
-        .collectAsState(initial = false)
-
-    val hideLoadingView by DataStoreUtil.getDataFlow(ConfigKeyUtil.HIDE_LOADING_VIEW, false)
-        .collectAsState(initial = false)
-
-    val earlyLoading by DataStoreUtil.getDataFlow(ConfigKeyUtil.EARLY_LOADING, false)
-        .collectAsState(initial = false)
-
-    val saveRequestCache by DataStoreUtil.getDataFlow(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
-        .collectAsState(initial = true)
-
-    val positionAfterAt by DataStoreUtil.getDataFlow(ConfigKeyUtil.POSITION_AFTER_AT, false)
-        .collectAsState(initial = false)
-
-    val torrentSort by DataStoreUtil.getDataFlow(ConfigKeyUtil.TORRENT_SORT, false)
-        .collectAsState(initial = false)
-    val currentOfflineTask by DataStoreUtil.getDataFlow(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
-        .collectAsState(initial = "")
-    // EditText 变量状态管理
-    val uid by DataStoreUtil.getDataFlow(ConfigKeyUtil.UID, "0")
-        .collectAsState(initial = "0")
-
-    val cookie by DataStoreUtil.getDataFlow(ConfigKeyUtil.COOKIE, "cookie")
-        .collectAsState(initial = "cookie")
-
-    val password by DataStoreUtil.getDataFlow(ConfigKeyUtil.PASSWORD, "")
-        .collectAsState(initial = "")
-
-    val requestLimitCount by DataStoreUtil.getDataFlow(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200")
-        .collectAsState(initial = "200")
-
-    val defaultOfflineCid by DataStoreUtil.getDataFlow(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
-        .collectAsState(initial = "")
-    val fabPosition by DataStoreUtil.getDataFlow(
-        ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION,
-        "End"
-    ).collectAsState(initial = "End")
-
     val fabArray = stringArrayResource(R.array.floatingActionButtonPosition)
 
-    val moveFailFile by DataStoreUtil.getDataFlow(ConfigKeyUtil.MOVE_FAIL_FILE, "")
-        .collectAsState(initial = "")
-
-    val defaultOfflineTime by DataStoreUtil.getDataFlow(ConfigKeyUtil.DEFAULT_OFFLINE_TIME, "5")
-        .collectAsState(initial = "5")
-
-    fun <T : Any> saveDate(key: String, newValue: T) {
-        coroutineScope.launch {
-            DataStoreUtil.putDataSuspend(
-                key,
-                newValue
-            ) // 保存后 logEnabled 会自动刷新 UI
-        }
-    }
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(text = ConfigKeyUtil.ADVANCED_SETTINGS) },
+                title = { Text(text = "高级设置") },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
                 navigationIcon = {
                     TopAppBarActionButton(
                         imageVector = Icons.Rounded.Menu,
                         description = "navigationIcon",
-                        onClick = { onClick.invoke("topAppBarActionButtonOnClick") }
+                        onClick = { onActionClick("topAppBarActionButtonOnClick") }
                     )
                 }
             )
@@ -130,254 +88,211 @@ fun SettingScreen(
                     .padding(innerPadding),
                 state = listState
             ) {
-                // 1. 用户 ID（禁用状态）
+                // --- 1. 账号与安全 ---
+                item { PreferenceCategoryHeader("账号与安全") }
                 item {
                     EditTextPreferenceItem(
                         title = "用户id",
-                        summary = uid,
-                        value = uid,
+                        summary = uiState.uid,
+                        value = uiState.uid,
                         enabled = false,
                         onValueSave = {}
                     )
                 }
-
-                // 2. Cookie & 密码设置
                 item {
                     EditTextPreferenceItem(
                         title = "登录Cookie",
                         summary = "点击更改",
-                        value = cookie,
-                        onValueSave = {
-                            saveDate(ConfigKeyUtil.COOKIE, it)
-                        }
+                        value = uiState.cookie,
+                        onValueSave = { onSaveConfig(ConfigKeyUtil.COOKIE, it) }
                     )
                 }
                 item {
                     EditTextPreferenceItem(
                         title = "数字安全密钥",
                         summary = "清空回收站文件时输入的密码",
-                        value = password,
+                        value = uiState.password,
                         isNumber = true,
-                        onValueSave = {
-                            saveDate(ConfigKeyUtil.PASSWORD, it)
-                        }
+                        onValueSave = { onSaveConfig(ConfigKeyUtil.PASSWORD, it) }
                     )
                 }
 
-                // 3. Aria2 地址设置
+                // --- 2. Aria2 与下载设置 ---
+                item { PreferenceCategoryHeader("Aria2 与下载") }
                 item {
                     EditTextPreferenceItem(
                         title = "aria2地址",
-                        summary = aria2Url,
-                        value = aria2Url,
-                        onValueSave = {
-                            saveDate(ConfigKeyUtil.ARIA2_URL, it)
-                        }
+                        summary = uiState.aria2Url,
+                        value = uiState.aria2Url,
+                        onValueSave = { onSaveConfig(ConfigKeyUtil.ARIA2_URL, it) }
                     )
                 }
                 item {
                     EditTextPreferenceItem(
                         title = "aria2秘钥",
-                        summary = aria2Token.ifEmpty { "没有留空即可" },
-                        value = aria2Token,
-                        onValueSave = {
-                            saveDate(ConfigKeyUtil.ARIA2_TOKEN, it)
-                        }
+                        summary = uiState.aria2Token.ifEmpty { "没有留空即可" },
+                        value = uiState.aria2Token,
+                        onValueSave = { onSaveConfig(ConfigKeyUtil.ARIA2_TOKEN, it) }
                     )
                 }
-                // 4. 请求限制数
                 item {
                     EditTextPreferenceItem(
-                        title = "每次请求文件数",
-                        summary = requestLimitCount,
-                        value = requestLimitCount,
+                        title = "默认离线位置",
+                        summary = uiState.defaultOfflineCid.ifEmpty { "输入文件夹cid，长按目录可复制当前目录cid" },
+                        value = uiState.defaultOfflineCid,
+                        onValueSave = { onSaveConfig(ConfigKeyUtil.DEFAULT_OFFLINE_CID, it) }
+                    )
+                }
+                item {
+                    EditTextPreferenceItem(
+                        title = "离线任务延迟时间",
+                        summary = "延迟${uiState.defaultOfflineTime}分钟后统一离线下载",
+                        value = uiState.defaultOfflineTime,
                         isNumber = true,
-                        onValueSave = {
-                            saveDate(ConfigKeyUtil.REQUEST_LIMIT_COUNT, it)
-                        }
+                        onValueSave = { onSaveConfig(ConfigKeyUtil.DEFAULT_OFFLINE_TIME, it) }
+                    )
+                }
+                item {
+                    PreferenceItem(
+                        title = "立即下载",
+                        summary = "立刻下载缓存的离线任务",
+                        onClick = { onActionClick("handleOfflineTask") }
+                    )
+                }
+                item {
+                    EditTextPreferenceItem(
+                        title = "离线任务缓存",
+                        summary = uiState.currentOfflineTask.ifEmpty { "当前尚未添加离线任务的链接" },
+                        value = uiState.currentOfflineTask,
+                        onValueSave = { onSaveConfig(ConfigKeyUtil.CURRENT_OFFLINE_TASK, it) }
                     )
                 }
 
-                // 5. 默认离线位置
-                item {
-                    val summaryText =
-                        defaultOfflineCid.ifEmpty { "输入文件夹cid，长按目录可复制当前目录cid" }
-                    EditTextPreferenceItem(
-                        title = "默认离线位置",
-                        summary = summaryText,
-                        value = defaultOfflineCid,
-                        onValueSave = {
-                            saveDate(ConfigKeyUtil.DEFAULT_OFFLINE_CID, it)
-                        }
-                    )
-                }
+                // --- 3. 文件与界面偏好 ---
+                item { PreferenceCategoryHeader("界面与操作") }
                 item {
                     ListPreferenceItem(
                         title = "浮动按钮位置",
-                        value = fabPosition,
+                        value = uiState.fabPosition,
                         entries = fabArray,
                         entryValues = fabArray,
                         onValueSave = {
-                            saveDate(ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION, it)
+                            onSaveConfig(
+                                ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION,
+                                it
+                            )
                         }
                     )
                 }
-                // 6. 移动失败文件文件夹
                 item {
-                    val summaryText = if (moveFailFile.isEmpty()) {
-                        "后台解压失败后，压缩包将移动至解压目录此名称的文件夹中，留空则不移动"
-                    } else {
-                        "后台解压失败后，压缩包将移动至\"解压目录\\$moveFailFile\"中"
-                    }
+                    EditTextPreferenceItem(
+                        title = "每次请求文件数",
+                        summary = uiState.requestLimitCount,
+                        value = uiState.requestLimitCount,
+                        isNumber = true,
+                        onValueSave = { onSaveConfig(ConfigKeyUtil.MOVE_FAIL_FILE, it) }
+                    )
+                }
+                item {
                     EditTextPreferenceItem(
                         title = "解压失败存放文件夹",
-                        summary = summaryText,
-                        value = moveFailFile,
-                        onValueSave = {
-                            saveDate(ConfigKeyUtil.MOVE_FAIL_FILE, it)
-                        }
+                        summary = if (uiState.moveFailFile.isEmpty()) {
+                            "后台解压失败后，压缩包将移动至解压目录此名称的文件夹中，留空则不移动"
+                        } else {
+                            "后台解压失败后，压缩包将移动至\"解压目录\\${uiState.moveFailFile}\"中"
+                        },
+                        value = uiState.moveFailFile,
+                        onValueSave = { onSaveConfig(ConfigKeyUtil.MOVE_FAIL_FILE, it) }
                     )
                 }
 
-                // 7. 账号验证按钮
-                item {
-                    PreferenceItem(
-                        title = "视频播放验证",
-                        summary = "打开视频播放异常验证页面",
-                        onClick = {
-                            onClick.invoke("VerifyVideoAccount")
-                        }
-                    )
-                }
-                item {
-                    PreferenceItem(
-                        title = "磁力链接验证",
-                        summary = "打开磁力链接添加异常验证页面",
-                        onClick = {
-                            onClick.invoke("VerifyMagnetLinkAccount")
-                        }
-                    )
-                }
-
-                // 8. 开关配置（Switches）
-                item {
-                    SwitchPreferenceItem(
-                        title = "日志记录",
-                        summary = "输出程序中部分关键节点内容，方便调试",
-                        checked = logEnabled,
-                        onCheckedChange = {
-                            saveDate(ConfigKeyUtil.LOG, it)
-                        }
-
-                    )
-                }
+                // --- 4. 自动化与开关控制 ---
+                item { PreferenceCategoryHeader("功能开关") }
                 item {
                     SwitchPreferenceItem(
                         title = "屏幕自动旋转",
                         summary = "根据视频横竖自动旋转屏幕",
-                        checked = autoRotateEnabled,
-                        onCheckedChange = {
-                            saveDate(ConfigKeyUtil.AUTO_ROTATE, it)
-                        }
+                        checked = uiState.autoRotateEnabled,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.AUTO_ROTATE, it) }
                     )
                 }
                 item {
                     SwitchPreferenceItem(
                         title = "隐藏视频加载提示",
                         summary = "当视频正在加载时，隐藏加载提示",
-                        checked = hideLoadingView,
-                        onCheckedChange = {
-                            saveDate(ConfigKeyUtil.HIDE_LOADING_VIEW, it)
-                        }
+                        checked = uiState.hideLoadingView,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.HIDE_LOADING_VIEW, it) }
                     )
                 }
                 item {
                     SwitchPreferenceItem(
                         title = "提前加载",
                         summary = "进入下级目录时，提前加载当前文件夹上下两个文件夹内的文件",
-                        checked = earlyLoading,
-                        onCheckedChange = {
-                            saveDate(ConfigKeyUtil.EARLY_LOADING, it)
-                        }
+                        checked = uiState.earlyLoading,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.EARLY_LOADING, it) }
                     )
                 }
                 item {
                     SwitchPreferenceItem(
                         title = "保存请求缓存",
-                        summary = "保存请求文件缓存到application.cacheDir/fileListCache.json中，便于提升加载速度",
-                        checked = saveRequestCache,
-                        onCheckedChange = {
-                            saveDate(ConfigKeyUtil.SAVE_REQUEST_CACHE, it)
-                        }
+                        summary = "保存请求文件缓存到 cacheDir 中，便于提升加载速度",
+                        checked = uiState.saveRequestCache,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.SAVE_REQUEST_CACHE, it) }
                     )
                 }
                 item {
                     SwitchPreferenceItem(
                         title = "光标重定位",
                         summary = "重命名时，光标定位在'@'或'空格'后",
-                        checked = positionAfterAt,
-                        onCheckedChange = {
-                            saveDate(ConfigKeyUtil.POSITION_AFTER_AT, it)
-                        }
+                        checked = uiState.positionAfterAt,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.POSITION_AFTER_AT, it) }
                     )
                 }
                 item {
                     SwitchPreferenceItem(
                         title = "种子排序",
                         summary = "种子文件按文件大小从大到小排序",
-                        checked = torrentSort,
-                        onCheckedChange = {
-                            saveDate(ConfigKeyUtil.TORRENT_SORT, it)
-                        }
+                        checked = uiState.torrentSort,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.TORRENT_SORT, it) }
+                    )
+                }
+                item {
+                    SwitchPreferenceItem(
+                        title = "日志记录",
+                        summary = "输出程序中部分关键节点内容，方便调试",
+                        checked = uiState.logEnabled,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.LOG, it) }
+                    )
+                }
+
+                // --- 5. 工具与维护 ---
+                item { PreferenceCategoryHeader("维护与验证") }
+                item {
+                    PreferenceItem(
+                        title = "视频播放验证",
+                        summary = "打开视频播放异常验证页面",
+                        onClick = { onActionClick("VerifyVideoAccount") }
+                    )
+                }
+                item {
+                    PreferenceItem(
+                        title = "磁力链接验证",
+                        summary = "打开磁力链接添加异常验证页面",
+                        onClick = { onActionClick("VerifyMagnetLinkAccount") }
                     )
                 }
                 item {
                     PreferenceItem(
                         title = "文件查重",
                         summary = "排查重复文件",
-                        onClick = {
-                            onClick.invoke("RepeatFile")
-                        }
-                    )
-                }
-                // 9. 离线延迟时间
-                item {
-                    EditTextPreferenceItem(
-                        title = "离线任务延迟时间",
-                        summary = "延迟${defaultOfflineTime}分钟后统一离线下载",
-                        value = defaultOfflineTime,
-                        isNumber = true,
-                        onValueSave = {
-                            saveDate(ConfigKeyUtil.DEFAULT_OFFLINE_TIME, it)
-                        }
-                    )
-                }
-                // 10. 立即下载与重启应用
-                item {
-                    PreferenceItem(
-                        title = "立即下载",
-                        summary = "立刻下载缓存的离线任务",
-                        onClick = { onClick.invoke("handleOfflineTask") }
-                    )
-                }
-                item {
-                    EditTextPreferenceItem(
-                        title = "离线任务缓存",
-                        summary = currentOfflineTask.ifEmpty { "当前尚未添加离线任务的链接" },
-                        value = currentOfflineTask,
-                        onValueSave = {
-                            saveDate(ConfigKeyUtil.CURRENT_OFFLINE_TASK, it)
-                        }
+                        onClick = { onActionClick("RepeatFile") }
                     )
                 }
                 item {
                     PreferenceItem(
                         title = "重启应用",
                         summary = "点我重新启动应用",
-                        onClick = {
-                            App.instance.toast("重启中～")
-                            ProcessPhoenix.triggerRebirth(App.instance)
-                        }
+                        onClick = onRestartApp
                     )
                 }
             }
