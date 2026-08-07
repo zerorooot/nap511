@@ -1,9 +1,8 @@
-name: Generate APK Release
+name: Generate APK Pre-Release
 
 on:
   push:
     branches: [ "main" ]
-    # 仅在相关代码或配置文件变动时触发
     paths:
       - 'app/**'
       - 'build.gradle.kts'
@@ -15,11 +14,12 @@ on:
       - '.github/workflows/generate-apk-release.yml'
 
 jobs:
-  build:
-    # 过滤特定 Commit（如版本更新或明确标记 [skip release] 的提交）
+  build_and_prerelease:
+    # 忽略版本 bump 提交或明确标注跳过 preview/release 的 Commit
     if: |
       !startsWith(github.event.head_commit.message, 'chore: bump version') &&
       !startsWith(github.event.head_commit.message, 'chore(release)') &&
+      !contains(github.event.head_commit.message, '[skip preview]') &&
       !contains(github.event.head_commit.message, '[skip release]')
     runs-on: ubuntu-latest
     permissions:
@@ -36,7 +36,6 @@ jobs:
         id: vars
         run: |
           echo "SHORT_SHA=$(git rev-parse --short=7 HEAD)" >> $GITHUB_OUTPUT
-          echo "DATE_TODAY=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
           echo "YY_MM=$(date +'%y.%m')" >> $GITHUB_OUTPUT
 
       - name: Setup Java 17
@@ -79,6 +78,7 @@ jobs:
             exit 1
           fi
 
+          # 生成纯版本 Tag 格式 (例如 26.03.1a2b3c4)
           VERSION_TAG="${{ steps.vars.outputs.YY_MM }}.${{ steps.vars.outputs.SHORT_SHA }}"
           DIR=$(dirname "$SIGNED_APK")
           NEW_APK_NAME="app-release-${VERSION_TAG}.apk"
@@ -88,6 +88,20 @@ jobs:
 
           echo "signed_apk=${NEW_APK_PATH}" >> $GITHUB_OUTPUT
           echo "version_tag=${VERSION_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Delete old preview release and tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 自动匹配并清理上一次生成的 Preview Tag (例如包含 7 位以上 commit hash 的临时 Tag)
+          # 这样不会误删 26.03 或 26.03.01 这类正式稳定版 Tag
+          LATEST_TAG=$(git tag --list --sort=-creatordate | grep -E '^[0-9]+\.[0-9]+\.[a-f0-9]{7,}$' | head -n 1)
+          if [[ -n "$LATEST_TAG" ]]; then
+            gh release delete "$LATEST_TAG" --yes || echo "No previous preview release found to delete."
+            git push origin --delete "$LATEST_TAG" || echo "No previous preview tag found to delete."
+          else
+            echo "No preview tag to delete."
+          fi
 
       - name: Generate changelog
         id: changelog
@@ -101,35 +115,57 @@ jobs:
             LOG_RANGE="$PREV_TAG..HEAD"
           fi
 
-          CHANGELOG_LIST=$(git log $LOG_RANGE --pretty=format:"- %s (%an)" | grep -v '^-\s*Merge' | head -n 10)
+          CHANGELOG_LIST=$(git log $LOG_RANGE --pretty=format:"- %s (%an)" | grep -v '^-\s*Merge' | head -n 5)
+          CHANGELOG_COUNT=$(git log $LOG_RANGE --pretty=format:"- %s (%an)" | grep -v '^-\s*Merge' | wc -l)
           
+          CHANGELOG_BODY_OUTPUT=""
           if [ -z "$CHANGELOG_LIST" ]; then
-            CHANGELOG_BODY_OUTPUT="No changes listed."
+            CHANGELOG_BODY_OUTPUT="No changes since the last release."
           else
             CHANGELOG_BODY_OUTPUT="$CHANGELOG_LIST"
           fi
 
+          CHANGELOG_LINK_OUTPUT=""
+          if [ "$CHANGELOG_COUNT" -gt 5 ]; then
+            if [ -z "$PREV_TAG" ]; then
+              COMPARE_URL="https://github.com/${{ github.repository }}/commits/main"
+            else
+              COMPARE_URL="https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${CURR_TAG}"
+            fi
+            CHANGELOG_LINK_OUTPUT="\n\n**Full Changelog:** [\`${PREV_TAG}...${CURR_TAG}\`]($COMPARE_URL)"
+          fi
+          
           {
             echo "changelog_body<<EOF"
             echo -e "$CHANGELOG_BODY_OUTPUT"
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
-      - name: Create GitHub Release
+          {
+            echo "changelog_full_link<<EOF"
+            echo -e "$CHANGELOG_LINK_OUTPUT"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+          echo "--- Generated Changelog for Release Body ---"
+          echo -e "${CHANGELOG_BODY_OUTPUT}${CHANGELOG_LINK_OUTPUT}"
+
+      - name: Create Latest Pre-Release
         uses: softprops/action-gh-release@v3
         with:
-          name: "Release (${{ steps.vars.outputs.DATE_TODAY }} - ${{ steps.vars.outputs.SHORT_SHA }})"
-          tag_name: "v${{ steps.rename_apk.outputs.version_tag }}"
+          name: "Preview Release (${{ steps.vars.outputs.SHORT_SHA }})"
+          tag_name: "${{ steps.rename_apk.outputs.version_tag }}"
           target_commitish: ${{ github.sha }}
           body: |
-            ## Release Build (${{ steps.vars.outputs.DATE_TODAY }})
+            ## 这是自动构建的最新测试版。
+            - **这是一个预发布版本，并非为生产环境准备就绪。**
+            - 我们非常鼓励您分享您的看法！
+            
+            ## This is an automatically built latest Preview release.
+            - **This is a pre-release version and is not intended for production use.**
+            - We appreciate any feedback!
             
             **更新日志（Changelog）:**
-            ${{ steps.changelog.outputs.changelog_body }}
+            ${{ steps.changelog.outputs.changelog_body }}${{ steps.changelog.outputs.changelog_full_link }}
+          prerelease: true
           files: ${{ steps.rename_apk.outputs.signed_apk }}
-
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.vars.outputs.DATE_TODAY }} - Release APK
-          path: ${{ steps.rename_apk.outputs.signed_apk }}
