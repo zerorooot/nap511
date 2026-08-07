@@ -11,7 +11,7 @@ on:
       - 'settings.gradle'
       - 'gradle.properties'
       - 'gradle/**'
-      - '.github/workflows/generate-apk-release.yml'
+      - '.github/workflows/generate-apk-release.yml.back'
 
 jobs:
   build_and_prerelease:

@@ -37,12 +37,15 @@ interface RepeatService {
     }
 
     //https://aps.115.com/repeat/repeat_status.php?_=123123
+    //{"state":false,"msg":"","msg_code":0,"data":{"group_count":0,"file_count":0,"file_size":0}}
+//{"state":true,"msg":"","msg_code":0,"data":{"group_count":"766","file_count":"1632","file_size":"216379446654"}}
     @GET("repeat_status.php")
     suspend fun getRepeatStatus(
         @Query("_") timestamp: Long = System.currentTimeMillis()
     ): RepeatStatusResponse
 
     //https://aps.115.com/repeat/repeat_list.php?s=0&l=100&_=123123
+    //{"state":true,"msg":"","msg_code":0,"data":[{"sha1":"sha1","file_id":"x","file_name":"x.iso","ico":"x","file_size":"x","user_utime":"x","user_utime_str":"1999-09-01 00:00:00","parent_id":"x","path":"x"}],"s":0,"l":"100","count":"xx"}
     @GET("repeat_list.php")
     suspend fun getRepeatList(
         @Query("s") offset: Int,
@@ -57,6 +60,8 @@ interface RepeatService {
     ): BaseResponse
 
 
+    //https://aps.115.com/repeat/repeat_delete.php
+    //{"state":true,"msg":"","msg_code":0}
     @FormUrlEncoded
     @POST("repeat_delete.php")
     suspend fun deleteRepeatFiles(
