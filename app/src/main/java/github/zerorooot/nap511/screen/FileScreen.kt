@@ -16,6 +16,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,6 +26,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -34,6 +37,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -43,6 +47,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
@@ -431,36 +436,47 @@ fun FileScreen(
                 isRefreshing = refreshing,
                 onRefresh = { fileViewModel.refresh() }
             ) {
-                //当 path 改变时，强制销毁并重新创建 Scrollbar，让它正确绑定新传入的 listState
-                key(path) {
-                    LazyColumnScrollbar(
-                        state = listState,
-                        settings = ScrollbarSettings.Default.copy(
-                            thumbUnselectedColor = Purple80
-                        )
+                if (fileBeanList.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState()), // 添加垂直滚动支持以分发下拉手势,
+                        contentAlignment = Alignment.Center
                     ) {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            state = listState
+                        Text("暂无文件")
+                    }
+                } else {
+                    //当 path 改变时，强制销毁并重新创建 Scrollbar，让它正确绑定新传入的 listState
+                    key(path) {
+                        LazyColumnScrollbar(
+                            state = listState,
+                            settings = ScrollbarSettings.Default.copy(
+                                thumbUnselectedColor = Purple80
+                            )
                         ) {
-                            itemsIndexed(
-                                items = fileBeanList,
-                                //已经在FileViewModel.setFileBeanProperty对文件夹设置了fileId
-                                key = { index, item -> item.fileId.ifEmpty { "placeholder_$index" } }
-                            ) { index, item ->
-                                FileCellItem(
-                                    item,
-                                    index,
-                                    fileViewModel.clickMap.getOrDefault(path, -1),
-                                    Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null),
-                                    ::myItemOnClick,
-                                    itemOnLongClick = ::itemOnLongClick,
-                                    onCut = ::onMenuCut,
-                                    onDelete = ::onMenuDelete,
-                                    onRename = ::onMenuRename,
-                                    onFileInfo = ::onMenuFileInfo,
-                                    onAria2Download = ::onMenuAria2Download,
-                                )
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                state = listState
+                            ) {
+                                itemsIndexed(
+                                    items = fileBeanList,
+                                    //已经在FileViewModel.setFileBeanProperty对文件夹设置了fileId
+                                    key = { index, item -> item.fileId.ifEmpty { "placeholder_$index" } }
+                                ) { index, item ->
+                                    FileCellItem(
+                                        item,
+                                        index,
+                                        fileViewModel.clickMap.getOrDefault(path, -1),
+                                        Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null),
+                                        ::myItemOnClick,
+                                        itemOnLongClick = ::itemOnLongClick,
+                                        onCut = ::onMenuCut,
+                                        onDelete = ::onMenuDelete,
+                                        onRename = ::onMenuRename,
+                                        onFileInfo = ::onMenuFileInfo,
+                                        onAria2Download = ::onMenuAria2Download,
+                                    )
+                                }
                             }
                         }
                     }

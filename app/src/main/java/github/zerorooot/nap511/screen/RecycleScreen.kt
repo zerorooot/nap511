@@ -1,13 +1,16 @@
 package github.zerorooot.nap511.screen
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.screenitem.RecycleCellItem
@@ -82,18 +86,32 @@ fun RecycleScreen(recycleViewModel: RecycleViewModel, onClick: () -> Unit) {
         )
         PullToRefreshBox(
             isRefreshing = refreshing, onRefresh = { recycleViewModel.refresh() }) {
-            LazyColumnScrollbar(
-                state = listState, settings = ScrollbarSettings.Default.copy(
-                    thumbUnselectedColor = Purple80
-                )
-            ) {
-                LazyColumn(Modifier.fillMaxSize(), state = listState) {
-                    itemsIndexed(items = recycleFileList, key = { _, item ->
-                        item.hashCode()
-                    }) { index, item ->
-                        RecycleCellItem(
-                            recycleBean = item, Modifier.animateItem(), index = index, menuOnClick
-                        )
+            if (recycleFileList.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()), // 添加垂直滚动支持以分发下拉手势,
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("暂无文件")
+                }
+            } else {
+                LazyColumnScrollbar(
+                    state = listState, settings = ScrollbarSettings.Default.copy(
+                        thumbUnselectedColor = Purple80
+                    )
+                ) {
+                    LazyColumn(Modifier.fillMaxSize(), state = listState) {
+                        itemsIndexed(items = recycleFileList, key = { _, item ->
+                            item.hashCode()
+                        }) { index, item ->
+                            RecycleCellItem(
+                                recycleBean = item,
+                                Modifier.animateItem(),
+                                index = index,
+                                menuOnClick
+                            )
+                        }
                     }
                 }
             }

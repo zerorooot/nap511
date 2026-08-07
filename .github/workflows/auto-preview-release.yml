@@ -115,7 +115,7 @@ jobs:
             LOG_RANGE="$PREV_TAG..HEAD"
           fi
 
-          CHANGELOG_LIST=$(git log $LOG_RANGE --pretty=format:"- %s (%an)" | grep -v '^-\s*Merge' | head -n 5)
+          CHANGELOG_LIST=$(git log $LOG_RANGE --pretty=format:"- %s%n" | grep -v '^-\s*Merge' | head -n 5)
           CHANGELOG_COUNT=$(git log $LOG_RANGE --pretty=format:"- %s (%an)" | grep -v '^-\s*Merge' | wc -l)
           
           CHANGELOG_BODY_OUTPUT=""
