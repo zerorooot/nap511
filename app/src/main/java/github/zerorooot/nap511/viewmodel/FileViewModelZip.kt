@@ -10,12 +10,12 @@ import androidx.work.WorkManager
 import com.elvishew.xlog.XLog
 import com.google.common.reflect.TypeToken
 import com.google.gson.Gson
-import github.zerorooot.nap511.worker.UnzipAllFileWorker
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.worker.UnzipAllFileWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
@@ -28,7 +28,8 @@ internal fun FileViewModel.getZipListFile(
 ) {
     viewModelScope.launch {
         val fileBean = fileBeanList[selectIndex]
-        if (isCheck && !isOpenUnzipDialog && paths == "文件") {
+//        if (isCheck && !isOpenUnzipDialog && paths == "文件") {
+        if (isCheck && paths == "文件") {
             // 首次打开，调用重构后的状态检查方法
             when (val status = fileRepository.checkZipStatus(fileBean.pickCode)) {
                 is ZipStatus.Encrypted -> {

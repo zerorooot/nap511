@@ -78,7 +78,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
-import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import github.zerorooot.nap511.R
@@ -101,8 +100,6 @@ import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import github.zerorooot.nap511.viewmodel.closeTextBodyDialog
 import github.zerorooot.nap511.viewmodel.closeUnzipAllFileDialog
 import github.zerorooot.nap511.viewmodel.closeUnzipDialog
-import github.zerorooot.nap511.viewmodel.closeUnzipPasswordDialog
-import github.zerorooot.nap511.viewmodel.decryptZip
 import github.zerorooot.nap511.viewmodel.getZipListFile
 import github.zerorooot.nap511.viewmodel.unzipFile
 import kotlinx.coroutines.delay
@@ -113,51 +110,34 @@ import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
-fun CreateFolderDialog(fileViewModel: FileViewModel, enter: (String?) -> Unit) {
-    if (fileViewModel.isOpenCreateFolderDialog) {
-        BaseDialog("请输入新建文件名", "文件名", enter = enter)
-    }
+fun CreateFolderDialog(enter: (String?) -> Unit) {
+    BaseDialog("请输入新建文件名", "文件名", enter = enter)
 }
 
 @Composable
-fun SearchDialog(fileViewModel: FileViewModel, enter: (String?) -> Unit) {
-    if (fileViewModel.isOpenSearchDialog) {
-        BaseDialog("在当前目录下搜索", "关键字", enter = enter)
-    }
+fun SearchDialog(enter: (String?) -> Unit) {
+    BaseDialog("在当前目录下搜索", "关键字", enter = enter)
 }
 
 
 @Composable
-fun RenameFileDialog(fileViewModel: FileViewModel, enter: (String?) -> Unit) {
-    if (fileViewModel.isOpenRenameFileDialog) {
-        val name = fileViewModel.fileBeanList[fileViewModel.selectIndex].name
-        val position = DataStoreUtil.getData(ConfigKeyUtil.POSITION_AFTER_AT, false)
-        val atPosition = kotlin.math.max(name.lastIndexOf("@"), name.lastIndexOf(" ")) + 1
-        BaseDialog(
-            "重命名文件", "新文件名", name, enter = enter, selection = TextRange(
-                if (!position || atPosition == 0) name.length else atPosition
-            )
+fun RenameFileDialog(name: String, enter: (String?) -> Unit) {
+    val position = DataStoreUtil.getData(ConfigKeyUtil.POSITION_AFTER_AT, false)
+    val atPosition = kotlin.math.max(name.lastIndexOf("@"), name.lastIndexOf(" ")) + 1
+    BaseDialog(
+        "重命名文件", "新文件名", name, enter = enter, selection = TextRange(
+            if (!position || atPosition == 0) name.length else atPosition
         )
-    }
+    )
+
 }
+
 
 @Composable
 fun FileInfoDialog(
-    fileViewModel: FileViewModel, enter: () -> Unit, fileInfoClick: (String) -> Unit
-) {
-    if (fileViewModel.isOpenFileInfoDialog) {
-        val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
-//        BaseDialog( title = fileBean.name,label = "文件信息", readOnly = true,context = fileBean.toString() + "\n" + fileViewModel.fileInfo,enter = enter)
-        FileInfoDialog(fileBean, fileViewModel.fileInfo, enter, fileInfoClick)
-    }
-}
-
-@Composable
-private fun FileInfoDialog(
     fileBean: FileBean,
     fileInfo: FileInfo,
-    onDismissRequest: () -> Unit,
-    fileInfoClick: (String) -> Unit
+    fileInfoClick: (String?) -> Unit
 ) {
     val icon = fileBean.fileIco
     val sections = mutableListOf<InfoSection>()
@@ -190,7 +170,7 @@ private fun FileInfoDialog(
                     currentFileName = fileBean.name,
                     onPathClick = { categoryId ->
                         fileInfoClick(categoryId)
-                        onDismissRequest() // 点击路径跳转后通常关闭弹窗
+                        fileInfoClick.invoke(null) // 点击路径跳转后通常关闭弹窗
                     }
                 )
             }
@@ -208,7 +188,10 @@ private fun FileInfoDialog(
     sections.add(InfoSection(title = "时间信息", items = timeItems))
 
     BaseDetailDialog(
-        title = fileBean.name, icon = icon, sections = sections, onDismissRequest = onDismissRequest
+        title = fileBean.name,
+        icon = icon,
+        sections = sections,
+        onDismissRequest = { fileInfoClick.invoke(null) }
     )
 }
 
@@ -355,18 +338,18 @@ fun BaseDetailDialog(
 
 @Composable
 fun OfflineFileInfoDialog(
-    offlineFileViewModel: OfflineFileViewModel, enter: () -> Unit, copyUrl: (String) -> Unit
+    offlineFileViewModel: OfflineFileViewModel, enter: () -> Unit
 ) {
     if (offlineFileViewModel.isOpenOfflineDialog) {
         val offlineTask = offlineFileViewModel.offlineTask
-        OfflineTaskDialog(offlineTask, onDismissRequest = enter, urlCopy = copyUrl)
+        OfflineTaskDialog(offlineTask, onDismissRequest = enter)
 //        BaseDialog(title = offlineTask.name, label = "文件信息", readOnly = true, context = offlineTask.toString(), enter = enter)
     }
 }
 
 @Composable
 fun OfflineTaskDialog(
-    task: OfflineTask, onDismissRequest: () -> Unit, urlCopy: (String) -> Unit
+    task: OfflineTask, onDismissRequest: () -> Unit
 ) {
     val sections = listOf(
         InfoSection(
@@ -377,9 +360,9 @@ fun OfflineTaskDialog(
             )
         ), InfoSection(
             title = "链接与哈希", items = listOf(
-                InfoItem("哈希值", task.infoHash), InfoItem("链接", task.url) {
-                    urlCopy.invoke(task.url)
-                })
+                InfoItem("哈希值", task.infoHash),
+                InfoItem("链接", task.url)
+            )
         ), InfoSection(
             title = "时间信息", items = listOf(
                 InfoItem("添加时间", task.timeString)
@@ -429,7 +412,7 @@ fun ExitApp(onDismissRequest: () -> Unit) {
 
 @Composable
 fun TextBodyDialog(fileViewModel: FileViewModel) {
-    if (fileViewModel.isOpenTextBodyDialog && fileViewModel.textBodyByteArray != null) {
+    if (fileViewModel.textBodyByteArray != null) {
         val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
         TextBodyDialogScreen(fileBean.name, fileViewModel.textBodyByteArray!!) {
             if (it == "") {
@@ -520,98 +503,89 @@ fun TextBodyDialogScreen(title: String, context: ByteArray, enter: (String) -> U
     })
 }
 
+@Composable
+fun UnzipPassword(fileBean: FileBean, enter: (String?) -> Unit) {
+    BaseDialog(
+        title = "云解压-${fileBean.name}",
+        label = "请输入密码",
+        dismissButtonText = "取消",
+        enter = enter
+    )
+}
+
 /**
  * 解压文件
  */
 @Composable
 fun UnzipDialog(fileViewModel: FileViewModel) {
-    if (fileViewModel.isOpenUnzipPasswordDialog) {
-        val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
+    val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
+    val zipBeanList by fileViewModel.unzipBeanList
+    LaunchedEffect(Unit) {
         fileViewModel.setRefreshingStatus(false)
-        BaseDialog(
-            title = "云解压-${fileBean.name}", label = "请输入密码", dismissButtonText = "取消"
-        ) {
-            XLog.d("云解压 ${fileBean.name} password $it")
-            if (it != null && it != "") {
-                fileViewModel.decryptZip(it)
-            } else {
-                fileViewModel.closeUnzipPasswordDialog()
-            }
-        }
     }
-
-    if (fileViewModel.isOpenUnzipDialog) {
-        val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
-        val zipBeanList by fileViewModel.unzipBeanList
-        LaunchedEffect(Unit) {
-            fileViewModel.setRefreshingStatus(false)
-        }
-        UnzipScreen(zipBeanList, fileBean.name) {
-            //Pair true is command,false is click event
-            if (it.first) {
-                when (it.second) {
-                    "exit" -> {
-                        fileViewModel.closeUnzipDialog()
-                    }
-
-                    "up" -> {
-                        val path = zipBeanList.pathString.split("/")
-                        var fileName = ""
-                        var paths = ""
-                        try {
-                            fileName = path[path.size - 2]
-                            paths = path.subList(0, path.size - 2).joinToString(separator = "/")
-                        } catch (e: Exception) {
-                        }
-                        fileViewModel.getZipListFile(fileName, paths)
-                    }
-
-                    "unzipAll" -> {
-                        fileViewModel.unzipFile()
-                        fileViewModel.closeUnzipDialog()
-                    }
+    UnzipScreen(zipBeanList, fileBean.name) {
+        //Pair true is command,false is click event
+        if (it.first) {
+            when (it.second) {
+                "exit" -> {
+                    fileViewModel.closeUnzipDialog()
                 }
-            } else {
-                //go to next folder
-                fileViewModel.getZipListFile(
-                    it.second, paths = zipBeanList.pathString
-                )
+
+                "up" -> {
+                    val path = zipBeanList.pathString.split("/")
+                    var fileName = ""
+                    var paths = ""
+                    try {
+                        fileName = path[path.size - 2]
+                        paths = path.subList(0, path.size - 2).joinToString(separator = "/")
+                    } catch (e: Exception) {
+                    }
+                    fileViewModel.getZipListFile(fileName, paths)
+                }
+
+                "unzipAll" -> {
+                    fileViewModel.unzipFile()
+                    fileViewModel.closeUnzipDialog()
+                }
             }
+        } else {
+            //go to next folder
+            fileViewModel.getZipListFile(
+                it.second, paths = zipBeanList.pathString
+            )
         }
     }
+
 }
 
 @Composable
 fun UnzipAllFile(
     fileViewModel: FileViewModel
 ) {
-    if (fileViewModel.isOpenUnzipAllFileDialog) {
-        BaseDialog("请输入解压密码", "如无加密，为空即可") { pwd ->
-            if (pwd == null) {
-                fileViewModel.closeUnzipAllFileDialog()
-                return@BaseDialog
-            }
-
-            val currentCid = fileViewModel.currentCid
-
+    BaseDialog("请输入解压密码", "如无加密，为空即可") { pwd ->
+        if (pwd == null) {
             fileViewModel.closeUnzipAllFileDialog()
-
-            val message =
-                fileViewModel.fileBeanList.filter { i -> i.isSelect && i.fileIco == R.drawable.zip }
-                    .takeIf { it.isNotEmpty() }?.let {
-                        fileViewModel.unzipFile(it, currentCid, pwd)
-                        "后台解压中......"
-                    } ?: run {
-                    "请选中压缩包解压！"
-                }
-            App.instance.toast(message)
-
-
-
-            fileViewModel.recoverFromLongPress()
-            fileViewModel.unSelect()
+            return@BaseDialog
         }
+
+        val currentCid = fileViewModel.currentCid
+
+        fileViewModel.closeUnzipAllFileDialog()
+
+        val message =
+            fileViewModel.fileBeanList.filter { i -> i.isSelect && i.fileIco == R.drawable.zip }
+                .takeIf { it.isNotEmpty() }?.let {
+                    fileViewModel.unzipFile(it, currentCid, pwd)
+                    "后台解压中......"
+                } ?: run {
+                "请选中压缩包解压！"
+            }
+        App.instance.toast(message)
+
+        fileViewModel.recoverFromLongPress()
+        fileViewModel.unSelect()
     }
+
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -762,20 +736,15 @@ fun CookieDialog(enter: (String?) -> Unit) {
 
 @ExperimentalMaterial3Api
 @Composable
-fun FileOrderDialog(fileViewModel: FileViewModel, enter: (String) -> Unit) {
-    if (fileViewModel.isOpenFileOrderDialog) {
-        val fileOrderList = stringArrayResource(id = R.array.fileOrder).toList()
-        RadioButtonDialog(fileOrderList, fileViewModel.orderBean.toString(), enter)
-    }
+fun FileOrderDialog(orderBean: String, enter: (String) -> Unit) {
+    val fileOrderList = stringArrayResource(id = R.array.fileOrder).toList()
+    RadioButtonDialog(fileOrderList, orderBean, enter)
+
 }
 
 
 @Composable
-fun Aria2Dialog(fileViewModel: FileViewModel, context: String, enter: (String) -> Unit) {
-    if (!fileViewModel.isOpenAria2Dialog) {
-        return
-    }
-
+fun Aria2Dialog(context: String, enter: (String) -> Unit) {
     var urlText by remember {
         mutableStateOf(
             TextFieldValue(
@@ -922,55 +891,53 @@ private fun RadioButtonDialog(
 
 @Composable
 fun CreateSelectTorrentFileDialog(
-    fileViewModel: FileViewModel,
-    offlineFileViewModel: OfflineFileViewModel,
+    torrentBean: TorrentFileBean,
+    onStopRefreshing: () -> Unit,
     enter: (infoHash: String, savePath: String, wanted: String) -> Unit
 ) {
-    if (fileViewModel.isOpenCreateSelectTorrentFileDialog) {
-        val torrentBean = offlineFileViewModel.torrentBean
-        // XLog.d("torrentBean: ${Gson().toJson(torrentBean)}")
-        if (!torrentBean.state) {
-            return
-        }
-
-        val infoHash = torrentBean.infoHash
-        val savePath = torrentBean.torrentName
-
-
-        var isSort by remember { mutableStateOf(false) }
-        val torrentFileListWeb = remember {
-            mutableStateListOf<TorrentFileListWeb>().apply {
-                addAll(torrentBean.torrentFileListWeb)
-            }
-        }
-
-        LaunchedEffect(Unit) {
-            isSort = DataStoreUtil.getData(ConfigKeyUtil.TORRENT_SORT, false)
-        }
-
-        if (isSort) {
-            torrentFileListWeb.sortByDescending { it.size }
-        }
-        fileViewModel.setRefreshingStatus(false)
-
-        SelectTorrentFileDialog(
-            torrentFileListWeb.toList(), torrentBean.fileCount, torrentBean.fileSizeString
-        ) {
-            val map = if (isSort) {
-                val sortMap = hashMapOf<Int, TorrentFileListWeb>()
-                val torrentFileList = it.values.toMutableList()
-                torrentFileList.forEach { i ->
-                    sortMap[torrentBean.torrentFileListWeb.indexOf(i)] = i
-                }
-                sortMap
-            } else {
-                it
-            }
-            val wanted = map.keys.joinToString(separator = ",")
-            enter.invoke(infoHash, savePath, wanted)
-        }
-
+    // XLog.d("torrentBean: ${Gson().toJson(torrentBean)}")
+    if (!torrentBean.state) {
+        return
     }
+
+    val infoHash = torrentBean.infoHash
+    val savePath = torrentBean.torrentName
+
+
+    var isSort by remember { mutableStateOf(false) }
+    val torrentFileListWeb = remember {
+        mutableStateListOf<TorrentFileListWeb>().apply {
+            addAll(torrentBean.torrentFileListWeb)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        isSort = DataStoreUtil.getData(ConfigKeyUtil.TORRENT_SORT, false)
+    }
+
+    if (isSort) {
+        torrentFileListWeb.sortByDescending { it.size }
+    }
+    onStopRefreshing.invoke()
+
+    SelectTorrentFileDialog(
+        torrentFileListWeb.toList(), torrentBean.fileCount, torrentBean.fileSizeString
+    ) {
+        val map = if (isSort) {
+            val sortMap = hashMapOf<Int, TorrentFileListWeb>()
+            val torrentFileList = it.values.toMutableList()
+            torrentFileList.forEach { i ->
+                sortMap[torrentBean.torrentFileListWeb.indexOf(i)] = i
+            }
+            sortMap
+        } else {
+            it
+        }
+        val wanted = map.keys.joinToString(separator = ",")
+        enter.invoke(infoHash, savePath, wanted)
+    }
+
+
 }
 
 @Composable

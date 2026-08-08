@@ -116,10 +116,7 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
                 // 3. 分离并统一更新 UI 状态
                 updateTasksState(downloadingRes, failedRes, completedRes)
 
-                _offlineInfo.value = infoRes.apply {
-                    quota = completedRes.quota
-                    total = completedRes.total
-                }
+                _offlineInfo.value = infoRes
             } catch (e: Exception) {
                 XLog.e("刷新离线任务列表失败", e)
             } finally {

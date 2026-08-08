@@ -51,50 +51,26 @@ internal fun FileViewModel.openTextBodyDialog() {
     viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenTextBodyDialog) }
 }
 
-// ==================== 关闭方法（直接在本地设 false） ====================
+// ==================== 关闭方法（统一重定向到 closeDialog） ====================
 
-// ==================== 关闭方法（直接在本地设 false） ====================
+internal fun FileViewModel.closeCreateFolderDialog() = closeDialog()
 
-internal fun FileViewModel.closeCreateFolderDialog() {
-    isOpenCreateFolderDialog = false
-}
+internal fun FileViewModel.closeSearchDialog() = closeDialog()
 
-internal fun FileViewModel.closeSearchDialog() {
-    isOpenSearchDialog = false
-}
+internal fun FileViewModel.closeRenameFileDialog() = closeDialog()
 
-internal fun FileViewModel.closeRenameFileDialog() {
-    isOpenRenameFileDialog = false
-}
+internal fun FileViewModel.closeFileInfoDialog() = closeDialog()
 
-internal fun FileViewModel.closeFileInfoDialog() {
-    isOpenFileInfoDialog = false
-}
+internal fun FileViewModel.closeFileOrderDialog() = closeDialog()
 
-internal fun FileViewModel.closeFileOrderDialog() {
-    isOpenFileOrderDialog = false
-}
+internal fun FileViewModel.closeAria2Dialog() = closeDialog()
 
-internal fun FileViewModel.closeAria2Dialog() {
-    isOpenAria2Dialog = false
-}
+internal fun FileViewModel.closeUnzipDialog() = closeDialog()
 
-internal fun FileViewModel.closeUnzipDialog() {
-    isOpenUnzipDialog = false
-}
+internal fun FileViewModel.closeUnzipPasswordDialog() = closeDialog()
 
-internal fun FileViewModel.closeUnzipPasswordDialog() {
-    isOpenUnzipPasswordDialog = false
-}
+internal fun FileViewModel.closeTextBodyDialog() = closeDialog()
 
-internal fun FileViewModel.closeTextBodyDialog() {
-    isOpenTextBodyDialog = false
-}
+internal fun FileViewModel.closeUnzipAllFileDialog() = closeDialog()
 
-internal fun FileViewModel.closeUnzipAllFileDialog() {
-    isOpenUnzipAllFileDialog = false
-}
-
-internal fun FileViewModel.closeCreateSelectTorrentFileDialog() {
-    isOpenCreateSelectTorrentFileDialog = false
-}
+internal fun FileViewModel.closeCreateSelectTorrentFileDialog() = closeDialog()

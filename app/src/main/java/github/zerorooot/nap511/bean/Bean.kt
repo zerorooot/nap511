@@ -316,9 +316,7 @@ data class OfflineListCount(
     @SerializedName("downloading_count") val downloadingCount: Int = 0,
     @SerializedName("state") val state: Boolean = false,
     @SerializedName("errtype") val errtype: String = "",
-    @SerializedName("errcode") val errcode: Int = 0,
-    var quota: Int = -1,
-    var total: Int = -1,
+    @SerializedName("errcode") val errcode: Int = 0
 )
 
 data class OfflineInfo(

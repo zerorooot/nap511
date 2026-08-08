@@ -26,6 +26,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.FileInfo
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.ImageBean
@@ -103,28 +104,13 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
      */
     internal val dialogEventBus = DialogEventBus.getInstance()
 
-    var isOpenCreateFolderDialog by mutableStateOf(false)
-        internal set
-    var isOpenSearchDialog by mutableStateOf(false)
-        internal set
-    var isOpenRenameFileDialog by mutableStateOf(false)
-        internal set
-    var isOpenFileInfoDialog by mutableStateOf(false)
-        internal set
-    var isOpenFileOrderDialog by mutableStateOf(false)
-        internal set
-    var isOpenAria2Dialog by mutableStateOf(false)
-        internal set
-    var isOpenUnzipDialog by mutableStateOf(false)
-        internal set
-    var isOpenUnzipPasswordDialog by mutableStateOf(false)
-        internal set
-    var isOpenTextBodyDialog by mutableStateOf(false)
-        internal set
-    var isOpenUnzipAllFileDialog by mutableStateOf(false)
-        internal set
-    var isOpenCreateSelectTorrentFileDialog by mutableStateOf(false)
-        internal set
+    // 替换原来 11 个 Boolean 状态
+    var activeDialog by mutableStateOf<FileDialogState>(FileDialogState.None)
+        private set
+
+    fun closeDialog() {
+        activeDialog = FileDialogState.None
+    }
 
     // 定义全局异常处理器处理，防止
     val exceptionHandler = CoroutineExceptionHandler { coroutineContext, throwable ->
@@ -144,27 +130,25 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     init {
         viewModelScope.launch {
             dialogEventBus.events.collect { event ->
-                when (event) {
-                    is DialogEvent.OpenCreateFolder -> isOpenCreateFolderDialog = true
-                    is DialogEvent.OpenSearch -> isOpenSearchDialog = true
-                    is DialogEvent.OpenRenameFile -> isOpenRenameFileDialog = true
-                    is DialogEvent.OpenFileInfo -> isOpenFileInfoDialog = true
-                    is DialogEvent.OpenFileOrder -> isOpenFileOrderDialog = true
-                    is DialogEvent.OpenAria2Dialog -> isOpenAria2Dialog = true
-                    is DialogEvent.OpenUnzipDialog -> isOpenUnzipDialog = true
-                    is DialogEvent.OpenUnzipPasswordDialog -> isOpenUnzipPasswordDialog = true
-                    is DialogEvent.OpenTextBodyDialog -> isOpenTextBodyDialog = true
-                    is DialogEvent.OpenUnzipAllFileDialog -> isOpenUnzipAllFileDialog = true
-                    is DialogEvent.OpenCreateSelectTorrentFileDialog -> isOpenCreateSelectTorrentFileDialog =
-                        true
-
+                activeDialog = when (event) {
+                    is DialogEvent.OpenCreateFolder -> FileDialogState.CreateFolder
+                    is DialogEvent.OpenSearch -> FileDialogState.Search
+                    is DialogEvent.OpenRenameFile -> FileDialogState.RenameFile
+                    is DialogEvent.OpenFileInfo -> FileDialogState.FileInfo
+                    is DialogEvent.OpenFileOrder -> FileDialogState.FileOrder
+                    is DialogEvent.OpenAria2Dialog -> FileDialogState.Aria2
+                    is DialogEvent.OpenUnzipDialog -> FileDialogState.Unzip
+                    is DialogEvent.OpenUnzipPasswordDialog -> FileDialogState.UnzipPassword
+                    is DialogEvent.OpenTextBodyDialog -> FileDialogState.TextBody
+                    is DialogEvent.OpenUnzipAllFileDialog -> FileDialogState.UnzipAllFile
+                    is DialogEvent.OpenCreateSelectTorrentFileDialog -> FileDialogState.CreateSelectTorrentFile
                     is DialogEvent.RefreshFileList -> {
                         refresh(event.cid)
+                        activeDialog
                     }
                     // 不属于 FileViewModel 的事件，忽略
                     is DialogEvent.OpenOfflineDialog,
-                    is DialogEvent.OpenRecyclePasswordDialog -> { /* ignore */
-                    }
+                    is DialogEvent.OpenRecyclePasswordDialog -> activeDialog
                 }
             }
         }

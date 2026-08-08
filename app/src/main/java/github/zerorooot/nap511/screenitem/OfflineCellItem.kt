@@ -125,7 +125,7 @@ fun OfflineCellItem(
                     }
                 }
 
-                OfflineFileMoreMenu() { itemName, _ ->
+                OfflineFileMoreMenu { itemName, _ ->
                     menuOnClick.invoke(itemName, index)
                 }
             }
