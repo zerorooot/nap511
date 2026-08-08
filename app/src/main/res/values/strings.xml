@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">nap511</string>
     <array name="appBarMenu">
+        <item>缓存清空</item>
         <item>文件排序</item>
         <item>刷新文件</item>
         <item>视频时间</item>

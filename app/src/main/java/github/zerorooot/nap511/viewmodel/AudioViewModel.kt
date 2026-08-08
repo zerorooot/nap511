@@ -285,6 +285,5 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
 
     override fun onCleared() {
         stopAudioAndService()
-        super.onCleared()
     }
 }

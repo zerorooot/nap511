@@ -117,19 +117,7 @@ internal fun FileViewModel.delete(index: Int) {
 
         //删除文件夹内的文件夹
         if (fileBean.isFolder) {
-            // 声明为挂起递归函数
-            suspend fun walk(cid: String) {
-                XLog.d("DebugWalk delete 真实 cid 值: $cid")
-                val folderList =
-                    fileListCache[cid]?.fileBeanList?.filter { it.isFolder } ?: emptyList()
-                for (item in folderList) {
-                    fileListCache.remove(item.categoryId)
-                    walk(item.categoryId)   // 递归调用
-                }
-            }
-
-            walk(fileBean.categoryId)
-            fileListCache.remove(fileBean.categoryId)
+            removeFolderCacheRecursively(fileBean.categoryId)
         }
 
         //    XLog.d("FileViewModel.delete after fileListCache size ${fileListCache.size}")
@@ -194,18 +182,7 @@ internal fun FileViewModel.deleteMultiple() {
             //update image cache
             imageBeanCache[cid]?.remove(index)
             if (fileBean.isFolder) {
-                // 声明为挂起递归函数
-                suspend fun walk(cid: String) {
-                    XLog.d("DebugWalk deleteMultiple 真实 cid 值: $cid")
-                    val folderList =
-                        fileListCache[cid]?.fileBeanList?.filter { it.isFolder } ?: emptyList()
-                    for (item in folderList) {
-                        fileListCache.remove(item.categoryId)
-                        walk(item.categoryId)   // 递归调用
-                    }
-                }
-                walk(fileBean.categoryId)
-                fileListCache.remove(fileBean.categoryId)
+                removeFolderCacheRecursively(fileBean.categoryId)
             }
         }
         //提前删除，优化速度

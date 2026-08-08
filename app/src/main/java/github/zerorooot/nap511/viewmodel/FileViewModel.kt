@@ -426,39 +426,53 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
 
     }
 
-
-    fun refresh() {
-        refresh(currentCid)
+    override fun onCleared() {
+        viewModelScope.launch {
+            fileListCache.deleteIndividualFile()
+        }
     }
 
-    internal fun refresh(cid: String) {
+    fun refresh(forceCache: Boolean = false) {
+        refresh(currentCid, forceCache)
+    }
+
+    internal fun refresh(cid: String, forceCache: Boolean = false) {
         isSearchState = false
         recoverFromLongPress()
-
+        val refreshCurrent = (cid == currentCid)
         viewModelScope.launch {
-            suspend fun walk(cid: String) {
-                XLog.d("DebugWalk refresh 真实 cid 值: $cid")
-                val folderList =
-                    fileListCache[cid]?.fileBeanList?.filter { it.isFolder } ?: emptyList()
-                for (item in folderList) {
-                    fileListCache.remove(item.categoryId)
-                    walk(item.categoryId)   // 递归调用
-                }
+            if (DataStoreUtil.getDataSuspend(ConfigKeyUtil.FORCE_LOAD_CACHE, false) || forceCache) {
+                removeFolderCacheRecursively(cid)
             }
-            walk(cid)
             fileListCache.remove(cid)
-
-            if (cid == currentCid) {
+            if (refreshCurrent) {
                 getFiles(currentCid)
             } else {
                 updateFileCache(cid)
             }
+            imageBeanCache.remove(cid)
         }
 
         // 图片缓存清理
-        imageBeanCache.remove(cid)
+
     }
 
+    suspend fun removeFolderCacheRecursively(categoryId: String) {
+        suspend fun walk(cid: String) {
+            XLog.d("DebugWalk delete 真实 cid 值: $cid")
+            // 1. 先取出当前层级的子文件夹列表
+            val folderList =
+                fileListCache[cid]?.fileBeanList?.filter { it.isFolder } ?: emptyList()
+            // 2. 优先向下递归，清理所有子文件夹
+            for (item in folderList) {
+                walk(item.categoryId)
+            }
+            // 3. 所有子级处理完后，再清理当前节点的缓存
+            fileListCache.remove(cid)
+        }
+        // 执行递归清理（内部已包含对根文件夹 fileBean.categoryId 的 remove）
+        walk(categoryId)
+    }
 
     /**
      * 从长按状态恢复

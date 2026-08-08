@@ -326,6 +326,10 @@ fun FileScreen(
 
             }
 
+            "缓存清空" -> {
+                fileViewModel.refresh(true)
+            }
+
             else -> {
                 appBarOnClick(name)
             }

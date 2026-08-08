@@ -278,8 +278,8 @@ fun SettingContent(
                 }
                 item {
                     SwitchPreferenceItem(
-                        title = "强制缓存更新",
-                        summary = "刷新时，清空当前目录里所有文件缓存",
+                        title = "清空当前缓存",
+                        summary = "刷新时，清空当前目录下所有文件缓存",
                         checked = uiState.forceLoadCache,
                         onCheckedChange = { onSaveConfig(ConfigKeyUtil.FORCE_LOAD_CACHE, it) }
                     )

@@ -10,6 +10,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.StringJoiner
 import java.util.concurrent.ConcurrentHashMap
 
 data class CacheWrapper(
@@ -65,14 +66,14 @@ class FileCacheManager(
         fileList.remove("0")
 
         fun walk(cid: String) {
-            fileList.remove(cid)
             val folderList =
                 getDiskCache(cid)?.data?.fileBeanList?.filter { it.isFolder } ?: emptyList()
             for (item in folderList) {
-                fileList.remove(item.categoryId)
-                walk(item.categoryId)   // 递归调用
+                walk(item.categoryId)
             }
+            fileList.remove(cid)
         }
+
         diskCache.data.fileBeanList.forEach {
             if (it.isFolder) {
                 walk(it.categoryId)
@@ -83,19 +84,17 @@ class FileCacheManager(
             return@withContext
         }
 
-        val arrayListOf = arrayListOf<String>()
+        val stringJoiner = StringJoiner("；")
         fileList.forEach { i ->
             memoryCache[i]?.data?.path?.last()?.name?.let {
-                arrayListOf.add("cid: $i; name: $it")
+                stringJoiner.add("name: $it")
             }
             deleteDiskFile(i)
         }
 
-        App.instance.toast("删除 $length 个单一文件！")
-        XLog.d("deleteIndividualFile 删除 $length 个单一文件\n$arrayListOf")
-
-
+        XLog.d("deleteIndividualFile 删除${length}个单一文件\n$stringJoiner")
     }
+
 
     /**
      * 读取缓存：
