@@ -158,12 +158,6 @@ jobs:
           target_commitish: ${{ github.sha }}
           body: |
             ## 这是自动构建的最新测试版。
-            - **这是一个预发布版本，并非为生产环境准备就绪。**
-            - 我们非常鼓励您分享您的看法！
-            
-            ## This is an automatically built latest Preview release.
-            - **This is a pre-release version and is not intended for production use.**
-            - We appreciate any feedback!
             
             **更新日志（Changelog）:**
             ${{ steps.changelog.outputs.changelog_body }}${{ steps.changelog.outputs.changelog_full_link }}
