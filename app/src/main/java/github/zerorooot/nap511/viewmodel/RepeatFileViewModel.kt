@@ -52,6 +52,7 @@ class RepeatFileViewModel(
     }
 
     // 2. 加载状态
+    //{"state":false,"msg":"","msg_code":0,"data":{"group_count":0,"file_count":0,"file_size":0}}
     private suspend fun loadStatus() {
         val repeatStatus = repeatService.getRepeatStatus()
         XLog.d("repeatStatus: $repeatStatus")
@@ -61,7 +62,7 @@ class RepeatFileViewModel(
 
 
     // 3. 刷新列表（重置 offset 并拉取首页）
-    fun refreshList(showToast: Boolean = false) {
+    fun refreshList() {
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -72,12 +73,12 @@ class RepeatFileViewModel(
                 )
             }
             val repeatList = getRepeatList(offset = 0)
-            XLog.d("repeatList: $repeatList")
+            //清空list,防止日志里的内容过多
+            val copy = repeatList.copy(data = emptyList())
+            XLog.d("repeatList: $copy")
+
             val list = repeatList.data
             val total = repeatList.count.toIntOrNull() ?: 0
-            if (showToast && total == 0) {
-                App.instance.toast("暂无重复文件")
-            }
             _uiState.update {
                 it.copy(
                     fileList = list,
@@ -130,7 +131,8 @@ class RepeatFileViewModel(
             val forceRefresh = repeatService.forceRefresh()
             XLog.d("forceRefresh: $forceRefresh")
             val message = if (forceRefresh.state) {
-                "已提交全盘排重请求，请稍后手动刷新"
+                refreshList()
+                "已提交全盘排重请求"
             } else {
                 forceRefresh.message
             }
@@ -152,6 +154,7 @@ class RepeatFileViewModel(
     fun executeDelete(field: String, order: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
+            XLog.d("executeDelete: $field $order")
             val deleteRepeatFiles = repeatService.deleteRepeatFiles(field, order)
             val clearEmpty = repeatService.clearEmpty()
 
@@ -187,13 +190,12 @@ class RepeatFileViewModel(
         val repeatList = repeatService.getRepeatList(offset)
         repeatList.data.forEach { i ->
             when (i.ico) {
+                "mp3" -> i.fileIco = R.drawable.mp3
+                "mp4" -> i.fileIco = R.drawable.mp4
                 "apk" -> i.fileIco = R.drawable.apk
                 "iso" -> i.fileIco = R.drawable.iso
-                "zip" -> i.fileIco = R.drawable.zip
-                "7z" -> i.fileIco = R.drawable.zip
-                "rar" -> i.fileIco = R.drawable.zip
-                "png" -> i.fileIco = R.drawable.png
-                "jpg" -> i.fileIco = R.drawable.png
+                "zip", "7z", "rar" -> i.fileIco = R.drawable.zip
+                "png", "gif", "jpg" -> i.fileIco = R.drawable.png
                 "txt" -> i.fileIco = R.drawable.txt
                 "torrent" -> i.fileIco = R.drawable.torrent
             }

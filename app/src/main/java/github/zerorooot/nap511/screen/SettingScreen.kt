@@ -146,7 +146,7 @@ fun SettingContent(
                 item {
                     EditTextPreferenceItem(
                         title = "默认离线位置",
-                        summary = uiState.defaultOfflineCid.ifEmpty { "输入文件夹cid，长按目录可复制当前目录cid" },
+                        summary = uiState.defaultOfflineCid.ifEmpty { "文件夹cid，长按目录可设置默认离线位置" },
                         value = uiState.defaultOfflineCid,
                         onValueSave = { onSaveConfig(ConfigKeyUtil.DEFAULT_OFFLINE_CID, it) }
                     )
@@ -222,42 +222,10 @@ fun SettingContent(
                 item { PreferenceCategoryHeader("功能开关") }
                 item {
                     SwitchPreferenceItem(
-                        title = "屏幕自动旋转",
+                        title = "屏幕旋转",
                         summary = "根据视频横竖自动旋转屏幕",
                         checked = uiState.autoRotateEnabled,
                         onCheckedChange = { onSaveConfig(ConfigKeyUtil.AUTO_ROTATE, it) }
-                    )
-                }
-                item {
-                    SwitchPreferenceItem(
-                        title = "隐藏视频加载提示",
-                        summary = "当视频正在加载时，隐藏加载提示",
-                        checked = uiState.hideLoadingView,
-                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.HIDE_LOADING_VIEW, it) }
-                    )
-                }
-                item {
-                    SwitchPreferenceItem(
-                        title = "提前加载",
-                        summary = "进入下级目录时，提前加载当前文件夹上下两个文件夹内的文件",
-                        checked = uiState.earlyLoading,
-                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.EARLY_LOADING, it) }
-                    )
-                }
-                item {
-                    SwitchPreferenceItem(
-                        title = "保存请求缓存",
-                        summary = "保存请求文件缓存到 cacheDir 中，便于提升加载速度",
-                        checked = uiState.saveRequestCache,
-                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.SAVE_REQUEST_CACHE, it) }
-                    )
-                }
-                item {
-                    SwitchPreferenceItem(
-                        title = "光标重定位",
-                        summary = "重命名时，光标定位在'@'或'空格'后",
-                        checked = uiState.positionAfterAt,
-                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.POSITION_AFTER_AT, it) }
                     )
                 }
                 item {
@@ -274,6 +242,46 @@ fun SettingContent(
                         summary = "输出程序中部分关键节点内容，方便调试",
                         checked = uiState.logEnabled,
                         onCheckedChange = { onSaveConfig(ConfigKeyUtil.LOG, it) }
+                    )
+                }
+                item {
+                    SwitchPreferenceItem(
+                        title = "隐藏视频加载",
+                        summary = "当视频正在加载时，隐藏加载提示",
+                        checked = uiState.hideLoadingView,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.HIDE_LOADING_VIEW, it) }
+                    )
+                }
+                item {
+                    SwitchPreferenceItem(
+                        title = "提前加载文件",
+                        summary = "进入下级目录时，提前加载当前文件夹上下两个文件夹内的文件",
+                        checked = uiState.earlyLoading,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.EARLY_LOADING, it) }
+                    )
+                }
+                item {
+                    SwitchPreferenceItem(
+                        title = "保存请求缓存",
+                        summary = "保存请求文件缓存到 cacheDir 中，便于提升加载速度",
+                        checked = uiState.saveRequestCache,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.SAVE_REQUEST_CACHE, it) }
+                    )
+                }
+                item {
+                    SwitchPreferenceItem(
+                        title = "光标重新定位",
+                        summary = "重命名时，光标定位在'@'或'空格'后",
+                        checked = uiState.positionAfterAt,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.POSITION_AFTER_AT, it) }
+                    )
+                }
+                item {
+                    SwitchPreferenceItem(
+                        title = "强制缓存更新",
+                        summary = "刷新时，清空当前目录里所有文件缓存",
+                        checked = uiState.forceLoadCache,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.FORCE_LOAD_CACHE, it) }
                     )
                 }
 

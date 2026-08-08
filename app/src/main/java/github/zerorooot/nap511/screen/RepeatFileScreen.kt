@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -43,7 +45,6 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.CategoryDetailResponse
 import github.zerorooot.nap511.screenitem.RepeatFileCardItem
 import github.zerorooot.nap511.ui.theme.Purple80
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.viewmodel.RepeatFileViewModel
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
@@ -111,11 +112,6 @@ fun RepeatFileScreen(
                 viewModel.triggerForceRefresh()
             }
 
-            "刷新页面" -> {
-                App.instance.toast("页面刷新中～")
-                viewModel.refreshList(true)
-            }
-
             "ModalNavigationDrawerMenu" -> {
                 onClick.invoke()
             }
@@ -128,21 +124,23 @@ fun RepeatFileScreen(
             .fillMaxSize()
     ) {
         AppTopBarRepeatFile("文件去重", appBarOnClick)
-        if (uiState.totalCount == 0) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = "暂无重复文件，点击右上角刷新页面")
-            }
-        } else {
-            MiddleEllipsisText(
-                text = "共${count}个重复文件，占用空间${formattedSize}",
-                modifier = Modifier.padding(8.dp, 4.dp)
-            )
-            PullToRefreshBox(
-                isRefreshing = uiState.isRefreshing,
-                onRefresh = { viewModel.refreshList() }) {
+        MiddleEllipsisText(
+            text = "共${count}个重复文件，占用空间${formattedSize}",
+            modifier = Modifier.padding(8.dp, 4.dp)
+        )
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = { viewModel.refreshList() }) {
+            if (uiState.totalCount == 0) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "暂无重复文件，点击右上角进行查重")
+                }
+            } else {
                 LazyColumnScrollbar(
                     state = listState, settings = ScrollbarSettings.Default.copy(
                         thumbUnselectedColor = Purple80

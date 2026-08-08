@@ -238,7 +238,7 @@ private fun BreadcrumbPath(
             )
         } else {
             // 2. 循环遍历各级目录
-            paths.forEach { path ->
+            paths.forEachIndexed { index, path ->
                 Text(
                     text = path.fileName.ifEmpty { "根目录" },
                     style = MaterialTheme.typography.bodyMedium,
@@ -247,21 +247,14 @@ private fun BreadcrumbPath(
                 )
 
                 // 间隔符
-                Text(
-                    text = " > ",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (index < paths.size - 1) {
+                    Text(
+                        text = " > ",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
-
-            // 3. 当前文件/文件夹名称（末尾，不可点击或作为终点展示）
-            Text(
-                text = currentFileName,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
         }
     }
 }
@@ -489,9 +482,10 @@ fun TextBodyDialogScreen(title: String, context: ByteArray, enter: (String) -> U
 
         }
     }, title = { Text(text = title) }, text = {
-        Column {
+        Column(modifier = Modifier.width(IntrinsicSize.Max)) {
             OutlinedTextField(
                 value = charsetText,
+                modifier = Modifier.fillMaxWidth(),
                 trailingIcon = {
                     Icon(
                         imageVector = Icons.Filled.Delete,

@@ -15,7 +15,6 @@ import androidx.compose.runtime.setValue
 import androidx.concurrent.futures.await
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequest
@@ -158,6 +157,10 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                     is DialogEvent.OpenUnzipAllFileDialog -> isOpenUnzipAllFileDialog = true
                     is DialogEvent.OpenCreateSelectTorrentFileDialog -> isOpenCreateSelectTorrentFileDialog =
                         true
+
+                    is DialogEvent.RefreshFileList -> {
+                        refresh(event.cid)
+                    }
                     // 不属于 FileViewModel 的事件，忽略
                     is DialogEvent.OpenOfflineDialog,
                     is DialogEvent.OpenRecyclePasswordDialog -> { /* ignore */
@@ -227,7 +230,10 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                 }
                 //adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/jump?param=0" github.zerorooot.nap511
                 "jump" -> {
-                    getFiles(param)
+                    viewModelScope.launch {
+                        fileListCache.remove(currentCid)
+                        getFiles(param)
+                    }
                 }
 
                 // adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/copy?param=copy_test" github.zerorooot.nap511
@@ -254,6 +260,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     }
 
     fun loadCacheFile() {
+        _isRefreshing.value = true
         viewModelScope.launch(Dispatchers.IO) {
             if (!saveRequestCache) {
                 // 不保存磁盘缓存时，仅清理硬盘旧文件，保留内存缓存
@@ -445,7 +452,18 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         recoverFromLongPress()
 
         viewModelScope.launch {
+            suspend fun walk(cid: String) {
+                XLog.d("DebugWalk refresh 真实 cid 值: $cid")
+                val folderList =
+                    fileListCache[cid]?.fileBeanList?.filter { it.isFolder } ?: emptyList()
+                for (item in folderList) {
+                    fileListCache.remove(item.categoryId)
+                    walk(item.categoryId)   // 递归调用
+                }
+            }
+            walk(cid)
             fileListCache.remove(cid)
+
             if (cid == currentCid) {
                 getFiles(currentCid)
             } else {
@@ -572,18 +590,13 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
             }
             App.instance.toast("开始下载！")
             XLog.d(
-                "handleOfflineTask forceRecreate=$forceRecreate, workInfos size=${workInfos.size}, task size=${currentOfflineTask.size} " +
-                        "currentOfflineTask:\n $currentOfflineTask"
+                "handleOfflineTask forceRecreate=$forceRecreate, workInfos size=${workInfos.size}"
             )
 
-            val defaultOfflineCid =
-                DataStoreUtil.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
             // 序列化并提交新任务
             val listType = object : TypeToken<List<String?>?>() {}.type
             val list = Gson().toJson(currentOfflineTask, listType)
-            val data = Data.Builder()
-                .putString("defaultOfflineCid", defaultOfflineCid)
-                .putString("list", list)
+            val data = Data.Builder().putString("list", list)
                 .build()
 
             val request = OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java)
@@ -595,14 +608,14 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
 
 
             // 将 LiveData 转为 Flow 或者直接观察（这里利用 WorkManager 提供的 LiveData 转换为 Flow）
-            workManager.getWorkInfoByIdLiveData(request.id).asFlow() // 将 LiveData 转换为 Flow
-                .collect { workInfo ->
-                    if (workInfo != null) {
-                        if (workInfo.state == WorkInfo.State.SUCCEEDED || workInfo.state == WorkInfo.State.FAILED) {
-                            refresh(defaultOfflineCid)
-                        }
-                    }
-                }
+//            workManager.getWorkInfoByIdLiveData(request.id).asFlow() // 将 LiveData 转换为 Flow
+//                .collect { workInfo ->
+//                    if (workInfo != null) {
+//                        if (workInfo.state == WorkInfo.State.SUCCEEDED || workInfo.state == WorkInfo.State.FAILED) {
+//                            refresh(defaultOfflineCid)
+//                        }
+//                    }
+//                }
         }
     }
 }

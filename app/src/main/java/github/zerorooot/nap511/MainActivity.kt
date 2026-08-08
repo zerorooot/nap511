@@ -271,7 +271,8 @@ class MainActivity : AppCompatActivity() {
                                 scope.launch { drawerState.close() }
 
                                 // 优先尝试直接弹出回目标顶级页面（如果当前正处于该页面的子页面中）
-                                val isPopped = navController.popBackStack(item.route, inclusive = false)
+                                val isPopped =
+                                    navController.popBackStack(item.route, inclusive = false)
 
                                 // 如果栈中没有该目标页面（即从其他 Tab 切过来），则执行标准的顶级导航
                                 if (!isPopped) {
@@ -386,11 +387,21 @@ class MainActivity : AppCompatActivity() {
                                 }
 
                                 "VerifyVideoAccount" -> {
-                                    navController.navigate(Route.VerifyVideoAccount)
+                                    navController.navigate(Route.VerifyVideoAccount) {
+                                        // 弹出 AdvancedSettings，让 RepeatFile 直接替换设置页在栈中的位置
+                                        popUpTo<Route.AdvancedSettings> {
+                                            inclusive = true
+                                        }
+                                    }
                                 }
 
                                 "VerifyMagnetLinkAccount" -> {
-                                    navController.navigate(Route.VerifyMagnetLinkAccount)
+                                    navController.navigate(Route.VerifyMagnetLinkAccount) {
+                                        // 弹出 AdvancedSettings，让 RepeatFile 直接替换设置页在栈中的位置
+                                        popUpTo<Route.AdvancedSettings> {
+                                            inclusive = true
+                                        }
+                                    }
                                 }
 
                                 "handleOfflineTask" -> {
@@ -398,7 +409,12 @@ class MainActivity : AppCompatActivity() {
                                 }
 
                                 "RepeatFile" -> {
-                                    navController.navigate(Route.RepeatFile)
+                                    navController.navigate(Route.RepeatFile) {
+                                        // 弹出 AdvancedSettings，让 RepeatFile 直接替换设置页在栈中的位置
+                                        popUpTo<Route.AdvancedSettings> {
+                                            inclusive = true
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -471,7 +487,6 @@ class MainActivity : AppCompatActivity() {
                         RepeatFileScreen(repeatViewModel, { scope.launch { drawerState.open() } }) {
                             fileViewModel.getFiles(it)
                             navController.navigate(Route.MyFile) {
-                                // 将 RepeatFile 中转页从返回栈中彻底弹出，用户返回时，就会直接退回首页，而不会退回中转页
                                 popUpTo<Route.RepeatFile> {
                                     inclusive = true
                                 }

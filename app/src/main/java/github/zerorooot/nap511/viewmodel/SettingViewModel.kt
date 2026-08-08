@@ -56,9 +56,10 @@ class SettingViewModel : ViewModel() {
     // 5. 开关配置分组 Flow (Part 2)
     private val switchFlow2 = combine(
         DataStoreUtil.getDataFlow(ConfigKeyUtil.TORRENT_SORT, false),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.LOG, false)
-    ) { torrentSort, logEnabled ->
-        Pair(torrentSort, logEnabled)
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.LOG, false),
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.FORCE_LOAD_CACHE, false)
+    ) { torrentSort, logEnabled, forceCache ->
+        Triple(torrentSort, logEnabled, forceCache)
     }
 
     // 统一暴露给 UI 的 StateFlow
@@ -91,7 +92,8 @@ class SettingViewModel : ViewModel() {
             saveRequestCache = s1.saveCache,
             positionAfterAt = s1.positionAfterAt,
             torrentSort = s2.first,
-            logEnabled = s2.second
+            logEnabled = s2.second,
+            forceLoadCache = s2.third
         )
     }.stateIn(
         scope = viewModelScope,

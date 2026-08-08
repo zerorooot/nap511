@@ -53,6 +53,9 @@ sealed interface DialogEvent {
 
     /** 回收站密码 */
     data object OpenRecyclePasswordDialog : DialogEvent
+
+    /** OfflineTaskWorker 中的文件刷新通知*/
+    data class RefreshFileList(val cid: String) : DialogEvent
 }
 
 class DialogEventBus private constructor() {

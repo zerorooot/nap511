@@ -11,6 +11,7 @@ data class SettingUiState(
     val earlyLoading: Boolean = false,
     val saveRequestCache: Boolean = true,
     val positionAfterAt: Boolean = false,
+    val forceLoadCache: Boolean = false,
     val torrentSort: Boolean = false,
     val logEnabled: Boolean = false,
     val currentOfflineTask: String = "",

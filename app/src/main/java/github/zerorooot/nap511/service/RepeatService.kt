@@ -49,7 +49,7 @@ interface RepeatService {
     @GET("repeat_list.php")
     suspend fun getRepeatList(
         @Query("s") offset: Int,
-        @Query("l") limit: Int = 100,
+        @Query("l") limit: Int = 50,
         @Query("_") timestamp: Long = System.currentTimeMillis()
     ): RepeatListResponse
 

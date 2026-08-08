@@ -89,6 +89,10 @@ class ConfigKeyUtil {
          *重命名时，光标定位在@后
          */
         const val POSITION_AFTER_AT = "PositionAfterAt"
+        /**
+         *forceLoadCache
+         */
+        const val FORCE_LOAD_CACHE = "ForceLoadCache"
 
         /**
          * 保存请求缓存
