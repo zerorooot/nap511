@@ -459,7 +459,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
 
     suspend fun removeFolderCacheRecursively(categoryId: String) {
         suspend fun walk(cid: String) {
-            XLog.d("DebugWalk delete 真实 cid 值: $cid")
+//            XLog.d("DebugWalk delete 真实 cid 值: $cid")
             // 1. 先取出当前层级的子文件夹列表
             val folderList =
                 fileListCache[cid]?.fileBeanList?.filter { it.isFolder } ?: emptyList()

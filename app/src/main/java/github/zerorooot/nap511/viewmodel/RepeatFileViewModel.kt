@@ -11,11 +11,13 @@ import github.zerorooot.nap511.bean.RepeatStatusData
 import github.zerorooot.nap511.screen.formatBytes
 import github.zerorooot.nap511.service.RepeatService
 import github.zerorooot.nap511.util.App
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 data class RepeatUiState(
     val statusData: RepeatStatusData? = null,
@@ -47,7 +49,6 @@ class RepeatFileViewModel(
             _uiState.update { it.copy(isRefreshing = true) }
             loadStatus()
             refreshList()
-            _uiState.update { it.copy(isRefreshing = false) }
         }
     }
 
@@ -64,6 +65,7 @@ class RepeatFileViewModel(
     // 3. 刷新列表（重置 offset 并拉取首页）
     fun refreshList() {
         viewModelScope.launch {
+            loadStatus()
             _uiState.update {
                 it.copy(
                     isLoadingList = true,
@@ -131,17 +133,15 @@ class RepeatFileViewModel(
             val forceRefresh = repeatService.forceRefresh()
             XLog.d("forceRefresh: $forceRefresh")
             val message = if (forceRefresh.state) {
-                refreshList()
                 "已提交全盘排重请求"
             } else {
                 forceRefresh.message
             }
             App.instance.toast(message)
-            _uiState.update {
-                it.copy(
-                    isRefreshing = false
-                )
-            }
+
+            delay(300.milliseconds)
+            refreshList()
+
         }
     }
 
@@ -156,24 +156,21 @@ class RepeatFileViewModel(
             _uiState.update { it.copy(isRefreshing = true) }
             XLog.d("executeDelete: $field $order")
             val deleteRepeatFiles = repeatService.deleteRepeatFiles(field, order)
-            val clearEmpty = repeatService.clearEmpty()
-
             XLog.d("deleteRepeatFiles: $deleteRepeatFiles")
-            XLog.d("clearEmpty: $clearEmpty")
+
             val a = if (deleteRepeatFiles.state) {
                 _uiState.update { RepeatUiState() }
-                "去重指令执行成功；"
+                "去重指令执行成功"
             } else {
-                deleteRepeatFiles.message + "；"
+                deleteRepeatFiles.message
             }
-            val b = if (clearEmpty.state) {
-                "删除空文件夹清空成功，记得刷新页面！"
-            } else {
-                clearEmpty.message
-            }
-            App.instance.toast(a + b)
 
+            App.instance.toast(a)
             _uiState.update { it.copy(isRefreshing = false) }
+
+            delay(300.milliseconds)
+            val clearEmpty = repeatService.clearEmpty()
+            XLog.d("clearEmpty: $clearEmpty")
         }
     }
 

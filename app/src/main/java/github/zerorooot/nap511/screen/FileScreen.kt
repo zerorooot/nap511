@@ -353,12 +353,8 @@ fun FileScreen(
     }
 
     fun onPathLongClick() {
-        val currentCid = fileViewModel.currentCid
-        clipboardManager.nativeClipboard.setPrimaryClip(
-            ClipData.newPlainText("currentCid", currentCid)
-        )
-        DataStoreUtil.putData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, currentCid)
-        App.instance.toast("默认离线位置已设置。cid $currentCid 已复制")
+        DataStoreUtil.putData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, fileViewModel.currentCid)
+        App.instance.toast("已设置默认离线位置")
     }
 
     // ============================================================
