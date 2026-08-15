@@ -21,6 +21,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -45,7 +54,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.util.Consumer
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -79,6 +87,7 @@ import github.zerorooot.nap511.screen.OfflineFileScreen
 import github.zerorooot.nap511.screen.RecycleScreen
 import github.zerorooot.nap511.screen.RepeatFileScreen
 import github.zerorooot.nap511.screen.SettingScreen
+import github.zerorooot.nap511.screen.TxtReaderScreen
 import github.zerorooot.nap511.screen.WebViewScreen
 import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.App
@@ -209,25 +218,25 @@ class MainActivity : AppCompatActivity() {
         BackHandler(drawerState.isOpen) {
             scope.launch { drawerState.close() }
         }
-
         val menuItems = remember {
             arrayListOf(
-                DrawerMenuItem(R.drawable.baseline_login_24, ConfigKeyUtil.LOGIN, Route.Login),
-                DrawerMenuItem(R.drawable.baseline_cloud_24, ConfigKeyUtil.MY_FILE, Route.MyFile),
+                DrawerMenuItem(Icons.AutoMirrored.Filled.Login, ConfigKeyUtil.LOGIN, Route.Login),
+                DrawerMenuItem(Icons.Default.Cloud, ConfigKeyUtil.MY_FILE, Route.MyFile),
                 DrawerMenuItem(
-                    R.drawable.baseline_cloud_download_24,
+                    Icons.Default.CloudDownload,
                     ConfigKeyUtil.OFFLINE_DOWNLOAD,
                     Route.OfflineDownload
                 ),
                 DrawerMenuItem(
-                    R.drawable.baseline_cloud_done_24, ConfigKeyUtil.OFFLINE_LIST, Route.OfflineList
+                    Icons.Default.CloudDone, ConfigKeyUtil.OFFLINE_LIST, Route.OfflineList
                 ),
-                //       DrawerMenuItem(R.drawable.baseline_web_24, ConfigKeyUtil.WEB, Route.Web),
+
+                //       DrawerMenuItem(Icons.Default.Web, ConfigKeyUtil.WEB, Route.Web),
                 DrawerMenuItem(
-                    R.drawable.ic_baseline_delete_24, ConfigKeyUtil.RECYCLE_BIN, Route.RecycleBin
+                    Icons.Default.Delete, ConfigKeyUtil.RECYCLE_BIN, Route.RecycleBin
                 ),
                 DrawerMenuItem(
-                    R.drawable.baseline_settings_24,
+                    Icons.Default.Settings,
                     ConfigKeyUtil.ADVANCED_SETTINGS,
                     Route.AdvancedSettings
                 ),
@@ -235,13 +244,15 @@ class MainActivity : AppCompatActivity() {
                 if (DataStoreUtil.getData(ConfigKeyUtil.LOG, false)) {
                     this.add(
                         DrawerMenuItem(
-                            R.drawable.baseline_log_24, ConfigKeyUtil.LOG_SCREEN, Route.LogScreen
+                            Icons.Default.Android, ConfigKeyUtil.LOG_SCREEN, Route.LogScreen
                         )
                     )
                 }
                 this.add(
                     DrawerMenuItem(
-                        R.drawable.android_exit, ConfigKeyUtil.EXIT_APPLICATION, Route.ExitApp
+                        Icons.AutoMirrored.Default.ExitToApp,
+                        ConfigKeyUtil.EXIT_APPLICATION,
+                        Route.ExitApp
                     )
                 )
             }
@@ -264,7 +275,7 @@ class MainActivity : AppCompatActivity() {
                         NavigationDrawerItem(
                             icon = {
                                 Icon(
-                                    painterResource(item.iconRes), contentDescription = item.label
+                                    item.iconVector, contentDescription = item.label
                                 )
                             }, label = { Text(item.label) }, selected = isSelected, onClick = {
                                 fileViewModel.gesturesEnabled = true
@@ -333,7 +344,11 @@ class MainActivity : AppCompatActivity() {
                             fileViewModel,
                             offlineFileViewModel,
                             audioViewModel,
-                            { navController.navigate(Route.Photo) },
+                            {
+                                scope.launch(Dispatchers.Main) {
+                                    navController.navigate(it)
+                                }
+                            },
                             appBarClick(fileViewModel)
                         ) {
                             val open = drawerState.isOpen
@@ -491,6 +506,12 @@ class MainActivity : AppCompatActivity() {
                                     inclusive = true
                                 }
                             }
+                        }
+                    }
+                    composable<Route.TxtReader> {
+                        val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
+                        TxtReaderScreen(fileViewModel.textBodyByteArray!!, title = fileBean.name) {
+                            navController.popBackStack()
                         }
                     }
 

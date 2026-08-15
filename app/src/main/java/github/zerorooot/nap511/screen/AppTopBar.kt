@@ -1,11 +1,25 @@
 package github.zerorooot.nap511.screen
 
-import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -55,32 +69,32 @@ fun AppTopBarMultiple(title: String, onClick: (String) -> Unit) {
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
         navigationIcon = {
             IconButton(onClick = { onClick.invoke("back") }) {
-                Icon(imageVector = Icons.Rounded.ArrowBack, contentDescription = "navigationIcon")
+                Icon(imageVector = Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "navigationIcon")
             }
         },
         actions = {
             TopAppBarActionButton(
-                painter = painterResource(id = R.drawable.ic_baseline_arrow_upward_24),
+                Icons.Default.ArrowUpward,
                 description = "up"
             ) {
                 onClick.invoke("selectToUp")
             }
             TopAppBarActionButton(
-                painter = painterResource(id = R.drawable.ic_baseline_arrow_downward_24),
+                Icons.Default.ArrowDownward,
                 description = "down"
             ) {
                 onClick.invoke("selectToDown")
             }
             // cut icon
             TopAppBarActionButton(
-                painter = painterResource(id = R.drawable.ic_baseline_content_cut_24),
+                Icons.Default.ContentCut,
                 description = "Cut"
             ) {
                 onClick.invoke("cut")
             }
 
             TopAppBarActionButton(
-                painter = painterResource(id = R.drawable.ic_baseline_delete_24),
+                Icons.Default.Delete,
                 description = "delete"
             ) {
                 onClick.invoke("delete")
@@ -92,14 +106,15 @@ fun AppTopBarMultiple(title: String, onClick: (String) -> Unit) {
 //                onClick.invoke("selectAll")
 //            }
             TopAppBarActionButton(
-                painter = painterResource(id = R.drawable.ic_baseline_select_reverse_24),
+                Icons.Default.SelectAll,
                 description = "ic_baseline_select_reverse_24"
             ) {
                 onClick.invoke("selectReverse")
             }
             //R.drawable.baseline_cloud_download_24
             TopAppBarActionButton(
-                painter = painterResource(id = R.drawable.baseline_cloud_24),
+
+                Icons.Default.Cloud,
                 description = "unzip file"
             ) {
                 onClick.invoke("unzipAllFile")
@@ -138,6 +153,7 @@ fun AppTopBarOfflineFile(title: String, onClick: (name: String) -> Unit) {
         }
     )
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppTopBarLogScreen(title: String, onClick: (name: String) -> Unit) {
@@ -162,6 +178,7 @@ fun AppTopBarLogScreen(title: String, onClick: (name: String) -> Unit) {
         }
     )
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppTopBarRepeatFile(title: String, onClick: (name: String) -> Unit) {
@@ -203,9 +220,13 @@ fun AppTopBarRecycle(title: String, onClick: (name: String) -> Unit) {
             }
         },
         actions = {
-            RecycleAppTopBarDropdownMenu(onClick = { itemValue, _ ->
-                onClick.invoke(itemValue)
-            })
+
+            IconButton(onClick = { onClick.invoke("清空所有文件") }) {
+                Icon(
+                    Icons.Default.DeleteForever,
+                    contentDescription = "清空所有文件"
+                )
+            }
         }
     )
 }

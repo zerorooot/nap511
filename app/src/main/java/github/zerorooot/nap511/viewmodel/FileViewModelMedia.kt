@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.App
@@ -13,6 +14,7 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -113,7 +115,7 @@ internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int, fi
     }
 }
 
-internal fun FileViewModel.downloadText(fileBean: FileBean) {
+internal fun FileViewModel.downloadText(fileBean: FileBean, onNav: (Route) -> Unit) {
     viewModelScope.launch(Dispatchers.IO) {
         var bytes = textFileCache[fileBean]
         if (bytes == null) {
@@ -122,9 +124,8 @@ internal fun FileViewModel.downloadText(fileBean: FileBean) {
             textFileCache[fileBean] = bytes
         }
         textBodyByteArray = bytes
-//        isOpenTextBodyDialog = true
-        openTextBodyDialog()
         setRefreshingStatus(false)
+        onNav.invoke(Route.TxtReader)
     }
 }
 

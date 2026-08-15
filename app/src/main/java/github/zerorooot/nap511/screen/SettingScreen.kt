@@ -202,7 +202,16 @@ fun SettingContent(
                         summary = uiState.requestLimitCount,
                         value = uiState.requestLimitCount,
                         isNumber = true,
-                        onValueSave = { onSaveConfig(ConfigKeyUtil.MOVE_FAIL_FILE, it) }
+                        onValueSave = { onSaveConfig(ConfigKeyUtil.REQUEST_LIMIT_COUNT, it) }
+                    )
+                }
+                item {
+                    EditTextPreferenceItem(
+                        title = "最大文本打开限制",
+                        summary = "支持打开${uiState.txtSize}kb以下的文本文件",
+                        value = uiState.txtSize,
+                        isNumber = true,
+                        onValueSave = { onSaveConfig(ConfigKeyUtil.MAX_TXT_SIZE, it) }
                     )
                 }
                 item {

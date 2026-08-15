@@ -129,12 +129,6 @@ fun LogScreenTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
 }
 
 @Composable
-fun RecycleAppTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
-    val listOf = listOf("清空所有文件")
-    BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
-}
-
-@Composable
 fun RepeatFileTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
     val listOf = listOf("开始查重", "一键去重")
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)

@@ -19,5 +19,6 @@ data class SettingUiState(
     val defaultOfflineCid: String = "",
     val fabPosition: String = "End",
     val moveFailFile: String = "",
-    val defaultOfflineTime: String = "5"
+    val defaultOfflineTime: String = "5",
+    val txtSize: String = "200"
 )

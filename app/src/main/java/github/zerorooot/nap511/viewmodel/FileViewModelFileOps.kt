@@ -252,7 +252,7 @@ internal fun FileViewModel.setFileBeanProperty(fileBeanList: ArrayList<FileBean>
             "gif", "jpg", "png", "jpeg", "bmp", "tif", "svg", "pic", "heic", "dng", "webp" ->
                 fileBean.fileIco = R.drawable.png
 
-            "reg", "txt", "wri", "rtf", "lrc", "sub", "srt", "ass", "ssa", "idx", "smi", "vtt", "sbv", "ttml", "ksc", "snc", "krc", "c", "cpp", "h", "asm", "s", "java", "asp", "aspx", "bat", "bas", "prg", "cmd", "log", "php", "js", "go", "sh", "css", "scss", "sass", "less", "hpp", "cc", "hex", "hxx", "cxx", "c++", "cs", "py", "pl", "pm", "md", "cue", "utf", "mhtml", "mht", "csv", "xml", "html", "htm" ->
+            "reg", "url", "txt", "wri", "rtf", "lrc", "sub", "srt", "ass", "ssa", "idx", "smi", "vtt", "sbv", "ttml", "ksc", "snc", "krc", "c", "cpp", "h", "asm", "s", "java", "asp", "aspx", "bat", "bas", "prg", "cmd", "log", "php", "js", "go", "sh", "css", "scss", "sass", "less", "hpp", "cc", "hex", "hxx", "cxx", "c++", "cs", "py", "pl", "pm", "md", "cue", "utf", "mhtml", "mht", "csv", "xml", "html", "htm" ->
                 fileBean.fileIco = R.drawable.txt
 
             "mp3", "wma", "wav", "midi", "flac", "ram", "ra", "mid", "aac", "m4a", "ape", "au", "ogg", "aif", "aiff", "snd", "voc", "mpa", "cda", "vqf", "wvx", "wmx", "m3u", "m3u8", "ttbl", "ttpl", "tta", "tak", "mpc", "mp+", "mp3pro", "mp1", "mp2", "mac", "xm", "umx", "stm", "s3m", "mtm", "mod", "it", "far", "rmi", "fla", "dts", "dtswav", "awb" -> {

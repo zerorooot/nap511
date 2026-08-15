@@ -37,9 +37,10 @@ class SettingViewModel : ViewModel() {
     private val uiPrefFlow = combine(
         DataStoreUtil.getDataFlow(ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION, "End"),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200"),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.MOVE_FAIL_FILE, "")
-    ) { fabPos, limit, moveFail ->
-        Triple(fabPos, limit, moveFail)
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.MOVE_FAIL_FILE, ""),
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.MAX_TXT_SIZE, "200")
+    ) { fabPos, limit, moveFail, txtSize ->
+        PrefGroup(fabPos, limit, moveFail, txtSize)
     }
 
     // 4. 开关配置分组 Flow (Part 1)
@@ -64,11 +65,7 @@ class SettingViewModel : ViewModel() {
 
     // 统一暴露给 UI 的 StateFlow
     val uiState: StateFlow<SettingUiState> = combine(
-        accountFlow,
-        aria2Flow,
-        uiPrefFlow,
-        switchFlow1,
-        switchFlow2
+        accountFlow, aria2Flow, uiPrefFlow, switchFlow1, switchFlow2
     ) { account, aria2, uiPref, s1, s2 ->
         SettingUiState(
             // 账号
@@ -82,9 +79,10 @@ class SettingViewModel : ViewModel() {
             defaultOfflineTime = aria2.time,
             currentOfflineTask = aria2.task,
             // 界面
-            fabPosition = uiPref.first,
-            requestLimitCount = uiPref.second,
-            moveFailFile = uiPref.third,
+            fabPosition = uiPref.fabPos,
+            requestLimitCount = uiPref.limit,
+            moveFailFile = uiPref.moveFail,
+            txtSize = uiPref.txtSize,
             // 开关
             autoRotateEnabled = s1.autoRotate,
             hideLoadingView = s1.hideLoading,
@@ -118,6 +116,15 @@ class SettingViewModel : ViewModel() {
         val time: String,
         val task: String
     )
+
+    // 内部聚合数据结构辅助类
+    private data class PrefGroup(
+        val fabPos: String,
+        val limit: String,
+        val moveFail: String,
+        val txtSize: String,
+    )
+
 
     private data class SwitchGroup1(
         val autoRotate: Boolean,

@@ -1,9 +1,10 @@
 package github.zerorooot.nap511.bean
 
+import androidx.compose.ui.graphics.vector.ImageVector
 import kotlinx.serialization.Serializable
 
 // 导航配置项辅助类
-data class DrawerMenuItem(val iconRes: Int, val label: String, val route: Route)
+data class DrawerMenuItem(val iconVector: ImageVector, val label: String, val route: Route)
 
 sealed interface Route {
     // 抽屉导航页面
@@ -46,6 +47,11 @@ sealed interface Route {
 
     @Serializable
     data object RepeatFile : Route
+
+    @Serializable
+    data object TxtReader : Route
+
+
     // 假设在别的 Screen 中跳转的“详情页”或“子页面”（带参数示例）
 //    @Serializable
 //    data class FileDetail(val fileId: String, val fileName: String) : Route

@@ -100,6 +100,10 @@ class ConfigKeyUtil {
         const val SAVE_REQUEST_CACHE = "SaveRequestCache"
 
         /**
+         * 支持打开xx kb以下的文件
+         */
+        const val MAX_TXT_SIZE="MaxTxtSize"
+        /**
          * 种子文件按文件大小从大到小排序
          */
         const val TORRENT_SORT = "TorrentSort"

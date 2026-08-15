@@ -11,6 +11,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.MusicNote
+import androidx.compose.material.icons.sharp.MusicNote
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -24,10 +32,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 
@@ -137,7 +143,7 @@ fun MiniPlayerBarContent(
             ) {
                 // 音频图标
                 Icon(
-                    painter = painterResource(id = R.drawable.outline_ear_sound_24),
+                    Icons.Default.MusicNote,
                     contentDescription = "Music",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp)
@@ -165,9 +171,7 @@ fun MiniPlayerBarContent(
                 // 快退
                 IconButton(onClick = { onClickEvent.invoke("onRewind") }) {
                     Icon(
-                        painter = painterResource(
-                            R.drawable.outline_arrow_back_ios_24
-                        ),
+                        Icons.Default.FastRewind,
                         contentDescription = "onRewind",
                         modifier = Modifier.size(24.dp)
                     )
@@ -184,9 +188,7 @@ fun MiniPlayerBarContent(
                 } else {
                     IconButton(onClick = { onClickEvent.invoke("onTogglePlay") }) {
                         Icon(
-                            painter = painterResource(
-                                id = if (isPlaying) R.drawable.outline_autopause_24 else R.drawable.outline_autoplay_24
-                            ),
+                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = if (isPlaying) "Pause" else "Play",
                             modifier = Modifier.size(28.dp)
                         )
@@ -195,9 +197,7 @@ fun MiniPlayerBarContent(
                 // 快进
                 IconButton(onClick = { onClickEvent.invoke("onFastForward") }) {
                     Icon(
-                        painter = painterResource(
-                            R.drawable.outline_arrow_forward_ios_24
-                        ),
+                        Icons.Default.FastForward,
                         contentDescription = "onFastForward",
                         modifier = Modifier.size(24.dp)
                     )

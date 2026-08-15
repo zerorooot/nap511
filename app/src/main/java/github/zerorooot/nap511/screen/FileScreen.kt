@@ -31,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
@@ -57,6 +58,7 @@ import com.google.gson.Gson
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.screenitem.FileCellItem
 import github.zerorooot.nap511.ui.theme.Purple80
@@ -95,7 +97,7 @@ fun FileScreen(
     fileViewModel: FileViewModel,
     offlineFileViewModel: OfflineFileViewModel,
     audioViewModel: AudioViewModel,
-    onNav: () -> Unit,
+    onNav: (Route) -> Unit,
     appBarOnClick: (String) -> Unit,
     drawerState: () -> Boolean
 ) {
@@ -179,7 +181,7 @@ fun FileScreen(
         fileViewModel.photoFileBeanList.clear()
         fileViewModel.photoFileBeanList.addAll(photoList)
         fileViewModel.photoIndexOf = photoList.indexOf(fileBean)
-        onNav.invoke()
+        onNav.invoke(Route.Photo)
         fileViewModel.setRefreshingStatus(false)
     }
 
@@ -195,11 +197,13 @@ fun FileScreen(
     }
 
     fun handleTextClick(i: Int, fileBean: FileBean) {
-        if (fileBean.size.toLong() < 1 * 1024 * 100) {
+        val txtSize = DataStoreUtil.getData(ConfigKeyUtil.MAX_TXT_SIZE, "200").toInt()
+        if (fileBean.size.toLong() < txtSize * 1024) {
             fileViewModel.selectIndex = i
-            fileViewModel.downloadText(fileBean)
+            fileViewModel.downloadText(fileBean, onNav)
         } else {
-            App.instance.toast("仅支持打开100kb以下的文件")
+            fileViewModel.setRefreshingStatus(false)
+            App.instance.toast("仅支持打开${txtSize}kb以下的文件")
         }
     }
 
@@ -416,7 +420,7 @@ fun FileScreen(
                             Spacer(modifier = Modifier.height(16.dp))
                             FloatingActionButton(onClick = ::onCutPasteClick) {
                                 Icon(
-                                    painter = painterResource(id = R.drawable.baseline_content_paste_24),
+                                    Icons.Default.ContentPaste,
                                     "cut"
                                 )
                             }

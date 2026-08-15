@@ -154,52 +154,14 @@ class AudioService : Service() {
     }
 
     private fun buildNotification(title: String): Notification {
-        val isPlaying = videoManger.isPlaying
-
-        // 绑定各个按钮的 PendingIntent
-        val rewindIntent = PendingIntent.getService(
-            this, 1, Intent(this, AudioService::class.java).apply { action = ACTION_REWIND },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val playPauseIntent = PendingIntent.getService(
-            this,
-            2,
-            Intent(this, AudioService::class.java).apply {
-                action = if (isPlaying) ACTION_PAUSE else ACTION_PLAY
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val ffIntent = PendingIntent.getService(
-            this, 3, Intent(this, AudioService::class.java).apply { action = ACTION_FAST_FORWARD },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.outline_ear_sound_24)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(title)
             .setContentText("nap511 音乐播放器")
             .setOngoing(true)
-            // 按严格顺序添加按钮：[0: 快退], [1: 播放/暂停], [2: 快进]
-            .addAction(
-                R.drawable.outline_arrow_back_ios_24,
-                "后退15秒",
-                rewindIntent
-            )          // Index 0
-            .addAction(
-                if (isPlaying) R.drawable.outline_autopause_24 else R.drawable.outline_autoplay_24,
-                if (isPlaying) "暂停" else "播放",
-                playPauseIntent
-            )                                                                               // Index 1
-            .addAction(
-                R.drawable.outline_arrow_forward_ios_24,
-                "快进15秒",
-                ffIntent
-            )            // Index 2
             .setStyle(
                 MediaStyle()
                     .setMediaSession(mediaSession.sessionToken)
-                    // 解决问题 1：指定折叠/小视图下显示的按钮索引（0:快退, 1:播放/暂停, 2:快进）
-                    .setShowActionsInCompactView(0, 1, 2)
             )
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .build()
