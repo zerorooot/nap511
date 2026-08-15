@@ -1,9 +1,25 @@
 #  nap511
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/zerorooot/nap511)
-[![Workflows](https://github.com/zerorooot/nap511/actions/workflows/auto-preview-release.yml/badge.svg)](https://github.com/zerorooot/nap511/actions/workflows/generate-apk-release.yml)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/zerorooot/nap511) 
+[![Latest Release](https://img.shields.io/github/v/release/zerorooot/nap511?label=Latest%20Release)](https://github.com/zerorooot/nap511/releases)
 [![License](https://img.shields.io/github/license/zerorooot/nap511.svg)](https://github.com/zerorooot/nap511/blob/main/LICENSE)
 
+
 一个Android自用的[115网盘](https://115.com/)客户端，用于[Jetpack Compose](https://developer.android.com/jetpack/compose)练手
+
+# 截图
+
+<table>
+  <tr style="text-align: center; vertical-align: middle;">
+    <td><a href="./assets/01.jpg?raw=true"><img src="./assets/01.jpg?raw=true" width="300" alt="Screenshot 01"/></a></td>
+    <td><a href="./assets/02.jpg?raw=true"><img src="./assets/02.jpg?raw=true" width="300" alt="Screenshot 002"/></a></td>
+    <td><a href="./assets/03.jpg?raw=true"><img src="./assets/03.jpg?raw=true" width="300" alt="Screenshot 003"/></a></td>
+  </tr>
+  <tr style="text-align: center; vertical-align: middle;">
+    <td><a href="./assets/04.jpg?raw=true"><img src="./assets/04.jpg?raw=true" width="300" alt="Screenshot 004"/></a></td>
+    <td><a href="./assets/05.jpg?raw=true"><img src="./assets/05.jpg?raw=true" width="300" alt="Screenshot 005"/></a></td>
+    <td><a href="./assets/06.jpg?raw=true"><img src="./assets/06.jpg?raw=true" width="300" alt="Screenshot 006"/></a></td>
+  </tr>
+</table>
 
 # 功能说明
 

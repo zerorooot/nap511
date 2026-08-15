@@ -155,14 +155,10 @@ fun FileScreen(
 
     fun handleFolderClick(i: Int, fileBean: FileBean) {
         if (DataStoreUtil.getData(ConfigKeyUtil.EARLY_LOADING, false)) {
-            val before = i - 1
-            val after = i + 1
-            if (before >= 0 && fileBeanList[before].isFolder) {
-                fileViewModel.updateFileCache(fileBeanList[before].categoryId)
-            }
-            if (after < fileBeanList.size && fileBeanList[after].isFolder) {
-                fileViewModel.updateFileCache(fileBeanList[after].categoryId)
-            }
+            listOf(i - 1, i + 1)
+                .mapNotNull { fileBeanList.getOrNull(it) }
+                .filter { it.isFolder }
+                .forEach { fileViewModel.updateFileCache(it.categoryId) }
         }
         fileViewModel.getFiles(fileBean.categoryId)
     }

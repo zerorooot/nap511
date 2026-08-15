@@ -538,7 +538,7 @@ class MainActivity : AppCompatActivity() {
                 text = avatarBean.value.userName, style = MaterialTheme.typography.titleMedium
             )
             //uid
-            Text(text = App.uid)
+            Text(text = avatarBean.value.userId)
             //会员到期时间
             Text(
                 text = "会员到期时间：${
