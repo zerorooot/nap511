@@ -3,7 +3,6 @@ package github.zerorooot.nap511.viewmodel
 import android.annotation.SuppressLint
 import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.viewModelScope
-import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.RenameBean
@@ -106,8 +105,7 @@ internal fun FileViewModel.delete(index: Int) {
         val beforeList = fileBeanList
         val beforeFileListCache = fileListCache[currentCid]
         val beforeClickMap = clickMap.getOrDefault(currentCid, 0)
-        val beforeImageBeanCache =
-            imageBeanCache.getOrDefault(currentCid, hashMapOf())
+        val beforeImageBeanCache = imageBeanCache.getOrDefault(currentCid, hashMapOf())
 
         // XLog.d("FileViewModel.delete before fileListCache size ${fileListCache.size}")
         //提前删除，优化速度
@@ -244,20 +242,23 @@ internal fun FileViewModel.setFileBeanProperty(fileBeanList: ArrayList<FileBean>
             fileBean.fileIco = R.drawable.mp4
             fileBean.playLongString = generateTime(fileBean.playLong.toLong()) + " "
         }
-        if (fileBean.icoString == "mp3" || fileBean.icoString == "m4a") {
-            fileBean.fileIco = R.drawable.mp3
-            fileBean.playLongString = generateTime(fileBean.playLong.toLong()) + " "
-        }
+
         when (fileBean.icoString) {
             "apk" -> fileBean.fileIco = R.drawable.apk
             "iso" -> fileBean.fileIco = R.drawable.iso
-            "zip" -> fileBean.fileIco = R.drawable.zip
-            "7z" -> fileBean.fileIco = R.drawable.zip
-            "rar" -> fileBean.fileIco = R.drawable.zip
-            "png" -> fileBean.fileIco = R.drawable.png
-            "jpg" -> fileBean.fileIco = R.drawable.png
-            "txt" -> fileBean.fileIco = R.drawable.txt
             "torrent" -> fileBean.fileIco = R.drawable.torrent
+            "rar", "tar", "gz", "7z", "zip", "part", "jar" -> fileBean.fileIco = R.drawable.zip
+
+            "gif", "jpg", "png", "jpeg", "bmp", "tif", "svg", "pic", "heic", "dng", "webp" ->
+                fileBean.fileIco = R.drawable.png
+
+            "reg", "txt", "wri", "rtf", "lrc", "sub", "srt", "ass", "ssa", "idx", "smi", "vtt", "sbv", "ttml", "ksc", "snc", "krc", "c", "cpp", "h", "asm", "s", "java", "asp", "aspx", "bat", "bas", "prg", "cmd", "log", "php", "js", "go", "sh", "css", "scss", "sass", "less", "hpp", "cc", "hex", "hxx", "cxx", "c++", "cs", "py", "pl", "pm", "md", "cue", "utf", "mhtml", "mht", "csv", "xml", "html", "htm" ->
+                fileBean.fileIco = R.drawable.txt
+
+            "mp3", "wma", "wav", "midi", "flac", "ram", "ra", "mid", "aac", "m4a", "ape", "au", "ogg", "aif", "aiff", "snd", "voc", "mpa", "cda", "vqf", "wvx", "wmx", "m3u", "m3u8", "ttbl", "ttpl", "tta", "tak", "mpc", "mp+", "mp3pro", "mp1", "mp2", "mac", "xm", "umx", "stm", "s3m", "mtm", "mod", "it", "far", "rmi", "fla", "dts", "dtswav", "awb" -> {
+                fileBean.fileIco = R.drawable.mp3
+                fileBean.playLongString = generateTime(fileBean.playLong.toLong()) + " "
+            }
         }
     }
 }

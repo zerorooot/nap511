@@ -227,11 +227,11 @@ fun FileScreen(
             when {
                 fileBean.isFolder -> handleFolderClick(i, fileBean)
                 fileBean.isVideo == 1 -> handleVideoClick(i, fileBean)
-                fileBean.photoThumb.isNotEmpty() -> handlePhotoClick(fileBean)
                 fileBean.fileIco == R.drawable.torrent -> handleTorrentClick(fileBean)
                 fileBean.fileIco == R.drawable.zip -> handleZipClick(i)
                 fileBean.fileIco == R.drawable.txt -> handleTextClick(i, fileBean)
                 fileBean.fileIco == R.drawable.mp3 -> handleAudioClick(fileBean)
+                fileBean.photoThumb.isNotEmpty() -> handlePhotoClick(fileBean)
                 else -> fileViewModel.setRefreshingStatus(false)
             }
 
