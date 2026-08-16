@@ -499,6 +499,19 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         }
     }
 
+    fun filterFile(type: Int, name: String) {
+        _isRefreshing.value = true
+        viewModelScope.launch {
+            isSearchState = true
+            val files = fileRepository.filterFile(currentCid, type)
+            setFileBeanProperty(files.fileBeanList)
+            fileBeanList.clear()
+            fileBeanList.addAll(files.fileBeanList)
+            appBarTitle = "过滤 - $name"
+            _isRefreshing.value = false
+        }
+    }
+
 
 //    fun selectAll() {
 //        val a = arrayListOf<FileBean>()

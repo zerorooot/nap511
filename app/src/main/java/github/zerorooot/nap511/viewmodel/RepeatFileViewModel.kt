@@ -174,6 +174,14 @@ class RepeatFileViewModel(
         }
     }
 
+    fun clearEmptyFile() {
+        viewModelScope.launch {
+            val clearEmpty = repeatService.clearEmpty()
+            XLog.d("clearEmpty: $clearEmpty")
+            App.instance.toast(clearEmpty.message)
+        }
+    }
+
     fun fetchCategoryDetail(cid: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }

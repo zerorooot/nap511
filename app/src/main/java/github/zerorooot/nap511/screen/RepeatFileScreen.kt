@@ -112,6 +112,10 @@ fun RepeatFileScreen(
                 viewModel.triggerForceRefresh()
             }
 
+            "删空文件" -> {
+                viewModel.clearEmptyFile()
+            }
+
             "ModalNavigationDrawerMenu" -> {
                 onClick.invoke()
             }

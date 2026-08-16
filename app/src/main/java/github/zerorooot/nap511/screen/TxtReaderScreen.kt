@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.screen
 
 import android.app.Activity
+import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -22,16 +23,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TextDecrease
 import androidx.compose.material.icons.filled.TextIncrease
-import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -48,10 +42,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -65,8 +55,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -75,6 +65,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -83,6 +74,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
+import java.io.File
 import java.nio.charset.Charset
 
 /**
@@ -113,6 +105,7 @@ fun TxtReaderScreen(
     defaultEncoding: String = "UTF-8",
     onBackClick: (() -> Unit)
 ) {
+    val context = LocalContext.current
     // 状态定义
     var currentEncoding by remember { mutableStateOf(defaultEncoding) }
     var fontSizeSp by remember { mutableFloatStateOf(16f) }
@@ -228,107 +221,48 @@ fun TxtReaderScreen(
                 enter = fadeIn(),
                 exit = fadeOut()
             ) {
-                TopAppBar(
-                    title = {
-                        if (isSearchOpen) {
-                            // 搜索输入框
-                            TextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it },
-                                placeholder = { Text("搜索文本...") },
-                                singleLine = true,
-                                colors = TextFieldDefaults.colors(
-                                    focusedContainerColor = Color.Transparent,
-                                    unfocusedContainerColor = Color.Transparent,
-                                    focusedIndicatorColor = Color.Transparent,
-                                    unfocusedIndicatorColor = Color.Transparent
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .focusRequester(focusRequester)
-                            )
-                        } else {
-                            Column {
-                                Text(
-                                    text = title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    maxLines = 1
-                                )
-                                Text(
-                                    text = "编码: $currentEncoding | 行数: ${paragraphs.size}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                if (isSearchOpen) {
+                    TopAppBarTxtReaderSearch(
+                        searchQuery = searchQuery,
+                        onSearchQueryChange = { searchQuery = it },
+                        onCloseSearch = {
+                            isSearchOpen = false
+                            searchQuery = ""
+                        },
+                        matchCount = searchMatches.size,
+                        currentMatchIndex = currentMatchIndex,
+                        onPrevMatch = {
+                            if (searchMatches.isNotEmpty()) {
+                                currentMatchIndex =
+                                    if (currentMatchIndex > 0) currentMatchIndex - 1 else searchMatches.lastIndex
                             }
+                        },
+                        onNextMatch = {
+                            if (searchMatches.isNotEmpty()) {
+                                currentMatchIndex =
+                                    if (currentMatchIndex < searchMatches.lastIndex) currentMatchIndex + 1 else 0
+                            }
+                        },
+                        focusRequester = focusRequester
+                    )
+                } else {
+                    TopAppBarTxtReaderNormal(
+                        title = title,
+                        currentEncoding = currentEncoding,
+                        paragraphsCount = paragraphs.size,
+                        onBackClick = onBackClick,
+                        onSearchOpen = { isSearchOpen = true },
+                        onShareClick = {
+                            shareAsFile(context, byteArray, title)
+                        },
+                        onEncodingClick = {
+                            showCharsetDialog = true
+                        },
+                        onSettingsClick = {
+                            showSettingsSheet = true
                         }
-                    },
-                    navigationIcon = {
-                        if (isSearchOpen) {
-                            IconButton(onClick = {
-                                isSearchOpen = false
-                                searchQuery = ""
-                            }) {
-                                Icon(Icons.Default.Close, contentDescription = "关闭搜索")
-                            }
-                        } else
-                            IconButton(onClick = onBackClick) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "返回"
-                                )
-                            }
-                    },
-                    actions = {
-                        if (isSearchOpen) {
-                            // 匹配计数 (如 3/15)
-                            val countText =
-                                if (searchMatches.isEmpty()) "0/0" else "${currentMatchIndex + 1}/${searchMatches.size}"
-                            Text(
-                                text = countText,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 4.dp)
-                            )
-                            // 上一个结果
-                            IconButton(
-                                onClick = {
-                                    if (searchMatches.isNotEmpty()) {
-                                        currentMatchIndex =
-                                            if (currentMatchIndex > 0) currentMatchIndex - 1 else searchMatches.lastIndex
-                                    }
-                                },
-                                enabled = searchMatches.isNotEmpty()
-                            ) {
-                                Icon(Icons.Default.KeyboardArrowUp, contentDescription = "上一个")
-                            }
-                            // 下一个结果
-                            IconButton(
-                                onClick = {
-                                    if (searchMatches.isNotEmpty()) {
-                                        currentMatchIndex =
-                                            if (currentMatchIndex < searchMatches.lastIndex) currentMatchIndex + 1 else 0
-                                    }
-                                },
-                                enabled = searchMatches.isNotEmpty()
-                            ) {
-                                Icon(Icons.Default.KeyboardArrowDown, contentDescription = "下一个")
-                            }
-                        } else {
-                            // 打开搜索按钮
-                            IconButton(onClick = { isSearchOpen = true }) {
-                                Icon(Icons.Default.Search, contentDescription = "搜索")
-                            }
-                            IconButton(onClick = { showCharsetDialog = true }) {
-                                Icon(Icons.Default.Translate, contentDescription = "切换编码")
-                            }
-                            IconButton(onClick = { showSettingsSheet = true }) {
-                                Icon(Icons.Default.Settings, contentDescription = "阅读设置")
-                            }
-                        }
-                    },
-
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
-                )
+                    )
+                }
             }
         },
         bottomBar = {
@@ -670,5 +604,28 @@ fun TxtReaderScreen(
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
+    }
+}
+
+/**
+ * 将 ByteArray 保存为临时文件并调用系统分享
+ */
+private fun shareAsFile(context: android.content.Context, byteArray: ByteArray, fileName: String) {
+    runCatching {
+        val cacheFile = File(context.cacheDir, fileName).apply {
+            writeBytes(byteArray)
+        }
+        val contentUri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            cacheFile
+        )
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+        //    type = "text/plain"
+            type = "*/*" // 通用 MIME 类型，允许任何能接收文件的应用打开
+            putExtra(Intent.EXTRA_STREAM, contentUri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(shareIntent, "分享文件"))
     }
 }

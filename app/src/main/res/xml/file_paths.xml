@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 对应 context.cacheDir 目录，用于暴露 shareAsFile 生成的临时 txt 文件 -->
+    <cache-path
+        name="cache_files"
+        path="." />
+</paths>

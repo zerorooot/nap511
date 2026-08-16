@@ -186,6 +186,11 @@ class FileRepository(private val cookie: String) {
         return fileService.search(cid, searchValue, aid, asc, limit)
     }
 
+    suspend fun filterFile(cid: String, type: Int, limit: Int = 999): FilesBean {
+        return fileService.filterFile(cid = cid, type = type, limit = limit)
+    }
+
+
     suspend fun image(pickCode: String, current: Long): ImageDate {
         return fileService.image(pickCode, current)
     }

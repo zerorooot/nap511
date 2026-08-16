@@ -1,30 +1,45 @@
 package github.zerorooot.nap511.screen
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
-import github.zerorooot.nap511.R
+import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.ui.theme.Purple80
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,7 +84,10 @@ fun AppTopBarMultiple(title: String, onClick: (String) -> Unit) {
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
         navigationIcon = {
             IconButton(onClick = { onClick.invoke("back") }) {
-                Icon(imageVector = Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "navigationIcon")
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = "navigationIcon"
+                )
             }
         },
         actions = {
@@ -113,7 +131,6 @@ fun AppTopBarMultiple(title: String, onClick: (String) -> Unit) {
             }
             //R.drawable.baseline_cloud_download_24
             TopAppBarActionButton(
-
                 Icons.Default.Cloud,
                 description = "unzip file"
             ) {
@@ -220,7 +237,6 @@ fun AppTopBarRecycle(title: String, onClick: (name: String) -> Unit) {
             }
         },
         actions = {
-
             IconButton(onClick = { onClick.invoke("清空所有文件") }) {
                 Icon(
                     Icons.Default.DeleteForever,
@@ -249,5 +265,123 @@ fun TopAppBarActionButton(
         }
 
     }
+}
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TopAppBarTxtReaderNormal(
+    title: String,
+    currentEncoding: String,
+    paragraphsCount: Int,
+    onBackClick: () -> Unit,
+    onSearchOpen: () -> Unit,
+    onShareClick: () -> Unit,
+    onEncodingClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    TopAppBar(
+        modifier = modifier,
+        title = {
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1
+                )
+                Text(
+                    text = "编码: $currentEncoding | 行数: $paragraphsCount",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        navigationIcon = {
+            IconButton(onClick = onBackClick) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "返回"
+                )
+            }
+        },
+        actions = {
+            IconButton(onClick = onSearchOpen) {
+                Icon(Icons.Default.Search, contentDescription = "搜索")
+            }
+            IconButton(onClick = onShareClick) {
+                Icon(Icons.Default.Share, contentDescription = "分享文本")
+            }
+            IconButton(onClick = onEncodingClick) {
+                Icon(Icons.Default.Translate, contentDescription = "切换编码")
+            }
+            IconButton(onClick = onSettingsClick) {
+                Icon(Icons.Default.Settings, contentDescription = "阅读设置")
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80)
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TopAppBarTxtReaderSearch(
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    onCloseSearch: () -> Unit,
+    matchCount: Int,
+    currentMatchIndex: Int,
+    onPrevMatch: () -> Unit,
+    onNextMatch: () -> Unit,
+    modifier: Modifier = Modifier,
+    focusRequester: FocusRequester
+) {
+    TopAppBar(
+        modifier = modifier,
+        title = {
+            TextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
+                placeholder = { Text("搜索文本...") },
+                singleLine = true,
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester)
+            )
+        },
+        navigationIcon = {
+            IconButton(onClick = onCloseSearch) {
+                Icon(Icons.Default.Close, contentDescription = "关闭搜索")
+            }
+        },
+        actions = {
+            val countText = if (matchCount == 0) "0/0" else "${currentMatchIndex + 1}/$matchCount"
+            Text(
+                text = countText,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+            IconButton(
+                onClick = onPrevMatch,
+                enabled = matchCount > 0
+            ) {
+                Icon(Icons.Default.KeyboardArrowUp, contentDescription = "上一个")
+            }
+            IconButton(
+                onClick = onNextMatch,
+                enabled = matchCount > 0
+            ) {
+                Icon(Icons.Default.KeyboardArrowDown, contentDescription = "下一个")
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80)
+    )
 }
 

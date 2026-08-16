@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,10 +29,20 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.FolderZip
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -39,11 +50,14 @@ import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -69,6 +83,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
@@ -114,11 +130,112 @@ fun CreateFolderDialog(enter: (String?) -> Unit) {
     BaseDialog("请输入新建文件名", "文件名", enter = enter)
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun SearchDialog(enter: (String?) -> Unit) {
-    BaseDialog("在当前目录下搜索", "关键字", enter = enter)
-}
+fun SearchDialog(
+    search: (searchKey: String?) -> Unit,
+    onSelectStrategy: (strategy: String) -> Unit
+) {
+    var text by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
 
+    // 预设分类及对应图标
+    val strategies = remember {
+        listOf(
+            "视频" to Icons.Default.Movie,
+            "音频" to Icons.Default.MusicNote,
+            "图片" to Icons.Default.Image,
+            "文档" to Icons.Default.Description,
+            "软件" to Icons.Default.Apps,
+            "压缩" to Icons.Default.FolderZip
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest = { search.invoke(null) },
+        title = {
+            Text(
+                text = "在当前目录下搜索",
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // 搜索输入框
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester),
+                    placeholder = { Text("输入关键字...") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    trailingIcon = {
+                        if (text.isNotEmpty()) {
+                            IconButton(onClick = { text = "" }) {
+                                Icon(Icons.Default.Clear, contentDescription = "清空输入")
+                            }
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(
+                        onSearch = {
+                            if (text.isNotBlank()) search(text)
+                        }
+                    )
+                )
+
+                // 快速分类筛选段落
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "按文件类型筛选",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        strategies.forEach { (label, icon) ->
+                            FilterChip(
+                                selected = false,
+                                onClick = { onSelectStrategy(label) },
+                                label = { Text(label) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(FilterChipDefaults.IconSize)
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { search(text.takeIf { it.isNotBlank() }) }
+            ) {
+                Text("搜索")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { search.invoke(null) }) {
+                Text("取消")
+            }
+        }
+    )
+
+    LaunchedEffect(Unit) {
+        delay(10.milliseconds)
+        focusRequester.requestFocus()
+    }
+}
 
 @Composable
 fun RenameFileDialog(name: String, enter: (String?) -> Unit) {
@@ -452,7 +569,8 @@ fun TextBodyDialogScreen(title: String, context: ByteArray, enter: (String) -> U
         enter.invoke("")
     }, confirmButton = {
         Row(
-            verticalAlignment = Alignment.CenterVertically, modifier = Modifier.offset(y = (-20).dp)
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.offset(y = (-20).dp)
         ) {
             TextButton(
                 onClick = {
@@ -598,7 +716,8 @@ fun UnzipScreen(
         enter.invoke(Pair(true, "exit"))
     }, confirmButton = {
         Row(
-            verticalAlignment = Alignment.CenterVertically, modifier = Modifier.offset(y = (-20).dp)
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.offset(y = (-20).dp)
         ) {
             TextButton(
                 onClick = {
@@ -653,7 +772,8 @@ fun UnzipScreen(
                         )
                         if (item.fileIco == R.drawable.folder) {
                             Text(
-                                text = item.fileName, modifier = Modifier.padding(start = 8.dp)
+                                text = item.fileName,
+                                modifier = Modifier.padding(start = 8.dp)
                             )
                         } else {
                             Column(
@@ -1008,7 +1128,8 @@ private fun SelectTorrentFileDialog(
 
     AlertDialog(onDismissRequest = ::cancel, confirmButton = {
         Row(
-            verticalAlignment = Alignment.CenterVertically, modifier = Modifier.offset(y = (-20).dp)
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.offset(y = (-20).dp)
         ) {
             TextButton(
                 onClick = ::default,
@@ -1112,7 +1233,8 @@ fun DynamicEllipsizedTextView(text: String, modifier: Modifier = Modifier) {
     val textWidth = remember { mutableIntStateOf(0) }
 
     Box(modifier = modifier.onSizeChanged { textWidth.intValue = it.width }) {
-        val maxChars = textWidth.intValue / with(density) { 12.toDp().toPx().toInt() } // 假设每字符占12px
+        val maxChars =
+            textWidth.intValue / with(density) { 12.toDp().toPx().toInt() } // 假设每字符占12px
         val halfChars = maxChars / 2
         EllipsizedTextView(text, maxStartChars = halfChars, maxEndChars = halfChars)
     }

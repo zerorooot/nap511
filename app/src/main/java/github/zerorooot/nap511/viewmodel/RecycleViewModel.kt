@@ -1,12 +1,12 @@
 package github.zerorooot.nap511.viewmodel
 
-//import github.zerorooot.nap511.util.SharedPreferencesUtil
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
@@ -90,14 +90,15 @@ class RecycleViewModel(private val cookie: String) :
     fun delete(index: Int, password: String, save: Boolean = false) {
         viewModelScope.launch {
             val revert = fileService.recycleClean(recycleFileList[index].id, password)
+            XLog.d("RecycleViewModel delete $revert")
             val message = if (revert.state) {
                 recycleFileList.removeAt(index)
                 if (save) {
-                    DataStoreUtil.putData(ConfigKeyUtil.PASSWORD, password)
+                    DataStoreUtil.putDataSuspend(ConfigKeyUtil.PASSWORD, password)
                 }
                 "删除成功"
             } else {
-                DataStoreUtil.putData(ConfigKeyUtil.PASSWORD, "")
+                DataStoreUtil.putDataSuspend(ConfigKeyUtil.PASSWORD, "")
                 "删除失败，${revert.errorMsg}"
             }
             App.instance.toast(message)
@@ -112,11 +113,12 @@ class RecycleViewModel(private val cookie: String) :
         }
         viewModelScope.launch {
             val recycleCleanAll = fileService.recycleCleanAll(password)
+            XLog.d("RecycleViewModel deleteAll $recycleCleanAll")
             val message = if (recycleCleanAll.state) {
                 recycleFileList.clear()
                 "清除成功"
             } else {
-                "清除失败，${recycleCleanAll.errorMsg}"
+                "清除失败，${recycleCleanAll.error}"
             }
             App.instance.toast(message)
         }
@@ -126,6 +128,7 @@ class RecycleViewModel(private val cookie: String) :
         viewModelScope.launch {
             val revert = fileService.revert(recycleFileList[index].id)
             val message = if (revert.state) {
+                XLog.d("RecycleViewModel revert $revert")
                 recycleFileList.removeAt(index)
                 "恢复成功"
             } else {
@@ -172,13 +175,16 @@ class RecycleViewModel(private val cookie: String) :
         when (recycleBean.ico) {
             "apk" -> recycleBean.fileIco = R.drawable.apk
             "iso" -> recycleBean.fileIco = R.drawable.iso
-            "zip" -> recycleBean.fileIco = R.drawable.zip
-            "7z" -> recycleBean.fileIco = R.drawable.zip
-            "rar" -> recycleBean.fileIco = R.drawable.zip
-            "png" -> recycleBean.fileIco = R.drawable.png
-            "jpg" -> recycleBean.fileIco = R.drawable.png
-            "mp3" -> recycleBean.fileIco = R.drawable.mp3
-            "txt" -> recycleBean.fileIco = R.drawable.txt
+            "torrent" -> recycleBean.fileIco = R.drawable.torrent
+            "rar", "tar", "gz", "7z", "zip", "part", "jar" -> recycleBean.fileIco = R.drawable.zip
+            "gif", "jpg", "png", "jpeg", "bmp", "tif", "svg", "pic", "heic", "dng", "webp" -> recycleBean.fileIco = R.drawable.png
+
+            "doc", "docx", "xls", "pdf", "ppt", "wps", "dps", "et", "mdb", "reg", "txt", "wri", "rtf", "lrc", "vob", "sub", "srt", "ass", "ssa", "idx", "umd", "xlsx", "xlsm", "xltx", "xltm", "xlam", "xlsb", "odt", "pptx", "ods", "odp", "chm", "pot", "pps", "ppsx", "smi", "vtt", "stl", "sbv", "ttml", "ksc", "snc", "krc", "c", "cpp", "h", "asm", "s", "java", "o", "asp", "aspx", "bat", "bas", "prg", "cmd", "log", "php", "js", "go", "sh", "css", "scss", "sass", "less", "class", "hpp", "cc", "hex", "hxx", "cxx", "c++", "cs", "py", "pl", "pm", "md", "cue", "utf", "dpt", "ofd", "eto", "ets", "mhtml", "mht", "uof", "dot", "wpt", "dotx", "docm", "dotm", "ett", "xlt", "pptm", "ppsm", "potx", "potm", "csv", "xml", "html", "htm" ->
+                recycleBean.fileIco = R.drawable.txt
+
+            "mp3", "wma", "wav", "midi", "flac", "ram", "ra", "mid", "aac", "m4a", "ape", "au", "ogg", "aif", "aiff", "snd", "voc", "mpa", "cda", "vqf", "wvx", "wmx", "m3u", "m3u8", "ttbl", "ttpl", "tta", "tak", "mpc", "mp+", "mp3pro", "mp1", "mp2", "mac", "xm", "umx", "stm", "s3m", "mtm", "mod", "it", "far", "rmi", "fla", "dts", "dtswav", "awb" -> {
+                recycleBean.fileIco = R.drawable.mp3
+            }
         }
     }
 }

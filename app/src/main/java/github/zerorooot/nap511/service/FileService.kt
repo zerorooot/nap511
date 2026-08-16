@@ -1,18 +1,14 @@
 package github.zerorooot.nap511.service
 
 import com.google.gson.JsonObject
-import github.zerorooot.nap511.bean.BaseResponse
 import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.CreateFolderMessage
-import github.zerorooot.nap511.bean.EncryptionData
 import github.zerorooot.nap511.bean.EncryptionDataResponse
-import github.zerorooot.nap511.bean.ExtractData
 import github.zerorooot.nap511.bean.ExtractResponse
 import github.zerorooot.nap511.bean.FileInfo
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.ImageDate
 import github.zerorooot.nap511.bean.MusicBean
-import github.zerorooot.nap511.bean.ProcessData
 import github.zerorooot.nap511.bean.ProcessDataResponse
 import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.bean.VideoInfoBean
@@ -132,6 +128,30 @@ interface FileService {
         @Query("limit") limit: Int
     ): FilesBean
 
+    @GET("files")
+    suspend fun filterFile(
+        @Query("aid") aid: Int = 1,
+        @Query("cid") cid: String,
+        @Query("o") order: String = "user_ptime",
+        @Query("asc") asc: Int = 0,
+        @Query("offset") offset: Int = 0,
+        @Query("show_dir") showDir: Int = 1,
+        @Query("limit") limit: Int = 40,
+        @Query("code") code: String? = null,
+        @Query("scid") scid: String? = null,
+        @Query("snap") snap: Int = 0,
+        @Query("natsort") natSort: Int = 1,
+        @Query("record_open_time") recordOpenTime: Int = 1,
+        @Query("count_folders") countFolders: Int = 1,
+        @Query("type") type: Int = 4,
+        @Query("source") source: String? = null,
+        @Query("format") format: String = "json",
+        @Query("star") star: String? = null,
+        @Query("suffix") suffix: String? = null,
+        @Query("is_share") isShare: String? = null,
+        @Query("custom_order") customOrder: String? = null,
+        @Query("fc_mix") fcMix: String? = null
+    ): FilesBean
 
     /**
      *

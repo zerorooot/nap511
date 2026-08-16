@@ -120,9 +120,19 @@ fun CreateDialogs(
 
         is FileDialogState.Search -> {
             //搜索
-            SearchDialog {
+            SearchDialog({
                 if (it != null && it != "") {
                     fileViewModel.search(it)
+                }
+                fileViewModel.closeSearchDialog()
+            }) {
+                when (it) {
+                    "文档" -> fileViewModel.filterFile(1, it)
+                    "图片" -> fileViewModel.filterFile(2, it)
+                    "音频" -> fileViewModel.filterFile(3, it)
+                    "视频" -> fileViewModel.filterFile(4, it)
+                    "压缩" -> fileViewModel.filterFile(5, it)
+                    "软件" -> fileViewModel.filterFile(6, it)
                 }
                 fileViewModel.closeSearchDialog()
             }
