@@ -58,9 +58,10 @@ class SettingViewModel : ViewModel() {
     private val switchFlow2 = combine(
         DataStoreUtil.getDataFlow(ConfigKeyUtil.TORRENT_SORT, false),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.LOG, false),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.FORCE_LOAD_CACHE, false)
-    ) { torrentSort, logEnabled, forceCache ->
-        Triple(torrentSort, logEnabled, forceCache)
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.FORCE_LOAD_CACHE, false),
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.VIDEO_LINK_MODE, false)
+    ) { torrentSort, logEnabled, forceCache, videoLinkMode ->
+        SwitchGroup2(torrentSort, logEnabled, forceCache, videoLinkMode)
     }
 
     // 统一暴露给 UI 的 StateFlow
@@ -89,9 +90,10 @@ class SettingViewModel : ViewModel() {
             earlyLoading = s1.earlyLoading,
             saveRequestCache = s1.saveCache,
             positionAfterAt = s1.positionAfterAt,
-            torrentSort = s2.first,
-            logEnabled = s2.second,
-            forceLoadCache = s2.third
+            torrentSort = s2.torrentSort,
+            logEnabled = s2.logEnabled,
+            forceLoadCache = s2.forceCache,
+            videoLinkMode = s2.videoLinkMode
         )
     }.stateIn(
         scope = viewModelScope,
@@ -132,5 +134,12 @@ class SettingViewModel : ViewModel() {
         val earlyLoading: Boolean,
         val saveCache: Boolean,
         val positionAfterAt: Boolean
+    )
+
+    private data class SwitchGroup2(
+        val torrentSort: Boolean,
+        val logEnabled: Boolean,
+        val forceCache: Boolean,
+        val videoLinkMode: Boolean
     )
 }

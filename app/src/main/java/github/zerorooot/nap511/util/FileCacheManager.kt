@@ -4,14 +4,14 @@ import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import github.zerorooot.nap511.bean.FilesBean
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.StringJoiner
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration.Companion.minutes
 
 data class CacheWrapper(
     val data: FilesBean,
@@ -41,33 +41,23 @@ class FileCacheManager(
     fun getDate(key: String): FilesBean? = memoryCache[key]?.data
 
     suspend fun loadAllCache() = withContext(Dispatchers.IO) {
-        // 立即异步启动加载 "0"
-        async { getDiskCache("0") }.await()?.let {
-            memoryCache["0"] = it
-        }
-        // 4. 并发加载其他文件
-        cacheDir.listFiles()?.map { file ->
-            async {
-                val key = file.name.substringBeforeLast(".")
-                getDiskCache(key)?.let {
-                    memoryCache[key] = it
-                }
-            }
-        }?.awaitAll()
-
-//        async { deleteIndividualFile() }.await()
+        deleteIndividualFile()
     }
 
     suspend fun deleteIndividualFile() = withContext(Dispatchers.IO) {
         val diskCache = getDiskCache("0") ?: return@withContext
+        memoryCache["0"] = diskCache
+
         val fileList =
             cacheDir.listFiles()?.map { i -> i.name.substringBeforeLast(".") }?.toMutableList()
                 ?: return@withContext
         fileList.remove("0")
 
-        fun walk(cid: String) {
-            val folderList =
-                getDiskCache(cid)?.data?.fileBeanList?.filter { it.isFolder } ?: emptyList()
+        suspend fun walk(cid: String) {
+            val walkCache = getDiskCache(cid) ?: return
+
+            memoryCache[cid] = walkCache
+            val folderList = walkCache.data.fileBeanList.filter { it.isFolder }
             for (item in folderList) {
                 walk(item.categoryId)
             }
@@ -127,29 +117,30 @@ class FileCacheManager(
     }
 
 
-    fun getDiskCache(key: String, now: Long = System.currentTimeMillis()): CacheWrapper? {
-        val diskFile = getDiskFile(key)
-        if (!diskFile.exists()) {
-            return null
-        }
-        try {
-            val json = diskFile.readText()
-            val diskEntry: CacheWrapper? = gson.fromJson(json, wrapperType)
-
-            if (diskEntry != null) {
-                if (now - diskEntry.timestamp > ttlMillis) {
-                    diskFile.delete()
-                    return null
-                }
-                // 磁盘读取成功后，同步一份到内存，下次直接走内存
-                //    memoryCache[key] = diskEntry
-                return diskEntry
+    suspend fun getDiskCache(key: String, now: Long = System.currentTimeMillis()): CacheWrapper? =
+        withContext(Dispatchers.IO) {
+            val diskFile = getDiskFile(key)
+            if (!diskFile.exists()) {
+                return@withContext null
             }
-        } catch (e: Exception) {
-            diskFile.delete()
+            try {
+                val json = diskFile.readText()
+                val diskEntry: CacheWrapper? = gson.fromJson(json, wrapperType)
+
+                if (diskEntry != null) {
+                    if (now - diskEntry.timestamp > ttlMillis) {
+                        diskFile.delete()
+                        return@withContext null
+                    }
+                    // 磁盘读取成功后，同步一份到内存，下次直接走内存
+                    //    memoryCache[key] = diskEntry
+                    return@withContext diskEntry
+                }
+            } catch (e: Exception) {
+                diskFile.delete()
+            }
+            return@withContext null
         }
-        return null
-    }
 
     suspend operator fun set(key: String, value: FilesBean) = put(key, value)
 

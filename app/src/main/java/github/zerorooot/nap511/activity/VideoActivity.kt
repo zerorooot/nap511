@@ -55,8 +55,6 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.player.MyGSYVideoPlayer
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import kotlinx.coroutines.launch
 import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
 
@@ -76,18 +74,20 @@ class VideoActivity : AppCompatActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_video)
-        val originVideo = DataStoreUtil.getData(
-            ConfigKeyUtil.ORIGIN_VIDEO, false
+        val headerMap = hashMapOf(
+            "cookie" to App.cookie,
+            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
         )
-        val address = if (originVideo) videoInfo.originFileUrl else videoInfo.videoUrl
+        val address = videoInfo.videoUrl.ifEmpty {
+            videoInfo.downloadUrl
+        }
         val title = videoInfo.fileName
-        val cookie = App.cookie
         videoPlayer = findViewById(R.id.pre_video_player)
 
         PlayerFactory.setPlayManager(Exo2PlayerManager::class.java)
 
         videoPlayer.apply {
-            setUp(address, false, null, mapOf("Cookie" to cookie), title)
+            setUp(address, false, null, headerMap, title)
             //增加title
             titleTextView.visibility = View.VISIBLE
             titleTextView.isSelected = true

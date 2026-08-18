@@ -6,8 +6,6 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import android.widget.Toast
-import androidx.compose.material3.DrawerState
-import androidx.compose.runtime.compositionLocalOf
 import androidx.core.app.NotificationManagerCompat
 import coil.ImageLoader
 import coil.ImageLoaderFactory
@@ -24,14 +22,21 @@ import com.elvishew.xlog.printer.AndroidPrinter
 import com.elvishew.xlog.printer.file.FilePrinter
 import com.elvishew.xlog.printer.file.clean.FileLastModifiedCleanStrategy
 import com.google.gson.Gson
+import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import com.google.gson.JsonParser
+import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.bean.AvatarBean
+import github.zerorooot.nap511.bean.Base115Response
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import okhttp3.Interceptor
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId
@@ -39,6 +44,10 @@ import java.time.format.DateTimeFormatter
 import kotlin.properties.Delegates
 
 class App : Application(), ImageLoaderFactory {
+    private val okHttpClient by lazy { OkHttpClient() }
+    private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+    private var currentToast: Toast? = null
+
     companion object {
         lateinit var instance: App
         var cookie = ""
@@ -96,11 +105,12 @@ class App : Application(), ImageLoaderFactory {
 //        }
     }
 
-    private val toastScope = CoroutineScope(Dispatchers.Main.immediate)
+    private val toastScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     fun toast(text: String) {
         toastScope.launch {
-            Toast.makeText(instance, text, Toast.LENGTH_SHORT).show()
+            currentToast?.cancel()
+            currentToast = Toast.makeText(instance, text, Toast.LENGTH_SHORT).also { it.show() }
         }
     }
 
@@ -109,50 +119,53 @@ class App : Application(), ImageLoaderFactory {
         return getString(id)
     }
 
-    fun checkLogin(cookie: String): Pair<Boolean, String> {
+    suspend fun checkLogin(cookie: String): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        val timestamp = System.currentTimeMillis() / 1000
+        val avatarUrl = "https://my.115.com/?ct=ajax&ac=nav&_$timestamp"
+        val ua =
+            "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
         val gson = Gson()
-        val okHttpClient = OkHttpClient().newBuilder()
-            .addInterceptor(Interceptor { chain ->
-                chain.proceed(
-                    chain.request().newBuilder()
-                        .addHeader("Cookie", cookie)
-                        .addHeader("Content-Type", "application/json; Charset=UTF-8")
-                        .addHeader(
-                            "User-Agent",
-                            "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
-                        )
-                        .build()
-                );
-            }).build()
-        val avatarUrl = "https://my.115.com/?ct=ajax&ac=nav&_${System.currentTimeMillis() / 1000}"
-        val avatarUrlRequest: Request = Request.Builder().url(avatarUrl).get().build()
-        val avatarUrlRespBody = okHttpClient.newCall(avatarUrlRequest).execute().body.string()
-        Log.d("nap511 checkLogin avatarBean", avatarUrlRespBody)
 
-        //{"state":true,"data":{"expire":1,"user_name":"Test","face":"face","user_id":11}}
-        val avatarBean = run {
-            try {
-                gson.fromJson(
-                    gson.fromJson(avatarUrlRespBody, JsonObject::class.java).get("data"),
-                    AvatarBean::class.java
-                )
-            } catch (e: Exception) {
-                e.printStackTrace()
-                null
+        val request = Request.Builder()
+            .url(avatarUrl)
+            .addHeader("Cookie", cookie)
+            .addHeader("User-Agent", ua)
+            .get()
+            .build()
+
+        // 使用 runCatching 捕获网络/解析异常，避免 try-catch 嵌套
+        runCatching {
+            // 使用 .use 自动关闭 Response 资源
+            okHttpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    return@runCatching Pair(false, "网络请求失败: HTTP ${response.code}")
+                }
+
+                val bodyStr = response.body.string()
+                Log.d("checkLogin", "avatarResp: $bodyStr")
+
+                // 4. 一次性反序列化，避免 Gson 嵌套双重解析
+                val type = object : TypeToken<Base115Response<AvatarBean>>() {}.type
+                val result = gson.fromJson<Base115Response<AvatarBean>>(bodyStr, type)
+
+                val avatarBean = result?.data ?: return@runCatching Pair(false, "验证失败，请重试")
+
+                // 5. 格式化过期时间
+                avatarBean.expireString = Instant.ofEpochSecond(avatarBean.expire)
+                    .atZone(ZoneId.systemDefault())
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+
+                // 6. 持久化数据
+                DataStoreUtil.putDataSuspend(ConfigKeyUtil.COOKIE, cookie)
+                DataStoreUtil.putDataSuspend(ConfigKeyUtil.UID, avatarBean.userId)
+                DataStoreUtil.putDataSuspend(ConfigKeyUtil.AVATAR_BEAN, gson.toJson(avatarBean))
+
+                Pair(true, "登陆成功,重启中～")
             }
+        }.getOrElse { e ->
+            Log.e("checkLogin", "Check login failed", e)
+            Pair(false, "验证失败: ${e.localizedMessage ?: "未知错误"}")
         }
-        if (avatarBean == null) {
-            return Pair(false, "验证失败，请重试")
-        }
-
-        avatarBean.expireString = Instant.ofEpochSecond(avatarBean.expire)
-            .atZone(ZoneId.systemDefault())
-            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-
-        DataStoreUtil.putData(ConfigKeyUtil.COOKIE, cookie)
-        DataStoreUtil.putData(ConfigKeyUtil.UID, avatarBean.userId)
-        DataStoreUtil.putData(ConfigKeyUtil.AVATAR_BEAN, gson.toJson(avatarBean))
-        return Pair(true, "登陆成功,重启中～")
     }
 
     /**
@@ -204,5 +217,49 @@ class App : Application(), ImageLoaderFactory {
             // 你也可以在这里配置全局的淡入淡出效果、默认占位图等
             .crossfade(true)
             .build()
+    }
+
+    /**
+     * {"jsonrpc":"2.0","id":"nap511","method":"aria2.getVersion","params":["token:11"]}
+     */
+    fun checkAria2(aria2Url: String, aria2Token: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val requestJson = JsonObject().apply {
+                addProperty("jsonrpc", "2.0")
+                addProperty("id", "nap511")
+                addProperty("method", "aria2.getVersion")
+                add("params", JsonArray().apply {
+                    if (aria2Token.isNotEmpty()) add("token:$aria2Token")
+                })
+            }
+
+            val request = Request.Builder()
+                .url(aria2Url)
+                .post(requestJson.toString().toRequestBody(jsonMediaType))
+                .build()
+
+            val message = runCatching {
+                okHttpClient.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@use "aria2配置失败, HTTP ${response.code}"
+
+                    val bodyStr = response.body.string()
+                    val bodyJson = JsonParser.parseString(bodyStr).asJsonObject
+
+                    if (bodyJson.has("error")) {
+                        val errorMsg = bodyJson.getAsJsonObject("error")?.get("message")?.asString
+                        "aria2配置失败, $errorMsg"
+                    } else {
+                        DataStoreUtil.putDataSuspend(ConfigKeyUtil.ARIA2_URL, aria2Url)
+                        DataStoreUtil.putDataSuspend(ConfigKeyUtil.ARIA2_TOKEN, aria2Token)
+                        "aria2配置成功，请重新下载文件"
+                    }
+                }
+            }.getOrElse { e ->
+                "aria2配置失败, ${e.localizedMessage ?: "未知错误"}"
+            }
+
+            toast(message)
+        }
+
     }
 }

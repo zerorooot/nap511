@@ -113,7 +113,7 @@ fun CreateDialogs(
                     val jsonObject = JsonParser.parseString(it).asJsonObject
                     val aria2Url = jsonObject.get(ConfigKeyUtil.ARIA2_URL).asString
                     val aria2Token = jsonObject.get(ConfigKeyUtil.ARIA2_TOKEN).asString
-                    scope.launch(Dispatchers.IO) { checkAria2(aria2Url, aria2Token) }
+                    App.instance.checkAria2(aria2Url, aria2Token)
                 }
             }
         }
@@ -188,42 +188,4 @@ fun CreateDialogs(
         }
     }
 
-}
-
-/**
- * {"jsonrpc":"2.0","id":"nap511","method":"aria2.getVersion","params":["token:11"]}
- */
-private fun checkAria2(aria2Url: String, aria2Token: String) {
-    val okHttpClient = OkHttpClient()
-    val jsonObject = JsonObject()
-    jsonObject.addProperty("jsonrpc", "2.0")
-    jsonObject.addProperty("id", "nap511")
-    jsonObject.addProperty("method", "aria2.getVersion")
-
-    val jsonArray = JsonArray()
-    if (aria2Token != "") {
-        jsonArray.add("token:$aria2Token")
-    }
-    jsonObject.add("params", jsonArray)
-
-    val request: Request = Request.Builder().url(aria2Url).post(
-        jsonObject.toString().toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
-    ).build()
-
-    val message: String = try {
-        val body = okHttpClient.newCall(request).execute().body.string()
-        val bodyJson = JsonParser.parseString(body).asJsonObject
-
-        if (bodyJson.has("error")) {
-            "aria2配置失败," + bodyJson.getAsJsonObject("error").get("message").asString
-        } else {
-            DataStoreUtil.putData(ConfigKeyUtil.ARIA2_URL, aria2Url)
-            DataStoreUtil.putData(ConfigKeyUtil.ARIA2_TOKEN, aria2Token)
-            "aria2配置成功，请重新下载文件"
-        }
-
-    } catch (e: Exception) {
-        "aria2配置失败," + e.message.toString()
-    }
-    App.instance.toast(message)
 }

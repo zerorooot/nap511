@@ -156,7 +156,7 @@ fun SearchDialog(
         title = {
             Text(
                 text = "在当前目录下搜索",
-                style = MaterialTheme.typography.titleLarge
+                style = MaterialTheme.typography.titleMedium
             )
         },
         text = {
@@ -168,7 +168,7 @@ fun SearchDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(focusRequester),
-                    placeholder = { Text("输入关键字...") },
+                    label = { Text("输入关键字...") },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     trailingIcon = {
@@ -218,7 +218,7 @@ fun SearchDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            Button(
                 onClick = { search(text.takeIf { it.isNotBlank() }) }
             ) {
                 Text("搜索")
@@ -228,7 +228,8 @@ fun SearchDialog(
             TextButton(onClick = { search.invoke(null) }) {
                 Text("取消")
             }
-        }
+        },
+        shape = MaterialTheme.shapes.medium
     )
 
     LaunchedEffect(Unit) {

@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jakewharton.processphoenix.ProcessPhoenix
@@ -293,6 +294,14 @@ fun SettingContent(
                         onCheckedChange = { onSaveConfig(ConfigKeyUtil.FORCE_LOAD_CACHE, it) }
                     )
                 }
+                item {
+                    SwitchPreferenceItem(
+                        title = "链接解析策略",
+                        summary = "开启后通过API获取视频链接（稍慢）；关闭则本地拼装视频链接（更快，但链接可能失效）",
+                        checked = uiState.videoLinkMode,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.VIDEO_LINK_MODE, it) }
+                    )
+                }
 
                 // --- 5. 工具与维护 ---
                 item { PreferenceCategoryHeader("维护与验证") }
@@ -327,4 +336,14 @@ fun SettingContent(
             }
         }
     }
+}
+
+@Preview
+@Composable
+fun t() {
+    SettingContent(SettingUiState(), { _, _ ->
+        run {
+
+        }
+    }, {}, {})
 }

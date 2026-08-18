@@ -10,6 +10,10 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 
+data class Base115Response<T>(
+    val state: Boolean = false,
+    val data: T? = null
+)
 
 sealed interface ZipStatus {
     /** 正常未加密的压缩包，可以直接预览 */
@@ -229,8 +233,19 @@ data class VideoInfoBean(
     @SerializedName("user_turn") var userTurn: Int = 0,
     @SerializedName("origin_file_url") var originFileUrl: String = "",
     var index: Int = -1,
-    var isAutoRotate: Boolean = false
-)
+    var isAutoRotate: Boolean = false,
+    @SerializedName("download_url")
+    private val rawDownloadUrl: Any? = null
+){
+    // 外部直接调用的属性
+    val downloadUrl: String
+        get() = when (rawDownloadUrl) {
+            is String -> rawDownloadUrl
+            // 当返回 [] 时，Gson 会解析为 ArrayList
+            is List<*> -> ""
+            else -> ""
+        }
+}
 
 data class FileInfo(
     @SerializedName("count") var count: String = "",

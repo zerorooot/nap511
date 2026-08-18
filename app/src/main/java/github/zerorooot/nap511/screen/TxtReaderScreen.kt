@@ -74,7 +74,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
-import java.io.File
 import java.nio.charset.Charset
 
 /**
@@ -612,16 +611,19 @@ fun TxtReaderScreen(
  */
 private fun shareAsFile(context: android.content.Context, byteArray: ByteArray, fileName: String) {
     runCatching {
-        val cacheFile = File(context.cacheDir, fileName).apply {
-            writeBytes(byteArray)
-        }
+        val cacheFile = context.cacheDir
+            .resolve("txt_cache")
+            .apply { mkdirs() }
+            .resolve(fileName)
+            .apply { writeBytes(byteArray) }
+
         val contentUri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
             cacheFile
         )
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
-        //    type = "text/plain"
+            //    type = "text/plain"
             type = "*/*" // 通用 MIME 类型，允许任何能接收文件的应用打开
             putExtra(Intent.EXTRA_STREAM, contentUri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

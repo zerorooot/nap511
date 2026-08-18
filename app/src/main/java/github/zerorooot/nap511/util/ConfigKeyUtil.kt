@@ -51,7 +51,11 @@ class ConfigKeyUtil {
          */
         const val AUTO_ROTATE = "autoRotate"
 
-
+        /**
+         * 开启后，每次播放将实时请求 API 接口获取最新有效的视频链接，确保高可用性，但会引入额外加载等待时间。
+         * 关闭后，将使用本地预置规则快速生成播放链接，响应极快，但链接存在一定失效风险，可能偶尔无法播放。
+         */
+        const val VIDEO_LINK_MODE = "videoLinkMode"
         /**
          * 头像信息bean的json信息,包含头像url、过期时间、用户名、过期时间等
          * @see github.zerorooot.nap511.bean.AvatarBean

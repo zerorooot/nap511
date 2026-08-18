@@ -105,8 +105,12 @@ interface FileService {
     @GET("files/image")
     suspend fun image(@Query("pickcode") pickCode: String, @Query("_") current: Long): ImageDate
 
-    @GET("files/video")
-    suspend fun video(@Query("pickcode") pickCode: String): VideoInfoBean
+    @GET("https://115vod.com/webapi/files/video")
+    suspend fun video(
+        @Query("pickcode") pickCode: String,
+        @Query("share_id") shareId: String = "0",
+        @Query("local") local: String ="1"
+    ): VideoInfoBean
 
     @FormUrlEncoded
     @POST("files/history")

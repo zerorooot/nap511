@@ -14,7 +14,6 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -85,15 +84,13 @@ internal fun FileViewModel.updateVideoFileBean(
     }
 }
 
-val isAutoRotate by lazy {
-    DataStoreUtil.getData(ConfigKeyUtil.AUTO_ROTATE, false)
-}
-
 internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int, fileName: String) {
     viewModelScope.launch(exceptionHandler) {
-        //仅开启自动旋转才请求，以提升视频打开速度
-        val video = if (isAutoRotate) {
-            fileRepository.video(pickCode).copy(index = fileBeanIndex, isAutoRotate = true)
+        val isAutoRotate = DataStoreUtil.getDataSuspend(ConfigKeyUtil.AUTO_ROTATE, false)
+        val videoLinkMode = DataStoreUtil.getDataSuspend(ConfigKeyUtil.VIDEO_LINK_MODE, false)
+
+        val video = if (videoLinkMode) {
+            fileRepository.video(pickCode).copy(index = fileBeanIndex, isAutoRotate = isAutoRotate)
         } else {
             val (width, height) = if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
                 1080 to 1920
@@ -109,7 +106,7 @@ internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int, fi
                 videoUrl = "http://115.com/api/video/m3u8/${pickCode}.m3u8"
             )
         }
-
+        XLog.d("FileViewModel getVideoInfo $video")
         _launchVideoEvent.emit(video)
         setRefreshingStatus(false)
     }

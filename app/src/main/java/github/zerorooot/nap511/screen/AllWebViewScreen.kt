@@ -29,6 +29,7 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.viewmodel.FileViewModel
+import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -197,13 +198,15 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
             }
 
             if (cookie != null) {
-                val checkLogin = App.instance.checkLogin(cookie)
-                App.instance.toast(checkLogin.second)
-                if (!checkLogin.first) {
-                    return null
+                runBlocking {
+                    val checkLogin = App.instance.checkLogin(cookie)
+                    App.instance.toast(checkLogin.second)
+                    if (!checkLogin.first) {
+                        return@runBlocking null
+                    }
+                    //restart
+                    ProcessPhoenix.triggerRebirth(App.instance);
                 }
-                //restart
-                ProcessPhoenix.triggerRebirth(App.instance);
             }
             return super.shouldInterceptRequest(view, webViewRequest)
         }
