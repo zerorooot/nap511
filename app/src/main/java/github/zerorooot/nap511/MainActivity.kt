@@ -13,14 +13,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.Login
@@ -45,14 +41,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.util.Consumer
@@ -63,24 +54,21 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import coil.compose.AsyncImage
-import coil.request.CachePolicy
-import coil.request.ImageRequest
-import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+import com.google.gson.JsonObject
 import com.jakewharton.processphoenix.ProcessPhoenix
-import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.bean.DrawerMenuItem
 import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.screen.CaptchaVideoWebViewScreen
 import github.zerorooot.nap511.screen.CaptchaWebViewScreen
-import github.zerorooot.nap511.screen.CookieDialog
 import github.zerorooot.nap511.screen.CreateDialogs
 import github.zerorooot.nap511.screen.ExitApp
 import github.zerorooot.nap511.screen.FileScreen
 import github.zerorooot.nap511.screen.LogScreen
-import github.zerorooot.nap511.screen.LoginWebViewScreen
+import github.zerorooot.nap511.screen.LoginCredential
+import github.zerorooot.nap511.screen.LoginScreen
 import github.zerorooot.nap511.screen.MyPhotoScreen
 import github.zerorooot.nap511.screen.OfflineDownloadScreen
 import github.zerorooot.nap511.screen.OfflineFileScreen
@@ -89,6 +77,7 @@ import github.zerorooot.nap511.screen.RepeatFileScreen
 import github.zerorooot.nap511.screen.SettingScreen
 import github.zerorooot.nap511.screen.TxtReaderScreen
 import github.zerorooot.nap511.screen.WebViewScreen
+import github.zerorooot.nap511.screenitem.Avatar
 import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -118,9 +107,9 @@ class MainActivity : AppCompatActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    val cookie = remember { App.cookie }
+                    val cookie = remember { DataStoreUtil.getData(ConfigKeyUtil.COOKIE, "") }
                     if (cookie == "") {
-                        Login(null)
+                        Login()
                     } else {
                         Init(cookie)
                     }
@@ -154,7 +143,7 @@ class MainActivity : AppCompatActivity() {
             fileViewModel.handleOfflineTask()
 
             fileViewModel.getRemainingSpace()
-//冷启动处理
+            //冷启动处理
             fileViewModel.handleDeepLink(intent)
 
             fileViewModel.navigationEvent.collect { event ->
@@ -333,9 +322,7 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     composable<Route.Login> {
                         fileViewModel.gesturesEnabled = false
-                        Login({ scope.launch { drawerState.open() } }) {
-                            navController.popBackStack()
-                        }
+                        Login()
                     }
 
                     composable<Route.MyFile> {
@@ -519,107 +506,72 @@ class MainActivity : AppCompatActivity() {
             })
     }
 
-    /**
-     * 头像、网名、uid、已用空间
-     */
-    @Composable
-    private fun Avatar(fileViewModel: FileViewModel) {
-        val remainingSpaceBean = fileViewModel.remainingSpace
-
-        val avatarBean = remember {
-            mutableStateOf(
-                Gson().fromJson(
-                    DataStoreUtil.getData(
-                        ConfigKeyUtil.AVATAR_BEAN, "{}"
-                    ), AvatarBean::class.java
-                )
-            )
-        }
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally, // 水平居中
-        ) {
-            //头像
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current).data(avatarBean.value.face)
-                    .memoryCachePolicy(CachePolicy.ENABLED).diskCachePolicy(CachePolicy.ENABLED)
-                    .networkCachePolicy(CachePolicy.ENABLED).scale(coil.size.Scale.FILL)
-                    .memoryCacheKey(avatarBean.value.userId).diskCacheKey(avatarBean.value.userId)
-                    .placeholder(R.drawable.avatar).build(),
-                modifier = Modifier
-                    .size(100.dp)
-                    //圆形裁剪
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop,
-                contentDescription = "Avatar",
-            )
-            Spacer(Modifier.height(6.dp))
-            //用户名
-            Text(
-                text = avatarBean.value.userName, style = MaterialTheme.typography.titleMedium
-            )
-            //uid
-            Text(text = avatarBean.value.userId)
-            //会员到期时间
-            Text(
-                text = "会员到期时间：${
-                    avatarBean.value.expireString
-                }", style = MaterialTheme.typography.titleSmall
-            )
-//            Spacer(Modifier.height(6.dp))
-            //已用空间
-            Text(
-                text = "总计${remainingSpaceBean.total.sizeFormat}，已用${remainingSpaceBean.use.sizeFormat}，剩余${remainingSpaceBean.remain.sizeFormat}",
-                style = MaterialTheme.typography.titleSmall
-            )
-//            //进度条
-//            LinearProgressIndicator(
-//                progress = (remainingSpaceBean.value.allUse.toDouble() / remainingSpaceBean.value.allTotal).toFloat(),
-//                color = Color.Cyan,
-//                modifier = Modifier
-//                    .fillMaxWidth(0.7f)
-//                    .clip(shape = RoundedCornerShape(100.dp))
-//            )
-        }
-    }
-
 
     @SuppressLint("UnrememberedMutableState")
     @Composable
-    private fun Login(onClick: (() -> Unit)? = null, onNav: (() -> Unit)? = null) {
-        var isOpenLoginWebView by remember { mutableStateOf(false) }
+    private fun Login() {
         val scope = rememberCoroutineScope()
-
-        if (isOpenLoginWebView) {
-            if (onClick == null) {
-                //首次进入，且选择通过网页登录
-                LoginWebViewScreen {
-                    isOpenLoginWebView = false
-                }
-            } else {
-                LoginWebViewScreen(onClick)
-            }
-            return
-        }
-
-
-        CookieDialog {
-            if (it == "通过网页登陆") {
-                isOpenLoginWebView = true
-                return@CookieDialog
-            }
-            if (it != null && it != "") {
-                val replace = it.replace(" ", "").replace("[\r\n]".toRegex(), "");
-                scope.launch(Dispatchers.IO) {
-                    val pair = App().checkLogin(replace)
-                    if (pair.first) {
-                        ProcessPhoenix.triggerRebirth(applicationContext);
+        LoginScreen { credential ->
+            scope.launch {
+                when (credential) {
+                    is LoginCredential.AccountPassword -> {
+                        // 直接读取 credential.username 和 credential.password
+                        val pair = App().accountLogin(credential.username, credential.password)
+                        if (pair.first) {
+                            ProcessPhoenix.triggerRebirth(applicationContext)
+                        }
+                        App.instance.toast(pair.second)
                     }
-                    App.instance.toast(pair.second)
+
+                    is LoginCredential.Cookie -> {
+                        val replace = credential.cookieString.replace(" ", "")
+                            .replace("[\r\n]".toRegex(), "");
+                        scope.launch(Dispatchers.IO) {
+                            val pair = App().checkLogin(replace)
+                            if (pair.first) {
+                                ProcessPhoenix.triggerRebirth(applicationContext);
+                            }
+                            App.instance.toast(pair.second)
+                        }
+                    }
+
+                    is LoginCredential.ConfigFile -> {
+                        try {
+                            val gson = GsonBuilder().setPrettyPrinting().create()
+                            val jsonString = credential.rawJson
+                            // 解析为 JsonObject
+                            val jsonObject = gson.fromJson(jsonString, JsonObject::class.java)
+
+                            // 动态遍历并保存到 DataStore
+                            jsonObject.entrySet().forEach { (key, element) ->
+                                if (element.isJsonPrimitive) {
+                                    val primitive = element.asJsonPrimitive
+                                    when {
+                                        primitive.isBoolean -> DataStoreUtil.putDataSuspend(
+                                            key,
+                                            primitive.asBoolean
+                                        )
+
+                                        primitive.isString -> DataStoreUtil.putDataSuspend(
+                                            key,
+                                            primitive.asString
+                                        )
+
+                                        primitive.isNumber -> DataStoreUtil.putDataSuspend(
+                                            key,
+                                            primitive.asNumber
+                                        )
+                                    }
+                                }
+                            }
+                            App.instance.toast("配置导入成功，正在重启！")
+                            ProcessPhoenix.triggerRebirth(applicationContext)
+                        } catch (e: Exception) {
+                            App.instance.toast("解析配置失败")
+                        }
+
+                    }
                 }
-            } else {
-                App.instance.toast("请输入cookie")
-                onNav?.invoke()
             }
         }
     }

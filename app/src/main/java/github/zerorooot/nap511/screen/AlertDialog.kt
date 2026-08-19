@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,7 +34,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
@@ -43,6 +41,8 @@ import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -57,7 +57,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -83,10 +82,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -170,7 +170,6 @@ fun SearchDialog(
                         .focusRequester(focusRequester),
                     label = { Text("输入关键字...") },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
                     trailingIcon = {
                         if (text.isNotEmpty()) {
                             IconButton(onClick = { text = "" }) {
@@ -852,7 +851,121 @@ fun CookieDialog(enter: (String?) -> Unit) {
             isOpen = false
         }
     }
+}
 
+@Composable
+fun LoginDialog(
+    onAccountLogin: (String, String) -> Unit,
+    onCookieLogin: () -> Unit,
+    onWebLogin: () -> Unit,
+    onImportConfig: () -> Unit
+) {
+    var isOpen by remember { mutableStateOf(true) }
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+
+    if (isOpen) {
+        AlertDialog(
+            modifier = Modifier.fillMaxWidth(),
+            onDismissRequest = {
+                isOpen = false
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (username.isNotBlank() && password.isNotBlank()) {
+                            isLoading = true
+                            onAccountLogin(username, password)
+                        }
+                    },
+                    enabled = !isLoading && username.isNotBlank() && password.isNotBlank()
+                ) {
+                    Text(text = if (isLoading) "登录中..." else "确认登录")
+                }
+            },
+            dismissButton = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    TextButton(
+                        onClick = {
+                            isOpen = false
+                            onImportConfig()
+                        }
+                    ) {
+                        Text("导入配置")
+                    }
+                    TextButton(
+                        onClick = {
+                            isOpen = false
+                            onCookieLogin()
+                        }
+                    ) {
+                        Text("Cookie登录")
+                    }
+                    TextButton(
+                        onClick = {
+                            isOpen = false
+                            onWebLogin()
+                        }
+                    ) {
+                        Text("网页登录")
+                    }
+                }
+            },
+            title = {
+                Text(
+                    text = "115账号登录",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = username,
+                        onValueChange = { username = it },
+                        label = { Text("账号") },
+                        placeholder = { Text("手机号/用户名") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isLoading,
+                    )
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text("密码") },
+                        placeholder = { Text("请输入密码") },
+                        singleLine = true,
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                    contentDescription = if (passwordVisible) "隐藏密码" else "显示密码"
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isLoading,
+                    )
+                }
+            },
+            shape = RoundedCornerShape(12.dp),
+        )
+
+        LaunchedEffect(Unit) {
+            delay(10.milliseconds)
+            focusRequester.requestFocus()
+        }
+    }
 }
 
 @ExperimentalMaterial3Api

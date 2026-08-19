@@ -199,7 +199,7 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
 
             if (cookie != null) {
                 runBlocking {
-                    val checkLogin = App.instance.checkLogin(cookie)
+                    val checkLogin = App().checkLogin(cookie)
                     App.instance.toast(checkLogin.second)
                     if (!checkLogin.first) {
                         return@runBlocking null
@@ -209,6 +209,16 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
                 }
             }
             return super.shouldInterceptRequest(view, webViewRequest)
+        }
+
+        override fun onPageFinished(view: WebView?, url: String?) {
+            super.onPageFinished(view, url)
+            url?.let {
+                val cookie = CookieManager.getInstance().getCookie(it)
+                if (!cookie.isNullOrBlank()) {
+                    XLog.d("loginWebViewClient onPageFinished cookie $cookie")
+                }
+            }
         }
     }
 

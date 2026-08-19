@@ -169,6 +169,86 @@ class App : Application(), ImageLoaderFactory {
     }
 
     /**
+     * 通过账号密码登录115网盘
+     * @param username 账号（手机号或用户名）
+     * @param password 密码
+     * @return Pair<成功标志, 消息>
+     */
+   suspend fun accountLogin(username: String, password: String): Pair<Boolean, String> {
+        try {
+            // RSA 加密密码
+            val rsaUtil = MyRsaUtil()
+            val encryptedPassword = rsaUtil.encrypt(password)
+
+            val jsonBody = """{"login_name":"$username","login_pass":"$encryptedPassword"}"""
+            val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
+
+            val client = OkHttpClient().newBuilder()
+                .followRedirects(false)
+                .build()
+
+            val request = Request.Builder()
+                .url("https://passportapi.115.com/app/1.0/web/1.0/login")
+                .post(requestBody)
+                .addHeader("Content-Type", "application/json")
+                .addHeader(
+                    "User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
+                )
+                .addHeader("Referer", "https://passport.115.com/")
+                .build()
+
+            val response = client.newCall(request).execute()
+            val responseBody = response.body.string()
+
+            Log.d("nap511 accountLogin", "response: $responseBody")
+            Log.d("nap511 accountLogin", "code: ${response.code}")
+
+            // 从 Set-Cookie 头中提取所有 cookie
+            val cookieHeaders = response.headers("Set-Cookie")
+            val cookieBuilder = StringBuilder()
+            for (cookieHeader in cookieHeaders) {
+                val cookiePart = cookieHeader.split(";")[0].trim()
+                if (cookiePart.isNotEmpty()) {
+                    if (cookieBuilder.isNotEmpty()) cookieBuilder.append("; ")
+                    cookieBuilder.append(cookiePart)
+                }
+            }
+            val cookieString = cookieBuilder.toString()
+
+            XLog.d("nap511 accountLogin cookies: $cookieString")
+
+            if (cookieString.isEmpty()) {
+                // 尝试从响应 JSON 中获取 cookie
+                return try {
+                    val jsonObject = Gson().fromJson(responseBody, JsonObject::class.java)
+                    val state = jsonObject.get("state")?.asBoolean ?: false
+                    if (!state) {
+                        val msg = jsonObject.get("message")?.asString ?: jsonObject.get("msg")?.asString ?: "登录失败"
+                        Pair(false, msg)
+                    } else {
+                        // 尝试从 data 中获取 cookie
+                        val data = jsonObject.getAsJsonObject("data")
+                        val cookieObj = data?.getAsJsonObject("cookie")
+                        if (cookieObj != null) {
+                            val cookieStr = cookieObj.entrySet().joinToString("; ") { "${it.key}=${it.value.asString}" }
+                            checkLogin(cookieStr)
+                        } else {
+                            Pair(false, "登录失败：无法获取Cookie，请尝试通过网页登录")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Pair(false, "登录失败：${e.message}")
+                }
+            }
+
+            return checkLogin(cookieString)
+        } catch (e: Exception) {
+            XLog.e("nap511 accountLogin error", e)
+            return Pair(false, "登录异常：${e.message}")
+        }
+    }
+    /**
      * 判断允许通知，是否已经授权
      * 返回值为true时，通知栏打开，false未打开。
      * @param context 上下文

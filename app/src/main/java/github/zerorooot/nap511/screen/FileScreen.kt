@@ -52,7 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.nativeClipboardManager
 import androidx.compose.ui.unit.dp
 import com.google.gson.Gson
 import github.zerorooot.nap511.R
@@ -137,6 +137,11 @@ fun FileScreen(
             val duration = data?.getIntExtra("current_time", 0) ?: 0
             val pickCode = data?.getStringExtra("pickCode") ?: "0"
             fileViewModel.updateVideoFileBean(fileViewModel.currentCid, index, duration, pickCode)
+
+            val nav = data?.getStringExtra("nav") ?: ""
+            if (nav == "VerifyVideoAccount") {
+                onNav.invoke(Route.VerifyVideoAccount)
+            }
         }
     }
 
@@ -342,7 +347,7 @@ fun FileScreen(
     // Phase 3: Extract path bar click callbacks
     // ============================================================
     fun onPathClick() {
-        clipboardManager.nativeClipboard.setPrimaryClip(
+        clipboardManager.nativeClipboardManager.setPrimaryClip(
             ClipData.newPlainText("path", path)
         )
         App.instance.toast("$path 已复制到剪切板")

@@ -13,6 +13,8 @@ import android.view.MotionEvent;
 import android.widget.TextView;
 
 import com.elvishew.xlog.XLog;
+import com.shuyu.gsyvideoplayer.listener.GSYSampleCallBack;
+import com.shuyu.gsyvideoplayer.listener.VideoAllCallBack;
 import com.shuyu.gsyvideoplayer.utils.CommonUtil;
 import com.shuyu.gsyvideoplayer.utils.GSYVideoType;
 import com.shuyu.gsyvideoplayer.video.StandardGSYVideoPlayer;
@@ -209,6 +211,7 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         mTitleTextView.setText(title);
         startPlayLogic();
     }
+
 
     @Override
     public void touchDoubleUp(MotionEvent event) {

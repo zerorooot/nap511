@@ -1,13 +1,15 @@
 package github.zerorooot.nap511.screen
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -17,8 +19,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringArrayResource
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jakewharton.processphoenix.ProcessPhoenix
@@ -43,18 +45,59 @@ fun SettingScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var lastClick by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
+    // 1. 导出配置 launcher (创建文件)
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        uri?.let {
+            viewModel.exportConfig(
+                context = context,
+                uri = it,
+                onSuccess = { App.instance.toast("配置导出成功！") },
+                onError = { err -> App.instance.toast("导出失败: $err") }
+            )
+        }
+    }
+
+    // 2. 导入配置 launcher (选择文件)
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let {
+            viewModel.importConfig(
+                context = context,
+                uri = it,
+                onSuccess = {
+                    App.instance.toast("配置导入成功，正在重启！")
+                    ProcessPhoenix.triggerRebirth(context)
+                },
+                onError = { err -> App.instance.toast("导入失败: $err") }
+            )
+        }
+    }
     SettingContent(
         uiState = uiState,
         onSaveConfig = { key, value -> viewModel.saveData(key, value) },
         onActionClick = onClick,
+        onExportConfig = {
+            exportLauncher.launch(
+                "nap511_${
+                    (System.currentTimeMillis()).toString().takeLast(13)
+                }.json"
+            )
+        },
+        onImportConfig = {
+            importLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+        },
         onRestartApp = {
             if (lastClick) { // 连点会被忽略
                 return@SettingContent
             }
             lastClick = true
             App.instance.toast("重启中～")
-            ProcessPhoenix.triggerRebirth(App.instance)
+            ProcessPhoenix.triggerRebirth(context)
         }
     )
 }
@@ -65,26 +108,26 @@ fun SettingContent(
     uiState: SettingUiState,
     onSaveConfig: (String, Any) -> Unit,
     onActionClick: (String) -> Unit,
+    onExportConfig: () -> Unit,      // 导出回调
+    onImportConfig: () -> Unit,      // 导入回调
     onRestartApp: () -> Unit
 ) {
     val listState = rememberLazyListState()
     val fabArray = stringArrayResource(R.array.floatingActionButtonPosition)
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(text = "高级设置") },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
-                navigationIcon = {
-                    TopAppBarActionButton(
-                        imageVector = Icons.Rounded.Menu,
-                        description = "navigationIcon",
-                        onClick = { onActionClick("topAppBarActionButtonOnClick") }
-                    )
-                }
-            )
-        }
-    ) { innerPadding ->
+    Column {
+        TopAppBar(
+            title = { Text(text = "高级设置") },
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
+            navigationIcon = {
+                TopAppBarActionButton(
+                    imageVector = Icons.Rounded.Menu,
+                    description = "navigationIcon",
+                    onClick = { onActionClick("topAppBarActionButtonOnClick") }
+                )
+            }
+        )
+
         LazyColumnScrollbar(
             state = listState,
             settings = ScrollbarSettings.Default.copy(
@@ -93,8 +136,7 @@ fun SettingContent(
         ) {
             LazyColumn(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
+                    .fillMaxSize(),
                 state = listState
             ) {
                 // --- 1. 账号与安全 ---
@@ -232,7 +274,7 @@ fun SettingContent(
                 item { PreferenceCategoryHeader("功能开关") }
                 item {
                     SwitchPreferenceItem(
-                        title = "屏幕旋转",
+                        title = "屏幕自动旋转",
                         summary = "根据视频横竖自动旋转屏幕",
                         checked = uiState.autoRotateEnabled,
                         onCheckedChange = { onSaveConfig(ConfigKeyUtil.AUTO_ROTATE, it) }
@@ -240,7 +282,7 @@ fun SettingContent(
                 }
                 item {
                     SwitchPreferenceItem(
-                        title = "种子排序",
+                        title = "种子文件排序",
                         summary = "种子文件按文件大小从大到小排序",
                         checked = uiState.torrentSort,
                         onCheckedChange = { onSaveConfig(ConfigKeyUtil.TORRENT_SORT, it) }
@@ -248,7 +290,23 @@ fun SettingContent(
                 }
                 item {
                     SwitchPreferenceItem(
-                        title = "日志记录",
+                        title = "链接解析策略",
+                        summary = "开启后通过API获取视频链接（稍慢）；关闭则直接请求视频链接（更快，但视频链接可能失效）",
+                        checked = uiState.videoLinkMode,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.VIDEO_LINK_MODE, it) }
+                    )
+                }
+                item {
+                    SwitchPreferenceItem(
+                        title = "清空当前缓存",
+                        summary = "刷新时，清空当前目录下所有文件缓存",
+                        checked = uiState.forceLoadCache,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.FORCE_LOAD_CACHE, it) }
+                    )
+                }
+                item {
+                    SwitchPreferenceItem(
+                        title = "记录日志信息",
                         summary = "输出程序中部分关键节点内容，方便调试",
                         checked = uiState.logEnabled,
                         onCheckedChange = { onSaveConfig(ConfigKeyUtil.LOG, it) }
@@ -286,23 +344,21 @@ fun SettingContent(
                         onCheckedChange = { onSaveConfig(ConfigKeyUtil.POSITION_AFTER_AT, it) }
                     )
                 }
+                item { PreferenceCategoryHeader("备份与恢复") }
                 item {
-                    SwitchPreferenceItem(
-                        title = "清空当前缓存",
-                        summary = "刷新时，清空当前目录下所有文件缓存",
-                        checked = uiState.forceLoadCache,
-                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.FORCE_LOAD_CACHE, it) }
+                    PreferenceItem(
+                        title = "导出配置",
+                        summary = "将当前所有设置导出为 JSON 配置文件",
+                        onClick = onExportConfig
                     )
                 }
                 item {
-                    SwitchPreferenceItem(
-                        title = "链接解析策略",
-                        summary = "开启后通过API获取视频链接（稍慢）；关闭则本地拼装视频链接（更快，但链接可能失效）",
-                        checked = uiState.videoLinkMode,
-                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.VIDEO_LINK_MODE, it) }
+                    PreferenceItem(
+                        title = "导入配置",
+                        summary = "从 JSON 配置文件中恢复设置",
+                        onClick = onImportConfig
                     )
                 }
-
                 // --- 5. 工具与维护 ---
                 item { PreferenceCategoryHeader("维护与验证") }
                 item {
@@ -336,14 +392,4 @@ fun SettingContent(
             }
         }
     }
-}
-
-@Preview
-@Composable
-fun t() {
-    SettingContent(SettingUiState(), { _, _ ->
-        run {
-
-        }
-    }, {}, {})
 }
