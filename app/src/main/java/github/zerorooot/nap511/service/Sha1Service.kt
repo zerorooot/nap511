@@ -16,8 +16,6 @@ import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import github.zerorooot.nap511.util.Sha1Util
-import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -66,7 +64,9 @@ class Sha1Service : Service() {
         val list = arrayListOf<String>()
         fileBeanList.forEach { fileBean ->
             val response = fileRepository.getDownloadUrl(fileBean.pickCode, fileBean.fileId)
-            list.add(response)
+            response?.let {
+                list.add(it)
+            }
         }
         return list
     }

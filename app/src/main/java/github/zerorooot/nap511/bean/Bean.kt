@@ -1,8 +1,16 @@
 package github.zerorooot.nap511.bean
 
 import android.os.Parcelable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.AudioFile
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.FolderZip
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import github.zerorooot.nap511.R
@@ -118,7 +126,17 @@ data class RemainingSpaceBean(
         @SerializedName("size_format") val sizeFormat: String = "0TB"
     )
 }
-
+enum class ForceOpenType(
+    val label: String,
+    val icon: ImageVector
+) {
+    VIDEO("视频", Icons.Default.VideoFile),
+    AUDIO("音频", Icons.Default.AudioFile),
+    IMAGE("图像", Icons.Default.Image),
+    TEXT("文本", Icons.Default.Description),
+    ARCHIVE("压缩", Icons.Default.FolderZip),
+    TORRENT("种子", Icons.AutoMirrored.Filled.InsertDriveFile)
+}
 
 data class FilesBean(
     @SerializedName("data") var fileBeanList: ArrayList<FileBean>,
@@ -444,7 +462,7 @@ data class TorrentFileBean(
     var state: Boolean = false,
     var errno: Long = 0,
     @SerializedName("error_msg")
-    var errorMessage: String = "",
+    var errorMessage: String = "种子文件解析失败",
     var errtype: String = "suc",
     var errcode: Long = 0,
     @SerializedName("file_size")

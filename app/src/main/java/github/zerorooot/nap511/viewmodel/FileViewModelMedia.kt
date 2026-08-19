@@ -116,8 +116,14 @@ internal fun FileViewModel.downloadText(fileBean: FileBean, onNav: (Route) -> Un
     viewModelScope.launch(Dispatchers.IO) {
         var bytes = textFileCache[fileBean]
         if (bytes == null) {
-            bytes = fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
-                .readBytes()
+            val downloadInputStream =
+                fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
+            if (downloadInputStream == null) {
+                setRefreshingStatus(false)
+                App.instance.toast("文本加载失败！")
+                return@launch
+            }
+            bytes = downloadInputStream.readBytes()
             textFileCache[fileBean] = bytes
         }
         textBodyByteArray = bytes

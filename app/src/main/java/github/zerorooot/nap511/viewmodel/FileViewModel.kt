@@ -37,6 +37,7 @@ import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.RemainingSpaceBean
 import github.zerorooot.nap511.bean.Route
+import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.repository.FileRepository
@@ -98,6 +99,8 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     //页面手势
     var gesturesEnabled by mutableStateOf(true)
 
+    var torrentBean by mutableStateOf(TorrentFileBean())
+    val torrentBeanCache = hashMapOf<String, TorrentFileBean>()
 
     /**
      * 打开对话框相关（状态下沉到 ViewModel 本地）

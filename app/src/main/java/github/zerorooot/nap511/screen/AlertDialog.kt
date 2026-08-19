@@ -99,6 +99,7 @@ import com.google.gson.JsonObject
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileInfo
+import github.zerorooot.nap511.bean.ForceOpenType
 import github.zerorooot.nap511.bean.InfoItem
 import github.zerorooot.nap511.bean.InfoSection
 import github.zerorooot.nap511.bean.OfflineTask
@@ -124,6 +125,52 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
+
+@Composable
+fun ForceOpenDialog(
+    onDismissRequest: () -> Unit,
+    onTypeSelected: (ForceOpenType) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        title = {
+            Text(text = "强行打开为", style = MaterialTheme.typography.titleLarge)
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                ForceOpenType.entries.forEach { type ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onTypeSelected(type)
+                                onDismissRequest()
+                            }
+                            .padding(vertical = 12.dp, horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = type.icon,
+                            contentDescription = type.label,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                            text = type.label,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismissRequest) {
+                Text("取消")
+            }
+        }
+    )
+}
 
 @Composable
 fun CreateFolderDialog(enter: (String?) -> Unit) {
@@ -1131,6 +1178,7 @@ fun CreateSelectTorrentFileDialog(
 ) {
     // XLog.d("torrentBean: ${Gson().toJson(torrentBean)}")
     if (!torrentBean.state) {
+        onStopRefreshing.invoke()
         return
     }
 

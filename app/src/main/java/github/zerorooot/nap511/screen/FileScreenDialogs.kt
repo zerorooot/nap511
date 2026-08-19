@@ -4,8 +4,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import com.elvishew.xlog.XLog
-import com.google.gson.JsonArray
-import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.OrderBean
@@ -15,7 +13,7 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
-import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
+import github.zerorooot.nap511.viewmodel.addTorrentTask
 import github.zerorooot.nap511.viewmodel.closeAria2Dialog
 import github.zerorooot.nap511.viewmodel.closeCreateFolderDialog
 import github.zerorooot.nap511.viewmodel.closeCreateSelectTorrentFileDialog
@@ -27,22 +25,13 @@ import github.zerorooot.nap511.viewmodel.closeUnzipPasswordDialog
 import github.zerorooot.nap511.viewmodel.createFolder
 import github.zerorooot.nap511.viewmodel.decryptZip
 import github.zerorooot.nap511.viewmodel.rename
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 
 @ExperimentalMaterial3Api
 @Composable
 fun CreateDialogs(
     fileViewModel: FileViewModel,
-    offlineFileViewModel: OfflineFileViewModel,
     onNav: (Route) -> Unit
 ) {
-//    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     when (fileViewModel.activeDialog) {
         //重命名
         is FileDialogState.RenameFile -> {
@@ -139,7 +128,7 @@ fun CreateDialogs(
         }
 
         is FileDialogState.CreateSelectTorrentFile -> {
-            val torrentBean = offlineFileViewModel.torrentBean
+            val torrentBean = fileViewModel.torrentBean
             CreateSelectTorrentFileDialog(
                 torrentBean,
                 { fileViewModel.setRefreshingStatus(false) }
@@ -148,7 +137,7 @@ fun CreateDialogs(
                 if (wanted.isEmpty()) {
                     return@CreateSelectTorrentFileDialog
                 }
-                offlineFileViewModel.addTorrentTask(
+                fileViewModel.addTorrentTask(
                     infoHash, savePath, wanted
                 ) {
                     if (it) {

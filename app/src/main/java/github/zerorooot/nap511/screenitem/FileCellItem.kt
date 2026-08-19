@@ -60,6 +60,7 @@ fun FileCellItem(
     onRename: ((Int) -> Unit)? = null,
     onFileInfo: ((Int) -> Unit)? = null,
     onAria2Download: ((Int) -> Unit)? = null,
+    onForceOpen:((Int) -> Unit)? = null,
 ) {
     val image = fileBean.fileIco
     val name = fileBean.name
@@ -188,6 +189,7 @@ fun FileCellItem(
                         "重命名" -> onRename?.invoke(index)
                         "文件信息" -> onFileInfo?.invoke(index)
                         "通过aria2下载" -> onAria2Download?.invoke(index)
+                        "强行打开为" -> onForceOpen?.invoke(index)
                     }
                 }
                 FileMoreMenu(onClick = dispatchMenuClick)

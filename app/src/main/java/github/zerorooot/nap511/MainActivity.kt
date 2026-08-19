@@ -165,7 +165,7 @@ class MainActivity : AppCompatActivity() {
             navController
         )
 
-        CreateDialogs(fileViewModel, offlineFileViewModel) {
+        CreateDialogs(fileViewModel) {
             navController.navigate(it)
         }
 
@@ -329,7 +329,6 @@ class MainActivity : AppCompatActivity() {
                         fileViewModel.gesturesEnabled = true
                         FileScreen(
                             fileViewModel,
-                            offlineFileViewModel,
                             audioViewModel,
                             {
                                 scope.launch(Dispatchers.Main) {

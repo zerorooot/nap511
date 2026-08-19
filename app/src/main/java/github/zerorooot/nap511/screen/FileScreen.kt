@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -49,6 +50,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -69,6 +71,7 @@ import com.google.gson.Gson
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.ForceOpenType
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.screenitem.FileCellItem
@@ -78,12 +81,12 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
-import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.cancelCut
 import github.zerorooot.nap511.viewmodel.cut
 import github.zerorooot.nap511.viewmodel.delete
 import github.zerorooot.nap511.viewmodel.downloadText
 import github.zerorooot.nap511.viewmodel.getFileInfo
+import github.zerorooot.nap511.viewmodel.getTorrentTask
 import github.zerorooot.nap511.viewmodel.getVideoInfo
 import github.zerorooot.nap511.viewmodel.getZipListFile
 import github.zerorooot.nap511.viewmodel.openAria2Dialog
@@ -106,7 +109,6 @@ import kotlin.time.Duration.Companion.milliseconds
 @Composable
 fun FileScreen(
     fileViewModel: FileViewModel,
-    offlineFileViewModel: OfflineFileViewModel,
     audioViewModel: AudioViewModel,
     onNav: (Route) -> Unit,
     appBarOnClick: (String) -> Unit,
@@ -123,9 +125,11 @@ fun FileScreen(
             }
         )
     }
-
     val fileBeanList = fileViewModel.fileBeanList
     val path by fileViewModel.currentPath.collectAsState()
+    val refreshing by fileViewModel.isRefreshing.collectAsState()
+    val context = LocalContext.current
+    var showDialog by remember { mutableIntStateOf(-1) }
 
     val listLocation = fileViewModel.getListLocation(path)
     val listState = key(path) {
@@ -181,9 +185,6 @@ fun FileScreen(
         }
     }
 
-    val refreshing by fileViewModel.isRefreshing.collectAsState()
-
-    val context = LocalContext.current
 
     val videoActivityLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -217,10 +218,6 @@ fun FileScreen(
         }
     }
 
-    fun handleMultiSelectClick(i: Int) {
-        fileViewModel.select(i)
-    }
-
     fun handleFolderClick(i: Int, fileBean: FileBean) {
         if (DataStoreUtil.getData(ConfigKeyUtil.EARLY_LOADING, false)) {
             listOf(i - 1, i + 1)
@@ -245,16 +242,20 @@ fun FileScreen(
     fun handlePhotoClick(fileBean: FileBean) {
         audioViewModel.pause()
         val photoList = fileBeanList.filter { it.photoThumb != "" }
-        fileViewModel.photoFileBeanList.clear()
-        fileViewModel.photoFileBeanList.addAll(photoList)
-        fileViewModel.photoIndexOf = photoList.indexOf(fileBean)
-        onNav.invoke(Route.Photo)
+        if (photoList.isEmpty()) {
+            App.instance.toast("图片打开失败，找不到图片url！")
+        } else {
+            fileViewModel.photoFileBeanList.clear()
+            fileViewModel.photoFileBeanList.addAll(photoList)
+            fileViewModel.photoIndexOf = photoList.indexOf(fileBean)
+            onNav.invoke(Route.Photo)
+        }
         fileViewModel.setRefreshingStatus(false)
     }
 
 
     fun handleTorrentClick(fileBean: FileBean) {
-        offlineFileViewModel.getTorrentTask(fileBean.sha1)
+        fileViewModel.getTorrentTask(fileBean.sha1)
         fileViewModel.openCreateSelectTorrentFileDialog()
     }
 
@@ -274,13 +275,51 @@ fun FileScreen(
         }
     }
 
+    fun forceOpen(openType: ForceOpenType) {
+        val bean = fileViewModel.fileBeanList[showDialog]
+        fileViewModel.setRefreshingStatus(true)
+        when (openType) {
+            ForceOpenType.VIDEO -> {
+                handleVideoClick(showDialog, bean)
+            }
+
+            ForceOpenType.AUDIO -> {
+                handleAudioClick(bean)
+            }
+
+            ForceOpenType.IMAGE -> {
+                handlePhotoClick(bean)
+            }
+
+            ForceOpenType.TEXT -> {
+                handleTextClick(showDialog, bean)
+            }
+
+            ForceOpenType.ARCHIVE -> {
+                handleZipClick(showDialog)
+            }
+
+            ForceOpenType.TORRENT -> {
+                handleTorrentClick(bean)
+            }
+        }
+
+
+    }
+    if (showDialog != -1) {
+        ForceOpenDialog(
+            onDismissRequest = { showDialog = -1 },
+            onTypeSelected = ::forceOpen
+        )
+    }
+
 // 记录上次点击时间，使用 longArrayOf 避免无意义的重组
     val lastClickTime = remember { longArrayOf(0L) }
 
     // Assembled myItemOnClick — routes to focused handlers
     fun myItemOnClick(i: Int) {
         if (fileViewModel.isLongClickState) {
-            handleMultiSelectClick(i)
+            fileViewModel.select(i)
         } else {
             val currentTime = SystemClock.elapsedRealtime()
             if (currentTime - lastClickTime[0] < 200L) { // 200ms 内的连点会被忽略
@@ -309,42 +348,6 @@ fun FileScreen(
         }
     }
 
-    // ============================================================
-    // Phase 2.1: Eliminate FAB string dispatch
-    // ============================================================
-    fun onCutPasteClick() {
-        fileViewModel.removeFile()
-    }
-
-    fun onAddFolderClick() {
-        fileViewModel.openCreateFolderDialog()
-    }
-
-    fun onCancelCutClick() {
-        fileViewModel.cancelCut()
-    }
-
-    // ============================================================
-    // Phase 2.2: Eliminate menu string dispatch
-    // ============================================================
-    fun onMenuCut(index: Int) {
-        fileViewModel.cut(index)
-    }
-
-    fun onMenuDelete(index: Int) {
-        fileViewModel.delete(index)
-    }
-
-    fun onMenuRename(index: Int) {
-        fileViewModel.selectIndex = index
-        fileViewModel.openRenameFileDialog()
-    }
-
-    fun onMenuFileInfo(index: Int) {
-        fileViewModel.selectIndex = index
-        fileViewModel.getFileInfo(index)
-    }
-
     fun onMenuAria2Download(index: Int) {
         val aria2Url =
             DataStoreUtil.getData(ConfigKeyUtil.ARIA2_URL, ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE)
@@ -370,8 +373,6 @@ fun FileScreen(
         //触发路径和数据源的改变，重组后交由上方滚动
         fileViewModel.back()
     }
-
-
 
     BackHandler(
         path != "/根目录" || fileViewModel.isLongClickState || fileViewModel.isSearchState,
@@ -406,25 +407,6 @@ fun FileScreen(
     val clipboardManager = LocalClipboard.current
 
     // ============================================================
-    // Phase 3: Extract path bar click callbacks
-    // ============================================================
-    fun onPathClick() {
-        clipboardManager.nativeClipboardManager.setPrimaryClip(
-            ClipData.newPlainText("path", path)
-        )
-        App.instance.toast("$path 已复制到剪切板")
-    }
-
-    fun onPathDoubleClick() {
-        listState.requestScrollToItem(0, 0)
-    }
-
-    fun onPathLongClick() {
-        DataStoreUtil.putData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, fileViewModel.currentCid)
-        App.instance.toast("已设置默认离线位置")
-    }
-
-    // ============================================================
     // Phase 4: inline itemOnLongClick (no remember needed)
     // ============================================================
     fun itemOnLongClick(i: Int) {
@@ -449,19 +431,24 @@ fun FileScreen(
             }
         }
 
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .combinedClickable(
-                    onClick = ::onPathClick,
-                    onDoubleClick = ::onPathDoubleClick,
-                    onLongClick = ::onPathLongClick,
-                ),
-        ) {
-            MiddleEllipsisText(
-                text = path, modifier = Modifier.padding(8.dp, 4.dp)
-            )
-        }
+        FilePathBar(
+            path = path,
+            onPathClick = {
+                clipboardManager.nativeClipboardManager.setPrimaryClip(
+                    ClipData.newPlainText(
+                        "path",
+                        path
+                    )
+                )
+                App.instance.toast("$path 已复制到剪切板")
+            },
+            onPathDoubleClick = { scope.launch { listState.requestScrollToItem(0, 0) } },
+            onPathLongClick = {
+                DataStoreUtil.putData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, fileViewModel.currentCid)
+                App.instance.toast("已设置默认离线位置")
+            }
+        )
+
 
         Scaffold(
             modifier = Modifier.nestedScroll(nestedScrollConnection),
@@ -482,92 +469,172 @@ fun FileScreen(
                 }
             },
             floatingActionButton = {
-                AnimatedContent(
-                    targetState = fileViewModel.isCutState,
-                    transitionSpec = { fadeIn() togetherWith fadeOut() },
-                    // 利用 graphicsLayer 进行 GPU 缩放与透明度变换，零布局开销
-                    modifier = Modifier.graphicsLayer {
-                        val progress = animProgress.value
-                        scaleX = progress
-                        scaleY = progress
-                        alpha = progress
-                        translationY = (1f - progress) * 80.dp.toPx()
-                    }
-                ) {
-                    if (it) {
-                        Column {
-                            FloatingActionButton(onClick = ::onCancelCutClick) {
-                                Icon(Icons.Filled.Close, "close")
-                            }
-                            Spacer(modifier = Modifier.height(16.dp))
-                            FloatingActionButton(onClick = ::onCutPasteClick) {
-                                Icon(
-                                    Icons.Default.ContentPaste,
-                                    "cut"
-                                )
-                            }
-                        }
-                    } else {
-                        FloatingActionButton(onClick = ::onAddFolderClick) {
-                            Icon(Icons.Filled.Add, "add")
-                        }
-                    }
-                }
-
+                FileScreenFab(
+                    isCutState = fileViewModel.isCutState,
+                    animProgress = animProgress.value,
+                    onCancelCut = { fileViewModel.cancelCut() },
+                    onCutPaste = { fileViewModel.removeFile() },
+                    onAddFolder = { fileViewModel.openCreateFolderDialog() }
+                )
             },
             floatingActionButtonPosition = fabPosition
         ) { _ ->
-            PullToRefreshBox(
-                isRefreshing = refreshing,
-                onRefresh = { fileViewModel.refresh() }
+            FileListContent(
+                refreshing = refreshing,
+                fileBeanList = fileBeanList,
+                path = path,
+                listState = listState,
+                clickIndex = fileViewModel.clickMap.getOrDefault(path, -1),
+                onRefresh = { fileViewModel.refresh() },
+                ::myItemOnClick,
+                onItemLongClick = ::itemOnLongClick,
+                onCut = { fileViewModel.cut(it) },
+                onDelete = { fileViewModel.delete(it) },
+                onRename = { index ->
+                    fileViewModel.selectIndex = index
+                    fileViewModel.openRenameFileDialog()
+                },
+                onFileInfo = { index ->
+                    fileViewModel.selectIndex = index
+                    fileViewModel.getFileInfo(index)
+                },
+                onAria2Download = ::onMenuAria2Download,
+                onForceOpen = { index -> showDialog = index }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun FilePathBar(
+    path: String,
+    onPathClick: () -> Unit,
+    onPathDoubleClick: () -> Unit,
+    onPathLongClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = onPathClick,
+                onDoubleClick = onPathDoubleClick,
+                onLongClick = onPathLongClick
+            )
+    ) {
+        MiddleEllipsisText(
+            text = path,
+            modifier = Modifier.padding(8.dp, 4.dp)
+        )
+    }
+}
+
+@Composable
+private fun FileScreenFab(
+    isCutState: Boolean,
+    animProgress: Float,
+    onCancelCut: () -> Unit,
+    onCutPaste: () -> Unit,
+    onAddFolder: () -> Unit
+) {
+    AnimatedContent(
+        targetState = isCutState,
+        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        modifier = Modifier.graphicsLayer {
+            scaleX = animProgress
+            scaleY = animProgress
+            alpha = animProgress
+            translationY = (1f - animProgress) * 80.dp.toPx()
+        },
+        label = "FabAnimation"
+    ) { isCut ->
+        if (isCut) {
+            Column {
+                FloatingActionButton(onClick = onCancelCut) {
+                    Icon(Icons.Filled.Close, "close")
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                FloatingActionButton(onClick = onCutPaste) {
+                    Icon(Icons.Default.ContentPaste, "cut")
+                }
+            }
+        } else {
+            FloatingActionButton(onClick = onAddFolder) {
+                Icon(Icons.Filled.Add, "add")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FileListContent(
+    refreshing: Boolean,
+    fileBeanList: List<FileBean>,
+    path: String,
+    listState: LazyListState,
+    clickIndex: Int,
+    onRefresh: () -> Unit,
+    onItemClick: (Int) -> Unit,
+    onItemLongClick: (Int) -> Unit,
+    onCut: (Int) -> Unit,
+    onDelete: (Int) -> Unit,
+    onRename: (Int) -> Unit,
+    onFileInfo: (Int) -> Unit,
+    onAria2Download: (Int) -> Unit,
+    onForceOpen: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    PullToRefreshBox(
+        isRefreshing = refreshing,
+        onRefresh = onRefresh,
+        modifier = modifier
+    ) {
+        if (fileBeanList.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+                contentAlignment = Alignment.Center
             ) {
-                if (fileBeanList.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState()), // 添加垂直滚动支持以分发下拉手势,
-                        contentAlignment = Alignment.Center
+                Text("暂无文件")
+            }
+        } else {
+            key(path) {
+                LazyColumnScrollbar(
+                    state = listState,
+                    settings = ScrollbarSettings.Default.copy(
+                        thumbUnselectedColor = Purple80
+                    )
+                ) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        state = listState
                     ) {
-                        Text("暂无文件")
-                    }
-                } else {
-                    //当 path 改变时，强制销毁并重新创建 Scrollbar，让它正确绑定新传入的 listState
-                    key(path) {
-                        LazyColumnScrollbar(
-                            state = listState,
-                            settings = ScrollbarSettings.Default.copy(
-                                thumbUnselectedColor = Purple80
+                        itemsIndexed(
+                            items = fileBeanList,
+                            key = { _, item ->
+                                item.fileId.ifEmpty { item.pickCode.ifEmpty { item.uuid.toString() } }
+                            },
+                            contentType = { _, item -> item.fileIco }
+                        ) { index, item ->
+                            FileCellItem(
+                                fileBean = item,
+                                index = index,
+                                clickIndex = clickIndex,
+                                modifier = Modifier.animateItem(
+                                    fadeInSpec = null,
+                                    fadeOutSpec = null
+                                ),
+                                itemOnClick = onItemClick,
+                                itemOnLongClick = onItemLongClick,
+                                onCut = onCut,
+                                onDelete = onDelete,
+                                onRename = onRename,
+                                onFileInfo = onFileInfo,
+                                onForceOpen = onForceOpen,
+                                onAria2Download = onAria2Download
                             )
-                        ) {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                state = listState
-                            ) {
-                                itemsIndexed(
-                                    items = fileBeanList,
-                                    key = { _, item ->
-                                        item.fileId.ifEmpty { item.pickCode.ifEmpty { item.uuid.toString() } }
-                                    },
-                                    //  区分类型：
-                                    contentType = { _, item ->
-                                        item.fileIco
-                                    }
-                                ) { index, item ->
-                                    FileCellItem(
-                                        item,
-                                        index,
-                                        fileViewModel.clickMap.getOrDefault(path, -1),
-                                        Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null),
-                                        ::myItemOnClick,
-                                        itemOnLongClick = ::itemOnLongClick,
-                                        onCut = ::onMenuCut,
-                                        onDelete = ::onMenuDelete,
-                                        onRename = ::onMenuRename,
-                                        onFileInfo = ::onMenuFileInfo,
-                                        onAria2Download = ::onMenuAria2Download,
-                                    )
-                                }
-                            }
                         }
                     }
                 }

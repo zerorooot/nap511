@@ -436,7 +436,7 @@ class FileRepository(private val cookie: String) {
         }
     }
 
-    fun getDownloadUrl(pickCode: String, fileId: String): String {
+    fun getDownloadUrl(pickCode: String, fileId: String): String? {
         val sha1Util = Sha1Util()
         val okHttpClient = OkHttpClient()
         val tm = System.currentTimeMillis() / 1000
@@ -461,17 +461,21 @@ class FileRepository(private val cookie: String) {
         XLog.d("FileRepository getDownloadUrl m115Decode $m115Decode")
 
         //{"fileId":{"file_name":"a","file_size":"0","pick_code":"pick_code","url":false}}
-        val downloadUrl = JsonParser.parseString(m115Decode).asJsonObject.getAsJsonObject(fileId)
-            .getAsJsonObject("url").get("url").asString
+        val downloadUrl = try {
+            JsonParser.parseString(m115Decode).asJsonObject.getAsJsonObject(fileId)
+                .getAsJsonObject("url").get("url").asString
+        } catch (e: Exception) {
+            XLog.e("FileRepository getDownloadUrl error ${JsonParser.parseString(m115Decode)}", e)
+            null
+        }
         XLog.d("FileRepository getDownloadUrl downloadUrl $downloadUrl")
         return downloadUrl;
     }
 
     fun getDownloadInputStream(
         pickCode: String, fileId: String
-    ): InputStream {
-        val downloadUrl = getDownloadUrl(pickCode, fileId)
-
+    ): InputStream? {
+        val downloadUrl = getDownloadUrl(pickCode, fileId) ?: return null
         val okHttpClient = OkHttpClient()
         val requestDownload: Request =
             Request.Builder().url(downloadUrl).addHeader("cookie", cookie)
