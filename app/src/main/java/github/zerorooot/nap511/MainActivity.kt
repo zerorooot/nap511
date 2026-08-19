@@ -54,9 +54,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.elvishew.xlog.XLog
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
-import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.bean.DrawerMenuItem
 import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.Route
@@ -512,27 +512,17 @@ class MainActivity : AppCompatActivity() {
     private fun Login() {
         val scope = rememberCoroutineScope()
         LoginScreen { credential ->
-            scope.launch {
+            scope.launch(Dispatchers.IO) {
                 when (credential) {
                     is LoginCredential.AccountPassword -> {
                         // 直接读取 credential.username 和 credential.password
-                        val pair = App().accountLogin(credential.username, credential.password)
-                        if (pair.first) {
-                            ProcessPhoenix.triggerRebirth(applicationContext)
-                        }
-                        App.instance.toast(pair.second)
+                        App.instance.accountLogin(credential.username, credential.password)
                     }
 
                     is LoginCredential.Cookie -> {
                         val replace = credential.cookieString.replace(" ", "")
                             .replace("[\r\n]".toRegex(), "");
-                        scope.launch(Dispatchers.IO) {
-                            val pair = App().checkLogin(replace)
-                            if (pair.first) {
-                                ProcessPhoenix.triggerRebirth(applicationContext);
-                            }
-                            App.instance.toast(pair.second)
-                        }
+                        App.instance.checkLogin(replace)
                     }
 
                     is LoginCredential.ConfigFile -> {
@@ -564,10 +554,10 @@ class MainActivity : AppCompatActivity() {
                                     }
                                 }
                             }
-                            App.instance.toast("配置导入成功，正在重启！")
-                            ProcessPhoenix.triggerRebirth(applicationContext)
+                            App.instance.checkLogin(jsonObject.get(ConfigKeyUtil.COOKIE).asString)
                         } catch (e: Exception) {
                             App.instance.toast("解析配置失败")
+                            XLog.d("LoginScreen LoginCredential.ConfigFile jsonString ${credential.rawJson}")
                         }
 
                     }

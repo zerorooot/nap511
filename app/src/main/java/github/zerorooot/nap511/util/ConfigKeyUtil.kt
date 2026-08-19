@@ -6,6 +6,9 @@ package github.zerorooot.nap511.util
  */
 class ConfigKeyUtil {
     companion object {
+        const val USER_AGENT =
+            "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
+
         /**
          * aria2秘钥
          */
@@ -56,6 +59,7 @@ class ConfigKeyUtil {
          * 关闭后，将使用本地预置规则快速生成播放链接，响应极快，但链接存在一定失效风险，可能偶尔无法播放。
          */
         const val VIDEO_LINK_MODE = "videoLinkMode"
+
         /**
          * 头像信息bean的json信息,包含头像url、过期时间、用户名、过期时间等
          * @see github.zerorooot.nap511.bean.AvatarBean
@@ -93,6 +97,7 @@ class ConfigKeyUtil {
          *重命名时，光标定位在@后
          */
         const val POSITION_AFTER_AT = "PositionAfterAt"
+
         /**
          *forceLoadCache
          */
@@ -106,7 +111,8 @@ class ConfigKeyUtil {
         /**
          * 支持打开xx kb以下的文件
          */
-        const val MAX_TXT_SIZE="MaxTxtSize"
+        const val MAX_TXT_SIZE = "MaxTxtSize"
+
         /**
          * 种子文件按文件大小从大到小排序
          */

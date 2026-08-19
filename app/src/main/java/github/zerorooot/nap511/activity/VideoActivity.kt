@@ -66,6 +66,7 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.player.MyGSYVideoPlayer
 import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.ConfigKeyUtil
 import kotlinx.coroutines.launch
 import okhttp3.Interceptor
 import okhttp3.MediaType
@@ -181,7 +182,7 @@ class VideoActivity : AppCompatActivity() {
         setContentView(R.layout.activity_video)
         val headerMap = hashMapOf(
             "cookie" to App.cookie,
-            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
+            "User-Agent" to ConfigKeyUtil.USER_AGENT
         )
         val address = videoInfo.videoUrl.ifEmpty {
             videoInfo.downloadUrl
@@ -261,7 +262,7 @@ class VideoActivity : AppCompatActivity() {
     }
 
 
-    private fun back(nav: String = "") {
+    private fun back(nav: String = "", toast: String = "") {
         val currentDuration = (videoPlayer.currentPositionWhenPlaying / 1000).toInt()
         val fileBeanIndex = intent.getIntExtra("fileBeanIndex", -1)
 // 1. 创建一个新的 Intent 用来装载要返回的数据
@@ -270,6 +271,7 @@ class VideoActivity : AppCompatActivity() {
             putExtra("fileBeanIndex", fileBeanIndex)
             putExtra("pickCode", videoInfo.pickCode)
             putExtra("nav", nav)
+            putExtra("toast", toast)
         }
         // 2. 设置结果码为 RESULT_OK，并传入 Intent
         setResult(RESULT_OK, returnIntent)
@@ -367,25 +369,29 @@ class VideoActivity : AppCompatActivity() {
         val customOkHttpClient = OkHttpClient.Builder()
             .addInterceptor(VideoErrorInterceptor { url, contentType, errorBody ->
                 XLog.d("GSY Player 网络请求失败 [$contentType] -> Body: $errorBody")
+                //"application/null"
                 val subtype = contentType.subtype
                 when (subtype) {
+                    "html" -> {
+                        back(toast = "视频地址错误！请打开\"视频解析模式\"请求正确链接")
+                    }
+
                     "xml" -> {
                         val message = parseOssErrorWithDom(errorBody).message
-                        App.instance.toast(message)
+                        back(toast = message)
                     }
+
                     "json" -> {
                         val fromJson = GsonBuilder().setPrettyPrinting().create()
                             .fromJson(errorBody, JsonObject::class.java)
                         if (fromJson.has("error")) {
                             val message = fromJson.get("error").asString
-                            App.instance.toast(message)
-                            back("VerifyVideoAccount")
-                            return@VideoErrorInterceptor
+                            back(nav = "VerifyVideoAccount", toast = message)
                         }
                     }
                 }
 
-                back()
+
             })
             .build()
 

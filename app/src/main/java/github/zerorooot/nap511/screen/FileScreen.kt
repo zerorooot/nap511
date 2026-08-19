@@ -9,6 +9,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -48,10 +52,17 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.nativeClipboardManager
 import androidx.compose.ui.unit.dp
 import com.google.gson.Gson
@@ -123,6 +134,52 @@ fun FileScreen(
             listLocation.firstVisibleItemScrollOffset
         )
     }
+    // 1. 定义 Animatable 状态
+    val animProgress = remember { Animatable(1f) }
+
+    val density = LocalDensity.current
+    // 1. 设置 35dp 的防抖阈值
+    val thresholdPx = remember(density) { with(density) { 35.dp.toPx() } }
+    var isBottomBarShow by remember { mutableStateOf(true) }
+    // 使用动画控制缩放和透明度（只作用于 Draw 阶段，不影响 Layout 测量）
+    // 2. 监听 isVisible 变化并执行动画
+    LaunchedEffect(isBottomBarShow) {
+        animProgress.animateTo(
+            targetValue = if (isBottomBarShow) 1f else 0f,
+            animationSpec = if (isBottomBarShow) {
+                // 显示（展开）：250ms，迅速展现
+                tween(durationMillis = 250, easing = LinearOutSlowInEasing)
+            } else {
+                // 隐藏（收起）：500ms，慢慢缩小消失，减少视觉上的突兀感
+                tween(durationMillis = 500, easing = FastOutLinearInEasing)
+            },
+        )
+    }
+    // 2. 嵌套滚动监听
+    val nestedScrollConnection = remember {
+        var accumulatedDelta = 0f
+
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val delta = available.y
+
+                // 方向改变，重置滑动累加值
+                if ((delta > 0 && accumulatedDelta < 0) || (delta < 0 && accumulatedDelta > 0)) {
+                    accumulatedDelta = 0f
+                }
+
+                accumulatedDelta += delta
+
+                // 【关键点】增加状态判断 (`&& isBottomBarShow` / `&& !isBottomBarShow`)，防止重复更新状态引发卡顿
+                if (accumulatedDelta < -thresholdPx && isBottomBarShow) {
+                    isBottomBarShow = false
+                } else if (accumulatedDelta > thresholdPx && !isBottomBarShow) {
+                    isBottomBarShow = true
+                }
+                return Offset.Zero
+            }
+        }
+    }
 
     val refreshing by fileViewModel.isRefreshing.collectAsState()
 
@@ -141,6 +198,10 @@ fun FileScreen(
             val nav = data?.getStringExtra("nav") ?: ""
             if (nav == "VerifyVideoAccount") {
                 onNav.invoke(Route.VerifyVideoAccount)
+            }
+            val message = data?.getStringExtra("toast") ?: ""
+            if (message.isNotEmpty()) {
+                App.instance.toast(message)
             }
         }
     }
@@ -176,6 +237,7 @@ fun FileScreen(
     }
 
     fun handleAudioClick(fileBean: FileBean) {
+        isBottomBarShow = true
         fileViewModel.setRefreshingStatus(false)
         audioViewModel.playAudio(fileBean)
     }
@@ -402,11 +464,19 @@ fun FileScreen(
         }
 
         Scaffold(
+            modifier = Modifier.nestedScroll(nestedScrollConnection),
             bottomBar = {
                 AnimatedVisibility(
                     visible = audioViewModel.currentMusic != null,
                     enter = slideInVertically(initialOffsetY = { it }),
-                    exit = slideOutVertically(targetOffsetY = { it })
+                    exit = slideOutVertically(targetOffsetY = { it }),
+                    // 利用 graphicsLayer 进行 GPU 缩放与透明度变换，零布局开销
+                    modifier = Modifier.graphicsLayer {
+                        /// 【核心】：完全不触发 Recompose / Layout，仅 GPU 绘图层平移
+                        val progress = animProgress.value
+                        translationY = (1f - progress) * size.height
+                        alpha = progress
+                    }
                 ) {
                     MiniPlayerBar(audioViewModel = audioViewModel)
                 }
@@ -415,7 +485,14 @@ fun FileScreen(
                 AnimatedContent(
                     targetState = fileViewModel.isCutState,
                     transitionSpec = { fadeIn() togetherWith fadeOut() },
-                    label = ""
+                    // 利用 graphicsLayer 进行 GPU 缩放与透明度变换，零布局开销
+                    modifier = Modifier.graphicsLayer {
+                        val progress = animProgress.value
+                        scaleX = progress
+                        scaleY = progress
+                        alpha = progress
+                        translationY = (1f - progress) * 80.dp.toPx()
+                    }
                 ) {
                     if (it) {
                         Column {
@@ -436,6 +513,7 @@ fun FileScreen(
                         }
                     }
                 }
+
             },
             floatingActionButtonPosition = fabPosition
         ) { _ ->
@@ -467,8 +545,13 @@ fun FileScreen(
                             ) {
                                 itemsIndexed(
                                     items = fileBeanList,
-                                    //已经在FileViewModel.setFileBeanProperty对文件夹设置了fileId
-                                    key = { index, item -> item.fileId.ifEmpty { "placeholder_$index" } }
+                                    key = { _, item ->
+                                        item.fileId.ifEmpty { item.pickCode.ifEmpty { item.uuid.toString() } }
+                                    },
+                                    //  区分类型：
+                                    contentType = { _, item ->
+                                        item.fileIco
+                                    }
                                 ) { index, item ->
                                     FileCellItem(
                                         item,

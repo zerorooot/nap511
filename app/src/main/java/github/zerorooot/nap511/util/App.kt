@@ -4,7 +4,6 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationManagerCompat
 import coil.ImageLoader
@@ -26,6 +25,7 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
+import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.bean.Base115Response
 import kotlinx.coroutines.CoroutineScope
@@ -50,6 +50,7 @@ class App : Application(), ImageLoaderFactory {
 
     companion object {
         lateinit var instance: App
+            private set
         var cookie = ""
         var uid = "0"
 
@@ -119,11 +120,10 @@ class App : Application(), ImageLoaderFactory {
         return getString(id)
     }
 
-    suspend fun checkLogin(cookie: String): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+    suspend fun checkLogin(cookie: String) = withContext(Dispatchers.IO) {
         val timestamp = System.currentTimeMillis() / 1000
         val avatarUrl = "https://my.115.com/?ct=ajax&ac=nav&_$timestamp"
-        val ua =
-            "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
+        val ua = ConfigKeyUtil.USER_AGENT
         val gson = Gson()
 
         val request = Request.Builder()
@@ -134,21 +134,21 @@ class App : Application(), ImageLoaderFactory {
             .build()
 
         // 使用 runCatching 捕获网络/解析异常，避免 try-catch 嵌套
-        runCatching {
+        val pair = try {
             // 使用 .use 自动关闭 Response 资源
             okHttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    return@runCatching Pair(false, "网络请求失败: HTTP ${response.code}")
+                    return@use Pair(false, "网络请求失败: HTTP ${response.code}")
                 }
 
                 val bodyStr = response.body.string()
-                Log.d("checkLogin", "avatarResp: $bodyStr")
+                XLog.d("checkLogin avatarResp: $bodyStr")
 
                 // 4. 一次性反序列化，避免 Gson 嵌套双重解析
                 val type = object : TypeToken<Base115Response<AvatarBean>>() {}.type
                 val result = gson.fromJson<Base115Response<AvatarBean>>(bodyStr, type)
 
-                val avatarBean = result?.data ?: return@runCatching Pair(false, "验证失败，请重试")
+                val avatarBean = result?.data ?: return@use Pair(false, "验证失败，请重试")
 
                 // 5. 格式化过期时间
                 avatarBean.expireString = Instant.ofEpochSecond(avatarBean.expire)
@@ -162,10 +162,15 @@ class App : Application(), ImageLoaderFactory {
 
                 Pair(true, "登陆成功,重启中～")
             }
-        }.getOrElse { e ->
-            Log.e("checkLogin", "Check login failed", e)
+        } catch (e: Exception) {
+            XLog.e("checkLogin Check login failed", e)
             Pair(false, "验证失败: ${e.localizedMessage ?: "未知错误"}")
         }
+
+        if (pair.first) {
+            ProcessPhoenix.triggerRebirth(applicationContext);
+        }
+        toast(pair.second)
     }
 
     /**
@@ -174,8 +179,8 @@ class App : Application(), ImageLoaderFactory {
      * @param password 密码
      * @return Pair<成功标志, 消息>
      */
-   suspend fun accountLogin(username: String, password: String): Pair<Boolean, String> {
-        try {
+    suspend fun accountLogin(username: String, password: String) {
+        val pair = try {
             // RSA 加密密码
             val rsaUtil = MyRsaUtil()
             val encryptedPassword = rsaUtil.encrypt(password)
@@ -193,7 +198,7 @@ class App : Application(), ImageLoaderFactory {
                 .addHeader("Content-Type", "application/json")
                 .addHeader(
                     "User-Agent",
-                    "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
+                    ConfigKeyUtil.USER_AGENT
                 )
                 .addHeader("Referer", "https://passport.115.com/")
                 .build()
@@ -201,8 +206,9 @@ class App : Application(), ImageLoaderFactory {
             val response = client.newCall(request).execute()
             val responseBody = response.body.string()
 
-            Log.d("nap511 accountLogin", "response: $responseBody")
-            Log.d("nap511 accountLogin", "code: ${response.code}")
+
+            XLog.d("nap511 accountLogin response: $responseBody")
+            XLog.d("nap511 accountLogin code: ${response.code}")
 
             // 从 Set-Cookie 头中提取所有 cookie
             val cookieHeaders = response.headers("Set-Cookie")
@@ -220,19 +226,23 @@ class App : Application(), ImageLoaderFactory {
 
             if (cookieString.isEmpty()) {
                 // 尝试从响应 JSON 中获取 cookie
-                return try {
+                try {
                     val jsonObject = Gson().fromJson(responseBody, JsonObject::class.java)
                     val state = jsonObject.get("state")?.asBoolean ?: false
                     if (!state) {
-                        val msg = jsonObject.get("message")?.asString ?: jsonObject.get("msg")?.asString ?: "登录失败"
+                        val msg =
+                            jsonObject.get("message")?.asString ?: jsonObject.get("msg")?.asString
+                            ?: "登录失败"
                         Pair(false, msg)
                     } else {
                         // 尝试从 data 中获取 cookie
                         val data = jsonObject.getAsJsonObject("data")
                         val cookieObj = data?.getAsJsonObject("cookie")
                         if (cookieObj != null) {
-                            val cookieStr = cookieObj.entrySet().joinToString("; ") { "${it.key}=${it.value.asString}" }
+                            val cookieStr = cookieObj.entrySet()
+                                .joinToString("; ") { "${it.key}=${it.value.asString}" }
                             checkLogin(cookieStr)
+                            Pair(true, "登录中...")
                         } else {
                             Pair(false, "登录失败：无法获取Cookie，请尝试通过网页登录")
                         }
@@ -240,14 +250,20 @@ class App : Application(), ImageLoaderFactory {
                 } catch (e: Exception) {
                     Pair(false, "登录失败：${e.message}")
                 }
-            }
 
-            return checkLogin(cookieString)
+            } else {
+                Pair(false, "登录失败，$cookieString")
+            }
         } catch (e: Exception) {
             XLog.e("nap511 accountLogin error", e)
-            return Pair(false, "登录异常：${e.message}")
+            Pair(false, "登录失败：${e.message}")
         }
+
+        XLog.d("nap511 accountLogin pair $pair")
+        toast(pair.second)
+
     }
+
     /**
      * 判断允许通知，是否已经授权
      * 返回值为true时，通知栏打开，false未打开。

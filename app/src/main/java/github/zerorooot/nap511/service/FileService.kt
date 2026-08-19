@@ -12,6 +12,7 @@ import github.zerorooot.nap511.bean.MusicBean
 import github.zerorooot.nap511.bean.ProcessDataResponse
 import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.bean.VideoInfoBean
+import github.zerorooot.nap511.util.ConfigKeyUtil
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
@@ -49,7 +50,7 @@ interface FileService {
                                         .addHeader("Cookie", cookie)
                                         .addHeader(
                                             "User-Agent",
-                                            "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
+                                            ConfigKeyUtil.USER_AGENT
                                         )
                                         .build()
                                     val response = chain.proceed(request)
@@ -109,7 +110,7 @@ interface FileService {
     suspend fun video(
         @Query("pickcode") pickCode: String,
         @Query("share_id") shareId: String = "0",
-        @Query("local") local: String ="1"
+        @Query("local") local: String = "1"
     ): VideoInfoBean
 
     @FormUrlEncoded

@@ -448,7 +448,7 @@ class FileRepository(private val cookie: String) {
                 .addHeader("cookie", cookie)
                 .addHeader("Content-Type", "application/x-www-form-urlencoded").addHeader(
                     "User-Agent",
-                    "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
+                    ConfigKeyUtil.USER_AGENT
                 ).post(map).build()
 
         val response = okHttpClient.newCall(request).execute()
@@ -477,7 +477,7 @@ class FileRepository(private val cookie: String) {
             Request.Builder().url(downloadUrl).addHeader("cookie", cookie)
                 .addHeader("Content-Type", "application/x-www-form-urlencoded").addHeader(
                     "User-Agent",
-                    "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
+                    ConfigKeyUtil.USER_AGENT
                 ).get().build()
         val responseDownload = okHttpClient.newCall(requestDownload).execute();
         val body = responseDownload.body.byteStream()

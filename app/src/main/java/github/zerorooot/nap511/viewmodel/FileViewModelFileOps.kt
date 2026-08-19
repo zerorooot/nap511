@@ -51,7 +51,7 @@ internal fun FileViewModel.removeFile() {
     viewModelScope.launch(exceptionHandler) {
         val move = fileRepository.removeFile(tempCid, cutFileList)
         val message = if (move.state) {
-            cutFileList.forEach { i -> i.isSelect = false }
+            cutFileList.forEach { i -> i.copy(isSelect = false) }
             //移除之前目录下剪切的文件
             fileListCache[cid]?.fileBeanList?.removeAll(cutFileList.toSet())
             //移除被剪切文件夹的缓存，防止路径未更改
@@ -205,63 +205,106 @@ internal fun FileViewModel.deleteMultiple() {
     }
 }
 
-internal fun FileViewModel.setFileBeanProperty(fileBeanList: ArrayList<FileBean>) {
-    fileBeanList.forEach { fileBean ->
-        fileBean.updateTimeString =
-            SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
-                fileBean.updateTime.toLong() * 1000
-            )
-        fileBean.createTimeString =
-            SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
-                fileBean.createTime.toLong() * 1000
-            )
-        if (fileBean.fileId == "") {
-            fileBean.fileId = fileBean.categoryId
-            fileBean.fileIco = R.drawable.folder
-            fileBean.isFolder = true
-            fileBean.modifiedTimeString =
-                SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
-                    fileBean.modifiedTime.toLong() * 1000
-                )
+// 1. 静态提取扩展名集合，避免每次遍历重复构造数组
+private val ZIP_EXTS = setOf("rar", "tar", "gz", "7z", "zip", "part", "jar")
+private val IMG_EXTS = setOf("gif", "jpg", "png", "jpeg", "bmp", "tif", "svg", "pic", "heic", "dng", "webp")
+private val AUDIO_EXTS = setOf(
+    "mp3", "wma", "wav", "midi", "flac", "ram", "ra", "mid", "aac", "m4a", "ape", "au",
+    "ogg", "aif", "aiff", "snd", "voc", "mpa", "cda", "vqf", "wvx", "wmx", "m3u", "m3u8",
+    "ttbl", "ttpl", "tta", "tak", "mpc", "mp+", "mp3pro", "mp1", "mp2", "mac", "xm",
+    "umx", "stm", "s3m", "mtm", "mod", "it", "far", "rmi", "fla", "dts", "dtswav", "awb"
+)
+private val TXT_EXTS = setOf(
+    "doc", "docx", "xls", "pdf", "ppt", "wps", "dps", "et", "mdb", "reg", "txt", "wri",
+    "rtf", "lrc", "vob", "sub", "srt", "ass", "ssa", "idx", "umd", "xlsx", "xlsm", "xltx",
+    "xltm", "xlam", "xlsb", "odt", "pptx", "ods", "odp", "chm", "pot", "pps", "ppsx",
+    "smi", "vtt", "stl", "sbv", "ttml", "ksc", "snc", "krc", "c", "cpp", "h", "asm",
+    "s", "java", "o", "asp", "aspx", "bat", "bas", "prg", "cmd", "log", "php", "js",
+    "go", "sh", "css", "scss", "sass", "less", "class", "hpp", "cc", "hex", "hxx",
+    "cxx", "c++", "cs", "py", "pl", "pm", "md", "cue", "utf", "dpt", "ofd", "eto",
+    "ets", "mhtml", "mht", "uof", "dot", "wpt", "dotx", "docm", "dotm", "ett", "xlt",
+    "pptm", "ppsm", "potx", "potm", "csv", "xml", "html", "htm"
+)
+// 2. 改造函数：入参和返回值均为 List，利用 .map() 生成全新的不可变列表
+internal fun FileViewModel.formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
+    // 复用同一个 SimpleDateFormat 实例
+    val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+
+    return fileBeanList.map { fileBean ->
+        // 解析时间戳
+        val updateTimeString = fileBean.updateTime.toLongOrNull()?.let {
+            dateFormat.format(it * 1000)
+        } ?: ""
+
+        var createTimeString = fileBean.createTime.toLongOrNull()?.let {
+            dateFormat.format(it * 1000)
+        } ?: ""
+
+        // 判断是否为文件夹
+        val isFolder = fileBean.fileId.isEmpty()
+        val finalFileId = if (isFolder) fileBean.categoryId else fileBean.fileId
+
+        var sizeString = fileBean.sizeString
+        var modifiedTimeString = fileBean.modifiedTimeString
+        var rawModifiedTime = fileBean.modifiedTime
+
+        if (isFolder) {
+            modifiedTimeString = fileBean.modifiedTime.toLongOrNull()?.let {
+                dateFormat.format(it * 1000)
+            } ?: ""
         } else {
-            fileBean.sizeString = fileRepository.formatFileSize(fileBean.size.toLong()) + " "
-            fileBean.modifiedTimeString = fileBean.modifiedTime
+            sizeString = fileRepository.formatFileSize(fileBean.size.toLongOrNull() ?: 0) + " "
+            modifiedTimeString = fileBean.modifiedTime
+
             if (fileBean.modifiedTime.isDigitsOnly()) {
-                fileBean.modifiedTime =
-                    (SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).parse(
-                        fileBean.modifiedTime
-                    )!!.time / 1000).toString()
+                val parsedTime = runCatching {
+                    dateFormat.parse(fileBean.modifiedTime)?.time?.div(1000)
+                }.getOrNull()
+                if (parsedTime != null) {
+                    rawModifiedTime = parsedTime.toString()
+                }
             }
+
             if (fileBean.currentPlayTime != 0 && fileBean.playLong != 0.00) {
-                val playTime =
-                    ((fileBean.currentPlayTime.toFloat() / fileBean.playLong) * 100).roundToInt()
-                fileBean.createTimeString = "▶️ $playTime% ${fileBean.createTimeString}"
+                val playTime = ((fileBean.currentPlayTime.toFloat() / fileBean.playLong) * 100).roundToInt()
+                createTimeString = "▶️ $playTime% $createTimeString"
             }
         }
-        if (fileBean.isVideo == 1) {
-            fileBean.fileIco = R.drawable.mp4
-            fileBean.playLongString = generateTime(fileBean.playLong.toLong()) + " "
-        }
 
-        when (fileBean.icoString) {
-            "apk" -> fileBean.fileIco = R.drawable.apk
-            "iso" -> fileBean.fileIco = R.drawable.iso
-            "torrent" -> fileBean.fileIco = R.drawable.torrent
-            "rar", "tar", "gz", "7z", "zip", "part", "jar" -> fileBean.fileIco = R.drawable.zip
-
-            "gif", "jpg", "png", "jpeg", "bmp", "tif", "svg", "pic", "heic", "dng", "webp" ->
-                fileBean.fileIco = R.drawable.png
-
-            "doc", "docx", "xls", "pdf", "ppt", "wps", "dps", "et", "mdb", "reg", "txt", "wri", "rtf", "lrc", "vob", "sub", "srt", "ass", "ssa", "idx", "umd", "xlsx", "xlsm", "xltx", "xltm", "xlam", "xlsb", "odt", "pptx", "ods", "odp", "chm", "pot", "pps", "ppsx", "smi", "vtt", "stl", "sbv", "ttml", "ksc", "snc", "krc", "c", "cpp", "h", "asm", "s", "java", "o", "asp", "aspx", "bat", "bas", "prg", "cmd", "log", "php", "js", "go", "sh", "css", "scss", "sass", "less", "class", "hpp", "cc", "hex", "hxx", "cxx", "c++", "cs", "py", "pl", "pm", "md", "cue", "utf", "dpt", "ofd", "eto", "ets", "mhtml", "mht", "uof", "dot", "wpt", "dotx", "docm", "dotm", "ett", "xlt", "pptm", "ppsm", "potx", "potm", "csv", "xml", "html", "htm" ->
-                //  "reg", "url", "txt", "wri", "rtf", "lrc", "sub", "srt", "ass", "ssa", "idx", "smi", "vtt", "sbv", "ttml", "ksc", "snc", "krc", "c", "cpp", "h", "asm", "s", "java", "asp", "aspx", "bat", "bas", "prg", "cmd", "log", "php", "js", "go", "sh", "css", "scss", "sass", "less", "hpp", "cc", "hex", "hxx", "cxx", "c++", "cs", "py", "pl", "pm", "md", "cue", "utf", "mhtml", "mht", "csv", "xml", "html", "htm" ->
-                fileBean.fileIco = R.drawable.txt
-
-            "mp3", "wma", "wav", "midi", "flac", "ram", "ra", "mid", "aac", "m4a", "ape", "au", "ogg", "aif", "aiff", "snd", "voc", "mpa", "cda", "vqf", "wvx", "wmx", "m3u", "m3u8", "ttbl", "ttpl", "tta", "tak", "mpc", "mp+", "mp3pro", "mp1", "mp2", "mac", "xm", "umx", "stm", "s3m", "mtm", "mod", "it", "far", "rmi", "fla", "dts", "dtswav", "awb" -> {
-                fileBean.fileIco = R.drawable.mp3
-                fileBean.playLongString = generateTime(fileBean.playLong.toLong()) + " "
+        // 图标与时长处理
+        var playLongString = fileBean.playLongString
+        val icoRes = when {
+            isFolder -> R.drawable.folder
+            fileBean.isVideo == 1 -> {
+                playLongString = generateTime(fileBean.playLong.toLong()) + " "
+                R.drawable.mp4
             }
+            fileBean.icoString in ZIP_EXTS -> R.drawable.zip
+            fileBean.icoString in IMG_EXTS -> R.drawable.png
+            fileBean.icoString in TXT_EXTS -> R.drawable.txt
+            fileBean.icoString in AUDIO_EXTS -> {
+                playLongString = generateTime(fileBean.playLong.toLong()) + " "
+                R.drawable.mp3
+            }
+            fileBean.icoString == "apk" -> R.drawable.apk
+            fileBean.icoString == "iso" -> R.drawable.iso
+            fileBean.icoString == "torrent" -> R.drawable.torrent
+            else -> fileBean.fileIco
         }
-    }
+
+        // 使用 copy() 拷贝并返回更新后的不可变对象
+        fileBean.copy(
+            fileId = finalFileId,
+            isFolder = isFolder,
+            fileIco = icoRes,
+            updateTimeString = updateTimeString,
+            createTimeString = createTimeString,
+            modifiedTimeString = modifiedTimeString,
+            modifiedTime = rawModifiedTime,
+            sizeString = sizeString,
+            playLongString = playLongString
+        )
+    }.toMutableList() as ArrayList<FileBean>
 }
 
 @SuppressLint("DefaultLocale")

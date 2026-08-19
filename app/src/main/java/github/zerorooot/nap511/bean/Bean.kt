@@ -2,6 +2,7 @@ package github.zerorooot.nap511.bean
 
 import android.os.Parcelable
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import github.zerorooot.nap511.R
@@ -164,34 +165,36 @@ data class SignBean(
 
 data class LocationBean(var firstVisibleItemIndex: Int, var firstVisibleItemScrollOffset: Int)
 
+// 告诉 Compose 编译器此类是稳定的，无需重复绘制未变动的 Item
+@Immutable
 @Parcelize
 data class FileBean(
-    @SerializedName("cid") var categoryId: String = "",
-    @SerializedName("ico") var icoString: String = "",
-    @SerializedName("aid") var areaId: String = "",
-    @SerializedName("pid") var parentId: String = "",
-    @SerializedName("n") var name: String = "",
-    @SerializedName("fid") var fileId: String = "",
-    @SerializedName("pc") var pickCode: String = "",
-    @SerializedName("te") var updateTime: String = "",
-    @SerializedName("tp") var createTime: String = "",
-    @SerializedName("t") var modifiedTime: String = "",
-    @SerializedName("iv") var isVideo: Int = 0,
-    @SerializedName("u") var photoThumb: String = "",
-//    @SerializedName("vdi") var videoDefinition: Int = 0,
-    @SerializedName("fuuid") var uuid: Long = 0,
-    @SerializedName("sha") var sha1: String = "",
-    @SerializedName("s") var size: String = "0",
-    @SerializedName("current_time") var currentPlayTime: Int = 0,
-    @SerializedName("play_long") var playLong: Double = 0.00,
-    var isFolder: Boolean = false,
-    var updateTimeString: String = "",
-    var createTimeString: String = "",
-    var playLongString: String = "",
-    var modifiedTimeString: String = "",
-    var sizeString: String = "",
-    var isSelect: Boolean = false,
-    var fileIco: Int = R.drawable.other
+    @SerializedName("cid") val categoryId: String = "",
+    @SerializedName("ico") val icoString: String = "",
+    @SerializedName("aid") val areaId: String = "",
+    @SerializedName("pid") val parentId: String = "",
+    @SerializedName("n") val name: String = "",
+    @SerializedName("fid") val fileId: String = "",
+    @SerializedName("pc") val pickCode: String = "",
+    @SerializedName("te") val updateTime: String = "",
+    @SerializedName("tp") val createTime: String = "",
+    @SerializedName("t") val modifiedTime: String = "",
+    @SerializedName("iv") val isVideo: Int = 0,
+    @SerializedName("u") val photoThumb: String = "",
+//    @SerializedName("vdi") val videoDefinition: Int = 0,
+    @SerializedName("fuuid") val uuid: Long = 0,
+    @SerializedName("sha") val sha1: String = "",
+    @SerializedName("s") val size: String = "0",
+    @SerializedName("current_time") val currentPlayTime: Int = 0,
+    @SerializedName("play_long") val playLong: Double = 0.00,
+    val isFolder: Boolean = false,
+    val updateTimeString: String = "",
+    val createTimeString: String = "",
+    val playLongString: String = "",
+    val modifiedTimeString: String = "",
+    val sizeString: String = "",
+    val isSelect: Boolean = false,
+    val fileIco: Int = R.drawable.other
 ) : Parcelable
 
 //data class FileBeanDownload(var downloadUrl: String,val name: String)

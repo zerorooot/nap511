@@ -199,13 +199,7 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
 
             if (cookie != null) {
                 runBlocking {
-                    val checkLogin = App().checkLogin(cookie)
-                    App.instance.toast(checkLogin.second)
-                    if (!checkLogin.first) {
-                        return@runBlocking null
-                    }
-                    //restart
-                    ProcessPhoenix.triggerRebirth(App.instance);
+                    App.instance.checkLogin(cookie)
                 }
             }
             return super.shouldInterceptRequest(view, webViewRequest)
