@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Web
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -220,7 +221,7 @@ class MainActivity : AppCompatActivity() {
                     Icons.Default.CloudDone, ConfigKeyUtil.OFFLINE_LIST, Route.OfflineList
                 ),
 
-                //       DrawerMenuItem(Icons.Default.Web, ConfigKeyUtil.WEB, Route.Web),
+                DrawerMenuItem(Icons.Default.Web, ConfigKeyUtil.WEB, Route.WebScreen),
                 DrawerMenuItem(
                     Icons.Default.Delete, ConfigKeyUtil.RECYCLE_BIN, Route.RecycleBin
                 ),
@@ -375,7 +376,7 @@ class MainActivity : AppCompatActivity() {
 
                     composable<Route.WebScreen> {
                         fileViewModel.gesturesEnabled = false
-                        WebViewScreen() {
+                        WebViewScreen {
                             scope.launch { drawerState.open() }
                         }
                     }
@@ -484,6 +485,7 @@ class MainActivity : AppCompatActivity() {
                             navController.popBackStack()
                         }
                     }
+
                     composable<Route.RepeatFile> {
                         RepeatFileScreen(repeatViewModel, { scope.launch { drawerState.open() } }) {
                             fileViewModel.getFiles(it)
@@ -520,7 +522,7 @@ class MainActivity : AppCompatActivity() {
 
                     is LoginCredential.Cookie -> {
                         val replace = credential.cookieString.replace(" ", "")
-                            .replace("[\r\n]".toRegex(), "");
+                            .replace("[\r\n]".toRegex(), "")
                         App.instance.checkLogin(replace)
                     }
 

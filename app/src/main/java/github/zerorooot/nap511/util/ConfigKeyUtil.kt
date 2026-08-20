@@ -162,7 +162,7 @@ class ConfigKeyUtil {
         /**
          * 网页版
          */
-        const val WEB = "网页版"
+        const val WEB = "网页版本"
 
         /**
          * 最近删除
@@ -179,10 +179,6 @@ class ConfigKeyUtil {
          */
         const val EXIT_APPLICATION = "退出应用"
 
-        /**
-         * 照片模式
-         */
-        const val PHOTO = "照片模式"
 
         /**
          * 日志页面

@@ -569,7 +569,7 @@ fun ExitApp(onDismissRequest: () -> Unit) {
                 Process.killProcess(Process.myPid());
                 exitProcess(1);
             },
-            dialogTitle = "是否离开Nap511?",
+            dialogTitle = "是否离开nap511?",
         )
     }
 }
