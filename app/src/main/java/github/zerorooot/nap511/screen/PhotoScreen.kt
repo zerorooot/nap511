@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -44,6 +45,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.lerp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -58,6 +60,7 @@ import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ImageBean
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.getImage
+import kotlin.math.absoluteValue
 
 @Composable
 fun MyPhotoScreen(
@@ -100,26 +103,25 @@ fun MyPhotoScreen(
         },
         onBack = {
             onNav.invoke()
-        })
+        }
+    )
 }
 
 /**
  * 大图预览
  */
-
 @Composable
 private fun ImageBrowserScreen(
-    // 1. 纯数据传入
     photoList: List<FileBean>,
     imageCache: Map<Int, ImageBean>,
     currentIndex: Int = 0,
-    // 2. 动作回调传出
-    onLoadImage: (pageIndex: Int) -> Unit, // 替换原来的 viewModel.getImage
+    onLoadImage: (pageIndex: Int) -> Unit,
     onBack: () -> Unit = {}
 ) {
     val rememberPagerState = rememberPagerState(
         initialPage = currentIndex,
-        pageCount = { photoList.size })
+        pageCount = { photoList.size }
+    )
 
     var controlsVisible by remember { mutableStateOf(false) }
 
@@ -133,18 +135,40 @@ private fun ImageBrowserScreen(
             .background(Color.Black)
     ) {
         HorizontalPager(
-            rememberPagerState,
+            state = rememberPagerState,
+            pageSpacing = 16.dp, // 图片间增加间距，避免紧贴
             modifier = Modifier.fillMaxSize()
         ) { page ->
             LaunchedEffect(page) {
                 onLoadImage(page)
             }
-            // 直接从传入的 Map 中取数据，不需要知道 currentCid 是什么
+
             val pageImage = imageCache[page] ?: ImageBean()
-            FullScreenImage(
-                image = pageImage,
-                onClick = ::onToggleControl
-            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        // 计算当前页面距离视口中心的偏移比例 [0f, 1f]
+                        val pageOffset = (
+                                (rememberPagerState.currentPage - page) +
+                                        rememberPagerState.currentPageOffsetFraction
+                                ).absoluteValue.coerceIn(0f, 1f)
+
+                        // 缩放过渡：未居中页面缩小至 70%
+                        val scale = lerp(1f, 0.7f, pageOffset)
+                        scaleX = scale
+                        scaleY = scale
+
+                        // 透明度过渡：未居中页面淡出至 50%
+                        alpha = lerp(1f, 0.5f, pageOffset)
+                    }
+            ) {
+                FullScreenImage(
+                    image = pageImage,
+                    onClick = ::onToggleControl
+                )
+            }
         }
 
         // Top Bar
@@ -181,13 +205,15 @@ private fun ImageBrowserScreen(
 @Composable
 private fun PhotoTopBar(title: String, onBack: () -> Unit) {
     Surface(
-        color = Color.Black.copy(alpha = 0.6f), modifier = Modifier.fillMaxWidth()
+        color = Color.Black.copy(alpha = 0.6f),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Box(
             modifier = Modifier
                 .safeDrawingPadding()
                 .padding(horizontal = 8.dp, vertical = 8.dp)
-                .fillMaxWidth(), contentAlignment = Alignment.CenterStart
+                .fillMaxWidth(),
+            contentAlignment = Alignment.CenterStart
         ) {
             IconButton(onClick = onBack) {
                 Icon(
@@ -215,7 +241,8 @@ private fun PhotoTopBar(title: String, onBack: () -> Unit) {
 @Composable
 private fun PhotoBottomBar(currentIndex: Int, totalCount: Int) {
     Surface(
-        color = Color.Black.copy(alpha = 0.6f), modifier = Modifier.fillMaxWidth()
+        color = Color.Black.copy(alpha = 0.6f),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Box(
             modifier = Modifier
@@ -247,13 +274,16 @@ private fun FullScreenImage(image: ImageBean, onClick: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current).data(image.url)
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(image.url)
                 .memoryCachePolicy(CachePolicy.ENABLED)
                 .diskCachePolicy(CachePolicy.ENABLED)
                 .networkCachePolicy(CachePolicy.ENABLED)
                 .memoryCacheKey(image.pickCode)
                 .diskCacheKey(image.pickCode)
-                .crossfade(true).scale(Scale.FIT).build(),
+                .crossfade(true)
+                .scale(Scale.FIT)
+                .build(),
             contentDescription = null,
             contentScale = ContentScale.Fit,
             onState = { state ->
@@ -262,20 +292,23 @@ private fun FullScreenImage(image: ImageBean, onClick: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .enhancedZoom(
-                    clip = true, enhancedZoomState = rememberEnhancedZoomState(
+                    clip = true,
+                    enhancedZoomState = rememberEnhancedZoomState(
                         minZoom = 0.8f,
                         maxZoom = 5f,
                         imageSize = IntSize(1080, 1920),
                         limitPan = true,
                         moveToBounds = true
-                    ), enabled = { zoom, _, _ ->
-                        (zoom > 1f)
-                    })
+                    ),
+                    enabled = { zoom, _, _ ->
+                        zoom > 1f
+                    }
+                )
                 .pointerInput(Unit) {
                     detectTapGestures(
                         onTap = { onClick() }
                     )
-                },
+                }
         )
 
         if (isLoading) {
@@ -295,7 +328,4 @@ fun ImageBrowserScreenPreview() {
     for (i in 1..5) {
         images.add(ImageBean("url", "Image $i.jpg"))
     }
-//    ImageBrowserScreen(
-//        images = images, currentIndex = 0
-//    )
 }
