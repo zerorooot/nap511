@@ -11,6 +11,8 @@ import org.junit.Test
 class ExampleUnitTest {
     @Test
     fun addition_isCorrect() {
-        assertEquals(4, 2 + 2)
+        var mType = 5
+        mType = (mType + 1) % 5;
+        println(mType)
     }
 }

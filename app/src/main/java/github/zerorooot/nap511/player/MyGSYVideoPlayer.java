@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.player;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -13,8 +14,6 @@ import android.view.MotionEvent;
 import android.widget.TextView;
 
 import com.elvishew.xlog.XLog;
-import com.shuyu.gsyvideoplayer.listener.GSYSampleCallBack;
-import com.shuyu.gsyvideoplayer.listener.VideoAllCallBack;
 import com.shuyu.gsyvideoplayer.utils.CommonUtil;
 import com.shuyu.gsyvideoplayer.utils.GSYVideoType;
 import com.shuyu.gsyvideoplayer.video.StandardGSYVideoPlayer;
@@ -31,13 +30,23 @@ import github.zerorooot.nap511.util.DataStoreUtil;
 public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     private TextView mMoreScale;
     private TextView switchSpeed;
-    //记住切换数据源类型
     private int mType = 0;
 
     long forwardRewindIncrementMs = 15000;
     private TextView batteryTextView;
     private TextView timeTextView;
     public static String TAG = "MyGSYVideoPlayer";
+
+    // 独立的 UI 主线程定时器，独立于 GSY 播放状态
+    private final Handler mClockHandler = new Handler(Looper.getMainLooper());
+    private final Runnable mClockRunnable = new Runnable() {
+        @Override
+        public void run() {
+            setBatteryAndTime();
+            // 每 1000ms 刷新一次，确保即使暂停也能每秒更新
+            mClockHandler.postDelayed(this, 1000);
+        }
+    };
 
     public MyGSYVideoPlayer(Context context) {
         super(context);
@@ -55,7 +64,6 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     @Override
     protected void init(Context context) {
         super.init(context);
-        //恢复默认播放模式
         GSYVideoType.setShowType(GSYVideoType.SCREEN_TYPE_DEFAULT);
         initView();
     }
@@ -71,49 +79,39 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
 
         mMoreScale = findViewById(R.id.moreScale);
         switchSpeed = findViewById(R.id.switchSpeed);
-        //切换清晰度
+
+        // 切换画面比例
         mMoreScale.setOnClickListener(v -> {
-            if (!mHadPlay) {
-                return;
-            }
-            if (mType == 0) {
-                mType = 1;
-            } else if (mType == 1) {
-                mType = 2;
-            } else if (mType == 2) {
-                mType = 3;
-            } else if (mType == 3) {
-                mType = 4;
-            } else if (mType == 4) {
-                mType = 0;
-            }
+            if (!mHadPlay) return;
+            mType = (mType + 1) % 5;
             resolveTypeUI();
         });
 
+        // 切换倍速
         switchSpeed.setOnClickListener(v -> {
             v.setOnCreateContextMenuListener((menu, v1, menuInfo) -> {
                 MenuItem speed5 = menu.add("× 0.5");
                 speed5.setOnMenuItemClickListener(e -> {
                     getCurrentPlayer().setSpeed(0.5f, true);
-                    switchSpeed.setText("0.5 倍速");
+                    switchSpeed.setText("0.5X");
                     return true;
                 });
-                MenuItem speed1 = menu.add("× 1");
+                MenuItem speed1 = menu.add("× 1.0");
                 speed1.setOnMenuItemClickListener(e -> {
                     getCurrentPlayer().setSpeed(1f, true);
-                    switchSpeed.setText("速度");
+                    switchSpeed.setText("倍速");
                     return true;
                 });
                 MenuItem speed15 = menu.add("× 1.5");
                 speed15.setOnMenuItemClickListener(e -> {
                     getCurrentPlayer().setSpeed(1.5f, true);
-                    switchSpeed.setText("1.5 倍速");
+                    switchSpeed.setText("1.5X");
                     return true;
                 });
-                MenuItem speed2 = menu.add("× 2");
+                MenuItem speed2 = menu.add("× 2.0");
                 speed2.setOnMenuItemClickListener(e -> {
                     getCurrentPlayer().setSpeed(2f, true);
-                    switchSpeed.setText("2 倍速");
+                    switchSpeed.setText("2.0X");
                     return true;
                 });
             });
@@ -121,51 +119,63 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         });
     }
 
+    /**
+     * View 挂载到窗口时启动定时器
+     */
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        startClockTimer();
+    }
+
+    /**
+     * View 销毁离开窗口时停止定时器，防止内存泄漏
+     */
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        stopClockTimer();
+    }
+
+    private void startClockTimer() {
+        stopClockTimer();
+        mClockHandler.post(mClockRunnable);
+    }
+
+    private void stopClockTimer() {
+        mClockHandler.removeCallbacks(mClockRunnable);
+    }
+
+
     @Override
     public int getLayoutId() {
         return R.layout.video_layout_preview;
     }
 
-    @Override
-    protected void setStateAndUi(int state) {
-        super.setStateAndUi(state);
-        setBatteryAndTime();
-    }
-
-
-    @Override
-    protected void showDragProgressTextOnSeekBar(boolean fromUser, int progress) {
-        super.showDragProgressTextOnSeekBar(fromUser, progress);
-        setBatteryAndTime();
-    }
-
     private void setBatteryAndTime() {
-        //电池
-        Intent batteryStatus = getContext().registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
-        int level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-        int scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
-        int batteryPct = level * 100 / scale;
-        batteryTextView.setText(batteryPct + "%");
-        //isCharging
-        int status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
-        boolean isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL;
-        if (isCharging) {
-            batteryTextView.setText(batteryTextView.getText() + "  ⚡︎");
+        if (batteryTextView == null || timeTextView == null || getContext() == null) {
+            return;
         }
 
-        //时间
+        // 获取电量与充电状态
+        Intent batteryStatus = getContext().registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        if (batteryStatus != null) {
+            int level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+            int scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+            int status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+            boolean isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING
+                    || status == BatteryManager.BATTERY_STATUS_FULL;
+
+            int batteryPct = (scale > 0) ? (level * 100 / scale) : 100;
+            batteryTextView.setText(batteryPct + "%" + (isCharging ? " ⚡" : ""));
+        }
+
+        // 规范为 HH:mm:ss
         timeTextView.setText(new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date()));
     }
 
-
-    /**
-     * 显示比例
-     * 注意，GSYVideoType.setShowType是全局静态生效，除非重启APP。
-     */
     private void resolveTypeUI() {
-        if (!mHadPlay) {
-            return;
-        }
+        if (!mHadPlay) return;
         if (mType == 1) {
             mMoreScale.setText("16:9");
             GSYVideoType.setShowType(GSYVideoType.SCREEN_TYPE_16_9);
@@ -186,10 +196,8 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         if (mTextureView != null) mTextureView.requestLayout();
     }
 
-
     public void forwardOrRewind(long time) {
         long totalTimeDuration = getDuration();
-
         mSeekTimePosition = (int) (getGSYVideoManager().getCurrentPosition() + time);
         if (mSeekTimePosition > totalTimeDuration) {
             mSeekTimePosition = totalTimeDuration;
@@ -198,13 +206,11 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         String totalTime = CommonUtil.stringForTime(totalTimeDuration);
         getGSYVideoManager().seekTo(mSeekTimePosition);
 
-
         new Handler(Objects.requireNonNull(Looper.myLooper())).postDelayed(() -> {
             showProgressDialog(time, seekTime, mSeekTimePosition, totalTime, totalTimeDuration);
         }, 100);
         new Handler(Objects.requireNonNull(Looper.myLooper())).postDelayed(this::dismissProgressDialog, 600);
     }
-
 
     public void playNext(String url, String title) {
         setUp(url, mCache, null, title, true);
@@ -212,43 +218,19 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         startPlayLogic();
     }
 
-
     @Override
     public void touchDoubleUp(MotionEvent event) {
         float x = event.getX();
-        //实时获取当前屏幕的总宽度（自动兼容横竖屏）
         DisplayMetrics displayMetrics = mContext.getResources().getDisplayMetrics();
         int screenWidth = displayMetrics.widthPixels;
 
         if (x <= screenWidth * 0.3) {
-            //快退
             forwardOrRewind(forwardRewindIncrementMs * (-1));
-        }
-
-        if (x > screenWidth * 0.3 && x < screenWidth * 0.6) {
-            if (!mHadPlay) {
-                return;
-            }
+        } else if (x > screenWidth * 0.3 && x < screenWidth * 0.6) {
+            if (!mHadPlay) return;
             clickStartIcon();
-        }
-        if (x >= screenWidth * 0.6) {
-            //快进
+        } else if (x >= screenWidth * 0.6) {
             forwardOrRewind(forwardRewindIncrementMs);
         }
-
     }
-
-    //todo 视频预览
-    /**
-     * val imageLoader = ImageLoader.Builder(context)
-     * .componentRegistry {
-     *      add(VideoFrameFileFetcher())
-     *      add(VideoFrameUriFetcher())
-     * }
-     * .build()
-     *
-     * imageView.load(File("/path/to/video.mp4",imageLoader)) {
-     * 	videoFrameMillis(1000)
-     * }
-     */
 }

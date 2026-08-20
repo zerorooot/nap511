@@ -6,12 +6,14 @@
     android:layout_height="match_parent"
     android:background="@android:color/black">
 
+    <!-- 视频渲染 Surface -->
     <RelativeLayout
         android:id="@+id/surface_container"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:gravity="center" />
 
+    <!-- 封面图 -->
     <RelativeLayout
         android:id="@+id/thumb"
         android:layout_width="match_parent"
@@ -19,12 +21,178 @@
         android:background="@android:color/black"
         android:scaleType="fitCenter" />
 
+    <!-- 顶部控制栏 (高度增至 56dp，兼顾横竖屏触摸热区) -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/layout_top"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_alignParentTop="true"
+        android:background="@drawable/bg_top_gradient"
+        android:paddingHorizontal="12dp">
+
+        <!-- 返回按钮 -->
+        <ImageView
+            android:id="@+id/back"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="8dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/video_back"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- 视频标题 -->
+        <TextView
+            android:id="@+id/title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="16dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@android:color/white"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/top_right_panel"
+            app:layout_constraintStart_toEndOf="@+id/back"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="视频标题示例" />
+
+        <!-- 顶部右侧整合面板：[比例胶囊] | [电量 时间] -->
+        <LinearLayout
+            android:id="@+id/top_right_panel"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <!-- 画面比例切换按钮 (胶囊样式) -->
+            <TextView
+                android:id="@+id/moreScale"
+                android:layout_width="wrap_content"
+                android:layout_height="28dp"
+                android:background="@drawable/bg_control_pill"
+                android:gravity="center"
+                android:minWidth="44dp"
+                android:paddingHorizontal="10dp"
+                android:text="默认"
+                android:textColor="@android:color/white"
+                android:textSize="12sp" />
+
+            <!-- 竖向半透明分割线 -->
+            <View
+                android:layout_width="1dp"
+                android:layout_height="14dp"
+                android:layout_marginHorizontal="12dp"
+                android:background="#33FFFFFF" />
+
+            <!-- 系统状态显示区 -->
+            <LinearLayout
+                android:id="@+id/layout_status_info"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/batteryTextView"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="12sp"
+                    android:typeface="monospace"
+                    tools:text="98% ⚡" />
+
+                <TextView
+                    android:id="@+id/timeTextView"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="12sp"
+                    android:typeface="monospace"
+                    tools:text="14:30" />
+            </LinearLayout>
+        </LinearLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- 播放与加载视图 -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/startAndLoadLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <moe.codeest.enviews.ENDownloadView
+            android:id="@+id/loading"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:visibility="invisible"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <moe.codeest.enviews.ENPlayView
+            android:id="@+id/start"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- 锁屏按钮 -->
+    <ImageView
+        android:id="@+id/lock_screen"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_alignParentEnd="true"
+        android:layout_centerVertical="true"
+        android:layout_marginEnd="20dp"
+        android:background="@drawable/bg_circle_translucent"
+        android:padding="10dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/unlock"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/small_close"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_circle_translucent"
+        android:padding="8dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/video_small_close"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/back_tiny"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="12dp"
+        android:padding="6dp"
+        android:visibility="gone" />
+
+    <!-- 底部控制栏 -->
     <LinearLayout
         android:id="@+id/layout_bottom"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="56dp"
         android:layout_alignParentBottom="true"
-        android:background="#99000000"
+        android:background="@drawable/bg_bottom_gradient"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="16dp"
@@ -34,26 +202,23 @@
             android:id="@+id/current"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:shadowColor="#80000000"
-            android:shadowDx="1"
-            android:shadowDy="1"
-            android:shadowRadius="2"
-            android:text="00:00"
-            android:textColor="@android:color/white"
-            android:textSize="12sp" />
+            android:textColor="#E6FFFFFF"
+            android:textSize="12sp"
+            android:typeface="monospace"
+            tools:text="00:00" />
 
         <SeekBar
             android:id="@+id/progress"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_gravity="center_vertical"
-            android:layout_marginHorizontal="12dp"
+            android:layout_marginHorizontal="8dp"
             android:layout_weight="1"
             android:background="@null"
             android:max="100"
-            android:maxHeight="4dp"
-            android:minHeight="4dp"
-            android:paddingVertical="8dp"
+            android:maxHeight="3dp"
+            android:minHeight="3dp"
+            android:paddingVertical="10dp"
             android:progressDrawable="@drawable/video_seek_progress"
             android:splitTrack="false"
             android:thumb="@drawable/video_seek_thumb" />
@@ -62,37 +227,38 @@
             android:id="@+id/total"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="16dp"
-            android:shadowColor="#80000000"
-            android:shadowDx="1"
-            android:shadowDy="1"
-            android:shadowRadius="2"
-            android:text="00:00"
-            android:textColor="@android:color/white"
-            android:textSize="12sp" />
+            android:layout_marginEnd="12dp"
+            android:textColor="#80FFFFFF"
+            android:textSize="12sp"
+            android:typeface="monospace"
+            tools:text="00:00" />
 
+        <!-- 播放倍速 (胶囊样式) -->
         <TextView
             android:id="@+id/switchSpeed"
             android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_marginEnd="16dp"
+            android:layout_height="28dp"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/bg_control_pill"
             android:gravity="center"
-            android:minEms="2"
-            android:shadowColor="#80000000"
-            android:shadowRadius="2"
-            android:text="速度"
+            android:minWidth="44dp"
+            android:paddingHorizontal="10dp"
+            android:text="倍速"
             android:textColor="@android:color/white"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:textSize="12sp" />
 
         <ImageView
             android:id="@+id/fullscreen"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="4dp"
             android:scaleType="centerInside"
             android:src="@drawable/video_enlarge" />
+
     </LinearLayout>
 
+    <!-- 底部微型进度条 -->
     <ProgressBar
         android:id="@+id/bottom_progressbar"
         style="?android:attr/progressBarStyleHorizontal"
@@ -101,145 +267,5 @@
         android:layout_alignParentBottom="true"
         android:max="100"
         android:progressDrawable="@drawable/video_progress" />
-
-    <ImageView
-        android:id="@+id/back_tiny"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="8dp"
-        android:padding="4dp"
-        android:visibility="gone" />
-
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/startAndLoadLayout"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent">
-
-        <moe.codeest.enviews.ENDownloadView
-            android:id="@+id/loading"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:visibility="invisible"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <moe.codeest.enviews.ENPlayView
-            android:id="@+id/start"
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
-
-    <ImageView
-        android:id="@+id/small_close"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="8dp"
-        android:padding="8dp"
-        android:scaleType="centerInside"
-        android:src="@drawable/video_small_close"
-        android:visibility="gone" />
-
-    <ImageView
-        android:id="@+id/lock_screen"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_alignParentEnd="true"
-        android:layout_centerVertical="true"
-        android:layout_marginEnd="32dp"
-        android:padding="8dp"
-        android:scaleType="centerInside"
-        android:src="@drawable/unlock"
-        android:visibility="gone" />
-
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/layout_top"
-        android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:layout_alignParentTop="true"
-        android:background="@drawable/video_title_bg"
-        android:paddingEnd="16dp">
-
-        <ImageView
-            android:id="@+id/back"
-            android:layout_width="48dp"
-            android:layout_height="match_parent"
-            android:paddingHorizontal="12dp"
-            android:scaleType="centerInside"
-            android:src="@drawable/video_back"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <TextView
-            android:id="@+id/title"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="16dp"
-            android:ellipsize="marquee"
-            android:shadowColor="#80000000"
-            android:shadowDx="1"
-            android:shadowDy="1"
-            android:shadowRadius="2"
-            android:singleLine="true"
-            android:textColor="@android:color/white"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/batteryTextView"
-            app:layout_constraintStart_toEndOf="@+id/back"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <TextView
-            android:id="@+id/batteryTextView"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="12dp"
-            android:shadowColor="#80000000"
-            android:shadowRadius="2"
-            android:text="100%"
-            android:textColor="@android:color/white"
-            android:textSize="12sp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/timeTextView"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <TextView
-            android:id="@+id/timeTextView"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="16dp"
-            android:shadowColor="#80000000"
-            android:shadowRadius="2"
-            android:text="13:13"
-            android:textColor="@android:color/white"
-            android:textSize="12sp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/moreScale"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <TextView
-            android:id="@+id/moreScale"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:shadowColor="#80000000"
-            android:shadowRadius="2"
-            android:text="比例"
-            android:textColor="@android:color/white"
-            android:textSize="14sp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </RelativeLayout>
