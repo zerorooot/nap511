@@ -55,9 +55,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.nativeClipboardManager
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -232,7 +236,15 @@ private fun AccountPasswordForm(
             label = { Text("账号 / 邮箱") },
             leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                imeAction = ImeAction.Next
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics {
+                    contentType = ContentType.Username // 标记为用户名/账号自动填充类型
+                },
             shape = RoundedCornerShape(12.dp)
         )
 
@@ -252,9 +264,16 @@ private fun AccountPasswordForm(
                 }
             },
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done
+            ),
             singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics {
+                    contentType = ContentType.Password // 标记为密码自动填充类型
+                },
             shape = RoundedCornerShape(12.dp)
         )
 

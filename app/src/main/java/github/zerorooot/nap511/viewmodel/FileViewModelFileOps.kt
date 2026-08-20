@@ -51,7 +51,7 @@ internal fun FileViewModel.removeFile() {
     viewModelScope.launch(exceptionHandler) {
         val move = fileRepository.removeFile(tempCid, cutFileList)
         val message = if (move.state) {
-            cutFileList.forEach { i -> i.copy(isSelect = false) }
+            cutFileList = cutFileList.map { it.copy(isSelect = false) }
             //移除之前目录下剪切的文件
             fileListCache[cid]?.fileBeanList?.removeAll(cutFileList.toSet())
             //移除被剪切文件夹的缓存，防止路径未更改
@@ -207,7 +207,8 @@ internal fun FileViewModel.deleteMultiple() {
 
 // 1. 静态提取扩展名集合，避免每次遍历重复构造数组
 private val ZIP_EXTS = setOf("rar", "tar", "gz", "7z", "zip", "part", "jar")
-private val IMG_EXTS = setOf("gif", "jpg", "png", "jpeg", "bmp", "tif", "svg", "pic", "heic", "dng", "webp")
+private val IMG_EXTS =
+    setOf("gif", "jpg", "png", "jpeg", "bmp", "tif", "svg", "pic", "heic", "dng", "webp")
 private val AUDIO_EXTS = setOf(
     "mp3", "wma", "wav", "midi", "flac", "ram", "ra", "mid", "aac", "m4a", "ape", "au",
     "ogg", "aif", "aiff", "snd", "voc", "mpa", "cda", "vqf", "wvx", "wmx", "m3u", "m3u8",
@@ -225,6 +226,7 @@ private val TXT_EXTS = setOf(
     "ets", "mhtml", "mht", "uof", "dot", "wpt", "dotx", "docm", "dotm", "ett", "xlt",
     "pptm", "ppsm", "potx", "potm", "csv", "xml", "html", "htm"
 )
+
 // 2. 改造函数：入参和返回值均为 List，利用 .map() 生成全新的不可变列表
 internal fun FileViewModel.formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
     // 复用同一个 SimpleDateFormat 实例
@@ -266,7 +268,8 @@ internal fun FileViewModel.formatFileBeanList(fileBeanList: List<FileBean>): Arr
             }
 
             if (fileBean.currentPlayTime != 0 && fileBean.playLong != 0.00) {
-                val playTime = ((fileBean.currentPlayTime.toFloat() / fileBean.playLong) * 100).roundToInt()
+                val playTime =
+                    ((fileBean.currentPlayTime.toFloat() / fileBean.playLong) * 100).roundToInt()
                 createTimeString = "▶️ $playTime% $createTimeString"
             }
         }
@@ -279,6 +282,7 @@ internal fun FileViewModel.formatFileBeanList(fileBeanList: List<FileBean>): Arr
                 playLongString = generateTime(fileBean.playLong.toLong()) + " "
                 R.drawable.mp4
             }
+
             fileBean.icoString in ZIP_EXTS -> R.drawable.zip
             fileBean.icoString in IMG_EXTS -> R.drawable.png
             fileBean.icoString in TXT_EXTS -> R.drawable.txt
@@ -286,6 +290,7 @@ internal fun FileViewModel.formatFileBeanList(fileBeanList: List<FileBean>): Arr
                 playLongString = generateTime(fileBean.playLong.toLong()) + " "
                 R.drawable.mp3
             }
+
             fileBean.icoString == "apk" -> R.drawable.apk
             fileBean.icoString == "iso" -> R.drawable.iso
             fileBean.icoString == "torrent" -> R.drawable.torrent

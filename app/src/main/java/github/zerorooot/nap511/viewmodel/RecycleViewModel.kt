@@ -10,12 +10,12 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
-import github.zerorooot.nap511.util.DialogEvent
-import github.zerorooot.nap511.util.DialogEventBus
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.DialogEvent
+import github.zerorooot.nap511.util.DialogEventBus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -129,6 +129,8 @@ class RecycleViewModel(private val cookie: String) :
             val revert = fileService.revert(recycleFileList[index].id)
             val message = if (revert.state) {
                 XLog.d("RecycleViewModel revert $revert")
+                val cid = recycleFileList[index].cid
+                dialogEventBus.emit(DialogEvent.RefreshFileList(cid))
                 recycleFileList.removeAt(index)
                 "恢复成功"
             } else {
@@ -177,7 +179,8 @@ class RecycleViewModel(private val cookie: String) :
             "iso" -> recycleBean.fileIco = R.drawable.iso
             "torrent" -> recycleBean.fileIco = R.drawable.torrent
             "rar", "tar", "gz", "7z", "zip", "part", "jar" -> recycleBean.fileIco = R.drawable.zip
-            "gif", "jpg", "png", "jpeg", "bmp", "tif", "svg", "pic", "heic", "dng", "webp" -> recycleBean.fileIco = R.drawable.png
+            "gif", "jpg", "png", "jpeg", "bmp", "tif", "svg", "pic", "heic", "dng", "webp" -> recycleBean.fileIco =
+                R.drawable.png
 
             "doc", "docx", "xls", "pdf", "ppt", "wps", "dps", "et", "mdb", "reg", "txt", "wri", "rtf", "lrc", "vob", "sub", "srt", "ass", "ssa", "idx", "umd", "xlsx", "xlsm", "xltx", "xltm", "xlam", "xlsb", "odt", "pptx", "ods", "odp", "chm", "pot", "pps", "ppsx", "smi", "vtt", "stl", "sbv", "ttml", "ksc", "snc", "krc", "c", "cpp", "h", "asm", "s", "java", "o", "asp", "aspx", "bat", "bas", "prg", "cmd", "log", "php", "js", "go", "sh", "css", "scss", "sass", "less", "class", "hpp", "cc", "hex", "hxx", "cxx", "c++", "cs", "py", "pl", "pm", "md", "cue", "utf", "dpt", "ofd", "eto", "ets", "mhtml", "mht", "uof", "dot", "wpt", "dotx", "docm", "dotm", "ett", "xlt", "pptm", "ppsm", "potx", "potm", "csv", "xml", "html", "htm" ->
                 recycleBean.fileIco = R.drawable.txt

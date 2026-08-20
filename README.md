@@ -10,16 +10,17 @@
 
 <table>
   <tr style="text-align: center; vertical-align: middle;">
-    <td><a href="./assets/01.jpg?raw=true"><img src="./assets/01.jpg?raw=true" width="300" alt="Screenshot 01"/></a></td>
-    <td><a href="./assets/02.jpg?raw=true"><img src="./assets/02.jpg?raw=true" width="300" alt="Screenshot 002"/></a></td>
-    <td><a href="./assets/03.jpg?raw=true"><img src="./assets/03.jpg?raw=true" width="300" alt="Screenshot 003"/></a></td>
+    <td><a href="./assets/01.jpg"><img src="./assets/01.jpg?raw=true" width="300" alt="Screenshot 001"/></a></td>
+    <td><a href="./assets/02.jpg"><img src="./assets/02.jpg?raw=true" width="300" alt="Screenshot 002"/></a></td>
+    <td><a href="./assets/03.jpg"><img src="./assets/03.jpg?raw=true" width="300" alt="Screenshot 003"/></a></td>
   </tr>
   <tr style="text-align: center; vertical-align: middle;">
-    <td><a href="./assets/04.jpg?raw=true"><img src="./assets/04.jpg?raw=true" width="300" alt="Screenshot 004"/></a></td>
-    <td><a href="./assets/05.jpg?raw=true"><img src="./assets/05.jpg?raw=true" width="300" alt="Screenshot 005"/></a></td>
-    <td><a href="./assets/06.jpg?raw=true"><img src="./assets/06.jpg?raw=true" width="300" alt="Screenshot 006"/></a></td>
+    <td><a href="./assets/04.jpg"><img src="./assets/04.jpg?raw=true" width="300" alt="Screenshot 004"/></a></td>
+    <td><a href="./assets/05.jpg"><img src="./assets/05.jpg?raw=true" width="300" alt="Screenshot 005"/></a></td>
+    <td><a href="./assets/06.jpg"><img src="./assets/06.jpg?raw=true" width="300" alt="Screenshot 006"/></a></td>
   </tr>
 </table>
+
 
 # 功能说明
 
