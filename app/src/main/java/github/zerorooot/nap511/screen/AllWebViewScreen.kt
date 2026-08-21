@@ -65,7 +65,7 @@ fun BaseWebViewScreen(
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var progress by remember { mutableFloatStateOf(0f) }
 
-    Column {
+    Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = {
                 Text(text = titleText)
@@ -125,27 +125,18 @@ fun BaseWebViewScreen(
                     webChromeClient = object : WebChromeClient() {
                         override fun onProgressChanged(view: WebView?, newProgress: Int) {
                             progress = newProgress / 100f
-                            if (newProgress == 100) {
-                                XLog.d("WebView Progress 100, attempting auto dump")
-                                view?.evaluateJavascript(
-                                    "(function() { return document.documentElement.outerHTML; })();"
-                                ) { result ->
-                                    if (result != null && result != "null") {
-                                        XLog.d("PROGRESS_DUMP_SUCCESS")
-                                        dumpFullHtml(result)
-                                    }
-                                }
-                            }
-                            if (newProgress > 5) {
-                                // 深度伪装环境 + API 拦截监控
+                            if (newProgress > 10) {
+                                // 1. 环境指纹伪装
                                 view?.evaluateJavascript(
                                     """
                                         (function() {
                                             if (window._hook_fixed) return;
-                                            Object.defineProperty(navigator, 'userAgent', { get: function(){ return '${ConfigKeyUtil.USER_AGENT}'; } });
+                                            var UA = '${ConfigKeyUtil.USER_AGENT}';
+                                            Object.defineProperty(navigator, 'userAgent', { get: function(){ return UA; } });
                                             Object.defineProperty(navigator, 'platform', { get: function(){ return 'Win32'; } });
-                                            Object.defineProperty(navigator, 'webdriver', { get: function(){ return false; } });
+                                            Object.defineProperty(navigator, 'vendor', { get: function(){ return 'Google Inc.'; } });
                                             window.is115Browser = true;
+                                            if(!window.external) window.external = {};
                                             window._hook_fixed = true;
                                         })();
                                         """.trimIndent(), null
@@ -155,16 +146,8 @@ fun BaseWebViewScreen(
 
                         override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
                             val msg = consoleMessage?.message() ?: ""
-                            val source = consoleMessage?.sourceId() ?: ""
-                            val line = consoleMessage?.lineNumber() ?: 0
-                            XLog.d("WebView Console: $msg -- From line $line of $source")
-
-                            // 特别识别 API 错误
-                            if (msg.contains("failed") || msg.contains("error") || msg.contains(
-                                    "403"
-                                ) || msg.contains("401")
-                            ) {
-                                XLog.e("WebView CRITICAL ERROR: $msg")
+                            if (msg.contains("failed") || msg.contains("error") || msg.contains("403")) {
+                                XLog.e("WebView_ERROR: $msg")
                             }
                             return true
                         }
@@ -185,14 +168,17 @@ fun BaseWebViewScreen(
 @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
 @Composable
 fun WebViewScreen(onClick: () -> Unit) {
-    val url = "https://115.com/?cid=0&offset=0&mode=wangpan"
+    val url = "https://115.com/storage/allfiles?cid=0&mode=wangpan"
     var isReady by remember { mutableStateOf(false) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     // 用于驱动 Compose UI 实时响应当前 URL 的状态
     var currentUrl by remember { mutableStateOf(url) }
     val rootUrls = remember {
         setOf(
-            url, "https://115.com/?cid=0&offset=0&tab=&mode=wangpan"
+            "https://115.com/?cid=0&offset=0&mode=wangpan",
+            "https://115.com/storage/allfiles?cid=0&mode=wangpan",
+            "https://115.com/?cid=0&offset=0&tab=&mode=wangpan",
+            "https://115.com/storage/allfiles"
         )
     }
 
@@ -277,11 +263,23 @@ fun webViewClient(onUrl: (String) -> Unit): WebViewClient {
         override fun shouldInterceptRequest(
             view: WebView, request: WebResourceRequest
         ): WebResourceResponse? {
+            val url = request.url.toString()
             val headers = request.requestHeaders
-            if (headers.containsKey("X-Requested-With")) {
-                headers.remove("X-Requested-With")
+
+            // 追踪关键资源加载
+            if (url.contains("115.com")) {
+                if (url.contains(".js") || url.contains(".css") || url.contains("/api/")) {
+                    XLog.v("WebView Requesting: $url")
+                }
             }
-            // 关键：彻底剥离 Android WebView 标识
+
+            if (headers.containsKey("X-Requested-With")) {
+                val newHeaders = HashMap(headers)
+                newHeaders.remove("X-Requested-With")
+                // 注意：如果只是返回 null，WebView 仍会发送原请求。
+                // 这里我们仅做日志记录，具体修改 headers 可能需要拦截并重新发起（略复杂）
+                XLog.d("WebView stripped X-Requested-With for $url")
+            }
             return null
         }
 
@@ -297,60 +295,51 @@ fun webViewClient(onUrl: (String) -> Unit): WebViewClient {
             view?.url?.let { onUrl.invoke(it) }
             XLog.d("WebView Page Finished: $url")
 
-            // 核心修复脚本：
-            // 1. 暴力移除加载屏蔽层
-            // 2. 强制 body 可见
-            // 3. 诊断与源码导出
             view?.evaluateJavascript(
                 """
                 (function() {
-                    function bruteForceVisible() {
-                        // 移除所有可能的遮罩层 (加载中、验证中)
-                        var selectors = [
-                            '[class*="loading"]', '[id*="loading"]', 
-                            '[class*="mask"]', '[id*="mask"]',
-                            '[class*="overlay"]'
-                        ];
-                        selectors.forEach(function(s) {
-                            document.querySelectorAll(s).forEach(function(el) { 
-                                // 只有当元素占满全屏且透明或带动画时才移除，避免误删正常 UI
-                                if(el.offsetHeight > window.innerHeight * 0.8) {
-                                    el.style.display = 'none';
-                                    el.style.opacity = '0';
-                                }
-                            });
-                        });
-
-                        document.body.style.opacity = '1';
-                        document.body.style.visibility = 'visible';
-                        document.body.style.display = 'block';
-                        
-                        // 穿透透明度死锁
-                        var styleId = 'force-visible-brute';
+                    function applyFix() {
+                        var styleId = '115-core-fix';
+                        var pxHeight = window.innerHeight + 'px';
                         var style = document.getElementById(styleId);
                         if (!style) {
                             style = document.createElement('style');
                             style.id = styleId;
-                            style.innerHTML = 'body { opacity: 1 !important; visibility: visible !important; } .jsx-e02dea5b1df978c2 { opacity: 1 !important; display: block !important; }';
                             document.head.appendChild(style);
                         }
+                        style.textContent = `
+                            html, body, #__next, [class*="h-screen"] {
+                                height: ${'$'}{pxHeight} !important;
+                                min-height: ${'$'}{pxHeight} !important;
+                            }
+                            body { display: block !important; overflow: auto !important; }
+                            #js_mainContent, .layout-main, .layout-content {
+                                overflow: auto !important;
+                                min-height: 100% !important;
+                            }
+                            .flex.relative.min-w-\[800px\] { min-width: 800px !important; }
+                            .v-modal, [class*="mask"], [class*="loading"] { display: none !important; pointer-events: none !important; }
+                        `;
                     }
                     
-                    bruteForceVisible();
-                    // 持续巡检，防止 JS 框架重新生成遮罩
+                    applyFix();
+                    // 115 页面会多次重绘，采用轮询确保修复持久生效
                     var count = 0;
                     var itv = setInterval(function() {
-                        bruteForceVisible();
+                        applyFix();
                         if(++count > 10) clearInterval(itv);
                     }, 1000);
-                    
-                    try { return document.documentElement.outerHTML; } catch(e) { return 'ERROR: ' + e.message; }
                 })();
-                """.trimIndent()
-            ) { result ->
-                XLog.d("AUTO_DUMP_RECEIVED for $url")
-                dumpFullHtml(result)
-            }
+                """.trimIndent(), null
+            )
+        }
+
+        override fun onReceivedSslError(
+            view: WebView?,
+            handler: android.webkit.SslErrorHandler?,
+            error: android.net.http.SslError?
+        ) {
+            handler?.proceed()
         }
 
         override fun onReceivedError(
@@ -451,9 +440,14 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
             url?.let {
                 val cookie = CookieManager.getInstance().getCookie(it)
                 if (!cookie.isNullOrBlank()) {
-                    XLog.d("loginWebViewClient onPageFinished cookie $cookie")
+                    XLog.d("loginWebViewClient onPageFinished cookie length: ${cookie.length}")
                 }
             }
+            // 登录页面也注入诊断，防止登录也白屏
+            view?.evaluateJavascript(
+                "(function() { return {url: window.location.href, title: document.title, elements: document.getElementsByTagName('*').length}; })();",
+                { result -> XLog.d("LOGIN_DIAG_DATA: $result") }
+            )
         }
     }
 

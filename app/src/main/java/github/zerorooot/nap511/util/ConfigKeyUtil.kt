@@ -142,7 +142,7 @@ class ConfigKeyUtil {
         /**
          * 登录
          */
-        const val LOGIN = "登录"
+        const val LOGIN = "应用登录"
 
         /**
          * 我的文件
