@@ -12,17 +12,23 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Menu
-import androidx.compose.material.icons.rounded.Print
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -34,8 +40,11 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.acsbendi.requestinspectorwebview.RequestInspectorWebViewClient
@@ -45,12 +54,12 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import kotlin.time.Duration.Companion.milliseconds
 
 @SuppressLint("SetJavaScriptEnabled")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -64,41 +73,145 @@ fun BaseWebViewScreen(
 ) {
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var progress by remember { mutableFloatStateOf(0f) }
+    var canGoBack by remember { mutableStateOf(false) }
+    var canGoForward by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(
-            title = {
-                Text(text = titleText)
-            },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
-            navigationIcon = {
-                TopAppBarActionButton(
-                    imageVector = Icons.Rounded.Menu, description = "navigationIcon"
-                ) {
-                    topAppBarActionButtonOnClick()
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+
+    Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            Column {
+                TopAppBar(
+                    title = {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp)
+                                .padding(end = 12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            shape = RoundedCornerShape(20.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                Text(
+                                    text = titleText,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Purple80,
+                        scrolledContainerColor = Purple80
+                    ),
+                    navigationIcon = {
+                        TopAppBarActionButton(
+                            imageVector = Icons.Rounded.Menu, description = "navigationIcon"
+                        ) {
+                            topAppBarActionButtonOnClick()
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = { webViewInstance?.goBack() },
+                            enabled = canGoBack
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = "Back"
+                            )
+                        }
+                        IconButton(
+                            onClick = { webViewInstance?.goForward() },
+                            enabled = canGoForward
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                                contentDescription = "Forward"
+                            )
+                        }
+                        actions()
+                    },
+                    scrollBehavior = scrollBehavior
+                )
+                if (progress < 1f && progress > 0f) {
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(2.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    )
                 }
-            },
-            actions = {
-                actions()
-            })
-        if (progress < 1f && progress > 0f) {
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant,
-            )
+            }
         }
+    ) { paddingValues ->
         Surface(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
             color = MaterialTheme.colorScheme.background,
         ) {
             AndroidView(modifier = Modifier.fillMaxSize(), factory = { context ->
                 WebView(context).apply {
                     webViewInstance = this
-                    this.webViewClient = webViewClient.invoke(this)
+                    val originalClient = webViewClient.invoke(this)
+                    this.webViewClient = object : WebViewClient() {
+                        override fun shouldInterceptRequest(
+                            view: WebView,
+                            request: WebResourceRequest
+                        ): WebResourceResponse? =
+                            originalClient.shouldInterceptRequest(view, request)
+
+                        override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                            originalClient.onPageStarted(view, url, favicon)
+                            canGoBack = view?.canGoBack() == true
+                            canGoForward = view?.canGoForward() == true
+                        }
+
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            originalClient.onPageFinished(view, url)
+                            canGoBack = view?.canGoBack() == true
+                            canGoForward = view?.canGoForward() == true
+                        }
+
+                        override fun doUpdateVisitedHistory(
+                            view: WebView?,
+                            url: String?,
+                            isReload: Boolean
+                        ) {
+                            originalClient.doUpdateVisitedHistory(view, url, isReload)
+                            canGoBack = view?.canGoBack() == true
+                            canGoForward = view?.canGoForward() == true
+                        }
+
+                        override fun onReceivedSslError(
+                            view: WebView?,
+                            handler: android.webkit.SslErrorHandler?,
+                            error: android.net.http.SslError?
+                        ) = originalClient.onReceivedSslError(view, handler, error)
+
+                        override fun onReceivedError(
+                            view: WebView?,
+                            request: WebResourceRequest?,
+                            error: WebResourceError?
+                        ) = originalClient.onReceivedError(view, request, error)
+
+                        override fun onReceivedHttpError(
+                            view: WebView?,
+                            request: WebResourceRequest?,
+                            errorResponse: WebResourceResponse?
+                        ) = originalClient.onReceivedHttpError(view, request, errorResponse)
+                    }
                     settings.apply {
                         javaScriptEnabled = true
                         loadWithOverviewMode = true
@@ -168,11 +281,11 @@ fun BaseWebViewScreen(
 @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
 @Composable
 fun WebViewScreen(onClick: () -> Unit) {
-    val url = "https://115.com/storage/allfiles?cid=0&mode=wangpan"
     var isReady by remember { mutableStateOf(false) }
+    val initialUrl = "https://115.com/storage/allfiles?cid=0&mode=wangpan"
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     // 用于驱动 Compose UI 实时响应当前 URL 的状态
-    var currentUrl by remember { mutableStateOf(url) }
+    var currentUrl by remember { mutableStateOf(initialUrl) }
     val rootUrls = remember {
         setOf(
             "https://115.com/?cid=0&offset=0&mode=wangpan",
@@ -190,17 +303,13 @@ fun WebViewScreen(onClick: () -> Unit) {
         }
     }
     LaunchedEffect(Unit) {
-        XLog.d("WebViewScreen LaunchedEffect, cookie length: ${App.cookie.length}")
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
-        WebView.setWebContentsDebuggingEnabled(true)
-
+        WebView.setWebContentsDebuggingEnabled(DataStoreUtil.getData(ConfigKeyUtil.LOG, false))
         // 1. 注入 Cookie
         setRawCookieString(App.cookie)
-
         // 2. 强制显式同步并引入物理延迟，确保 API 请求发起时 Cookie 已在磁盘就绪
         cookieManager.flush()
-        kotlinx.coroutines.delay(1500.milliseconds)
 
         isReady = true
     }
@@ -215,24 +324,8 @@ fun WebViewScreen(onClick: () -> Unit) {
                     currentUrl = u
                 }
             },
-            loadUrl = url,
-            actions = {
-                TopAppBarActionButton(
-                    imageVector = Icons.Rounded.Print, description = "Dump HTML"
-                ) {
-                    webViewRef?.evaluateJavascript(
-                        "(function() { return document.documentElement.outerHTML; })();"
-                    ) { result ->
-                        XLog.d("MANUAL_DUMP_RECEIVED")
-                        dumpFullHtml(result)
-                    }
-                }
-                TopAppBarActionButton(
-                    imageVector = Icons.Rounded.Refresh, description = "Refresh"
-                ) {
-                    webViewRef?.reload()
-                }
-            })
+            loadUrl = initialUrl
+        )
     }
 }
 
@@ -366,27 +459,6 @@ fun webViewClient(onUrl: (String) -> Unit): WebViewClient {
             // 应对单页应用（SPA）无刷新路由切换时的 URL 变化
             view?.url?.let { onUrl.invoke(it) }
         }
-    }
-}
-
-private fun dumpFullHtml(jsonResult: String?) {
-    if (jsonResult == null || jsonResult == "null") {
-        XLog.e("dumpFullHtml: Result is null")
-        return
-    }
-    try {
-        // 由于返回的是 JSON 化的字符串，包含转义，这里简单处理或直接输出关键部分
-        XLog.d("FULL_HTML_START")
-        val chunkSize = 3000
-        var index = 0
-        while (index < jsonResult.length) {
-            val end = (index + chunkSize).coerceAtMost(jsonResult.length)
-            XLog.d("FULL_HTML_PART: ${jsonResult.substring(index, end)}")
-            index = end
-        }
-        XLog.d("FULL_HTML_END")
-    } catch (e: Exception) {
-        XLog.e("dumpFullHtml error", e)
     }
 }
 
