@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.widget.Toast
+import androidx.compose.foundation.ComposeFoundationFlags
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.core.app.NotificationManagerCompat
 import coil.ImageLoader
 import coil.ImageLoaderFactory
@@ -43,6 +45,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.properties.Delegates
 
+@OptIn(ExperimentalFoundationApi::class)
 class App : Application(), ImageLoaderFactory {
     private val okHttpClient by lazy { OkHttpClient() }
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
@@ -62,6 +65,9 @@ class App : Application(), ImageLoaderFactory {
     }
 
     override fun onCreate() {
+        // 1.12.0 起新文字上下文菜单默认开启，但在 Dialog 内的 TextField
+        // 长按/选中后剪切、复制、粘贴点击无效。回退到旧实现规避该回归。
+        ComposeFoundationFlags.isNewContextMenuEnabled = false
         super.onCreate()
         instance = this
         cookie = DataStoreUtil.getData(ConfigKeyUtil.COOKIE, "")
