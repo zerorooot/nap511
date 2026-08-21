@@ -252,7 +252,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         ModalNavigationDrawer(
-            gesturesEnabled = fileViewModel.gesturesEnabled,
+            gesturesEnabled = fileViewModel.gesturesEnabled || drawerState.isOpen,
             drawerState = drawerState,
             drawerContent = {
                 ModalDrawerSheet(
