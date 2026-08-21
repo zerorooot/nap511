@@ -595,7 +595,7 @@ fun captchaWebViewClient(
             if ("https://webapi.115.com/user/captcha" == webViewRequest.url) {
                 if (check("https://webapi.115.com/user/captcha", webViewRequest, handle)) {
                     fileViewModel.handleOfflineTask()
-                    App.instance.toast("验证账号成功~，重新添加链接中.......")
+                    App.instance.toast("验证账号成功，重新添加链接中")
                 }
             }
             //视频验证

@@ -219,6 +219,7 @@ fun FileScreen(
     }
 
     fun handleFolderClick(i: Int, fileBean: FileBean) {
+        isBottomBarShow = true
         if (DataStoreUtil.getData(ConfigKeyUtil.EARLY_LOADING, false)) {
             listOf(i - 1, i + 1)
                 .mapNotNull { fileBeanList.getOrNull(it) }
@@ -370,6 +371,7 @@ fun FileScreen(
         if (path != "/根目录" && !fileViewModel.isLongClickState) {
             fileViewModel.setListLocation(path, listState)
         }
+        isBottomBarShow = true
         //触发路径和数据源的改变，重组后交由上方滚动
         fileViewModel.back()
     }

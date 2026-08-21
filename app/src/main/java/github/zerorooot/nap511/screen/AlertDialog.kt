@@ -28,7 +28,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -41,8 +40,6 @@ import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -84,9 +81,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -323,7 +318,7 @@ fun FileInfoDialog(
     sections.add(InfoSection(title = "基础信息", items = baseItems))
 
     // 区块二：位置与共享
-    val locationItems = listOf(
+    val locationItems = mutableListOf(
         InfoItem(
             label = "文件路径",
             value = "",
@@ -331,7 +326,6 @@ fun FileInfoDialog(
                 // 渲染可点击的层级面包屑
                 BreadcrumbPath(
                     paths = fileInfo.paths,
-                    currentFileName = fileBean.name,
                     onPathClick = { categoryId ->
                         fileInfoClick(categoryId)
                         fileInfoClick.invoke(null) // 点击路径跳转后通常关闭弹窗
@@ -340,8 +334,11 @@ fun FileInfoDialog(
             }
         ),
         InfoItem("提取码", fileBean.pickCode.ifEmpty { "无" }),
-        InfoItem("sha1", fileBean.sha1)
     )
+    if (fileBean.sha1 != "") {
+        locationItems.add(InfoItem("sha1", fileBean.sha1))
+    }
+
     sections.add(InfoSection(title = "位置与共享", items = locationItems))
 
     // 区块三：时间信息
@@ -366,7 +363,6 @@ fun FileInfoDialog(
 @Composable
 private fun BreadcrumbPath(
     paths: List<PathsBean>,
-    currentFileName: String,
     onPathClick: (String) -> Unit
 ) {
     // 假设每个 path 对象有 categoryId 和 fileName 属性（根据你的数据模型修改对应字段名）
@@ -896,121 +892,6 @@ fun CookieDialog(enter: (String?) -> Unit) {
         ) {
             enter.invoke(it)
             isOpen = false
-        }
-    }
-}
-
-@Composable
-fun LoginDialog(
-    onAccountLogin: (String, String) -> Unit,
-    onCookieLogin: () -> Unit,
-    onWebLogin: () -> Unit,
-    onImportConfig: () -> Unit
-) {
-    var isOpen by remember { mutableStateOf(true) }
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
-    val focusRequester = remember { FocusRequester() }
-
-    if (isOpen) {
-        AlertDialog(
-            modifier = Modifier.fillMaxWidth(),
-            onDismissRequest = {
-                isOpen = false
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (username.isNotBlank() && password.isNotBlank()) {
-                            isLoading = true
-                            onAccountLogin(username, password)
-                        }
-                    },
-                    enabled = !isLoading && username.isNotBlank() && password.isNotBlank()
-                ) {
-                    Text(text = if (isLoading) "登录中..." else "确认登录")
-                }
-            },
-            dismissButton = {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    TextButton(
-                        onClick = {
-                            isOpen = false
-                            onImportConfig()
-                        }
-                    ) {
-                        Text("导入配置")
-                    }
-                    TextButton(
-                        onClick = {
-                            isOpen = false
-                            onCookieLogin()
-                        }
-                    ) {
-                        Text("Cookie登录")
-                    }
-                    TextButton(
-                        onClick = {
-                            isOpen = false
-                            onWebLogin()
-                        }
-                    ) {
-                        Text("网页登录")
-                    }
-                }
-            },
-            title = {
-                Text(
-                    text = "115账号登录",
-                    style = MaterialTheme.typography.titleMedium
-                )
-            },
-            text = {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    OutlinedTextField(
-                        value = username,
-                        onValueChange = { username = it },
-                        label = { Text("账号") },
-                        placeholder = { Text("手机号/用户名") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !isLoading,
-                    )
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("密码") },
-                        placeholder = { Text("请输入密码") },
-                        singleLine = true,
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        trailingIcon = {
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(
-                                    imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                    contentDescription = if (passwordVisible) "隐藏密码" else "显示密码"
-                                )
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !isLoading,
-                    )
-                }
-            },
-            shape = RoundedCornerShape(12.dp),
-        )
-
-        LaunchedEffect(Unit) {
-            delay(10.milliseconds)
-            focusRequester.requestFocus()
         }
     }
 }
