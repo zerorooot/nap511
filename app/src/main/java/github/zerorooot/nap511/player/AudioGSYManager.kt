@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.player
 
+import android.annotation.SuppressLint
 import com.shuyu.gsyvideoplayer.GSYVideoBaseManager
 
 /*
@@ -39,6 +40,7 @@ class AudioGSYManager private constructor() : GSYVideoBaseManager() {
     companion object {
         const val TAG = "AudioGSYManager"
 
+        @SuppressLint("StaticFieldLeak")
         @Volatile
         private var instance: AudioGSYManager? = null
 
