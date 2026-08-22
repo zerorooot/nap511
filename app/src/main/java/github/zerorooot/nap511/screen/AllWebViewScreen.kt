@@ -2,7 +2,6 @@ package github.zerorooot.nap511.screen
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
-import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -12,26 +11,24 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,18 +37,14 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.acsbendi.requestinspectorwebview.RequestInspectorWebViewClient
 import com.acsbendi.requestinspectorwebview.WebViewRequest
 import com.elvishew.xlog.XLog
-import github.zerorooot.nap511.R
-import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
@@ -65,16 +58,12 @@ import okhttp3.RequestBody.Companion.toRequestBody
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BaseWebViewScreen(
-    titleText: String = stringResource(R.string.app_name),
     topAppBarActionButtonOnClick: () -> Unit,
     webViewClient: (WebView) -> WebViewClient,
-    loadUrl: String,
-    actions: @Composable () -> Unit = {}
+    loadUrl: String
 ) {
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var progress by remember { mutableFloatStateOf(0f) }
-    var canGoBack by remember { mutableStateOf(false) }
-    var canGoForward by remember { mutableStateOf(false) }
 
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
@@ -83,75 +72,15 @@ fun BaseWebViewScreen(
             .fillMaxSize()
             .nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            Column {
-                TopAppBar(
-                    title = {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(40.dp)
-                                .padding(end = 12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                            shape = RoundedCornerShape(20.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                Text(
-                                    text = titleText,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.padding(horizontal = 12.dp),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Purple80,
-                        scrolledContainerColor = Purple80
-                    ),
-                    navigationIcon = {
-                        TopAppBarActionButton(
-                            imageVector = Icons.Rounded.Menu, description = "navigationIcon"
-                        ) {
-                            topAppBarActionButtonOnClick()
-                        }
-                    },
-                    actions = {
-                        IconButton(
-                            onClick = { webViewInstance?.goBack() },
-                            enabled = canGoBack
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = "Back"
-                            )
-                        }
-                        IconButton(
-                            onClick = { webViewInstance?.goForward() },
-                            enabled = canGoForward
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-                                contentDescription = "Forward"
-                            )
-                        }
-                        actions()
-                    },
-                    scrollBehavior = scrollBehavior
+            if (progress < 1f && progress > 0f) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
                 )
-                if (progress < 1f && progress > 0f) {
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(2.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                    )
-                }
             }
         }
     ) { paddingValues ->
@@ -161,87 +90,39 @@ fun BaseWebViewScreen(
                 .padding(paddingValues),
             color = MaterialTheme.colorScheme.background,
         ) {
-            AndroidView(modifier = Modifier.fillMaxSize(), factory = { context ->
-                WebView(context).apply {
-                    webViewInstance = this
-                    val originalClient = webViewClient.invoke(this)
-                    this.webViewClient = object : WebViewClient() {
-                        override fun shouldInterceptRequest(
-                            view: WebView,
-                            request: WebResourceRequest
-                        ): WebResourceResponse? =
-                            originalClient.shouldInterceptRequest(view, request)
-
-                        override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                            originalClient.onPageStarted(view, url, favicon)
-                            canGoBack = view?.canGoBack() == true
-                            canGoForward = view?.canGoForward() == true
+            Box {
+                AndroidView(modifier = Modifier.fillMaxSize(), factory = { context ->
+                    WebView(context).apply {
+                        webViewInstance = this
+                        this.webViewClient = webViewClient.invoke(this)
+                        settings.apply {
+                            javaScriptEnabled = true
+                            loadWithOverviewMode = true
+                            useWideViewPort = true
+                            javaScriptCanOpenWindowsAutomatically = true
+                            setSupportZoom(true)
+                            builtInZoomControls = true
+                            displayZoomControls = false
+                            domStorageEnabled = true
+                            databaseEnabled = true
+                            textZoom = 100
+                            cacheMode = WebSettings.LOAD_NO_CACHE
+                            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                            // 关键：桌面版可能需要这些
+                            mediaPlaybackRequiresUserGesture = false
+                            allowFileAccess = true
+                            allowContentAccess = true
                         }
+                        settings.userAgentString = ConfigKeyUtil.USER_AGENT
+                        CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
-                        override fun onPageFinished(view: WebView?, url: String?) {
-                            originalClient.onPageFinished(view, url)
-                            canGoBack = view?.canGoBack() == true
-                            canGoForward = view?.canGoForward() == true
-                        }
-
-                        override fun doUpdateVisitedHistory(
-                            view: WebView?,
-                            url: String?,
-                            isReload: Boolean
-                        ) {
-                            originalClient.doUpdateVisitedHistory(view, url, isReload)
-                            canGoBack = view?.canGoBack() == true
-                            canGoForward = view?.canGoForward() == true
-                        }
-
-                        override fun onReceivedSslError(
-                            view: WebView?,
-                            handler: android.webkit.SslErrorHandler?,
-                            error: android.net.http.SslError?
-                        ) = originalClient.onReceivedSslError(view, handler, error)
-
-                        override fun onReceivedError(
-                            view: WebView?,
-                            request: WebResourceRequest?,
-                            error: WebResourceError?
-                        ) = originalClient.onReceivedError(view, request, error)
-
-                        override fun onReceivedHttpError(
-                            view: WebView?,
-                            request: WebResourceRequest?,
-                            errorResponse: WebResourceResponse?
-                        ) = originalClient.onReceivedHttpError(view, request, errorResponse)
-                    }
-                    settings.apply {
-                        javaScriptEnabled = true
-                        loadWithOverviewMode = true
-                        useWideViewPort = true
-                        javaScriptCanOpenWindowsAutomatically = true
-                        setSupportZoom(true)
-                        builtInZoomControls = true
-                        displayZoomControls = false
-                        domStorageEnabled = true
-                        databaseEnabled = true
-                        textZoom = 100
-                        cacheMode = WebSettings.LOAD_NO_CACHE
-                        mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                        // 关键：桌面版可能需要这些
-                        mediaPlaybackRequiresUserGesture = false
-                        allowFileAccess = true
-                        allowContentAccess = true
-                    }
-
-                    // 使用纯净的现代桌面端 User Agent
-                    settings.userAgentString = ConfigKeyUtil.USER_AGENT
-                    CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
-
-                    webChromeClient = object : WebChromeClient() {
-                        override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                            progress = newProgress / 100f
-                            if (newProgress > 10) {
-                                // 1. 环境指纹伪装
-                                view?.evaluateJavascript(
-                                    """
+                        webChromeClient = object : WebChromeClient() {
+                            override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                                progress = newProgress / 100f
+                                if (newProgress > 10) {
+                                    // 1. 环境指纹伪装
+                                    view?.evaluateJavascript(
+                                        """
                                         (function() {
                                             if (window._hook_fixed) return;
                                             var UA = '${ConfigKeyUtil.USER_AGENT}';
@@ -253,28 +134,39 @@ fun BaseWebViewScreen(
                                             window._hook_fixed = true;
                                         })();
                                         """.trimIndent(), null
-                                )
+                                    )
+                                }
                             }
                         }
-
-                        override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-                            val msg = consoleMessage?.message() ?: ""
-                            if (msg.contains("failed") || msg.contains("error") || msg.contains("403")) {
-                                XLog.e("WebView_ERROR: $msg")
-                            }
-                            return true
-                        }
+                        val headers = HashMap<String, String>()
+                        headers["X-Requested-With"] = ""
+                        loadUrl(loadUrl, headers)
                     }
+                }, update = { webView ->
+                    webViewInstance = webView
+                })
 
-                    val headers = HashMap<String, String>()
-                    headers["X-Requested-With"] = ""
-                    loadUrl(loadUrl, headers)
+                IconButton(
+                    onClick = {
+                        topAppBarActionButtonOnClick.invoke()
+                    },
+                    modifier = Modifier
+                        .padding(start = 12.dp, top = 8.dp)
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.65f)),
+                    colors = IconButtonDefaults.iconButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurface
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "打开侧边栏菜单",
+                        modifier = Modifier.size(22.dp)
+                    )
                 }
-            }, update = { webView ->
-                webViewInstance = webView
-            })
+            }
         }
-
     }
 }
 
@@ -316,7 +208,6 @@ fun WebViewScreen(onClick: () -> Unit) {
 
     if (isReady) {
         BaseWebViewScreen(
-            titleText = currentUrl,
             topAppBarActionButtonOnClick = onClick,
             webViewClient = {
                 webViewRef = it
@@ -465,7 +356,6 @@ fun webViewClient(onUrl: (String) -> Unit): WebViewClient {
 @Composable
 fun LoginWebViewScreen(onClick: () -> Unit) {
     BaseWebViewScreen(
-        titleText = "通过网页登陆",
         topAppBarActionButtonOnClick = onClick,
         webViewClient = { loginWebViewClient(it) },
         loadUrl = "https://115.com/"
@@ -527,16 +417,17 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
 
 @Composable
 fun CaptchaWebViewScreen(fileViewModel: FileViewModel, onNav: (String) -> Unit) {
-    val cookieManager = CookieManager.getInstance()
-    App.cookie.split(";").forEach { a ->
-        cookieManager.setCookie("https://captchaapi.115.com", a)
-        cookieManager.setCookie("https://webapi.115.com", a)
-        cookieManager.setCookie("https://webapi.115.com/user/captcha", a)
+    LaunchedEffect(Unit) {
+        val cookieManager = CookieManager.getInstance()
+        App.cookie.split(";").forEach { a ->
+            cookieManager.setCookie("https://captchaapi.115.com", a)
+            cookieManager.setCookie("https://webapi.115.com", a)
+            cookieManager.setCookie("https://webapi.115.com/user/captcha", a)
+        }
+        cookieManager.flush()
     }
-    cookieManager.flush()
 
     BaseWebViewScreen(
-        titleText = "磁力链接验证码",
         topAppBarActionButtonOnClick = {
             onNav.invoke("topAppBarActionButtonOnClick")
         },
@@ -557,15 +448,16 @@ fun CaptchaWebViewScreen(fileViewModel: FileViewModel, onNav: (String) -> Unit) 
 
 @Composable
 fun CaptchaVideoWebViewScreen(fileViewModel: FileViewModel, onNav: (String) -> Unit) {
-    val cookieManager = CookieManager.getInstance()
-
-    App.cookie.split(";").forEach { a ->
-        cookieManager.setCookie("https://115vod.com/captchaapi/", a)
-        cookieManager.setCookie("https://115vod.com/webapi/user/captcha", a)
+    LaunchedEffect(Unit) {
+        val cookieManager = CookieManager.getInstance()
+        App.cookie.split(";").forEach { a ->
+            cookieManager.setCookie("https://115vod.com/captchaapi/", a)
+            cookieManager.setCookie("https://115vod.com/webapi/user/captcha", a)
+        }
+        cookieManager.flush()
     }
-    cookieManager.flush()
+
     BaseWebViewScreen(
-        titleText = "视频播放验证码",
         topAppBarActionButtonOnClick = {
             onNav.invoke("topAppBarActionButtonOnClick")
         },

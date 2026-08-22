@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.screen
 
 import android.net.Uri
+import android.view.WindowManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -48,6 +49,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -58,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.nativeClipboardManager
 import androidx.compose.ui.semantics.contentType
 import androidx.compose.ui.semantics.semantics
@@ -68,6 +71,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
@@ -298,9 +302,18 @@ fun WebLoginCardSection(onClick: () -> Unit) {
     Dialog(
         onDismissRequest = { onClick.invoke() },
         properties = DialogProperties(
-            usePlatformDefaultWidth = false // 关键：禁用默认宽度限制，实现全屏
+            usePlatformDefaultWidth = false, // 关键：禁用默认宽度限制，实现全屏
         )
     ) {
+        val view = LocalView.current
+        // 配置 Dialog 独立 Window 的系统栏属性
+        DisposableEffect(view) {
+            val dialogWindow = (view.parent as? DialogWindowProvider)?.window
+            //清除 Dialog 默认的变暗蒙层（解决状态栏和全屏内容整体发灰）
+            dialogWindow?.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            onDispose {}
+        }
+
         LoginWebViewScreen {
             onClick.invoke()
         }

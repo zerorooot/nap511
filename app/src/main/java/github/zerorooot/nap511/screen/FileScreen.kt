@@ -9,12 +9,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
@@ -58,7 +56,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -138,27 +135,11 @@ fun FileScreen(
             listLocation.firstVisibleItemScrollOffset
         )
     }
-    // 1. 定义 Animatable 状态
-    val animProgress = remember { Animatable(1f) }
-
     val density = LocalDensity.current
     // 1. 设置 35dp 的防抖阈值
     val thresholdPx = remember(density) { with(density) { 35.dp.toPx() } }
     var isBottomBarShow by remember { mutableStateOf(true) }
-    // 使用动画控制缩放和透明度（只作用于 Draw 阶段，不影响 Layout 测量）
-    // 2. 监听 isVisible 变化并执行动画
-    LaunchedEffect(isBottomBarShow) {
-        animProgress.animateTo(
-            targetValue = if (isBottomBarShow) 1f else 0f,
-            animationSpec = if (isBottomBarShow) {
-                // 显示（展开）：250ms，迅速展现
-                tween(durationMillis = 250, easing = LinearOutSlowInEasing)
-            } else {
-                // 隐藏（收起）：500ms，慢慢缩小消失，减少视觉上的突兀感
-                tween(durationMillis = 500, easing = FastOutLinearInEasing)
-            },
-        )
-    }
+
     // 2. 嵌套滚动监听
     val nestedScrollConnection = remember {
         var accumulatedDelta = 0f
@@ -456,16 +437,9 @@ fun FileScreen(
             modifier = Modifier.nestedScroll(nestedScrollConnection),
             bottomBar = {
                 AnimatedVisibility(
-                    visible = audioViewModel.currentMusic != null,
+                    visible = audioViewModel.currentMusic != null && isBottomBarShow,
                     enter = slideInVertically(initialOffsetY = { it }),
                     exit = slideOutVertically(targetOffsetY = { it }),
-                    // 利用 graphicsLayer 进行 GPU 缩放与透明度变换，零布局开销
-                    modifier = Modifier.graphicsLayer {
-                        /// 【核心】：完全不触发 Recompose / Layout，仅 GPU 绘图层平移
-                        val progress = animProgress.value
-                        translationY = (1f - progress) * size.height
-                        alpha = progress
-                    }
                 ) {
                     MiniPlayerBar(audioViewModel = audioViewModel)
                 }
@@ -473,7 +447,7 @@ fun FileScreen(
             floatingActionButton = {
                 FileScreenFab(
                     isCutState = fileViewModel.isCutState,
-                    animProgress = animProgress.value,
+                    visible = isBottomBarShow,
                     onCancelCut = { fileViewModel.cancelCut() },
                     onCutPaste = { fileViewModel.removeFile() },
                     onAddFolder = { fileViewModel.openCreateFolderDialog() }
@@ -534,35 +508,35 @@ private fun FilePathBar(
 @Composable
 private fun FileScreenFab(
     isCutState: Boolean,
-    animProgress: Float,
+    visible: Boolean,
     onCancelCut: () -> Unit,
     onCutPaste: () -> Unit,
     onAddFolder: () -> Unit
 ) {
-    AnimatedContent(
-        targetState = isCutState,
-        transitionSpec = { fadeIn() togetherWith fadeOut() },
-        modifier = Modifier.graphicsLayer {
-            scaleX = animProgress
-            scaleY = animProgress
-            alpha = animProgress
-            translationY = (1f - animProgress) * 80.dp.toPx()
-        },
-        label = "FabAnimation"
-    ) { isCut ->
-        if (isCut) {
-            Column {
-                FloatingActionButton(onClick = onCancelCut) {
-                    Icon(Icons.Filled.Close, "close")
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInVertically(initialOffsetY = { it }) + scaleIn() + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { it }) + scaleOut() + fadeOut()
+    ) {
+        AnimatedContent(
+            targetState = isCutState,
+            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            label = "FabAnimation"
+        ) { isCut ->
+            if (isCut) {
+                Column {
+                    FloatingActionButton(onClick = onCancelCut) {
+                        Icon(Icons.Filled.Close, "close")
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    FloatingActionButton(onClick = onCutPaste) {
+                        Icon(Icons.Default.ContentPaste, "cut")
+                    }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
-                FloatingActionButton(onClick = onCutPaste) {
-                    Icon(Icons.Default.ContentPaste, "cut")
+            } else {
+                FloatingActionButton(onClick = onAddFolder) {
+                    Icon(Icons.Filled.Add, "add")
                 }
-            }
-        } else {
-            FloatingActionButton(onClick = onAddFolder) {
-                Icon(Icons.Filled.Add, "add")
             }
         }
     }
