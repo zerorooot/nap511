@@ -73,6 +73,7 @@ import github.zerorooot.nap511.screen.FileScreen
 import github.zerorooot.nap511.screen.LogScreen
 import github.zerorooot.nap511.screen.LoginCredential
 import github.zerorooot.nap511.screen.LoginScreen
+import github.zerorooot.nap511.screen.MusicDetailScreen
 import github.zerorooot.nap511.screen.MyPhotoScreen
 import github.zerorooot.nap511.screen.OfflineDownloadScreen
 import github.zerorooot.nap511.screen.OfflineFileScreen
@@ -506,6 +507,12 @@ class MainActivity : AppCompatActivity() {
                     composable<Route.TxtReader> {
                         val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
                         TxtReaderScreen(fileViewModel.textBodyByteArray!!, title = fileBean.name) {
+                            navController.popBackStack()
+                        }
+                    }
+
+                    composable<Route.MusicDetail> {
+                        MusicDetailScreen(audioViewModel) {
                             navController.popBackStack()
                         }
                     }

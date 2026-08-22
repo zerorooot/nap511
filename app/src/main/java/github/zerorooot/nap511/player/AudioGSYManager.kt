@@ -27,6 +27,15 @@ class AudioGSYManager private constructor() : GSYVideoBaseManager() {
         this.seekTo(target)
     }
 
+    fun setVolume(volume: Float) {
+        try {
+            // GSYVideoBaseManager 通常通过此方法获取当前的播放内核
+            curPlayerManager?.setVolume(volume, volume)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     companion object {
         const val TAG = "AudioGSYManager"
 

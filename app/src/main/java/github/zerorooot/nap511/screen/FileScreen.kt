@@ -441,7 +441,9 @@ fun FileScreen(
                     enter = slideInVertically(initialOffsetY = { it }),
                     exit = slideOutVertically(targetOffsetY = { it }),
                 ) {
-                    MiniPlayerBar(audioViewModel = audioViewModel)
+                    MiniPlayerBar(audioViewModel = audioViewModel) {
+                        onNav(Route.MusicDetail)
+                    }
                 }
             },
             floatingActionButton = {

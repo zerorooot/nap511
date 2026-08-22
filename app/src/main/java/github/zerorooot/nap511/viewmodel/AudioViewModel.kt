@@ -46,6 +46,12 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
     var currentPositionText by mutableStateOf("00:00")
         private set
 
+    var playbackSpeed by mutableFloatStateOf(1.0f)
+        private set
+
+    var volume by mutableFloatStateOf(1.0f)
+        private set
+
     private var progressJob: Job? = null
 
     // 记录用户是否正在拖动进度条
@@ -98,11 +104,17 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
     // 1. 开始拖动
     fun onSeekStart() {
         isUserSeeking = true
+        pause()
     }
 
     // 2. 拖动中改变数值
     fun onSeekChange(newProgress: Float) {
         userSeekProgress = newProgress
+        val duration = videoManger.duration
+        if (duration > 0) {
+            val targetMs = (newProgress * duration).toLong()
+            currentPositionText = "${formatTime(targetMs)}/${formatTime(duration)}"
+        }
     }
 
     // 3. 松开手指，执行 Seek 操作
@@ -115,6 +127,7 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
             currentPositionText = "${formatTime(targetMs)}/${formatTime(duration)}"
         }
         isUserSeeking = false
+        togglePlayPause()
     }
 
     init {
@@ -164,7 +177,7 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
                         playUrl,        // url
                         mapOf("Cookie" to cookie),           // headers (Map<String, String>?)
                         false,          // loop (是否循环播放)
-                        1.0f,           // speed (播放速度)
+                        playbackSpeed,           // speed (播放速度)
                         false,           // cache (是否开启缓存)
                         null,           // cachePath (缓存路径，传 null 为默认)
                         fileBean.name   // title
@@ -218,6 +231,8 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
     fun stopAudioAndService() {
         stop()
         stopAudioService()
+        playbackSpeed = 1.0f
+        volume = 1.0f
     }
 
     private fun stop() {
@@ -248,6 +263,16 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
     fun onFastForward() {
         videoManger.seekRelative(SEEK_STEP_MS)
         updateAudioTime()
+    }
+
+    fun changeSpeed(speed: Float) {
+        playbackSpeed = speed
+        videoManger.setSpeed(speed, true)
+    }
+
+    fun changeVolume(v: Float) {
+        volume = v
+        videoManger.setVolume(v)
     }
 
     // 修改轮询进度逻辑：用户拖拽时跳过自动赋值

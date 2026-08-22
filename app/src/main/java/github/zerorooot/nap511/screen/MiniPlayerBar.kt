@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.screen
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,12 +14,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
-import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.outlined.MusicNote
-import androidx.compose.material.icons.sharp.MusicNote
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -42,8 +40,7 @@ import github.zerorooot.nap511.viewmodel.AudioViewModel
  */
 @Composable
 fun MiniPlayerBar(
-    audioViewModel: AudioViewModel,
-    modifier: Modifier = Modifier
+    audioViewModel: AudioViewModel, modifier: Modifier = Modifier, musicOnClick: () -> Unit
 ) {
     val fileBean = audioViewModel.currentMusic ?: return
 
@@ -69,9 +66,11 @@ fun MiniPlayerBar(
         isPlaying = audioViewModel.isPlaying,
         isLoading = audioViewModel.isLoading,
         progress = displayProgress,
+        isUserSeeking = audioViewModel.isUserSeeking,
         positionText = audioViewModel.currentPositionText,
         onSeekChange = { audioViewModel.onSeekChange(it) },
         modifier = modifier,
+        musicOnClick = musicOnClick,
         onClickEvent = onClickEvent
     )
 }
@@ -86,52 +85,73 @@ fun MiniPlayerBarContent(
     isPlaying: Boolean,
     isLoading: Boolean,
     progress: Float,
+    isUserSeeking: Boolean,
     positionText: String,
     onSeekChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
+    musicOnClick: () -> Unit,
     onClickEvent: (String) -> Unit
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
-        tonalElevation = 6.dp,
-        shadowElevation = 8.dp
+        modifier = modifier.fillMaxWidth(), tonalElevation = 6.dp, shadowElevation = 8.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // 1. 顶部进度条 / 拖动快进快退条
-            if (isLoading) {
-                LinearProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            } else {
-                Box(
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!isUserSeeking) {
+                    if (isLoading) {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(3.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    } else {
+                        LinearProgressIndicator(
+                            progress = { progress.coerceIn(0f, 1f) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(3.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    }
+                }
+
+                Slider(
+                    value = progress.coerceIn(0f, 1f),
+                    onValueChange = {
+                        if (!isUserSeeking) {
+                            onClickEvent.invoke("onSeekStart")
+                        }
+                        onSeekChange(it)
+                    },
+                    onValueChangeFinished = {
+                        onClickEvent.invoke("onSeekEnd")
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Slider(
-                        value = progress.coerceIn(0f, 1f),
-                        onValueChange = {
-                            onClickEvent.invoke("onSeekStart")
-                            onSeekChange(it)
-                        },
-                        onValueChangeFinished = {
-                            onClickEvent.invoke("onSeekEnd")
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(16.dp),
-                        colors = SliderDefaults.colors(
+                    colors = if (isUserSeeking) {
+                        SliderDefaults.colors(
                             thumbColor = MaterialTheme.colorScheme.primary,
                             activeTrackColor = MaterialTheme.colorScheme.primary,
                             inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
-                    )
-                }
+                    } else {
+                        SliderDefaults.colors(
+                            thumbColor = androidx.compose.ui.graphics.Color.Transparent,
+                            activeTrackColor = androidx.compose.ui.graphics.Color.Transparent,
+                            inactiveTrackColor = androidx.compose.ui.graphics.Color.Transparent
+                        )
+                    }
+                )
             }
 
             // 2. 播放器主体控制区域
@@ -141,29 +161,37 @@ fun MiniPlayerBarContent(
                     .padding(start = 12.dp, end = 8.dp, top = 2.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 音频图标
-                Icon(
-                    Icons.Default.MusicNote,
-                    contentDescription = "Music",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(32.dp)
-                )
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                // 曲目名称与时间点
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = fileBean.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(onClick = {
+                            musicOnClick.invoke()
+                        }), verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 音频图标
+                    Icon(
+                        Icons.Default.MusicNote,
+                        contentDescription = "Music",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp)
                     )
-                    Text(
-                        text = if (isLoading) "正在加载音频..." else positionText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    // 曲目名称与时间点
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = fileBean.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = if (isLoading) "正在加载音频..." else positionText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))
