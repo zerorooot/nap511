@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -23,7 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.screenitem.RecycleCellItem
-import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
@@ -98,7 +98,7 @@ fun RecycleScreen(recycleViewModel: RecycleViewModel, onClick: () -> Unit) {
             } else {
                 LazyColumnScrollbar(
                     state = listState, settings = ScrollbarSettings.Default.copy(
-                        thumbUnselectedColor = Purple80
+                        thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
                     )
                 ) {
                     LazyColumn(Modifier.fillMaxSize(), state = listState) {

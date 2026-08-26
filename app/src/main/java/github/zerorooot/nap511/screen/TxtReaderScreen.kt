@@ -69,7 +69,6 @@ import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import github.zerorooot.nap511.ui.theme.Purple80
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import my.nanihadesuka.compose.LazyColumnScrollbar
@@ -363,7 +362,7 @@ fun TxtReaderScreen(
                     LazyColumnScrollbar(
                         state = listState,
                         settings = ScrollbarSettings.Default.copy(
-                            thumbUnselectedColor = Purple80
+                            thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
                         )
                     ) {
                         LazyColumn(

@@ -81,14 +81,14 @@ fun FileCellItem(
                     itemOnLongClick.invoke(index)
                 }
             ),
-        color = if (fileBean.isSelect) Color.Cyan else MaterialTheme.colorScheme.surface
+        color = if (fileBean.isSelect) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
     ) {
         Card(
             modifier = Modifier
                 .padding(4.dp, 4.dp)
                 .height(80.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if ((clickIndex == index) && !fileBean.isSelect) Color.LightGray else Color.Transparent
+                containerColor = if ((clickIndex == index) && !fileBean.isSelect) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent
             ),
         ) {
             Row(

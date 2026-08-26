@@ -55,7 +55,6 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.ui.theme.Nap511Theme
-import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,7 +81,12 @@ fun MusicDetailScreen(
                         Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Back")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
+                colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ),
             )
         },
         containerColor = MaterialTheme.colorScheme.surface
@@ -430,7 +434,12 @@ fun MusicDetailScreenPreview() {
                             Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Back")
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
+                    colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ),
                 )
             }
         ) { paddingValues ->

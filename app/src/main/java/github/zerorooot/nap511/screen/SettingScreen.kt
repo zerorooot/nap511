@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -31,7 +32,6 @@ import github.zerorooot.nap511.screenitem.ListPreferenceItem
 import github.zerorooot.nap511.screenitem.PreferenceCategoryHeader
 import github.zerorooot.nap511.screenitem.PreferenceItem
 import github.zerorooot.nap511.screenitem.SwitchPreferenceItem
-import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.SettingViewModel
@@ -118,7 +118,12 @@ fun SettingContent(
     Column {
         TopAppBar(
             title = { Text(text = "高级设置") },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
+            colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ),
             navigationIcon = {
                 TopAppBarActionButton(
                     imageVector = Icons.Rounded.Menu,
@@ -131,7 +136,7 @@ fun SettingContent(
         LazyColumnScrollbar(
             state = listState,
             settings = ScrollbarSettings.Default.copy(
-                thumbUnselectedColor = Purple80
+                thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
             )
         ) {
             LazyColumn(

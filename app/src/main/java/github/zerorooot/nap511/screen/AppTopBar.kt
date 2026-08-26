@@ -40,7 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import github.zerorooot.nap511.ui.theme.Purple80
+import github.zerorooot.nap511.ui.theme.Typography
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,10 +50,15 @@ fun AppTopBarNormal(title: String, onClick: (name: String) -> Unit) {
         title = {
             Text(text = title)
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ),
         navigationIcon = {
             TopAppBarActionButton(
-                imageVector = Icons.Rounded.ArrowBack,
+                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                 description = "navigationIcon"
             ) {
                 onClick.invoke("back")
@@ -81,7 +86,12 @@ fun AppTopBarMultiple(title: String, onClick: (String) -> Unit) {
         title = {
             Text(text = title)
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ),
         navigationIcon = {
             IconButton(onClick = { onClick.invoke("back") }) {
                 Icon(
@@ -154,7 +164,12 @@ fun AppTopBarOfflineFile(title: String, onClick: (name: String) -> Unit) {
         title = {
             Text(text = title)
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ),
         navigationIcon = {
             TopAppBarActionButton(
                 imageVector = Icons.Rounded.Menu,
@@ -179,7 +194,12 @@ fun AppTopBarLogScreen(title: String, onClick: (name: String) -> Unit) {
         title = {
             Text(text = title)
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ),
         navigationIcon = {
             TopAppBarActionButton(
                 imageVector = Icons.Rounded.Menu,
@@ -203,7 +223,12 @@ fun AppTopBarRepeatFile(title: String, onClick: (name: String) -> Unit) {
         title = {
             Text(text = title)
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ),
         navigationIcon = {
             TopAppBarActionButton(
                 imageVector = Icons.Rounded.Menu,
@@ -227,7 +252,12 @@ fun AppTopBarRecycle(title: String, onClick: (name: String) -> Unit) {
         title = {
             Text(text = title)
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80),
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ),
         navigationIcon = {
             TopAppBarActionButton(
                 imageVector = Icons.Rounded.Menu,
@@ -319,7 +349,12 @@ fun TopAppBarTxtReaderNormal(
                 Icon(Icons.Default.Settings, contentDescription = "阅读设置")
             }
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80)
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        )
     )
 }
 
@@ -381,7 +416,12 @@ fun TopAppBarTxtReaderSearch(
                 Icon(Icons.Default.KeyboardArrowDown, contentDescription = "下一个")
             }
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = Purple80)
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        )
     )
 }
 

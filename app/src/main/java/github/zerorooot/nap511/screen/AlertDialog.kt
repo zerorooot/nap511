@@ -1039,7 +1039,7 @@ private fun RadioButtonDialog(
                         },
 
                         contentDescription = null,
-                        tint = Color.Magenta
+                        tint = MaterialTheme.colorScheme.primary
                     )
                     Text(
                         text = item, modifier = Modifier.fillMaxWidth()
@@ -1240,7 +1240,7 @@ private fun SelectTorrentFileDialog(
                                 Icons.Outlined.CheckBoxOutlineBlank
                             },
                             contentDescription = null,
-                            tint = Color.Magenta
+                            tint = MaterialTheme.colorScheme.primary
                         )
                         DynamicEllipsizedTextView(
                             text = item.path,

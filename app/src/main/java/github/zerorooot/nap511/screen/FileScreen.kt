@@ -53,6 +53,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -72,7 +73,6 @@ import github.zerorooot.nap511.bean.ForceOpenType
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.screenitem.FileCellItem
-import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
@@ -582,7 +582,7 @@ private fun FileListContent(
                 LazyColumnScrollbar(
                     state = listState,
                     settings = ScrollbarSettings.Default.copy(
-                        thumbUnselectedColor = Purple80
+                        thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
                     )
                 ) {
                     LazyColumn(

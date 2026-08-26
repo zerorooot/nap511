@@ -14,6 +14,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -33,7 +34,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat.getSystemService
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.screenitem.OfflineCellItem
-import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
@@ -214,7 +214,7 @@ fun OfflineFileScreen(
                     LazyColumnScrollbar(
                         state = listState,
                         settings = ScrollbarSettings.Default.copy(
-                            thumbUnselectedColor = Purple80
+                            thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
                         )
                     ) {
                         LazyColumn(

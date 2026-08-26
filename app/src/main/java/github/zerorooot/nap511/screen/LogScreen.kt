@@ -41,7 +41,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import kotlinx.coroutines.CoroutineScope
@@ -198,7 +197,7 @@ fun LogScreen(onClick: () -> Unit) {
             LazyColumnScrollbar(
                 state = lazyListState,
                 settings = ScrollbarSettings.Default.copy(
-                    thumbUnselectedColor = Purple80
+                    thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
                 )
             ) {
                 LazyColumn(

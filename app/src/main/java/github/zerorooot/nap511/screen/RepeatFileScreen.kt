@@ -44,7 +44,6 @@ import androidx.compose.ui.unit.dp
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.CategoryDetailResponse
 import github.zerorooot.nap511.screenitem.RepeatFileCardItem
-import github.zerorooot.nap511.ui.theme.Purple80
 import github.zerorooot.nap511.viewmodel.RepeatFileViewModel
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
@@ -147,7 +146,7 @@ fun RepeatFileScreen(
             } else {
                 LazyColumnScrollbar(
                     state = listState, settings = ScrollbarSettings.Default.copy(
-                        thumbUnselectedColor = Purple80
+                        thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
                     )
                 ) {
                     LazyColumn(
