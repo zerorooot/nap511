@@ -16,6 +16,7 @@ data class SettingUiState(
     @SerializedName(ConfigKeyUtil.POSITION_AFTER_AT) val positionAfterAt: Boolean = false,
     @SerializedName(ConfigKeyUtil.FORCE_LOAD_CACHE) val forceLoadCache: Boolean = false,
     @SerializedName(ConfigKeyUtil.VIDEO_LINK_MODE) val videoLinkMode: Boolean = false,
+    @SerializedName(ConfigKeyUtil.DYNAMIC_COLOR) val dynamicColorEnabled: Boolean = true,
     @SerializedName(ConfigKeyUtil.TORRENT_SORT) val torrentSort: Boolean = false,
     @SerializedName(ConfigKeyUtil.LOG) val logEnabled: Boolean = false,
     @SerializedName(ConfigKeyUtil.CURRENT_OFFLINE_TASK) val currentOfflineTask: String = "",

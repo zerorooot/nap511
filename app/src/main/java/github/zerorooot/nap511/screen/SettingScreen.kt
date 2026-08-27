@@ -338,6 +338,14 @@ fun SettingContent(
                 }
                 item {
                     SwitchPreferenceItem(
+                        title = "动态配色",
+                        summary = "根据系统壁纸自动衍生应用配色（仅支持 Android 12+）",
+                        checked = uiState.dynamicColorEnabled,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.DYNAMIC_COLOR, it) }
+                    )
+                }
+                item {
+                    SwitchPreferenceItem(
                         title = "重命名自动定位光标",
                         summary = "重命名文件时，输入光标自动定位至 '@' 或 '空格' 字符后",
                         checked = uiState.positionAfterAt,

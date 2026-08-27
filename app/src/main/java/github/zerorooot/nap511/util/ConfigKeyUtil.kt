@@ -138,6 +138,11 @@ class ConfigKeyUtil {
          */
         const val FLOATING_ACTION_BUTTON_POSITION = "floatingActionButtonPosition"
 
+        /**
+         * 动态配色
+         */
+        const val DYNAMIC_COLOR = "dynamicColor"
+
 
         /**
          * 登录

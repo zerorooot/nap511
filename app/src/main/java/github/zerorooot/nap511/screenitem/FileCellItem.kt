@@ -88,7 +88,7 @@ fun FileCellItem(
                 .padding(4.dp, 4.dp)
                 .height(80.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if ((clickIndex == index) && !fileBean.isSelect) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent
+                containerColor = if ((clickIndex == index) && !fileBean.isSelect) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent
             ),
         ) {
             Row(
