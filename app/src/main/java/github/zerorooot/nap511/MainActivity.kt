@@ -107,14 +107,13 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("CoroutineCreationDuringComposition")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        initializeViewTreeOwners()
         enableEdgeToEdge()
         setContent {
             val dynamicColor by DataStoreUtil.getDataFlow(ConfigKeyUtil.DYNAMIC_COLOR, true)
                 .collectAsStateWithLifecycle(initialValue = true)
             val themeMode by DataStoreUtil.getDataFlow(ConfigKeyUtil.THEME_MODE, "跟随系统")
                 .collectAsStateWithLifecycle(initialValue = "跟随系统")
-            val cookie by DataStoreUtil.getDataFlow(ConfigKeyUtil.COOKIE, "")
-                .collectAsStateWithLifecycle(initialValue = "")
 
             val darkTheme = when (themeMode) {
                 "亮色模式" -> false
@@ -150,6 +149,7 @@ class MainActivity : AppCompatActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
+                    val cookie = remember { DataStoreUtil.getData(ConfigKeyUtil.COOKIE, "") }
                     if (cookie == "") {
                         Login()
                     } else {
