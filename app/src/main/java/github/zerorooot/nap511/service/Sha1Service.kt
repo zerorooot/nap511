@@ -108,7 +108,7 @@ class Sha1Service : Service() {
         val headersJsonObject = JsonObject()
         headersJsonObject.addProperty(
             "header",
-            "User-Agent:Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/23.9.3.6"
+            ConfigKeyUtil.USER_AGENT
         )
         paramsJsonArray.add(headersJsonObject)
 

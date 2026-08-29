@@ -53,4 +53,9 @@
         <item>End</item>
         <item>EndOverlay</item>
     </array>
+    <array name="themeMode">
+        <item>跟随系统</item>
+        <item>亮色模式</item>
+        <item>暗色模式</item>
+    </array>
 </resources>

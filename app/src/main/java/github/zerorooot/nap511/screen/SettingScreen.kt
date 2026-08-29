@@ -114,16 +114,17 @@ fun SettingContent(
 ) {
     val listState = rememberLazyListState()
     val fabArray = stringArrayResource(R.array.floatingActionButtonPosition)
+    val themeArray = stringArrayResource(R.array.themeMode)
 
     Column {
         TopAppBar(
             title = { Text(text = "高级设置") },
             colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        ),
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ),
             navigationIcon = {
                 TopAppBarActionButton(
                     imageVector = Icons.Rounded.Menu,
@@ -331,6 +332,20 @@ fun SettingContent(
                         onValueSave = {
                             onSaveConfig(
                                 ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION,
+                                it
+                            )
+                        }
+                    )
+                }
+                item {
+                    ListPreferenceItem(
+                        title = "主题颜色模式",
+                        value = uiState.themeMode,
+                        entries = themeArray,
+                        entryValues = themeArray,
+                        onValueSave = {
+                            onSaveConfig(
+                                ConfigKeyUtil.THEME_MODE,
                                 it
                             )
                         }

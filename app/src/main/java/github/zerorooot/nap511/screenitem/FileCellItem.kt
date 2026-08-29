@@ -60,7 +60,7 @@ fun FileCellItem(
     onRename: ((Int) -> Unit)? = null,
     onFileInfo: ((Int) -> Unit)? = null,
     onAria2Download: ((Int) -> Unit)? = null,
-    onForceOpen:((Int) -> Unit)? = null,
+    onForceOpen: ((Int) -> Unit)? = null,
 ) {
     val image = fileBean.fileIco
     val name = fileBean.name
@@ -88,7 +88,7 @@ fun FileCellItem(
                 .padding(4.dp, 4.dp)
                 .height(80.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if ((clickIndex == index) && !fileBean.isSelect) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent
+                containerColor = if ((clickIndex == index) && !fileBean.isSelect) MaterialTheme.colorScheme.surfaceContainerLow else Color.Transparent
             ),
         ) {
             Row(

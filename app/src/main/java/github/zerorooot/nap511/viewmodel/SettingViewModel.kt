@@ -45,9 +45,10 @@ class SettingViewModel : ViewModel() {
         DataStoreUtil.getDataFlow(ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION, "End"),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200"),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.MOVE_FAIL_FILE, ""),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.MAX_TXT_SIZE, "200")
-    ) { fabPos, limit, moveFail, txtSize ->
-        PrefGroup(fabPos, limit, moveFail, txtSize)
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.MAX_TXT_SIZE, "200"),
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.THEME_MODE, "跟随系统")
+    ) { fabPos, limit, moveFail, txtSize, themeMode ->
+        PrefGroup(fabPos, limit, moveFail, txtSize, themeMode)
     }
 
     // 4. 开关配置分组 Flow (Part 1)
@@ -92,6 +93,7 @@ class SettingViewModel : ViewModel() {
             requestLimitCount = uiPref.limit,
             moveFailFile = uiPref.moveFail,
             txtSize = uiPref.txtSize,
+            themeMode = uiPref.themeMode,
             // 开关
             autoRotateEnabled = s1.autoRotate,
             hideLoadingView = s1.hideLoading,
@@ -205,6 +207,7 @@ class SettingViewModel : ViewModel() {
         val limit: String,
         val moveFail: String,
         val txtSize: String,
+        val themeMode: String
     )
 
 

@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -109,14 +110,46 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContent {
             val dynamicColor by DataStoreUtil.getDataFlow(ConfigKeyUtil.DYNAMIC_COLOR, true)
-                .collectAsStateWithLifecycle(initialValue = false)
+                .collectAsStateWithLifecycle(initialValue = true)
+            val themeMode by DataStoreUtil.getDataFlow(ConfigKeyUtil.THEME_MODE, "跟随系统")
+                .collectAsStateWithLifecycle(initialValue = "跟随系统")
+            val cookie by DataStoreUtil.getDataFlow(ConfigKeyUtil.COOKIE, "")
+                .collectAsStateWithLifecycle(initialValue = "")
 
-            Nap511Theme(dynamicColor = dynamicColor) {
+            val darkTheme = when (themeMode) {
+                "亮色模式" -> false
+                "暗色模式" -> true
+                else -> androidx.compose.foundation.isSystemInDarkTheme()
+            }
+
+            // 实时更新状态栏和导航栏颜色，确保主题切换立即生效
+            DisposableEffect(darkTheme) {
+                enableEdgeToEdge(
+                    statusBarStyle = if (darkTheme) {
+                        SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                    } else {
+                        SystemBarStyle.light(
+                            android.graphics.Color.TRANSPARENT,
+                            android.graphics.Color.TRANSPARENT
+                        )
+                    },
+                    navigationBarStyle = if (darkTheme) {
+                        SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                    } else {
+                        SystemBarStyle.light(
+                            android.graphics.Color.TRANSPARENT,
+                            android.graphics.Color.TRANSPARENT
+                        )
+                    }
+                )
+                onDispose {}
+            }
+
+            Nap511Theme(dynamicColor = dynamicColor, darkTheme = darkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    val cookie = remember { DataStoreUtil.getData(ConfigKeyUtil.COOKIE, "") }
                     if (cookie == "") {
                         Login()
                     } else {

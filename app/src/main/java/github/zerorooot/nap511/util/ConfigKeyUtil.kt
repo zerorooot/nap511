@@ -143,6 +143,11 @@ class ConfigKeyUtil {
          */
         const val DYNAMIC_COLOR = "dynamicColor"
 
+        /**
+         * 主题色模式：跟随系统、亮色模式、暗色模式
+         */
+        const val THEME_MODE = "themeMode"
+
 
         /**
          * 登录
