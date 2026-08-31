@@ -5,19 +5,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.OfflineInfo
 import github.zerorooot.nap511.bean.OfflineListCount
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.OfflineTaskType
 import github.zerorooot.nap511.bean.QuotaBean
-import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.DialogEvent
 import github.zerorooot.nap511.util.DialogEventBus
+import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -92,7 +91,7 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
     fun refresh() {
         viewModelScope.launch {
             _isRefreshing.value = true
-            try {
+            runCatching {
                 val uid = App.uid
                 val sign = fileRepository.getOfflineSign().sign
 
@@ -115,11 +114,8 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
                 updateTasksState(downloadingRes, failedRes, completedRes)
 
                 _offlineInfo.value = infoRes
-            } catch (e: Exception) {
-                XLog.e("刷新离线任务列表失败", e)
-            } finally {
-                _isRefreshing.value = false
-            }
+            }.onFailureToastAndLog(tag = "OfflineFileViewModel", customMsg = "刷新离线任务列表失败")
+            _isRefreshing.value = false
         }
     }
 
@@ -175,7 +171,7 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
 
         _isRefreshing.value = true
         viewModelScope.launch {
-            try {
+            runCatching {
                 val uid = App.uid
                 val sign = fileRepository.getOfflineSign().sign
                 val nextPage = currentPage + 1
@@ -186,11 +182,8 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
                     // 5. 追加新数据并更新页码
                     applyTaskResult(type, res)
                 }
-            } catch (e: Exception) {
-                XLog.e("加载下一页失败", e)
-            } finally {
-                _isRefreshing.value = false
-            }
+            }.onFailureToastAndLog(tag = "OfflineFileViewModel", customMsg = "加载下一页失败")
+            _isRefreshing.value = false
         }
     }
 
@@ -253,39 +246,51 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
 
     fun clearFinish() {
         viewModelScope.launch {
-            val clearFinish = fileRepository.clearOfflineFinish()
-            val message = if (clearFinish.state) {
-                refresh()
-                "清除成功"
-            } else {
-                "清除失败，${clearFinish.errorMsg}"
-            }
-            App.instance.toast(message)
+            runCatching {
+                val clearFinish = fileRepository.clearOfflineFinish()
+                if (clearFinish.state) {
+                    refresh()
+                    "清除成功"
+                } else {
+                    "清除失败，${clearFinish.errorMsg}"
+                }
+            }.onSuccess { message ->
+                App.instance.toast(message)
+            }.onFailureToastAndLog(tag = "OfflineFileViewModel")
         }
     }
 
     fun clearError() {
         viewModelScope.launch {
-            val clearError = fileRepository.clearOfflineError()
-            val message = if (clearError.state) {
-                refresh()
-                "清除成功"
-            } else {
-                "清除失败，${clearError.errorMsg}"
-            }
-            App.instance.toast(message)
+            runCatching {
+                val clearError = fileRepository.clearOfflineError()
+                if (clearError.state) {
+                    refresh()
+                    "清除成功"
+                } else {
+                    "清除失败，${clearError.errorMsg}"
+                }
+            }.onSuccess { message ->
+                App.instance.toast(message)
+            }.onFailureToastAndLog(tag = "OfflineFileViewModel")
         }
     }
 
     fun quota() {
         viewModelScope.launch {
-            _quotaBean.value = fileRepository.quota()
+            runCatching {
+                fileRepository.quota()
+            }.onSuccess { quotaData ->
+                _quotaBean.value = quotaData
+            }.onFailureToastAndLog(tag = "OfflineFileViewModel")
         }
     }
 
     fun addTask(list: List<String>, currentCid: String, handle: (Boolean) -> Unit) {
         viewModelScope.launch {
-            fileRepository.addOfflineTask(list, currentCid, handle)
+            runCatching {
+                fileRepository.addOfflineTask(list, currentCid, handle)
+            }.onFailureToastAndLog(tag = "OfflineFileViewModel")
         }
     }
 
@@ -303,18 +308,21 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
 
     fun delete(offlineTask: OfflineTask) {
         viewModelScope.launch {
-            val map = hashMapOf("hash[0]" to offlineTask.infoHash)
-            map["uid"] = DataStoreUtil.getData(ConfigKeyUtil.UID, "")
-            map["sign"] = fileRepository.getOfflineSign().sign
-            map["time"] = (System.currentTimeMillis() / 1000).toString()
-            val deleteTask = fileRepository.deleteOfflineTask(map)
-            val message = if (deleteTask.state) {
-                refresh()
-                "删除成功"
-            } else {
-                "删除失败，${deleteTask.errorMsg}"
-            }
-            App.instance.toast(message)
+            runCatching {
+                val map = hashMapOf("hash[0]" to offlineTask.infoHash)
+                map["uid"] = DataStoreUtil.getData(ConfigKeyUtil.UID, "")
+                map["sign"] = fileRepository.getOfflineSign().sign
+                map["time"] = (System.currentTimeMillis() / 1000).toString()
+                val deleteTask = fileRepository.deleteOfflineTask(map)
+                if (deleteTask.state) {
+                    refresh()
+                    "删除成功"
+                } else {
+                    "删除失败，${deleteTask.errorMsg}"
+                }
+            }.onSuccess { message ->
+                App.instance.toast(message)
+            }.onFailureToastAndLog(tag = "OfflineFileViewModel")
         }
     }
 }

@@ -47,6 +47,7 @@ import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.DialogEvent
 import github.zerorooot.nap511.util.DialogEventBus
 import github.zerorooot.nap511.util.FileCacheManager
+import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.worker.OfflineTaskWorker
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
@@ -115,20 +116,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         activeDialog = FileDialogState.None
     }
 
-    // 定义全局异常处理器处理，防止
-    val exceptionHandler = CoroutineExceptionHandler { coroutineContext, throwable ->
-        when (throwable) {
-            is retrofit2.HttpException -> {
-                App.instance.toast("HTTP请求错误: ${throwable.code()}，请重试")
-                setRefreshingStatus(false)
-            }
-
-            else -> {
-                App.instance.toast("错误: ${throwable.message}")
-                setRefreshingStatus(false)
-            }
-        }
-    }
 
     init {
         viewModelScope.launch {
@@ -269,10 +256,12 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
             if (fileListCache.containsKey(cid)) {
                 return@launch
             }
-            val files =
-                fileRepository.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
-            files.fileBeanList = formatFileBeanList(files.fileBeanList)
-            fileListCache[cid] = files
+            runCatching {
+                val files =
+                    fileRepository.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
+                files.fileBeanList = formatFileBeanList(files.fileBeanList)
+                fileListCache[cid] = files
+            }.onFailureToastAndLog(tag = "FileViewModel")
         }
     }
 
@@ -333,13 +322,13 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
      */
     fun getRemainingSpace() {
         viewModelScope.launch {
-            val gson = fileRepository.remainingSpace()
-            if (!gson.get("state").asBoolean) {
-                //{"state":false,"error":"登录超时，请重新登录。","errNo":990001,"request":"/files/index_info?count_space_nums=1"}
-                return@launch
-            }
-            val spaceInfoJson = gson.getAsJsonObject("data").get("space_info")
-            remainingSpace = Gson().fromJson(spaceInfoJson, RemainingSpaceBean::class.java)
+            runCatching {
+                val gson = fileRepository.remainingSpace()
+                if (gson.get("state").asBoolean) {
+                    val spaceInfoJson = gson.getAsJsonObject("data").get("space_info")
+                    remainingSpace = Gson().fromJson(spaceInfoJson, RemainingSpaceBean::class.java)
+                }
+            }.onFailureToastAndLog(tag = "FileViewModel")
         }
     }
 
@@ -365,7 +354,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                 if (cid != "0" && files.cid == "0") {
                     App.instance.toast("当前文件夹被删除！")
                 }
-
                 files.fileBeanList = formatFileBeanList(files.fileBeanList)
                 // 3. 网络请求成功后写入缓存
                 setFiles(files)
@@ -382,13 +370,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     }
 
     fun order() {
-        /**
-         *
-        user_order:file_size
-        file_id:2573609193685653011
-        user_asc:1
-        fc_mix:0
-         */
         val map = mapOf(
             "user_order" to orderBean.type,
             "user_asc" to orderBean.asc.toString(),
@@ -396,13 +377,14 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
             "fc_mix" to "0"
         )
         viewModelScope.launch {
-            val order = fileRepository.order(map)
-            if (order.state) {
-                refresh(currentCid)
-            } else {
-                App.instance.toast("排序失败")
-            }
-
+            runCatching {
+                val order = fileRepository.order(map)
+                if (order.state) {
+                    refresh(currentCid)
+                } else {
+                    App.instance.toast("排序失败")
+                }
+            }.onFailureToastAndLog(tag = "FileViewModel")
         }
     }
 
@@ -494,11 +476,13 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         _isRefreshing.value = true
         viewModelScope.launch {
             isSearchState = true
-            val files = fileRepository.search(currentCid, searchKey)
-            files.fileBeanList = formatFileBeanList(files.fileBeanList)
-            fileBeanList.clear()
-            fileBeanList.addAll(files.fileBeanList)
-            appBarTitle = "搜索 - $searchKey"
+            runCatching {
+                val files = fileRepository.search(currentCid, searchKey)
+                files.fileBeanList = formatFileBeanList(files.fileBeanList)
+                fileBeanList.clear()
+                fileBeanList.addAll(files.fileBeanList)
+                appBarTitle = "搜索 - $searchKey"
+            }.onFailureToastAndLog(tag = "FileViewModel")
             _isRefreshing.value = false
         }
     }
@@ -507,11 +491,13 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         _isRefreshing.value = true
         viewModelScope.launch {
             isSearchState = true
-            val files = fileRepository.filterFile(currentCid, type)
-            files.fileBeanList = formatFileBeanList(files.fileBeanList)
-            fileBeanList.clear()
-            fileBeanList.addAll(files.fileBeanList)
-            appBarTitle = "过滤 - $name"
+            runCatching {
+                val files = fileRepository.filterFile(currentCid, type)
+                files.fileBeanList = formatFileBeanList(files.fileBeanList)
+                fileBeanList.clear()
+                fileBeanList.addAll(files.fileBeanList)
+                appBarTitle = "过滤 - $name"
+            }.onFailureToastAndLog(tag = "FileViewModel")
             _isRefreshing.value = false
         }
     }

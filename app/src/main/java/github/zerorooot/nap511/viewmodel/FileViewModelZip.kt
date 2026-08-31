@@ -15,6 +15,7 @@ import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.worker.UnzipAllFileWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -28,44 +29,49 @@ internal fun FileViewModel.getZipListFile(
 ) {
     viewModelScope.launch {
         val fileBean = fileBeanList[selectIndex]
-//        if (isCheck && !isOpenUnzipDialog && paths == "文件") {
         if (isCheck && paths == "文件") {
-            // 首次打开，调用重构后的状态检查方法
-            when (val status = fileRepository.checkZipStatus(fileBean.pickCode)) {
-                is ZipStatus.Encrypted -> {
-                    XLog.d("${fileBean.name} 是加密压缩包，拦截流程并弹窗")
-                    openUnzipPasswordDialog()
-                    setRefreshingStatus(false)
-                    return@launch // 拦截，等待用户输入密码
-                }
+            var isInterrupted = false
+            runCatching {
+                fileRepository.checkZipStatus(fileBean.pickCode)
+            }.onSuccess { status ->
+                when (status) {
+                    is ZipStatus.Encrypted -> {
+                        XLog.d("${fileBean.name} 是加密压缩包，拦截流程并弹窗")
+                        openUnzipPasswordDialog()
+                        setRefreshingStatus(false)
+                        isInterrupted = true
+                    }
 
-                is ZipStatus.UnsupportedOrError -> {
-                    XLog.w("业务不支持或发生错误: ${status.message}")
-                    // 【核心优化】在这里消费错误，比如弹一个 Toast 提示用户，并终止后续流程
-                    App.instance.toast(status.message)
-                    setRefreshingStatus(false)
-                    return@launch // 拦截，不再继续请求文件列表，避免无意义的崩溃或空白页
-                }
+                    is ZipStatus.UnsupportedOrError -> {
+                        XLog.w("业务不支持或发生错误: ${status.message}")
+                        App.instance.toast(status.message)
+                        setRefreshingStatus(false)
+                        isInterrupted = true
+                    }
 
-                is ZipStatus.Normal -> {
-                    // 正常未加密包，不做任何拦截，继续向下执行
-                    XLog.d("${fileBean.name} 为普通压缩包，准备直接打开")
-                }
+                    is ZipStatus.Normal -> {
+                        XLog.d("${fileBean.name} 为普通压缩包，准备直接打开")
+                    }
 
-                is ZipStatus.Loading -> {
-                    val message = "正在进行云解压，请稍等...(${status.progress}%)"
-                    XLog.d("${fileBean.name} 要云解压，$message")
-                    App.instance.toast(message)
-                    setRefreshingStatus(false)
-                    return@launch
+                    is ZipStatus.Loading -> {
+                        val message = "正在进行云解压，请稍等...(${status.progress}%)"
+                        XLog.d("${fileBean.name} 要云解压，$message")
+                        App.instance.toast(message)
+                        setRefreshingStatus(false)
+                        isInterrupted = true
+                    }
                 }
+            }.onFailureToastAndLog(tag = "FileViewModelZip")
 
-            }
+            if (isInterrupted) return@launch
         }
 
-        // 只有 ZipStatus.Normal 或者已经处理完流程时，才会走到这里
-        unzipBeanList.value = fileRepository.getZipListFile(fileBean.pickCode, fileName, paths)
-        openUnzipDialog()
+        runCatching {
+            fileRepository.getZipListFile(fileBean.pickCode, fileName, paths)
+        }.onSuccess { zipList ->
+            unzipBeanList.value = zipList
+            openUnzipDialog()
+        }.onFailureToastAndLog(tag = "FileViewModelZip")
     }
 }
 
@@ -144,21 +150,18 @@ internal fun FileViewModel.decryptZip(secret: String) {
         val fileBean = fileBeanList[selectIndex]
         val pickCode = fileBean.pickCode
         closeUnzipPasswordDialog()
-        val decryptZip = fileRepository.decryptZip(pickCode, secret)
-        if (!decryptZip) {
-            App.instance.toast("密码错误～")
-            return@launch
-        }
+        runCatching {
+            val decryptZip = fileRepository.decryptZip(pickCode, secret)
+            if (!decryptZip) {
+                App.instance.toast("密码错误～")
+                return@launch
+            }
 
-        //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
-        if (fileRepository.tryToExtract(pickCode)) {
-            //当云解压未完成，加密压缩包随便输入一个密码，会返回1,tryToExtract返回了true,但不代表密码正确。
-            //官网会显示服务器解压中，并继续get push_extract（fileService.getDecryptZipProcess）然后一段时间会返回
-            // {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":6,"progress":88}}}
-            //重新进入输入密码循环中
-            getZipListFile(isCheck = true)
-        } else {
-            App.instance.toast("服务器解压中～")
-        }
+            if (fileRepository.tryToExtract(pickCode)) {
+                getZipListFile(isCheck = true)
+            } else {
+                App.instance.toast("服务器解压中～")
+            }
+        }.onFailureToastAndLog(tag = "FileViewModelZip")
     }
 }

@@ -14,21 +14,30 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
 
+import java.util.concurrent.TimeUnit
+
 interface RepeatService {
     companion object {
         private var repeatService: RepeatService? = null
         fun getInstance(cookie: String): RepeatService {
             if (repeatService == null) {
+                val okHttpClient = OkHttpClient().newBuilder()
+                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .readTimeout(30, TimeUnit.SECONDS)
+                    .writeTimeout(30, TimeUnit.SECONDS)
+                    .retryOnConnectionFailure(true)
+                    .addInterceptor(Interceptor { chain ->
+                        chain.proceed(
+                            chain.request().newBuilder().addHeader("Cookie", cookie).build()
+                        )
+                    })
+                    .build()
+
                 repeatService = Retrofit
                     .Builder()
                     .baseUrl("https://aps.115.com/repeat/")
                     .addConverterFactory(GsonConverterFactory.create())
-                    //add cookie
-                    .client(OkHttpClient().newBuilder().addInterceptor(Interceptor { chain ->
-                        chain.proceed(
-                            chain.request().newBuilder().addHeader("Cookie", cookie).build()
-                        );
-                    }).build())
+                    .client(okHttpClient)
                     .build()
                     .create(RepeatService::class.java)
             }

@@ -17,22 +17,31 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
 
+import java.util.concurrent.TimeUnit
+
 interface OfflineService {
     companion object {
         private var offlineService: OfflineService? = null
         fun getInstance(cookie: String): OfflineService {
             if (offlineService == null) {
+                val okHttpClient = OkHttpClient().newBuilder()
+                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .readTimeout(30, TimeUnit.SECONDS)
+                    .writeTimeout(30, TimeUnit.SECONDS)
+                    .retryOnConnectionFailure(true)
+                    .addInterceptor(Interceptor { chain ->
+                        chain.proceed(
+                            chain.request().newBuilder().addHeader("Cookie", cookie).build()
+                        )
+                    })
+                    .build()
+
                 offlineService = Retrofit
                     .Builder()
                     .baseUrl("https://115.com")
                     .addConverterFactory(GsonConverterFactory.create())
 //                    .addConverterFactory(FileBeanConverterFactory.create())
-                    //add cookie
-                    .client(OkHttpClient().newBuilder().addInterceptor(Interceptor { chain ->
-                        chain.proceed(
-                            chain.request().newBuilder().addHeader("Cookie", cookie).build()
-                        );
-                    }).build())
+                    .client(okHttpClient)
                     .build()
                     .create(OfflineService::class.java)
             }

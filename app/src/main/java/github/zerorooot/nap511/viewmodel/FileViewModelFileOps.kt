@@ -7,6 +7,7 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.RenameBean
 import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -48,25 +49,27 @@ internal fun FileViewModel.removeFile() {
         return
     }
 
-    viewModelScope.launch(exceptionHandler) {
-        val move = fileRepository.removeFile(tempCid, cutFileList)
-        val message = if (move.state) {
-            cutFileList = cutFileList.map { it.copy(isSelect = false) }
-            //移除之前目录下剪切的文件
-            fileListCache[cid]?.fileBeanList?.removeAll(cutFileList.toSet())
-            //移除被剪切文件夹的缓存，防止路径未更改
-            cutFileList.forEach { i ->
-                if (i.isFolder) {
-                    fileListCache.remove(i.categoryId)
+    viewModelScope.launch {
+        runCatching {
+            val move = fileRepository.removeFile(tempCid, cutFileList)
+            if (move.state) {
+                cutFileList = cutFileList.map { it.copy(isSelect = false) }
+                //移除之前目录下剪切的文件
+                fileListCache[cid]?.fileBeanList?.removeAll(cutFileList.toSet())
+                //移除被剪切文件夹的缓存，防止路径未更改
+                cutFileList.forEach { i ->
+                    if (i.isFolder) {
+                        fileListCache.remove(i.categoryId)
+                    }
                 }
+                refresh(tempCid)
+                "移动${cutFileList.size}个文件成功"
+            } else {
+                "移动失败~"
             }
-
-            refresh(tempCid)
-            "移动${cutFileList.size}个文件成功"
-        } else {
-            "移动失败~"
-        }
-        App.instance.toast(message)
+        }.onSuccess { message ->
+            App.instance.toast(message)
+        }.onFailureToastAndLog(tag = "FileViewModel")
     }
 }
 
@@ -74,34 +77,39 @@ internal fun FileViewModel.createFolder(folderName: String) {
     viewModelScope.launch {
         //提前保存cid,防止进入其他文件夹后刷新当前目录
         val cid = currentCid
-        val createFolder = fileRepository.createFolder(cid, folderName)
-        val message = if (createFolder.state) {
-            refresh(cid)
-            "创建文件夹 $folderName 成功"
-        } else {
-            "创建失败，${createFolder.error}"
-        }
-        App.instance.toast(message)
+        runCatching {
+            val createFolder = fileRepository.createFolder(cid, folderName)
+            if (createFolder.state) {
+                refresh(cid)
+                "创建文件夹 $folderName 成功"
+            } else {
+                "创建失败，${createFolder.error}"
+            }
+        }.onSuccess { message ->
+            App.instance.toast(message)
+        }.onFailureToastAndLog(tag = "FileViewModel")
     }
 }
 
 internal fun FileViewModel.getFileInfo(index: Int) {
     viewModelScope.launch {
         _isRefreshing.value = true
-        val fileBean = fileBeanList[index]
-        fileInfo = if (fileBean.isFolder) {
-            fileRepository.getFileInfo(fileBean.categoryId)
-        } else {
-            fileRepository.getFileInfo(fileBean.fileId)
-        }
+        runCatching {
+            val fileBean = fileBeanList[index]
+            fileInfo = if (fileBean.isFolder) {
+                fileRepository.getFileInfo(fileBean.categoryId)
+            } else {
+                fileRepository.getFileInfo(fileBean.fileId)
+            }
+            openFileInfoDialog()
+        }.onFailureToastAndLog(tag = "FileViewModel")
         _isRefreshing.value = false
-        openFileInfoDialog()
     }
 }
 
 internal fun FileViewModel.delete(index: Int) {
     val fileBean = fileBeanList[index]
-    viewModelScope.launch(exceptionHandler) {
+    viewModelScope.launch {
         val beforeList = fileBeanList
         val beforeFileListCache = fileListCache[currentCid]
         val beforeClickMap = clickMap.getOrDefault(currentCid, 0)
@@ -125,23 +133,25 @@ internal fun FileViewModel.delete(index: Int) {
         val fid = fileBean.fileId
         val pid = currentCid
 
-        val delete = fileRepository.delete(pid, fid)
-
-        val message = if (delete.state) {
-            "删除 ${fileBean.name} 成功"
-        } else {
-            fileBeanList = beforeList
-            fileListCache[currentCid] = beforeFileListCache!!
-            clickMap[currentCid] = beforeClickMap
-            imageBeanCache[currentCid] = beforeImageBeanCache
-            "删除 ${fileBean.name} 失败~${delete.errorMsg}"
-        }
-        App.instance.toast(message)
+        runCatching {
+            val delete = fileRepository.delete(pid, fid)
+            if (delete.state) {
+                "删除 ${fileBean.name} 成功"
+            } else {
+                fileBeanList = beforeList
+                fileListCache[currentCid] = beforeFileListCache!!
+                clickMap[currentCid] = beforeClickMap
+                imageBeanCache[currentCid] = beforeImageBeanCache
+                "删除 ${fileBean.name} 失败~${delete.errorMsg}"
+            }
+        }.onSuccess { message ->
+            App.instance.toast(message)
+        }.onFailureToastAndLog(tag = "FileViewModel")
     }
 }
 
 internal fun FileViewModel.rename(name: String) {
-    viewModelScope.launch(exceptionHandler) {
+    viewModelScope.launch {
         val cid = currentCid
         val fileBean = fileBeanList[selectIndex]
         val beforeList = fileBeanList
@@ -150,20 +160,24 @@ internal fun FileViewModel.rename(name: String) {
         fileBeanList[selectIndex] = fileBean.copy(name = name)
         fileListCache[cid]!!.fileBeanList[selectIndex] = fileBean.copy(name = name)
         fileListCache[fileBean.categoryId]?.let { it.path.last().name = name }
-        val rename = fileRepository.rename(RenameBean(fileBean.fileId, name).toRequestBody())
-        val message = if (rename.state) {
-            "重命名成功"
-        } else {
-            fileBeanList = beforeList
-            fileListCache[cid] = beforeFileListCache!!
-            "重命名失败"
-        }
-        App.instance.toast(message)
+
+        runCatching {
+            val rename = fileRepository.rename(RenameBean(fileBean.fileId, name).toRequestBody())
+            if (rename.state) {
+                "重命名成功"
+            } else {
+                fileBeanList = beforeList
+                fileListCache[cid] = beforeFileListCache!!
+                "重命名失败"
+            }
+        }.onSuccess { message ->
+            App.instance.toast(message)
+        }.onFailureToastAndLog(tag = "FileViewModel")
     }
 }
 
 internal fun FileViewModel.deleteMultiple() {
-    viewModelScope.launch(exceptionHandler) {
+    viewModelScope.launch {
         val cid = currentCid
         val beforeList = fileBeanList
         val beforeFileListCache = fileListCache[cid]
@@ -192,16 +206,19 @@ internal fun FileViewModel.deleteMultiple() {
 
         recoverFromLongPress()
 
-        val deleteMultiple = fileRepository.deleteMultiple(mapOf)
-        val message = if (deleteMultiple.state) {
-            "成功删除 ${filter.size} 个文件"
-        } else {
-            fileBeanList = beforeList
-            fileListCache[cid] = beforeFileListCache!!
-            clickMap[cid] = beforeClickMap
-            "删除 ${filter.size} 个文件失败~"
-        }
-        App.instance.toast(message)
+        runCatching {
+            val deleteMultiple = fileRepository.deleteMultiple(mapOf)
+            if (deleteMultiple.state) {
+                "成功删除 ${filter.size} 个文件"
+            } else {
+                fileBeanList = beforeList
+                fileListCache[cid] = beforeFileListCache!!
+                clickMap[cid] = beforeClickMap
+                "删除 ${filter.size} 个文件失败~"
+            }
+        }.onSuccess { message ->
+            App.instance.toast(message)
+        }.onFailureToastAndLog(tag = "FileViewModel")
     }
 }
 

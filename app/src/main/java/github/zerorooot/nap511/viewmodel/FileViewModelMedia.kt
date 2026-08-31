@@ -12,6 +12,7 @@ import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -29,17 +30,18 @@ internal fun FileViewModel.getImage(fileBeanList: List<FileBean>, indexOf: Int) 
         return
     }
 
-    //获取当前点击的
-    viewModelScope.launch(exceptionHandler) {
-        val imageBean = fileRepository.image(
-            fileBeanList[indexOf].pickCode, System.currentTimeMillis() / 1000
-        ).imageBean
+    viewModelScope.launch {
+        runCatching {
+            val imageBean = fileRepository.image(
+                fileBeanList[indexOf].pickCode, System.currentTimeMillis() / 1000
+            ).imageBean
 
-        val oldMap = imageBeanCache[currentCid] ?: hashMapOf()
-        val newMap = HashMap(oldMap)
-        newMap[indexOf] = imageBean
+            val oldMap = imageBeanCache[currentCid] ?: hashMapOf()
+            val newMap = HashMap(oldMap)
+            newMap[indexOf] = imageBean
 
-        imageBeanCache[currentCid] = newMap
+            imageBeanCache[currentCid] = newMap
+        }.onFailureToastAndLog(tag = "FileViewModelMedia")
     }
 }
 
@@ -49,7 +51,7 @@ internal fun FileViewModel.updateVideoFileBean(
     duration: Int,
     pickCode: String
 ) {
-    viewModelScope.launch(exceptionHandler) {
+    viewModelScope.launch {
         val fileBean = fileBeanList[index]
 
         if (fileBean.isVideo != 1) return@launch
@@ -79,35 +81,39 @@ internal fun FileViewModel.updateVideoFileBean(
             "category" to "1",
             "format" to "json"
         )
-        val videoHistory = fileRepository.videoHistory(map)
-        XLog.d("更新视频时间 $videoHistory")
+        runCatching {
+            val videoHistory = fileRepository.videoHistory(map)
+            XLog.d("更新视频时间 $videoHistory")
+        }.onFailureToastAndLog(tag = "FileViewModelMedia")
     }
 }
 
 internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int, fileName: String) {
-    viewModelScope.launch(exceptionHandler) {
+    viewModelScope.launch {
         val isAutoRotate = DataStoreUtil.getDataSuspend(ConfigKeyUtil.AUTO_ROTATE, false)
         val videoLinkMode = DataStoreUtil.getDataSuspend(ConfigKeyUtil.VIDEO_LINK_MODE, false)
 
-        val video = if (videoLinkMode) {
-            fileRepository.video(pickCode).copy(index = fileBeanIndex, isAutoRotate = isAutoRotate)
-        } else {
-            val (width, height) = if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
-                1080 to 1920
+        runCatching {
+            val video = if (videoLinkMode) {
+                fileRepository.video(pickCode).copy(index = fileBeanIndex, isAutoRotate = isAutoRotate)
             } else {
-                1920 to 1080
+                val (width, height) = if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
+                    1080 to 1920
+                } else {
+                    1920 to 1080
+                }
+                VideoInfoBean(
+                    width = width,
+                    height = height,
+                    index = fileBeanIndex,
+                    fileName = fileName,
+                    pickCode = pickCode,
+                    videoUrl = "http://115.com/api/video/m3u8/${pickCode}.m3u8"
+                )
             }
-            VideoInfoBean(
-                width = width,
-                height = height,
-                index = fileBeanIndex,
-                fileName = fileName,
-                pickCode = pickCode,
-                videoUrl = "http://115.com/api/video/m3u8/${pickCode}.m3u8"
-            )
-        }
-        XLog.d("FileViewModel getVideoInfo $video")
-        _launchVideoEvent.emit(video)
+            XLog.d("FileViewModel getVideoInfo $video")
+            _launchVideoEvent.emit(video)
+        }.onFailureToastAndLog(tag = "FileViewModelMedia")
         setRefreshingStatus(false)
     }
 }
@@ -116,19 +122,25 @@ internal fun FileViewModel.downloadText(fileBean: FileBean, onNav: (Route) -> Un
     viewModelScope.launch(Dispatchers.IO) {
         var bytes = textFileCache[fileBean]
         if (bytes == null) {
-            val downloadInputStream =
-                fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
-            if (downloadInputStream == null) {
-                setRefreshingStatus(false)
-                App.instance.toast("文本加载失败！")
-                return@launch
-            }
-            bytes = downloadInputStream.readBytes()
-            textFileCache[fileBean] = bytes
+            runCatching {
+                val downloadInputStream =
+                    fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
+                if (downloadInputStream == null) {
+                    setRefreshingStatus(false)
+                    App.instance.toast("文本加载失败！")
+                    return@launch
+                }
+                bytes = downloadInputStream.readBytes()
+                textFileCache[fileBean] = bytes
+            }.onFailureToastAndLog(tag = "FileViewModelMedia")
         }
-        textBodyByteArray = bytes
-        setRefreshingStatus(false)
-        onNav.invoke(Route.TxtReader)
+        if (bytes != null) {
+            textBodyByteArray = bytes
+            setRefreshingStatus(false)
+            onNav.invoke(Route.TxtReader)
+        } else {
+            setRefreshingStatus(false)
+        }
     }
 }
 
