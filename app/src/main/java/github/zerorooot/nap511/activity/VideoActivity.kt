@@ -312,7 +312,7 @@ class VideoActivity : AppCompatActivity() {
     private fun back(nav: String = "", toast: String = "", resultCode: Int = RESULT_OK) {
         val currentDuration = (videoPlayer.currentPositionWhenPlaying / 1000).toInt()
         val fileBeanIndex = intent.getIntExtra("fileBeanIndex", -1)
-// 1. 创建一个新的 Intent 用来装载要返回的数据
+        // 1. 创建一个新的 Intent 用来装载要返回的数据
         val returnIntent = Intent().apply {
             putExtra("current_time", currentDuration)
             putExtra("fileBeanIndex", fileBeanIndex)

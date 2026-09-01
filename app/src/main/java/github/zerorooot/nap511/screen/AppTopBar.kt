@@ -20,7 +20,6 @@ import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Translate
-import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -209,6 +208,12 @@ fun AppTopBarLogScreen(title: String, onClick: (name: String) -> Unit) {
             }
         },
         actions = {
+            TopAppBarActionButton(
+                imageVector = Icons.Default.Search,
+                description = "搜索"
+            ) {
+                onClick.invoke("搜索")
+            }
             LogScreenTopBarDropdownMenu(onClick = { itemValue, _ ->
                 onClick.invoke(itemValue)
             })
@@ -360,7 +365,7 @@ fun TopAppBarTxtReaderNormal(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TopAppBarTxtReaderSearch(
+fun TopAppBarSearch(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onCloseSearch: () -> Unit,
@@ -369,6 +374,7 @@ fun TopAppBarTxtReaderSearch(
     onPrevMatch: () -> Unit,
     onNextMatch: () -> Unit,
     modifier: Modifier = Modifier,
+    placeholderText: String = "搜索...",
     focusRequester: FocusRequester
 ) {
     TopAppBar(
@@ -377,7 +383,7 @@ fun TopAppBarTxtReaderSearch(
             TextField(
                 value = searchQuery,
                 onValueChange = onSearchQueryChange,
-                placeholder = { Text("搜索文本...") },
+                placeholder = { Text(placeholderText) },
                 singleLine = true,
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
@@ -422,6 +428,33 @@ fun TopAppBarTxtReaderSearch(
             navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
         )
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TopAppBarTxtReaderSearch(
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    onCloseSearch: () -> Unit,
+    matchCount: Int,
+    currentMatchIndex: Int,
+    onPrevMatch: () -> Unit,
+    onNextMatch: () -> Unit,
+    modifier: Modifier = Modifier,
+    focusRequester: FocusRequester
+) {
+    TopAppBarSearch(
+        searchQuery = searchQuery,
+        onSearchQueryChange = onSearchQueryChange,
+        onCloseSearch = onCloseSearch,
+        matchCount = matchCount,
+        currentMatchIndex = currentMatchIndex,
+        onPrevMatch = onPrevMatch,
+        onNextMatch = onNextMatch,
+        modifier = modifier,
+        placeholderText = "搜索文本...",
+        focusRequester = focusRequester
     )
 }
 

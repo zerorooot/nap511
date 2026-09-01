@@ -5,6 +5,7 @@ import android.content.ContentValues
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,9 +18,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -28,13 +28,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -87,6 +92,16 @@ data class LogEntry(
     val message: String = raw
 )
 
+/**
+ * 搜索匹配项位置信息
+ */
+data class LogSearchMatch(
+    val globalIndex: Int,
+    val logIndex: Int,
+    val startCharInRaw: Int,
+    val length: Int
+)
+
 // ==================== 解析器 ====================
 object LogParser {
     // 匹配类似: 2026-08-02 13:31:24.732 27099-27134 XLOG github.zerorooot.nap511 D save file list cache 69
@@ -125,12 +140,61 @@ fun LogScreen(onClick: () -> Unit) {
     val parsedLogs by remember(rawLogText) { derivedStateOf { LogParser.parse(rawLogText) } }
 
     val lazyListState = rememberLazyListState()
-//    val horizontalScrollState = rememberScrollState()
     val coroutine = rememberCoroutineScope()
     val formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd/HH/mm/ss")
 
-    val appBarOnClick = { name: String ->
+    // --- 搜索相关状态 ---
+    var isSearchOpen by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var currentMatchIndex by remember { mutableIntStateOf(0) }
+    val focusRequester = remember { FocusRequester() }
+
+    // 打开搜索栏时自动获取焦点唤起键盘
+    LaunchedEffect(isSearchOpen) {
+        if (isSearchOpen) {
+            focusRequester.requestFocus()
+        }
+    }
+
+    // 计算所有匹配项的位置列表
+    val searchMatches = remember(parsedLogs, searchQuery) {
+        if (searchQuery.isBlank()) emptyList()
+        else {
+            val list = mutableListOf<LogSearchMatch>()
+            var globalIdx = 0
+            parsedLogs.forEachIndexed { lIdx, logEntry ->
+                val text = logEntry.raw
+                var startIndex = 0
+                while (startIndex < text.length) {
+                    val foundIndex = text.indexOf(searchQuery, startIndex, ignoreCase = true)
+                    if (foundIndex == -1) break
+                    list.add(LogSearchMatch(globalIdx++, lIdx, foundIndex, searchQuery.length))
+                    startIndex = foundIndex + searchQuery.length
+                }
+            }
+            list
+        }
+    }
+
+    // 搜索匹配项改变时重置当前焦点索引
+    LaunchedEffect(searchMatches) {
+        currentMatchIndex = 0
+    }
+
+    // 当选中的匹配项切换时，自动滚动 LazyColumn 到对应日志
+    LaunchedEffect(currentMatchIndex, searchMatches) {
+        if (searchMatches.isNotEmpty() && currentMatchIndex in searchMatches.indices) {
+            val targetMatch = searchMatches[currentMatchIndex]
+            lazyListState.animateScrollToItem(targetMatch.logIndex)
+        }
+    }
+
+    val appBarOnClick: (String) -> Unit = { name ->
         when (name) {
+            "搜索" -> {
+                isSearchOpen = true
+            }
+
             "滚动顶部" -> {
                 coroutine.launch {
                     if (parsedLogs.isNotEmpty()) lazyListState.animateScrollToItem(0)
@@ -176,7 +240,34 @@ fun LogScreen(onClick: () -> Unit) {
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        AppTopBarLogScreen(ConfigKeyUtil.LOG_SCREEN, appBarOnClick as (String) -> Unit)
+        if (isSearchOpen) {
+            TopAppBarSearch(
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it },
+                onCloseSearch = {
+                    isSearchOpen = false
+                    searchQuery = ""
+                },
+                matchCount = searchMatches.size,
+                currentMatchIndex = currentMatchIndex,
+                onPrevMatch = {
+                    if (searchMatches.isNotEmpty()) {
+                        currentMatchIndex =
+                            if (currentMatchIndex > 0) currentMatchIndex - 1 else searchMatches.lastIndex
+                    }
+                },
+                onNextMatch = {
+                    if (searchMatches.isNotEmpty()) {
+                        currentMatchIndex =
+                            if (currentMatchIndex < searchMatches.lastIndex) currentMatchIndex + 1 else 0
+                    }
+                },
+                placeholderText = "搜索日志...",
+                focusRequester = focusRequester
+            )
+        } else {
+            AppTopBarLogScreen(ConfigKeyUtil.LOG_SCREEN, appBarOnClick)
+        }
 
         if (parsedLogs.isEmpty()) {
             Box(
@@ -190,10 +281,6 @@ fun LogScreen(onClick: () -> Unit) {
                 )
             }
         } else {
-            // Box(
-            //                modifier = Modifier
-            //                    .fillMaxSize()
-            //                    .horizontalScroll(horizontalScrollState)
             LazyColumnScrollbar(
                 state = lazyListState,
                 settings = ScrollbarSettings.Default.copy(
@@ -206,17 +293,23 @@ fun LogScreen(onClick: () -> Unit) {
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    items(parsedLogs) { item ->
-                        LogItemRow(logEntry = item)
+                    itemsIndexed(parsedLogs) { index, item ->
+                        LogItemRow(
+                            logEntry = item,
+                            logIndex = index,
+                            searchQuery = searchQuery,
+                            searchMatches = searchMatches,
+                            currentMatchIndex = currentMatchIndex
+                        )
                     }
                 }
             }
         }
     }
 
-    // 首次进入自动滚动至底部
+    // 首次进入自动滚动至底部（仅在非搜索模式下）
     LaunchedEffect(parsedLogs.size) {
-        if (parsedLogs.isNotEmpty()) {
+        if (parsedLogs.isNotEmpty() && !isSearchOpen) {
             lazyListState.scrollToItem(parsedLogs.lastIndex)
         }
     }
@@ -224,10 +317,103 @@ fun LogScreen(onClick: () -> Unit) {
 
 // ==================== 单条日志渲染组件 ====================
 @Composable
-fun LogItemRow(logEntry: LogEntry) {
+fun LogItemRow(
+    logEntry: LogEntry,
+    logIndex: Int = 0,
+    searchQuery: String = "",
+    searchMatches: List<LogSearchMatch> = emptyList(),
+    currentMatchIndex: Int = 0
+) {
+    val matchesForThisLog = remember(searchMatches, logIndex) {
+        if (searchQuery.isBlank()) emptyList() else searchMatches.filter { it.logIndex == logIndex }
+    }
+    val isActiveLogEntry = remember(searchMatches, currentMatchIndex, logIndex) {
+        if (searchQuery.isBlank()) false else searchMatches.getOrNull(currentMatchIndex)?.logIndex == logIndex
+    }
+
+    val annotatedTimestamp = remember(logEntry.timestamp, logEntry.raw, searchQuery, matchesForThisLog, currentMatchIndex) {
+        if (searchQuery.isBlank() || logEntry.timestamp.isEmpty()) {
+            AnnotatedString(logEntry.timestamp)
+        } else {
+            val ts = logEntry.timestamp
+            val tsStartInRaw = logEntry.raw.indexOf(ts)
+            buildAnnotatedString {
+                append(ts)
+                if (tsStartInRaw != -1) {
+                    matchesForThisLog.forEach { match ->
+                        val startInTs = match.startCharInRaw - tsStartInRaw
+                        val endInTs = startInTs + match.length
+                        if (startInTs >= 0 && endInTs <= ts.length) {
+                            val isActive = (match.globalIndex == currentMatchIndex)
+                            addStyle(
+                                style = SpanStyle(
+                                    background = if (isActive) Color(0xFFFF9800) else Color(0xFFFFE082),
+                                    color = Color.Black
+                                ),
+                                start = startInTs,
+                                end = endInTs
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    val annotatedMessage = remember(logEntry.message, logEntry.raw, searchQuery, matchesForThisLog, currentMatchIndex) {
+        if (searchQuery.isBlank() || logEntry.message.isEmpty()) {
+            AnnotatedString(logEntry.message)
+        } else {
+            val msg = logEntry.message
+            val msgStartInRaw = if (logEntry.timestamp.isEmpty()) 0 else logEntry.raw.lastIndexOf(msg)
+            buildAnnotatedString {
+                append(msg)
+                if (msgStartInRaw != -1) {
+                    matchesForThisLog.forEach { match ->
+                        val startInMsg = match.startCharInRaw - msgStartInRaw
+                        val endInMsg = startInMsg + match.length
+                        if (startInMsg >= 0 && endInMsg <= msg.length) {
+                            val isActive = (match.globalIndex == currentMatchIndex)
+                            addStyle(
+                                style = SpanStyle(
+                                    background = if (isActive) Color(0xFFFF9800) else Color(0xFFFFE082),
+                                    color = Color.Black
+                                ),
+                                start = startInMsg,
+                                end = endInMsg
+                            )
+                        }
+                    }
+                } else {
+                    var startIndex = 0
+                    while (startIndex < msg.length) {
+                        val foundIndex = msg.indexOf(searchQuery, startIndex, ignoreCase = true)
+                        if (foundIndex == -1) break
+                        addStyle(
+                            style = SpanStyle(
+                                background = Color(0xFFFFE082),
+                                color = Color.Black
+                            ),
+                            start = foundIndex,
+                            end = foundIndex + searchQuery.length
+                        )
+                        startIndex = foundIndex + searchQuery.length
+                    }
+                }
+            }
+        }
+    }
+
     Surface(
         shape = RoundedCornerShape(6.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        color = if (isActiveLogEntry) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+        },
+        border = if (isActiveLogEntry) {
+            BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+        } else null,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -237,7 +423,7 @@ fun LogItemRow(logEntry: LogEntry) {
             if (logEntry.timestamp.isNotEmpty()) {
                 // 时间戳
                 Text(
-                    text = logEntry.timestamp,
+                    text = annotatedTimestamp,
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
@@ -268,7 +454,7 @@ fun LogItemRow(logEntry: LogEntry) {
 
             // 日志消息主体
             Text(
-                text = logEntry.message,
+                text = annotatedMessage,
                 fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace,
                 lineHeight = 17.sp,
