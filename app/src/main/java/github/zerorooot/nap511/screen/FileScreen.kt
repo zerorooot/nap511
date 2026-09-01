@@ -17,9 +17,13 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -39,6 +43,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -53,7 +58,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -70,6 +74,7 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ForceOpenType
+import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.screenitem.FileCellItem
@@ -97,6 +102,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
+import kotlin.text.ifEmpty
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(
@@ -416,7 +422,7 @@ fun FileScreen(
         }
 
         FilePathBar(
-            path = path,
+            pathList = fileViewModel.pathList,
             onPathClick = {
                 clipboardManager.nativeClipboardManager.setPrimaryClip(
                     ClipData.newPlainText(
@@ -430,6 +436,9 @@ fun FileScreen(
             onPathLongClick = {
                 DataStoreUtil.putData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, fileViewModel.currentCid)
                 App.instance.toast("已设置默认离线位置")
+            },
+            onItemClick = {
+                fileViewModel.getFiles(it)
             }
         )
 
@@ -487,10 +496,11 @@ fun FileScreen(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FilePathBar(
-    path: String,
+    pathList: List<PathBean>,
     onPathClick: () -> Unit,
     onPathDoubleClick: () -> Unit,
-    onPathLongClick: () -> Unit
+    onPathLongClick: () -> Unit,
+    onItemClick: (String) -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -501,10 +511,30 @@ private fun FilePathBar(
                 onLongClick = onPathLongClick
             )
     ) {
-        MiddleEllipsisText(
-            text = path,
-            modifier = Modifier.padding(8.dp, 4.dp)
-        )
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.Center
+        ) {
+            pathList.forEachIndexed { index, path ->
+                MiddleEllipsisText(
+                    text = path.name.ifEmpty { "根目录" },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .padding(4.dp, 4.dp)
+                        .clickable { onItemClick(path.cid) }
+                )
+                // 间隔符
+                if (index < pathList.size - 1) {
+                    MiddleEllipsisText(
+                        text = "/",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(0.dp, 4.dp)
+                    )
+                }
+            }
+        }
     }
 }
 

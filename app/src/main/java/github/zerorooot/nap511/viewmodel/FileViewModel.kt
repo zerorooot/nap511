@@ -85,7 +85,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
             saveRequestCache
         )
     }
-    private var pathList = emptyList<PathBean>()
+    var pathList: List<PathBean> = mutableStateListOf()
 
     internal var cutFileList = emptyList<FileBean>()
 
@@ -543,6 +543,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
 
         currentCid = files.cid
         count = files.count
+
         pathList = files.path
 
         _currentPath.value = "/" + pathList.joinToString("/") { it.name }
