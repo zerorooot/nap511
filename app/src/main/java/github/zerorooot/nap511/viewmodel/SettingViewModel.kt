@@ -196,6 +196,38 @@ class SettingViewModel : ViewModel() {
         }
     }
 
+    /**
+     * 恢复默认设置（保留登录凭证 UID、Cookie、头像信息）
+     */
+    fun resetConfig(
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val currentUid = DataStoreUtil.getDataSuspend(ConfigKeyUtil.UID, "0")
+                val currentCookie = DataStoreUtil.getDataSuspend(ConfigKeyUtil.COOKIE, "")
+                val currentAvatar = DataStoreUtil.getDataSuspend(ConfigKeyUtil.AVATAR_BEAN, "")
+
+                DataStoreUtil.clearData()
+
+                if (currentUid != "0") {
+                    DataStoreUtil.putDataSuspend(ConfigKeyUtil.UID, currentUid)
+                }
+                if (currentCookie.isNotEmpty()) {
+                    DataStoreUtil.putDataSuspend(ConfigKeyUtil.COOKIE, currentCookie)
+                }
+                if (currentAvatar.isNotEmpty()) {
+                    DataStoreUtil.putDataSuspend(ConfigKeyUtil.AVATAR_BEAN, currentAvatar)
+                }
+
+                withContext(Dispatchers.Main) { onSuccess() }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { onError(e.localizedMessage ?: "恢复默认设置失败") }
+            }
+        }
+    }
+
     // 内部聚合数据结构辅助类
     private data class Aria2Group(
         val url: String,

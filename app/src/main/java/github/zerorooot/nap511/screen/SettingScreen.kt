@@ -9,9 +9,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -77,6 +79,35 @@ fun SettingScreen(
             )
         }
     }
+
+    var showResetDialog by remember { mutableStateOf(false) }
+
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text("恢复默认设置") },
+            text = { Text("确定要将所有设置恢复为默认状态吗？（账号登录信息将被保留）") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showResetDialog = false
+                        viewModel.resetConfig(
+                            onSuccess = { App.instance.toast("已恢复默认设置！") },
+                            onError = { err -> App.instance.toast("恢复失败: $err") }
+                        )
+                    }
+                ) {
+                    Text("确定")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
     SettingContent(
         uiState = uiState,
         onSaveConfig = { key, value -> viewModel.saveData(key, value) },
@@ -90,6 +121,9 @@ fun SettingScreen(
         },
         onImportConfig = {
             importLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+        },
+        onResetConfig = {
+            showResetDialog = true
         },
         onRestartApp = {
             if (lastClick) { // 连点会被忽略
@@ -110,6 +144,7 @@ fun SettingContent(
     onActionClick: (String) -> Unit,
     onExportConfig: () -> Unit,      // 导出回调
     onImportConfig: () -> Unit,      // 导入回调
+    onResetConfig: () -> Unit,       // 恢复默认设置回调
     onRestartApp: () -> Unit
 ) {
     val listState = rememberLazyListState()
@@ -399,6 +434,13 @@ fun SettingContent(
                         title = "导入配置",
                         summary = "从 JSON 配置文件恢复应用设置并重启应用",
                         onClick = onImportConfig
+                    )
+                }
+                item {
+                    PreferenceItem(
+                        title = "恢复默认设置",
+                        summary = "将所有应用设置恢复为默认状态",
+                        onClick = onResetConfig
                     )
                 }
                 item {
