@@ -170,13 +170,14 @@ fun FileScreen(
     val videoActivityLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
+        val data = result.data
         if (result.resultCode == Activity.RESULT_OK) {
-            val data = result.data
             val index = data?.getIntExtra("fileBeanIndex", -1) ?: -1
             val duration = data?.getIntExtra("current_time", 0) ?: 0
             val pickCode = data?.getStringExtra("pickCode") ?: "0"
             fileViewModel.updateVideoFileBean(fileViewModel.currentCid, index, duration, pickCode)
-
+        }
+        if (result.resultCode == Activity.RESULT_CANCELED) {
             val nav = data?.getStringExtra("nav") ?: ""
             if (nav == "VerifyVideoAccount") {
                 onNav.invoke(Route.VerifyVideoAccount)
