@@ -49,7 +49,6 @@ import github.zerorooot.nap511.util.DialogEventBus
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.worker.OfflineTaskWorker
-import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -358,8 +357,11 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                 // 3. 网络请求成功后写入缓存
                 setFiles(files)
             } catch (_: NullPointerException) {
-                fileListCache.clearAll()
                 App.instance.toast("获取文件列表失败，建议更新您的Cookie")
+
+                fileListCache.clearAll()
+                DataStoreUtil.putDataSuspend(ConfigKeyUtil.COOKIE, "")
+                DataStoreUtil.putDataSuspend(ConfigKeyUtil.UID, "")
             } catch (e: Exception) {
                 e.printStackTrace()
                 App.instance.toast("${e.message}，请重试～")

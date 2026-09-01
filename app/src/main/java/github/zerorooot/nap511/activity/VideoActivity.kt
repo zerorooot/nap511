@@ -57,7 +57,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MediaSource
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
-import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import com.shuyu.gsyvideoplayer.GSYVideoManager
 import com.shuyu.gsyvideoplayer.listener.GSYSampleCallBack
@@ -99,7 +98,7 @@ class HandledVideoException(message: String) : IOException(message)
  * @param onErrorCallback 当状态码非 2xx 时触发回调：(url, httpCode, responseBody)
  */
 class VideoErrorInterceptor(
-    private val onErrorCallback: ((url: String, contentType: MediaType, errorBody: String) -> Unit)? = null
+    private val onErrorCallback: ((url: String, contentType: MediaType, errorBody: String) -> Boolean)
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
@@ -121,10 +120,10 @@ class VideoErrorInterceptor(
                 ""
             }
             // 回调业务层通知（比如提取 JSON 里的 code 和 msg）
-            onErrorCallback?.invoke(url, contentType, errorBody)
-
-            // 这会让 ExoPlayer 在 open() 阶段直接捕获网络源头错误，阻止其继续尝试解码 JSON/HTML
-            throw HandledVideoException("Invalid video Content-Type: '$contentType', Error Body: $errorBody")
+            if (onErrorCallback.invoke(url, contentType, errorBody)) {
+                // 这会让 ExoPlayer 在 open() 阶段直接捕获网络源头错误，阻止其继续尝试解码 JSON/HTML
+                throw HandledVideoException("Invalid video Content-Type: '$contentType', Error Body: $errorBody")
+            }
         }
 
         return response
@@ -262,7 +261,7 @@ class VideoActivity : AppCompatActivity() {
     }
 
 
-    private fun back(nav: String = "", toast: String = "") {
+    private fun back(nav: String = "", toast: String = "", resultCode: Int = RESULT_OK) {
         val currentDuration = (videoPlayer.currentPositionWhenPlaying / 1000).toInt()
         val fileBeanIndex = intent.getIntExtra("fileBeanIndex", -1)
 // 1. 创建一个新的 Intent 用来装载要返回的数据
@@ -274,8 +273,7 @@ class VideoActivity : AppCompatActivity() {
             putExtra("toast", toast)
         }
         // 2. 设置结果码为 RESULT_OK，并传入 Intent
-        setResult(RESULT_OK, returnIntent)
-
+        setResult(resultCode, returnIntent)
         //释放所有
         videoPlayer.setVideoAllCallBack(null);
         finish()
@@ -369,29 +367,33 @@ class VideoActivity : AppCompatActivity() {
         val customOkHttpClient = OkHttpClient.Builder()
             .addInterceptor(VideoErrorInterceptor { url, contentType, errorBody ->
                 XLog.d("GSY Player 网络请求失败 [$contentType] -> Body: $errorBody")
-                //"application/null"
-                val subtype = contentType.subtype
-                when (subtype) {
-                    "html" -> {
-                        back(toast = "视频地址错误！请打开\"视频解析模式\"请求正确链接")
-                    }
-
-                    "xml" -> {
-                        val message = parseOssErrorWithDom(errorBody).message
-                        back(toast = message)
-                    }
-
-                    "json" -> {
-                        val fromJson = GsonBuilder().setPrettyPrinting().create()
-                            .fromJson(errorBody, JsonObject::class.java)
-                        if (fromJson.has("error")) {
-                            val message = fromJson.get("error").asString
-                            back(nav = "VerifyVideoAccount", toast = message)
-                        }
-                    }
+                if (errorBody.isEmpty()) {
+                    back(
+                        toast = "视频地址错误！请打开\"视频解析模式\"请求正确链接",
+                        resultCode = RESULT_CANCELED
+                    )
+                    return@VideoErrorInterceptor true
                 }
 
+                runCatching { Gson().fromJson(errorBody, JsonObject::class.java) }
+                    .onSuccess { fromJson ->
+                        if (fromJson.has("error")) {
+                            val message = fromJson.get("error").asString
+                            back(
+                                nav = "VerifyVideoAccount",
+                                toast = message,
+                                resultCode = RESULT_CANCELED
+                            )
+                            return@VideoErrorInterceptor true
+                        }
+                    }
+                runCatching { parseOssErrorWithDom(errorBody).message }
+                    .onSuccess { message ->
+                        back(toast = message, resultCode = RESULT_CANCELED)
+                        return@VideoErrorInterceptor true
+                    }
 
+                return@VideoErrorInterceptor false
             })
             .build()
 
