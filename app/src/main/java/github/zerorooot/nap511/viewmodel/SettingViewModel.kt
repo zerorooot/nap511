@@ -70,7 +70,7 @@ class SettingViewModel : ViewModel() {
         DataStoreUtil.getDataFlow(ConfigKeyUtil.VIDEO_LINK_MODE, false),
         combine(
             DataStoreUtil.getDataFlow(ConfigKeyUtil.DYNAMIC_COLOR, true),
-            DataStoreUtil.getDataFlow(ConfigKeyUtil.AUTO_JUMP_RETRY, false)
+            DataStoreUtil.getDataFlow(ConfigKeyUtil.AUTO_JUMP_RETRY, true)
         ) { dynamicColor, autoJumpRetry -> dynamicColor to autoJumpRetry }
     ) { torrentSort, logEnabled, forceCache, videoLinkMode, (dynamicColor, autoJumpRetry) ->
         SwitchGroup2(torrentSort, logEnabled, forceCache, videoLinkMode, dynamicColor, autoJumpRetry)

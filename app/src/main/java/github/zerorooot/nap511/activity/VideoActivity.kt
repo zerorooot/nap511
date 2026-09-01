@@ -64,8 +64,10 @@ import com.shuyu.gsyvideoplayer.player.PlayerFactory
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.player.MyGSYVideoPlayer
+import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.DataStoreUtil
 import kotlinx.coroutines.launch
 import okhttp3.Interceptor
 import okhttp3.MediaType
@@ -212,6 +214,8 @@ class VideoActivity : AppCompatActivity() {
         CUSTOM_ERROR_CODE_BASE to "发生自定义系统错误"
     )
 
+    @Volatile
+    private var isReloadingVideo = false
     private lateinit var videoPlayer: MyGSYVideoPlayer
     private val videoInfo: VideoInfoBean by lazy {
         Gson().fromJson(
@@ -370,6 +374,14 @@ class VideoActivity : AppCompatActivity() {
             .addInterceptor(VideoErrorInterceptor { url, contentType, errorBody ->
                 XLog.d("GSY Player 网络请求失败 [$contentType] -> Body: $errorBody")
                 if (errorBody.isEmpty()) {
+                    //重新解析并获取正确链接
+                    val videoLinkMode = DataStoreUtil.getData(ConfigKeyUtil.VIDEO_LINK_MODE, false)
+                    val autoJumpRetry = DataStoreUtil.getData(ConfigKeyUtil.AUTO_JUMP_RETRY, false)
+                    if (!videoLinkMode && autoJumpRetry) {
+                        playNewVideo()
+                        return@VideoErrorInterceptor true
+                    }
+
                     back(
                         toast = "视频地址错误！请打开\"视频解析模式\"请求正确链接",
                         resultCode = RESULT_CANCELED
@@ -438,6 +450,23 @@ class VideoActivity : AppCompatActivity() {
                 return null
             }
         })
+    }
+
+    fun playNewVideo() {
+        // 如果已经在重新获取链接中，直接跳过
+        if (isReloadingVideo) return
+        isReloadingVideo = true
+        App.instance.toast("视频地址错误！正在重新获取新链接")
+        lifecycleScope.launch {
+            try {
+                val fileRepository = FileRepository.getInstance(App.cookie)
+                val video = fileRepository.video(videoInfo.pickCode)
+                XLog.d("playNewVideo $video")
+                this@VideoActivity.videoPlayer.playNext(video.downloadUrl, video.fileName)
+            } catch (e: Exception) {
+                isReloadingVideo = false // 异常时重置标志位
+            }
+        }
     }
 
     fun parseOssErrorWithDom(xmlString: String): OssError {
