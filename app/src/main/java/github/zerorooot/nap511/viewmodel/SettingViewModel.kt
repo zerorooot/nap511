@@ -68,9 +68,12 @@ class SettingViewModel : ViewModel() {
         DataStoreUtil.getDataFlow(ConfigKeyUtil.LOG, false),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.FORCE_LOAD_CACHE, false),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.VIDEO_LINK_MODE, false),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.DYNAMIC_COLOR, true)
-    ) { torrentSort, logEnabled, forceCache, videoLinkMode, dynamicColor ->
-        SwitchGroup2(torrentSort, logEnabled, forceCache, videoLinkMode, dynamicColor)
+        combine(
+            DataStoreUtil.getDataFlow(ConfigKeyUtil.DYNAMIC_COLOR, true),
+            DataStoreUtil.getDataFlow(ConfigKeyUtil.AUTO_JUMP_RETRY, false)
+        ) { dynamicColor, autoJumpRetry -> dynamicColor to autoJumpRetry }
+    ) { torrentSort, logEnabled, forceCache, videoLinkMode, (dynamicColor, autoJumpRetry) ->
+        SwitchGroup2(torrentSort, logEnabled, forceCache, videoLinkMode, dynamicColor, autoJumpRetry)
     }
 
     // 统一暴露给 UI 的 StateFlow
@@ -104,7 +107,8 @@ class SettingViewModel : ViewModel() {
             logEnabled = s2.logEnabled,
             forceLoadCache = s2.forceCache,
             videoLinkMode = s2.videoLinkMode,
-            dynamicColorEnabled = s2.dynamicColor
+            dynamicColorEnabled = s2.dynamicColor,
+            autoJumpRetry = s2.autoJumpRetry
         )
     }.stateIn(
         scope = viewModelScope,
@@ -224,6 +228,7 @@ class SettingViewModel : ViewModel() {
         val logEnabled: Boolean,
         val forceCache: Boolean,
         val videoLinkMode: Boolean,
-        val dynamicColor: Boolean
+        val dynamicColor: Boolean,
+        val autoJumpRetry: Boolean
     )
 }

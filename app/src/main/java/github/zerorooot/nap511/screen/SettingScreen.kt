@@ -249,6 +249,15 @@ fun SettingContent(
                 }
                 item {
                     SwitchPreferenceItem(
+                        title = "自动跳转重试",
+                        summary = "未开启“视频解析模式”时生效。若播放提示“视频地址错误”，自动重新解析并获取正确链接",
+                        checked = uiState.autoJumpRetry,
+                        enabled = !uiState.videoLinkMode,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.AUTO_JUMP_RETRY, it) }
+                    )
+                }
+                item {
+                    SwitchPreferenceItem(
                         title = "隐藏加载提示",
                         summary = "视频缓冲加载时隐藏居中的加载动画",
                         checked = uiState.hideLoadingView,

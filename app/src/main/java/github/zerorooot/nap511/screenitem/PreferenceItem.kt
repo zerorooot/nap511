@@ -59,18 +59,36 @@ fun SwitchPreferenceItem(
     title: String,
     summary: String? = null,
     checked: Boolean,
+    enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit
 ) {
+    val disabledAlpha = 0.38f
+    val headlineColor = if (enabled) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = disabledAlpha)
+    }
+    val supportingColor = if (enabled) {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = disabledAlpha)
+    }
+
     ListItem(
         headlineContent = { Text(text = title) },
         supportingContent = summary?.let { { Text(text = it) } },
         trailingContent = {
             Switch(
                 checked = checked,
+                enabled = enabled,
                 onCheckedChange = onCheckedChange
             )
         },
-        modifier = Modifier.clickable { onCheckedChange(!checked) }
+        colors = ListItemDefaults.colors(
+            headlineColor = headlineColor,
+            supportingColor = supportingColor
+        ),
+        modifier = Modifier.clickable(enabled = enabled) { onCheckedChange(!checked) }
     )
 }
 

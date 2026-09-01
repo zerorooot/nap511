@@ -61,6 +61,11 @@ class ConfigKeyUtil {
         const val VIDEO_LINK_MODE = "videoLinkMode"
 
         /**
+         * 当未开启“视频解析模式”且播放视频提示“视频地址错误”时，自动重新解析获取正确链接
+         */
+        const val AUTO_JUMP_RETRY = "autoJumpRetry"
+
+        /**
          * 头像信息bean的json信息,包含头像url、过期时间、用户名、过期时间等
          * @see github.zerorooot.nap511.bean.AvatarBean
          */
