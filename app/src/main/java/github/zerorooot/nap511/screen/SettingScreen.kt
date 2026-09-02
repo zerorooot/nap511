@@ -438,13 +438,6 @@ fun SettingContent(
                 }
                 item {
                     PreferenceItem(
-                        title = "恢复默认设置",
-                        summary = "将所有应用设置恢复为默认状态",
-                        onClick = onResetConfig
-                    )
-                }
-                item {
-                    PreferenceItem(
                         title = "重复文件排查",
                         summary = "扫描并清理网盘中的重复文件",
                         onClick = { onActionClick("RepeatFile") }
@@ -462,6 +455,13 @@ fun SettingContent(
                         title = "磁力链接排错验证",
                         summary = "打开磁力添加失败问题诊断页面",
                         onClick = { onActionClick("VerifyMagnetLinkAccount") }
+                    )
+                }
+                item {
+                    PreferenceItem(
+                        title = "恢复默认设置",
+                        summary = "将所有应用设置恢复为默认状态",
+                        onClick = onResetConfig
                     )
                 }
                 item {

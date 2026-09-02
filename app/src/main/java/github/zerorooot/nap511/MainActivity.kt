@@ -75,6 +75,7 @@ import github.zerorooot.nap511.screen.FileScreen
 import github.zerorooot.nap511.screen.LogScreen
 import github.zerorooot.nap511.screen.LoginCredential
 import github.zerorooot.nap511.screen.LoginScreen
+import github.zerorooot.nap511.screen.LoginScreenAccount
 import github.zerorooot.nap511.screen.MusicDetailScreen
 import github.zerorooot.nap511.screen.MyPhotoScreen
 import github.zerorooot.nap511.screen.OfflineDownloadScreen
@@ -368,7 +369,7 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     composable<Route.Login> {
                         fileViewModel.gesturesEnabled = false
-                        Login()
+                        LoginScreenAccount()
                     }
 
                     composable<Route.MyFile> {
