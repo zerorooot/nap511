@@ -2,6 +2,7 @@ package github.zerorooot.nap511.screen
 
 import android.net.Uri
 import android.view.WindowManager
+import android.view.autofill.AutofillManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -234,6 +235,7 @@ private fun AccountPasswordForm(
     authManager: OneOneFiveAuthManager = remember { OneOneFiveAuthManager() }
 ) {
     val context = LocalContext.current
+    val autofillManager = remember { context.getSystemService(AutofillManager::class.java) }
     val coroutineScope = rememberCoroutineScope()
 
     var username by remember { mutableStateOf("") }
@@ -248,16 +250,12 @@ private fun AccountPasswordForm(
 
     // 图形验证码状态
     var showCaptchaDialog by remember { mutableStateOf(false) }
-    var captchaMessage by remember { mutableStateOf("") }
 
     fun handleLoginResult(res: LoginResult) {
         when (res) {
             is LoginResult.Success -> {
-                Toast.makeText(
-                    context,
-                    "登录成功！UID: ${res.userId}",
-                    Toast.LENGTH_LONG
-                ).show()
+                // 登录成功提交 Autofill，触发系统保存密码弹窗
+                autofillManager?.commit()
                 onLoginSuccess(LoginCredential.Cookie(res.cookies))
             }
 
@@ -268,12 +266,12 @@ private fun AccountPasswordForm(
             }
 
             is LoginResult.NeedCaptcha -> {
-                captchaMessage = res.message
+                App.instance.toast(res.message)
                 showCaptchaDialog = true
             }
 
             is LoginResult.Failure -> {
-                Toast.makeText(context, res.message, Toast.LENGTH_SHORT).show()
+                App.instance.toast(res.message)
             }
         }
     }
@@ -368,18 +366,8 @@ private fun AccountPasswordForm(
                 authManager.sendSms(currentUserId)
             },
             onSubmitCode = { code ->
-                when (val result = authManager.submitTwoFactorCode(currentUserId, code)) {
-                    is LoginResult.Success -> {
-                        showTwoFactorDialog = false
-                        onLoginSuccess(LoginCredential.Cookie(result.cookies))
-                    }
-
-                    is LoginResult.Failure -> {
-                        Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
-                    }
-
-                    else -> {}
-                }
+                val result = authManager.submitTwoFactorCode(currentUserId, code)
+                handleLoginResult(result)
             }
         )
     }
