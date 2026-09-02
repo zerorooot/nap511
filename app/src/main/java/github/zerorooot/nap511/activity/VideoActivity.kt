@@ -372,11 +372,18 @@ class VideoActivity : AppCompatActivity() {
         // 1. 创建包含错误拦截器的 OkHttpClient
         val customOkHttpClient = OkHttpClient.Builder()
             .addInterceptor(VideoErrorInterceptor { url, contentType, errorBody ->
-                XLog.d("GSY Player 网络请求失败 [$contentType] -> Body: $errorBody")
+                XLog.e(
+                    "GSY Player 网络请求 $url 失败: [$contentType] -> Body: ${
+                        errorBody.replace(
+                            "\n",
+                            ""
+                        )
+                    }"
+                )
                 if (errorBody.isEmpty()) {
                     //重新解析并获取正确链接
                     val videoLinkMode = DataStoreUtil.getData(ConfigKeyUtil.VIDEO_LINK_MODE, false)
-                    val autoJumpRetry = DataStoreUtil.getData(ConfigKeyUtil.AUTO_JUMP_RETRY, false)
+                    val autoJumpRetry = DataStoreUtil.getData(ConfigKeyUtil.AUTO_JUMP_RETRY, true)
                     if (!videoLinkMode && autoJumpRetry) {
                         playNewVideo()
                         return@VideoErrorInterceptor true

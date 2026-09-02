@@ -1,22 +1,22 @@
 package github.zerorooot.nap511.screen
 
 import android.app.Application
+import android.content.ClipData
 import android.content.ContentValues
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -37,6 +37,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.nativeClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -86,7 +88,6 @@ enum class LogLevel(
 data class LogEntry(
     val raw: String,
     val timestamp: String = "",
-    val pidTid: String = "",
     val tag: String = "",
     val level: LogLevel = LogLevel.UNKNOWN,
     val message: String = raw
@@ -104,25 +105,25 @@ data class LogSearchMatch(
 
 // ==================== 解析器 ====================
 object LogParser {
-    // 匹配类似: 2026-08-02 13:31:24.732 27099-27134 XLOG github.zerorooot.nap511 D save file list cache 69
-    private val logPattern =
-        Regex("""^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3})\s+(\d+-\d+)\s+(\S+)\s+(\S+)\s+([VDIWE])\s+(.*)$""")
+    // XLog ClassicFlattener 格式: 2026-09-01 16:15:46.776 D/XLOG: message
+    private val xlogPattern =
+        Regex("""^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)\s+([VDIWEFA])/([^:]+):\s*(.*)$""")
+
 
     fun parse(rawLog: String): List<LogEntry> {
         if (rawLog.isBlank()) return emptyList()
         return rawLog.lineSequence()
             .filter { it.isNotBlank() }
             .map { line ->
-                val match = logPattern.find(line.trim())
-                if (match != null) {
-                    val (time, pidTid, _, pkg, levelStr, msg) = match.destructured
-                    // 仅保留时间部分（如 13:31:24.732），精简视图空间
-                    val timeOnly = time.substringAfter(" ")
+                val trimmed = line.trim()
+                val xlogMatch = xlogPattern.find(trimmed)
+                if (xlogMatch != null) {
+                    val (time, levelStr, tagStr, msg) = xlogMatch.destructured
+                    //  val timeOnly = time.substringAfter(" ")
                     LogEntry(
                         raw = line,
-                        timestamp = timeOnly,
-                        pidTid = pidTid,
-                        tag = pkg.substringAfterLast('.'), // 可选：仅显示包名尾缀或全称
+                        timestamp = time,
+                        tag = tagStr,
                         level = LogLevel.fromCode(levelStr),
                         message = msg
                     )
@@ -138,6 +139,7 @@ object LogParser {
 fun LogScreen(onClick: () -> Unit) {
     var rawLogText by remember { mutableStateOf(readLog()) }
     val parsedLogs by remember(rawLogText) { derivedStateOf { LogParser.parse(rawLogText) } }
+    val clipboardManager = LocalClipboard.current
 
     val lazyListState = rememberLazyListState()
     val coroutine = rememberCoroutineScope()
@@ -300,7 +302,15 @@ fun LogScreen(onClick: () -> Unit) {
                             searchQuery = searchQuery,
                             searchMatches = searchMatches,
                             currentMatchIndex = currentMatchIndex
-                        )
+                        ) {
+                            clipboardManager.nativeClipboardManager.setPrimaryClip(
+                                ClipData.newPlainText(
+                                    "logs",
+                                    it.message
+                                )
+                            )
+                            App.instance.toast("日志已复制到剪切板")
+                        }
                     }
                 }
             }
@@ -322,7 +332,8 @@ fun LogItemRow(
     logIndex: Int = 0,
     searchQuery: String = "",
     searchMatches: List<LogSearchMatch> = emptyList(),
-    currentMatchIndex: Int = 0
+    currentMatchIndex: Int = 0,
+    onLongClick: (LogEntry) -> Unit
 ) {
     val matchesForThisLog = remember(searchMatches, logIndex) {
         if (searchQuery.isBlank()) emptyList() else searchMatches.filter { it.logIndex == logIndex }
@@ -331,7 +342,14 @@ fun LogItemRow(
         if (searchQuery.isBlank()) false else searchMatches.getOrNull(currentMatchIndex)?.logIndex == logIndex
     }
 
-    val annotatedTimestamp = remember(logEntry.timestamp, logEntry.raw, searchQuery, matchesForThisLog, currentMatchIndex) {
+
+    val annotatedTimestamp = remember(
+        logEntry.timestamp,
+        logEntry.raw,
+        searchQuery,
+        matchesForThisLog,
+        currentMatchIndex
+    ) {
         if (searchQuery.isBlank() || logEntry.timestamp.isEmpty()) {
             AnnotatedString(logEntry.timestamp)
         } else {
@@ -347,7 +365,9 @@ fun LogItemRow(
                             val isActive = (match.globalIndex == currentMatchIndex)
                             addStyle(
                                 style = SpanStyle(
-                                    background = if (isActive) Color(0xFFFF9800) else Color(0xFFFFE082),
+                                    background = if (isActive) Color(0xFFFF9800) else Color(
+                                        0xFFFFE082
+                                    ),
                                     color = Color.Black
                                 ),
                                 start = startInTs,
@@ -360,12 +380,19 @@ fun LogItemRow(
         }
     }
 
-    val annotatedMessage = remember(logEntry.message, logEntry.raw, searchQuery, matchesForThisLog, currentMatchIndex) {
+    val annotatedMessage = remember(
+        logEntry.message,
+        logEntry.raw,
+        searchQuery,
+        matchesForThisLog,
+        currentMatchIndex
+    ) {
         if (searchQuery.isBlank() || logEntry.message.isEmpty()) {
             AnnotatedString(logEntry.message)
         } else {
             val msg = logEntry.message
-            val msgStartInRaw = if (logEntry.timestamp.isEmpty()) 0 else logEntry.raw.lastIndexOf(msg)
+            val msgStartInRaw =
+                if (logEntry.timestamp.isEmpty()) 0 else logEntry.raw.lastIndexOf(msg)
             buildAnnotatedString {
                 append(msg)
                 if (msgStartInRaw != -1) {
@@ -376,7 +403,9 @@ fun LogItemRow(
                             val isActive = (match.globalIndex == currentMatchIndex)
                             addStyle(
                                 style = SpanStyle(
-                                    background = if (isActive) Color(0xFFFF9800) else Color(0xFFFFE082),
+                                    background = if (isActive) Color(0xFFFF9800) else Color(
+                                        0xFFFFE082
+                                    ),
                                     color = Color.Black
                                 ),
                                 start = startInMsg,
@@ -414,23 +443,17 @@ fun LogItemRow(
         border = if (isActiveLogEntry) {
             BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
         } else null,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = {},
+                onLongClick = { onLongClick.invoke(logEntry) }
+            )
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (logEntry.timestamp.isNotEmpty()) {
-                // 时间戳
-                Text(
-                    text = annotatedTimestamp,
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
+        Column(modifier = Modifier.padding(6.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 // 日志级别 Tag Badge
                 Box(
                     modifier = Modifier
@@ -448,10 +471,25 @@ fun LogItemRow(
                         color = logEntry.level.color
                     )
                 }
-
-                Spacer(modifier = Modifier.width(8.dp))
+                Column(
+                    modifier = Modifier.padding(start = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy((-8).dp) // 通过负间距拉近两个 Text 的距离
+                ) {
+                    Text(
+                        text = logEntry.tag,
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = annotatedTimestamp,
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                    )
+                }
             }
-
             // 日志消息主体
             Text(
                 text = annotatedMessage,
@@ -465,6 +503,7 @@ fun LogItemRow(
                 }
             )
         }
+
     }
 }
 

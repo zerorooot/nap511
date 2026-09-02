@@ -45,6 +45,42 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.properties.Delegates
 
+
+import com.elvishew.xlog.interceptor.Interceptor
+
+class AutoTagInterceptor(
+    private val defaultTag: String = "XLOG",
+    private val maxTagLength: Int = 23
+) : Interceptor {
+    override fun intercept(log: LogItem): LogItem {
+        // 仅当用户未显式调用 XLog.tag("CustomTag") 时，才通过堆栈动态推导
+        if (log.tag == defaultTag) {
+            log.tag = resolveCallerClassName()
+        }
+        return log
+    }
+
+    private fun resolveCallerClassName(): String {
+        val stackTrace = Throwable().stackTrace
+        val caller = stackTrace.firstOrNull { element ->
+            val className = element.className
+            !className.startsWith("com.elvishew.xlog.") &&
+                    !className.startsWith("java.lang.") &&
+                    !className.startsWith("dalvik.system.") &&
+                    !className.contains(AutoTagInterceptor::class.java.simpleName)
+        } ?: return defaultTag
+
+        // 提取简短类名，去除包名前缀及内部类、匿名类的 '$' 符号
+        val simpleName = caller.className.substringAfterLast('.').substringBefore('$')
+        val string = if (simpleName.length > maxTagLength) {
+            simpleName.substring(0, maxTagLength)
+        } else {
+            simpleName
+        }
+        return "$string-$defaultTag"
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 class App : Application(), ImageLoaderFactory {
     private val okHttpClient by lazy { OkHttpClient() }
@@ -85,13 +121,9 @@ class App : Application(), ImageLoaderFactory {
                 override fun reject(log: LogItem?): Boolean {
                     return !DataStoreUtil.getData(ConfigKeyUtil.LOG, true)
                 }
-            }).build()
-        //todo  日志输出代码位置
-        /**
-         *     val stackTrace = Throwable().stackTrace
-         *                     val caller = stackTrace[1] // 获取调用者信息
-         *                     val logTag = "${caller.fileName}:${caller.lineNumber}" // 显示文件名和行号
-         */
+            })
+            .addInterceptor(AutoTagInterceptor())
+            .build()
         val print = FilePrinter
             .Builder(this.cacheDir.absolutePath)
             .cleanStrategy(FileLastModifiedCleanStrategy(7 * 24 * 60 * 60 * 1000))
@@ -99,17 +131,6 @@ class App : Application(), ImageLoaderFactory {
             .build()
         XLog.init(build, AndroidPrinter(true), print);
         XLog.d("-----------------------init-----------------------------------")
-//        val handler = Thread.getDefaultUncaughtExceptionHandler()
-//        Thread.setDefaultUncaughtExceptionHandler { thread, e ->
-//            XLog.enableStackTrace(50).e("程序崩溃退出", e)
-//            handler?.uncaughtException(thread, e)
-//        }
-//
-//        val uncaughtExceptionHandler = Thread.currentThread().uncaughtExceptionHandler
-//        Thread.currentThread().uncaughtExceptionHandler = UncaughtExceptionHandler { t, e ->
-//            XLog.enableStackTrace(50).e("程序崩溃退出", e)
-//            uncaughtExceptionHandler?.uncaughtException(t, e)
-//        }
     }
 
     private val toastScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)

@@ -388,9 +388,6 @@ private fun AccountPasswordForm(
                         captchaSign = sign
                     )
                     isLoading = false
-                    if (res is LoginResult.NeedCaptcha) {
-                        Toast.makeText(context, "验证码错误，请重新输入", Toast.LENGTH_SHORT).show()
-                    }
                     handleLoginResult(res)
                 }
             }
