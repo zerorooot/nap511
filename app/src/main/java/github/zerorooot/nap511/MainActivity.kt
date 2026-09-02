@@ -75,7 +75,6 @@ import github.zerorooot.nap511.screen.FileScreen
 import github.zerorooot.nap511.screen.LogScreen
 import github.zerorooot.nap511.screen.LoginCredential
 import github.zerorooot.nap511.screen.LoginScreen
-import github.zerorooot.nap511.screen.LoginScreenAccount
 import github.zerorooot.nap511.screen.MusicDetailScreen
 import github.zerorooot.nap511.screen.MyPhotoScreen
 import github.zerorooot.nap511.screen.OfflineDownloadScreen
@@ -369,7 +368,7 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     composable<Route.Login> {
                         fileViewModel.gesturesEnabled = false
-                        LoginScreenAccount()
+                        Login()
                     }
 
                     composable<Route.MyFile> {
@@ -567,11 +566,6 @@ class MainActivity : AppCompatActivity() {
         LoginScreen { credential ->
             scope.launch(Dispatchers.IO) {
                 when (credential) {
-                    is LoginCredential.AccountPassword -> {
-                        // 直接读取 credential.username 和 credential.password
-                        App.instance.accountLogin(credential.username, credential.password)
-                    }
-
                     is LoginCredential.Cookie -> {
                         val replace = credential.cookieString.replace(" ", "")
                             .replace("[\r\n]".toRegex(), "")

@@ -2,6 +2,7 @@ package github.zerorooot.nap511.screen
 
 import android.net.Uri
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -11,6 +12,8 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,6 +34,8 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -50,39 +55,44 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.nativeClipboardManager
 import androidx.compose.ui.semantics.contentType
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.LoginResult
+import github.zerorooot.nap511.util.OneOneFiveAuthManager
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 sealed interface LoginCredential {
-    // 1. 账号密码登录
-    data class AccountPassword(
-        val username: String,
-        val password: String
-    ) : LoginCredential
-
     // 2. Cookie 登录 (无论是网页捕获还是手动粘贴)
     data class Cookie(
         val cookieString: String
@@ -167,14 +177,7 @@ fun LoginScreen(
                         label = "form_switch"
                     ) { tab ->
                         when (tab) {
-                            0 -> AccountPasswordForm(onLogin = { u, p ->
-                                onLoginSuccess(
-                                    LoginCredential.AccountPassword(
-                                        username = u,
-                                        password = p
-                                    )
-                                )
-                            })
+                            0 -> AccountPasswordForm(onLoginSuccess = onLoginSuccess)
 
                             1 -> {
                                 WebLoginCardSection {
@@ -223,15 +226,57 @@ fun LoginScreen(
 
 
 // ==========================================
-// 2. 方式一：账号密码表单
+// 2. 方式一：账号密码表单 (使用 OneOneFiveAuthManager)
 // ==========================================
 @Composable
 private fun AccountPasswordForm(
-    onLogin: (username: String, pass: String) -> Unit
+    onLoginSuccess: (credential: LoginCredential) -> Unit,
+    authManager: OneOneFiveAuthManager = remember { OneOneFiveAuthManager() }
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+
+    // 2FA 弹窗状态
+    var showTwoFactorDialog by remember { mutableStateOf(false) }
+    var currentUserId by remember { mutableLongStateOf(0L) }
+    var maskedMobile by remember { mutableStateOf("") }
+
+    // 图形验证码状态
+    var showCaptchaDialog by remember { mutableStateOf(false) }
+    var captchaMessage by remember { mutableStateOf("") }
+
+    fun handleLoginResult(res: LoginResult) {
+        when (res) {
+            is LoginResult.Success -> {
+                Toast.makeText(
+                    context,
+                    "登录成功！UID: ${res.userId}",
+                    Toast.LENGTH_LONG
+                ).show()
+                onLoginSuccess(LoginCredential.Cookie(res.cookies))
+            }
+
+            is LoginResult.NeedTwoFactor -> {
+                currentUserId = res.userId
+                maskedMobile = res.maskedMobile
+                showTwoFactorDialog = true
+            }
+
+            is LoginResult.NeedCaptcha -> {
+                captchaMessage = res.message
+                showCaptchaDialog = true
+            }
+
+            is LoginResult.Failure -> {
+                Toast.makeText(context, res.message, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     Column {
         OutlinedTextField(
@@ -284,14 +329,195 @@ private fun AccountPasswordForm(
         Spacer(modifier = Modifier.height(20.dp))
 
         Button(
-            onClick = { onLogin(username, password) },
-            enabled = username.isNotBlank() && password.isNotBlank(),
+            onClick = {
+                if (username.isBlank() || password.isBlank()) {
+                    Toast.makeText(context, "请输入账号和密码", Toast.LENGTH_SHORT).show()
+                    return@Button
+                }
+                isLoading = true
+                coroutineScope.launch {
+                    val res = authManager.login(username, password)
+                    isLoading = false
+                    handleLoginResult(res)
+                }
+            },
+            enabled = username.isNotBlank() && password.isNotBlank() && !isLoading,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Text("登录")
+            if (isLoading) {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(24.dp)
+                )
+            } else {
+                Text("登录")
+            }
+        }
+    }
+
+    // 2FA / 短信核验弹窗
+    if (showTwoFactorDialog) {
+        TwoFactorVerifyDialog(
+            userId = currentUserId,
+            maskedMobile = maskedMobile,
+            onDismiss = { showTwoFactorDialog = false },
+            onSendSms = {
+                authManager.sendSms(currentUserId)
+            },
+            onSubmitCode = { code ->
+                when (val result = authManager.submitTwoFactorCode(currentUserId, code)) {
+                    is LoginResult.Success -> {
+                        showTwoFactorDialog = false
+                        onLoginSuccess(LoginCredential.Cookie(result.cookies))
+                    }
+
+                    is LoginResult.Failure -> {
+                        Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
+                    }
+
+                    else -> {}
+                }
+            }
+        )
+    }
+
+    // 行为式/图形验证码提示弹窗
+    if (showCaptchaDialog) {
+        CaptchaPromptDialog(
+            authManager = authManager,
+            onDismiss = { showCaptchaDialog = false },
+            onVerifySuccess = { codeString, sign ->
+                showCaptchaDialog = false
+                isLoading = true
+                coroutineScope.launch {
+                    val res = authManager.login(
+                        account = username,
+                        password = password,
+                        captchaCode = codeString,
+                        captchaSign = sign
+                    )
+                    isLoading = false
+                    if (res is LoginResult.NeedCaptcha) {
+                        Toast.makeText(context, "验证码错误，请重新输入", Toast.LENGTH_SHORT).show()
+                    }
+                    handleLoginResult(res)
+                }
+            }
+        )
+    }
+}
+
+/**
+ * 2FA 验证码输入与短信重发组件
+ */
+@Composable
+fun TwoFactorVerifyDialog(
+    userId: Long,
+    maskedMobile: String,
+    onDismiss: () -> Unit,
+    onSendSms: suspend () -> Pair<Boolean, String>,
+    onSubmitCode: suspend (String) -> Unit
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    var verifyCode by remember { mutableStateOf("") }
+    var countdown by remember { mutableIntStateOf(0) }
+    var isSubmitting by remember { mutableStateOf(false) }
+
+    // 倒计时协程
+    LaunchedEffect(countdown) {
+        if (countdown > 0) {
+            delay(1000L.milliseconds)
+            countdown--
+        }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(text = "两步安全验证", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = if (maskedMobile.isNotBlank()) "点击获取验证码。用户 $userId 验证码将发送至: $maskedMobile " else "请输入 6 位短信验证码或 115 动态安全令",
+                    fontSize = 13.sp,
+                    color = Color.Gray
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = verifyCode,
+                        onValueChange = { if (it.length <= 6) verifyCode = it },
+                        label = { Text("6位验证码") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                val (ok, msg) = onSendSms()
+                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                if (ok) countdown = 60
+                            }
+                        },
+                        enabled = countdown == 0,
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) {
+                        Text(if (countdown > 0) "${countdown}s" else "获取验证码", fontSize = 13.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) {
+                        Text("取消")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (verifyCode.length != 6) {
+                                Toast.makeText(
+                                    context,
+                                    "请输入完整的 6 位验证码",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                return@Button
+                            }
+                            isSubmitting = true
+                            coroutineScope.launch {
+                                onSubmitCode(verifyCode)
+                                isSubmitting = false
+                            }
+                        },
+                        enabled = !isSubmitting
+                    ) {
+                        Text("确认验证")
+                    }
+                }
+            }
         }
     }
 }

@@ -358,10 +358,11 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                 setFiles(files)
             } catch (_: NullPointerException) {
                 App.instance.toast("获取文件列表失败，建议更新您的Cookie")
-
                 fileListCache.clearAll()
                 DataStoreUtil.putDataSuspend(ConfigKeyUtil.COOKIE, "")
                 DataStoreUtil.putDataSuspend(ConfigKeyUtil.UID, "")
+
+                _navigationEvent.send(NavEvent.NavigateToScreen(Route.Login))
             } catch (e: Exception) {
                 e.printStackTrace()
                 App.instance.toast("${e.message}，请重试～")

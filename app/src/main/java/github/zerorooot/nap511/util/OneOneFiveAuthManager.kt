@@ -5,6 +5,9 @@ import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import com.elvishew.xlog.XLog
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -20,7 +23,6 @@ import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
-import org.json.JSONObject
 import java.io.IOException
 import java.security.KeyFactory
 import java.security.MessageDigest
@@ -158,12 +160,12 @@ class OneOneFiveAuthManager {
                 .post(formBodyBuilder.build())
             applyBrowserHeaders(request)
             val response = executeRequest(request.build())
-            val json = JSONObject(response)
+            val json = JsonParser.parseString(response).asJsonObject
             val isState = (json.optInt("state", -1) == 1)
             val code = json.optInt("code", json.optInt("errno", 0))
             val message = json.optString("message", json.optString("error", ""))
             if (code == 40101010 || code == 70128) {
-                val dataObj = json.optJSONObject("data") ?: JSONObject()
+                val dataObj = json.optJsonObject("data") ?: JsonObject()
                 return@withContext LoginResult.NeedTwoFactor(
                     userId = dataObj.optLong("user_id", 0L),
                     maskedMobile = dataObj.optString("mobile", ""),
@@ -177,7 +179,7 @@ class OneOneFiveAuthManager {
                 )
             }
             if (isState) {
-                val dataObj = json.optJSONObject("data") ?: JSONObject()
+                val dataObj = json.optJsonObject("data") ?: JsonObject()
                 return@withContext LoginResult.Success(
                     dataObj.optLong("user_id", 0L),
                     exportCookies()
@@ -222,7 +224,7 @@ class OneOneFiveAuthManager {
             // 1. 获取 sign
             val signReq = Request.Builder().url("https://captchaapi.115.com/?ac=code&t=sign").get()
             applyBrowserHeaders(signReq)
-            val signRes = JSONObject(executeRequest(signReq.build()))
+            val signRes = JsonParser.parseString(executeRequest(signReq.build())).asJsonObject
             val sign = signRes.optString("sign", "")
             if (sign.isBlank()) return@withContext null
             // 2. 并行拉取目标大图与 10 个候选字符切片
@@ -300,7 +302,7 @@ class OneOneFiveAuthManager {
             applyBrowserHeaders(request)
 
             val response = executeRequest(request.build())
-            val json = JSONObject(response)
+            val json = JsonParser.parseString(response).asJsonObject
 
             val state = (json.optInt("state", -1) == 1)
             val msg = json.optString("message", json.optString("error", ""))
@@ -335,10 +337,10 @@ class OneOneFiveAuthManager {
                 applyBrowserHeaders(request)
 
                 val response = executeRequest(request.build())
-                val json = JSONObject(response)
+                val json = JsonParser.parseString(response).asJsonObject
 
                 if (json.optInt("state", -1) == 1) {
-                    val data = json.optJSONObject("data") ?: JSONObject()
+                    val data = json.optJsonObject("data") ?: JsonObject()
                     val uid = data.optLong("user_id", userId)
                     return@withContext LoginResult.Success(uid, exportCookies())
                 } else {
@@ -361,9 +363,9 @@ class OneOneFiveAuthManager {
         applyBrowserHeaders(request)
 
         val res = executeRequest(request.build())
-        val json = JSONObject(res)
+        val json = JsonParser.parseString(res).asJsonObject
         return if (json.optInt("state", -1) == 1) {
-            json.optJSONObject("data")?.optString("key")
+            json.optJsonObject("data")?.optString("key")
         } else null
     }
 
@@ -378,7 +380,8 @@ class OneOneFiveAuthManager {
 
                 override fun onResponse(call: Call, response: Response) {
                     response.use {
-                        val bodyString = it.body?.string() ?: ""
+                        val bodyString = it.body.string()
+                        XLog.d("OneOneFiveAuthManager executeRequest [${request.url}] -> $bodyString")
                         if (continuation.isActive) continuation.resume(bodyString)
                     }
                 }
@@ -433,10 +436,58 @@ class OneOneFiveAuthManager {
     }
 
     fun exportCookies(): String {
-        val stringJoiner = StringJoiner(";")
+        val stringJoiner = StringJoiner("; ")
         cookieStore.values.flatten().forEach { cookie ->
-            stringJoiner.add("${cookie.name}:${cookie.value}")
+            stringJoiner.add("${cookie.name}=${cookie.value}")
         }
         return stringJoiner.toString()
     }
+}
+
+// ==========================================
+// Gson 拓展扩展函数 (实现与 JSONObject 兼容的 opt* 方法)
+// ==========================================
+
+private fun JsonObject.optInt(key: String, default: Int = 0): Int {
+    val element = get(key) ?: return default
+    return try {
+        if (element.isJsonPrimitive) {
+            val prim = element.asJsonPrimitive
+            if (prim.isNumber) prim.asInt
+            else if (prim.isBoolean) if (prim.asBoolean) 1 else 0
+            else prim.asString.toIntOrNull() ?: default
+        } else default
+    } catch (e: Exception) {
+        default
+    }
+}
+
+private fun JsonObject.optLong(key: String, default: Long = 0L): Long {
+    val element = get(key) ?: return default
+    return try {
+        if (element.isJsonPrimitive) {
+            val prim = element.asJsonPrimitive
+            if (prim.isNumber) prim.asLong
+            else prim.asString.toLongOrNull() ?: default
+        } else default
+    } catch (e: Exception) {
+        default
+    }
+}
+
+private fun JsonObject.optString(key: String, default: String = ""): String {
+    val element = get(key) ?: return default
+    return try {
+        if (element.isJsonPrimitive) {
+            val prim = element.asJsonPrimitive
+            if (prim.isString) prim.asString else prim.toString()
+        } else default
+    } catch (e: Exception) {
+        default
+    }
+}
+
+private fun JsonObject.optJsonObject(key: String): JsonObject? {
+    val element = get(key) ?: return null
+    return if (element.isJsonObject) element.asJsonObject else null
 }
