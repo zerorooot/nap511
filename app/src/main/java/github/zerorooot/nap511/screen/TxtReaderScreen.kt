@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -368,7 +369,9 @@ fun TxtReaderScreen(
                         LazyColumn(
                             state = listState,
                             modifier = Modifier
-                                .fillMaxSize(),
+                                .fillMaxSize()
+                                .widthIn(max = 800.dp)
+                                .align(Alignment.TopCenter),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
                         ) {
                             itemsIndexed(paragraphs) { index, paragraph ->

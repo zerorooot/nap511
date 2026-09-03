@@ -22,6 +22,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -122,6 +125,7 @@ fun LoginScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
@@ -149,9 +153,13 @@ fun LoginScreen(
                 Text("欢迎使用nap511", style = MaterialTheme.typography.headlineMedium)
             }
 
+            Spacer(modifier = Modifier.height(24.dp))
+
             // 中部核心登录卡片
             ElevatedCard(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .widthIn(max = 480.dp)
+                    .fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp)
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
@@ -424,6 +432,7 @@ fun TwoFactorVerifyDialog(
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
+                .widthIn(max = 480.dp)
                 .fillMaxWidth()
                 .padding(16.dp),
             shape = RoundedCornerShape(16.dp)

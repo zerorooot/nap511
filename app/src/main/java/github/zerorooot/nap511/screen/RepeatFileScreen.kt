@@ -14,8 +14,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -46,6 +51,7 @@ import github.zerorooot.nap511.bean.CategoryDetailResponse
 import github.zerorooot.nap511.screenitem.RepeatFileCardItem
 import github.zerorooot.nap511.viewmodel.RepeatFileViewModel
 import my.nanihadesuka.compose.LazyColumnScrollbar
+import my.nanihadesuka.compose.LazyVerticalGridScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -131,6 +137,9 @@ fun RepeatFileScreen(
             text = "共${count}个重复文件，占用空间${formattedSize}",
             modifier = Modifier.padding(8.dp, 4.dp)
         )
+        val configuration = LocalConfiguration.current
+        val isExpandedScreen = configuration.screenWidthDp >= 600
+
         PullToRefreshBox(
             isRefreshing = uiState.isRefreshing,
             onRefresh = { viewModel.refreshList() }) {
@@ -142,6 +151,27 @@ fun RepeatFileScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(text = "暂无重复文件，点击右上角进行查重")
+                }
+            } else if (isExpandedScreen) {
+                val gridState = rememberLazyGridState()
+                LazyVerticalGridScrollbar(
+                    state = gridState,
+                    settings = ScrollbarSettings.Default.copy(
+                        thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
+                    )
+                ) {
+                    LazyVerticalGrid(
+                        state = gridState,
+                        columns = GridCells.Adaptive(minSize = 340.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        gridItems(uiState.fileList, key = { it.fileId }) { item ->
+                            RepeatFileCardItem(
+                                item = item,
+                                onPathClick = { onPathClick(item.parentId) }
+                            )
+                        }
+                    }
                 }
             } else {
                 LazyColumnScrollbar(

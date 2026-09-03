@@ -6,8 +6,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +34,7 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import my.nanihadesuka.compose.LazyColumnScrollbar
+import my.nanihadesuka.compose.LazyVerticalGridScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -84,6 +91,9 @@ fun RecycleScreen(recycleViewModel: RecycleViewModel, onClick: () -> Unit) {
         MiddleEllipsisText(
             text = "当前文件数：${recycleFileList.size}", modifier = Modifier.padding(8.dp, 4.dp)
         )
+        val configuration = LocalConfiguration.current
+        val isExpandedScreen = configuration.screenWidthDp >= 600
+
         PullToRefreshBox(
             isRefreshing = refreshing, onRefresh = { recycleViewModel.refresh() }) {
             if (recycleFileList.isEmpty()) {
@@ -94,6 +104,31 @@ fun RecycleScreen(recycleViewModel: RecycleViewModel, onClick: () -> Unit) {
                     contentAlignment = Alignment.Center
                 ) {
                     Text("暂无文件")
+                }
+            } else if (isExpandedScreen) {
+                val gridState = rememberLazyGridState()
+                LazyVerticalGridScrollbar(
+                    state = gridState,
+                    settings = ScrollbarSettings.Default.copy(
+                        thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
+                    )
+                ) {
+                    LazyVerticalGrid(
+                        state = gridState,
+                        columns = GridCells.Adaptive(minSize = 340.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        gridItemsIndexed(items = recycleFileList, key = { _, item ->
+                            item.hashCode()
+                        }) { index, item ->
+                            RecycleCellItem(
+                                recycleBean = item,
+                                Modifier.animateItem(),
+                                index = index,
+                                menuOnClick
+                            )
+                        }
+                    }
                 }
             } else {
                 LazyColumnScrollbar(

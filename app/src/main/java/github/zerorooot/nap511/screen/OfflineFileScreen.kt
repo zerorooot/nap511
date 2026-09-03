@@ -8,8 +8,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -39,6 +45,7 @@ import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import kotlinx.coroutines.launch
 import my.nanihadesuka.compose.LazyColumnScrollbar
+import my.nanihadesuka.compose.LazyVerticalGridScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 import java.util.StringJoiner
 
@@ -196,6 +203,9 @@ fun OfflineFileScreen(
                 2 -> failedList
                 else -> emptyList()
             }
+            val configuration = LocalConfiguration.current
+            val isExpandedScreen = configuration.screenWidthDp >= 600
+
             PullToRefreshBox(
                 isRefreshing = refreshing,
                 onRefresh = { offlineFileViewModel.refresh() },
@@ -209,6 +219,36 @@ fun OfflineFileScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text("暂无记录")
+                    }
+                } else if (isExpandedScreen) {
+                    val gridState = rememberLazyGridState()
+                    LazyVerticalGridScrollbar(
+                        state = gridState,
+                        settings = ScrollbarSettings.Default.copy(
+                            thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
+                        )
+                    ) {
+                        LazyVerticalGrid(
+                            state = gridState,
+                            columns = GridCells.Adaptive(minSize = 340.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            gridItemsIndexed(
+                                items = currentSubList,
+                                key = { _, item -> item.infoHash }
+                            ) { index, item ->
+                                OfflineCellItem(
+                                    offlineTask = item,
+                                    index = index,
+                                    itemOnClick = { _ ->
+                                        if (page == 0) {
+                                            itemOnClick(item)
+                                        }
+                                    },
+                                    menuOnClick = { menuName, _ -> menuOnClick(menuName, item) }
+                                )
+                            }
+                        }
                     }
                 } else {
                     LazyColumnScrollbar(

@@ -30,6 +30,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -64,6 +68,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.nativeClipboardManager
@@ -100,8 +105,10 @@ import github.zerorooot.nap511.viewmodel.updateVideoFileBean
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import my.nanihadesuka.compose.LazyColumnScrollbar
+import my.nanihadesuka.compose.LazyVerticalGridScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 import kotlin.time.Duration.Companion.milliseconds
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 
 @OptIn(
     ExperimentalFoundationApi::class,
@@ -472,7 +479,7 @@ fun FileScreen(
                 listState = listState,
                 clickIndex = fileViewModel.clickMap.getOrDefault(path, -1),
                 onRefresh = { fileViewModel.refresh() },
-                ::myItemOnClick,
+                onItemClick = ::myItemOnClick,
                 onItemLongClick = ::itemOnLongClick,
                 onCut = { fileViewModel.cut(it) },
                 onDelete = { fileViewModel.delete(it) },
@@ -600,6 +607,9 @@ private fun FileListContent(
     onForceOpen: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val configuration = LocalConfiguration.current
+    val isExpandedScreen = configuration.screenWidthDp >= 600
+
     PullToRefreshBox(
         isRefreshing = refreshing,
         onRefresh = onRefresh,
@@ -616,40 +626,82 @@ private fun FileListContent(
             }
         } else {
             key(path) {
-                LazyColumnScrollbar(
-                    state = listState,
-                    settings = ScrollbarSettings.Default.copy(
-                        thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
-                    )
-                ) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        state = listState
+                if (isExpandedScreen) {
+                    val gridState = rememberLazyGridState()
+                    LazyVerticalGridScrollbar(
+                        state = gridState,
+                        settings = ScrollbarSettings.Default.copy(
+                            thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
+                        )
                     ) {
-                        itemsIndexed(
-                            items = fileBeanList,
-                            key = { _, item ->
-                                item.fileId.ifEmpty { item.pickCode.ifEmpty { item.uuid.toString() } }
-                            },
-                            contentType = { _, item -> item.fileIco }
-                        ) { index, item ->
-                            FileCellItem(
-                                fileBean = item,
-                                index = index,
-                                clickIndex = clickIndex,
-                                modifier = Modifier.animateItem(
-                                    fadeInSpec = null,
-                                    fadeOutSpec = null
-                                ),
-                                itemOnClick = onItemClick,
-                                itemOnLongClick = onItemLongClick,
-                                onCut = onCut,
-                                onDelete = onDelete,
-                                onRename = onRename,
-                                onFileInfo = onFileInfo,
-                                onForceOpen = onForceOpen,
-                                onAria2Download = onAria2Download
-                            )
+                        LazyVerticalGrid(
+                            state = gridState,
+                            columns = GridCells.Adaptive(minSize = 340.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            gridItemsIndexed(
+                                items = fileBeanList,
+                                key = { _, item ->
+                                    item.fileId.ifEmpty { item.pickCode.ifEmpty { item.uuid.toString() } }
+                                },
+                                contentType = { _, item -> item.fileIco }
+                            ) { index, item ->
+                                FileCellItem(
+                                    fileBean = item,
+                                    index = index,
+                                    clickIndex = clickIndex,
+                                    modifier = Modifier.animateItem(
+                                        fadeInSpec = null,
+                                        fadeOutSpec = null
+                                    ),
+                                    itemOnClick = onItemClick,
+                                    itemOnLongClick = onItemLongClick,
+                                    onCut = onCut,
+                                    onDelete = onDelete,
+                                    onRename = onRename,
+                                    onFileInfo = onFileInfo,
+                                    onForceOpen = onForceOpen,
+                                    onAria2Download = onAria2Download
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    LazyColumnScrollbar(
+                        state = listState,
+                        settings = ScrollbarSettings.Default.copy(
+                            thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
+                        )
+                    ) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            state = listState
+                        ) {
+                            itemsIndexed(
+                                items = fileBeanList,
+                                key = { _, item ->
+                                    item.fileId.ifEmpty { item.pickCode.ifEmpty { item.uuid.toString() } }
+                                },
+                                contentType = { _, item -> item.fileIco }
+                            ) { index, item ->
+                                FileCellItem(
+                                    fileBean = item,
+                                    index = index,
+                                    clickIndex = clickIndex,
+                                    modifier = Modifier.animateItem(
+                                        fadeInSpec = null,
+                                        fadeOutSpec = null
+                                    ),
+                                    itemOnClick = onItemClick,
+                                    itemOnLongClick = onItemLongClick,
+                                    onCut = onCut,
+                                    onDelete = onDelete,
+                                    onRename = onRename,
+                                    onFileInfo = onFileInfo,
+                                    onForceOpen = onForceOpen,
+                                    onAria2Download = onAria2Download
+                                )
+                            }
                         }
                     }
                 }
