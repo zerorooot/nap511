@@ -59,7 +59,7 @@ class OfflineTaskWorker(
         val cid = DataStoreUtil.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
         val addTaskReturn = fileRepository.addOfflineTask(a, cid) {}
 
-        XLog.d("OfflineTaskWorker cid $cid addTaskReturn $addTaskReturn task size=${a.size} currentOfflineTask:\n $a")
+        XLog.d("OfflineTaskWorker cid $cid addTaskReturn $addTaskReturn task size=${a.size} currentOfflineTask: $a")
 
         val state = addTaskReturn.first
         val message = addTaskReturn.second

@@ -123,7 +123,7 @@ object LogParser {
                     LogEntry(
                         raw = line,
                         timestamp = time,
-                        tag = tagStr,
+                        tag = tagStr.replace("-XLOG",""),
                         level = LogLevel.fromCode(levelStr),
                         message = msg
                     )

@@ -5,14 +5,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -30,7 +28,6 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Scale
 import github.zerorooot.nap511.bean.RepeatFileItem
-import kotlin.text.ifEmpty
 
 @Composable
 fun RepeatFileCardItem(
@@ -97,7 +94,9 @@ fun RepeatFileCardItem(
                         maxLines = 2
                     )
                     Text(
-                        modifier = Modifier.padding(start = 4.dp, top = 4.dp)  .clickable { onPathClick() },
+                        modifier = Modifier
+                            .padding(start = 4.dp, top = 4.dp)
+                            .clickable { onPathClick() },
                         text = parentName,
                         overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.bodySmall,
@@ -114,12 +113,16 @@ fun RepeatFileCardItem(
                     ) {
                         Text(
                             text = size,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
                         )
                         Text(
                             text = time,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(0.7f)
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
 
                         )
                     }

@@ -394,7 +394,8 @@ class MainActivity : AppCompatActivity() {
                     composable<Route.OfflineDownload> {
                         OfflineDownloadScreen(
                             offlineFileViewModel,
-                            fileViewModel,
+                            fileViewModel.currentCid,
+                            fileViewModel.currentPath.value,
                             { scope.launch { drawerState.open() } },
                             { navController.navigate(Route.VerifyMagnetLinkAccount) }
                         )

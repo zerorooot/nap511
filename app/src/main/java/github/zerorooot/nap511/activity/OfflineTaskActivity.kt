@@ -79,7 +79,7 @@ class OfflineTaskActivity : ComponentActivity() {
             ) || i.startsWith("magnet", true) || i.startsWith("ed2k", true)
         }.toSet()
 
-        XLog.d("OfflineTaskActivity $tag urlList:\n${urlList}")
+        XLog.d("OfflineTaskActivity $tag urlList: $urlList")
 
         //非空列表
         if (urlList.isNotEmpty()) {

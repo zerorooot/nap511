@@ -108,13 +108,16 @@ fun RecycleCellItem(
                     ) {
                         Text(
                             text = size,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
                         )
                         Text(
                             text = time,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(0.7f)
-
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
 
                     }

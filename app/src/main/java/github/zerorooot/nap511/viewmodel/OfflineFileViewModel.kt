@@ -49,6 +49,7 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
     var quotaBean = _quotaBean.asStateFlow()
 
     lateinit var offlineTask: OfflineTask
+    val urlText = mutableStateOf("")
 
     private val dialogEventBus = DialogEventBus.getInstance()
 

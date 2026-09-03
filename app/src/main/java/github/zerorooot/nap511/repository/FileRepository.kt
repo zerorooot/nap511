@@ -123,17 +123,16 @@ class FileRepository(private val cookie: String) {
         } else {
             if (addTask.errorMsg.contains("请验证账号")) {
                 handle.invoke(true)
-                //   App.selectedItem = ConfigKeyUtil.VERIFY_MAGNET_LINK_ACCOUNT
             }
             //把失败的离线链接保存起来
             val currentOfflineTaskList =
-                DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "").split("\n")
+                DataStoreUtil.getDataSuspend(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "").split("\n")
                     .filter { i -> i != "" && i != " " }.toSet().toMutableList()
             currentOfflineTaskList.addAll(list)
             val stringJoiner = StringJoiner("\n")
             currentOfflineTaskList.toSet().forEach { stringJoiner.add(it) }
             //写入缓存
-            DataStoreUtil.putData(
+            DataStoreUtil.putDataSuspend(
                 ConfigKeyUtil.CURRENT_OFFLINE_TASK, stringJoiner.toString()
             )
             "任务添加失败，${addTask.errorMsg}"
