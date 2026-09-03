@@ -27,7 +27,6 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
-import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.bean.Base115Response
 import kotlinx.coroutines.CoroutineScope
@@ -177,22 +176,19 @@ class App : Application(), ImageLoaderFactory {
                     .atZone(ZoneId.systemDefault())
                     .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
 
-                // 6. 持久化数据
-                DataStoreUtil.putDataSuspend(ConfigKeyUtil.COOKIE, cookie)
-                DataStoreUtil.putDataSuspend(ConfigKeyUtil.UID, avatarBean.userId)
+                // 6. 持久化数据并同步更新会话
+                UserSessionManager.updateSession(cookie, avatarBean.userId)
                 DataStoreUtil.putDataSuspend(ConfigKeyUtil.AVATAR_BEAN, gson.toJson(avatarBean))
 
-                Pair(true, "登录成功,重启中～")
+                Pair(true, "登录成功～")
             }
         } catch (e: Exception) {
             XLog.e("checkLogin Check login failed", e)
             Pair(false, "验证失败: ${e.localizedMessage ?: "未知错误"}")
         }
 
-        if (pair.first) {
-            ProcessPhoenix.triggerRebirth(applicationContext);
-        }
         toast(pair.second)
+        return@withContext pair.first
     }
 
 

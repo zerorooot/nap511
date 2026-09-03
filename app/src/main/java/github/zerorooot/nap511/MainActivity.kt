@@ -68,7 +68,6 @@ import github.zerorooot.nap511.bean.DrawerMenuItem
 import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.dialog.ExitApp
-import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.screen.CaptchaVideoWebViewScreen
 import github.zerorooot.nap511.screen.CaptchaWebViewScreen
 import github.zerorooot.nap511.screen.CreateDialogs
@@ -90,6 +89,7 @@ import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.UserSessionManager
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
@@ -102,6 +102,7 @@ import github.zerorooot.nap511.viewmodel.openSearchDialog
 import github.zerorooot.nap511.viewmodel.openUnzipAllFileDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 
 class MainActivity : AppCompatActivity() {
@@ -150,8 +151,8 @@ class MainActivity : AppCompatActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    val cookie = remember { DataStoreUtil.getData(ConfigKeyUtil.COOKIE, "") }
-                    if (cookie == "") {
+                    val cookie = UserSessionManager.cookie
+                    if (cookie.isEmpty()) {
                         Login()
                     } else {
                         Init(cookie)
@@ -165,12 +166,11 @@ class MainActivity : AppCompatActivity() {
     @Composable
     private fun Init(cookie: String) {
         //初始化
-        val factory = remember { CookieViewModelFactory(cookie, application) }
-        val fileViewModel: FileViewModel = viewModel(factory = factory)
-        val offlineFileViewModel: OfflineFileViewModel = viewModel(factory = factory)
-        val recycleViewModel: RecycleViewModel = viewModel(factory = factory)
-        val audioViewModel: AudioViewModel = viewModel(factory = factory)
-        val repeatViewModel: RepeatFileViewModel = viewModel(factory = factory)
+        val fileViewModel: FileViewModel = viewModel()
+        val offlineFileViewModel: OfflineFileViewModel = viewModel()
+        val recycleViewModel: RecycleViewModel = viewModel()
+        val audioViewModel: AudioViewModel = viewModel()
+        val repeatViewModel: RepeatFileViewModel = viewModel()
         val navController = rememberNavController()
         val context = LocalContext.current
 
@@ -375,7 +375,13 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     composable<Route.Login> {
                         fileViewModel.gesturesEnabled = false
-                        Login()
+                        Login {
+                            navController.navigate(Route.MyFile) {
+                                popUpTo<Route.Login> {
+                                    inclusive = true
+                                }
+                            }
+                        }
                     }
 
                     composable<Route.MyFile> {
@@ -400,10 +406,11 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     composable<Route.OfflineDownload> {
+                        val currentPath by fileViewModel.currentPath.collectAsStateWithLifecycle()
                         OfflineDownloadScreen(
                             offlineFileViewModel,
                             fileViewModel.currentCid,
-                            fileViewModel.currentPath.value,
+                            currentPath,
                             { scope.launch { drawerState.open() } },
                             { navController.navigate(Route.VerifyMagnetLinkAccount) }
                         )
@@ -555,7 +562,8 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                     composable<Route.TxtReader> {
-                        val fileBean = fileViewModel.fileBeanList.getOrNull(fileViewModel.selectIndex)
+                        val fileBean =
+                            fileViewModel.fileBeanList.getOrNull(fileViewModel.selectIndex)
                         val byteArray = fileViewModel.textBodyByteArray
                         if (byteArray != null) {
                             TxtReaderScreen(byteArray, title = fileBean?.name ?: "文本阅读") {
@@ -579,11 +587,11 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("UnrememberedMutableState")
     @Composable
-    private fun Login() {
+    private fun Login(onLoginSuccess: (() -> Unit)? = null) {
         val scope = rememberCoroutineScope()
         LoginScreen { credential ->
             scope.launch(Dispatchers.IO) {
-                when (credential) {
+                val success = when (credential) {
                     is LoginCredential.Cookie -> {
                         val replace = credential.cookieString.replace(" ", "")
                             .replace("[\r\n]".toRegex(), "")
@@ -619,12 +627,18 @@ class MainActivity : AppCompatActivity() {
                                     }
                                 }
                             }
-                            App.instance.checkLogin(jsonObject.get(ConfigKeyUtil.COOKIE).asString)
+                            val cookie = jsonObject.get(ConfigKeyUtil.COOKIE).asString
+                            App.instance.checkLogin(cookie)
                         } catch (e: Exception) {
                             App.instance.toast("解析配置失败")
                             XLog.d("LoginScreen LoginCredential.ConfigFile jsonString ${credential.rawJson}")
+                            false
                         }
-
+                    }
+                }
+                if (success) {
+                    withContext(Dispatchers.Main) {
+                        onLoginSuccess?.invoke()
                     }
                 }
             }

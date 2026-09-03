@@ -376,9 +376,7 @@ fun TxtReaderScreen(
                                 .align(Alignment.TopCenter),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
                         ) {
-                            itemsIndexed(items = paragraphs, { _, item ->
-                                item.ifEmpty { UUID.randomUUID().toString() }
-                            }) { index, paragraph ->
+                            itemsIndexed(paragraphs) { index, paragraph ->
                                 // 1. 动态生成高亮文本（当前选中的匹配项深色高亮，其他匹配项浅色高亮）
                                 val annotatedParagraph = remember(
                                     paragraph,

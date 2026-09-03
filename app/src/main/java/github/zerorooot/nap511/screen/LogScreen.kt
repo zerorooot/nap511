@@ -91,7 +91,8 @@ data class LogEntry(
     val timestamp: String = "",
     val tag: String = "",
     val level: LogLevel = LogLevel.UNKNOWN,
-    val message: String = raw
+    val message: String = raw,
+    val uuid: String = UUID.randomUUID().toString()
 )
 
 /**
@@ -297,7 +298,7 @@ fun LogScreen(onClick: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     itemsIndexed(items = parsedLogs, key = { _, item ->
-                        item.timestamp.ifEmpty { UUID.randomUUID().toString() }
+                        item.uuid
                     }) { index, item ->
                         LogItemRow(
                             logEntry = item,

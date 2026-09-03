@@ -6,8 +6,9 @@ import github.zerorooot.nap511.bean.OfflineListCount
 import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.bean.SignBean
 import github.zerorooot.nap511.bean.TorrentFileBean
+import github.zerorooot.nap511.util.NetworkClient
+import github.zerorooot.nap511.util.UserSessionManager
 import okhttp3.Interceptor
-import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Field
@@ -17,17 +18,18 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
 
-import java.util.concurrent.TimeUnit
-
 interface OfflineService {
     companion object {
         private var offlineService: OfflineService? = null
-        fun getInstance(cookie: String): OfflineService {
+        fun getInstance(): OfflineService {
             if (offlineService == null) {
-                val okHttpClient = github.zerorooot.nap511.util.NetworkClient.sharedOkHttpClient.newBuilder()
+                val okHttpClient = NetworkClient.sharedOkHttpClient.newBuilder()
                     .addInterceptor(Interceptor { chain ->
                         chain.proceed(
-                            chain.request().newBuilder().addHeader("Cookie", cookie).build()
+                            chain.request().newBuilder().addHeader(
+                                "Cookie",
+                                UserSessionManager.cookie
+                            ).build()
                         )
                     })
                     .build()
@@ -66,10 +68,10 @@ interface OfflineService {
     @POST("web/lixian/?ct=lixian&ac=task_lists")
     suspend fun taskList(
         @Field("uid") uid: String,
-        @Field("sign") sign: String ,
+        @Field("sign") sign: String,
         @Field("page") page: Int,
         //9是下载失败，11是下载完成，12是正在下载
-        @Field("stat") stat: Int ,
+        @Field("stat") stat: Int,
         @Field("time") time: Long = System.currentTimeMillis() / 1000
     ): OfflineInfo
 

@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-class OfflineFileViewModel(private val cookie: String) : ViewModel() {
+class OfflineFileViewModel : ViewModel() {
     private val _isRefreshing = MutableStateFlow(false)
     var isRefreshing = _isRefreshing.asStateFlow()
 
@@ -55,7 +55,7 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
 
 
     private val fileRepository: FileRepository by lazy {
-        FileRepository.getInstance(cookie)
+        FileRepository.getInstance()
     }
 
     /**

@@ -34,7 +34,7 @@ class OfflineTaskWorker(
     appContext: Context, workerParams: WorkerParameters
 ) : CoroutineWorker(appContext, workerParams) {
     private val fileRepository: FileRepository by lazy {
-        FileRepository.getInstance(UserSessionManager.cookie)
+        FileRepository.getInstance()
     }
 
     companion object {

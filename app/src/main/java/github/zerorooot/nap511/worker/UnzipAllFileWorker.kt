@@ -49,7 +49,7 @@ class UnzipAllFileWorker(
         applicationContext.getSystemService(NotificationManager::class.java)
 
     private val fileRepository: FileRepository by lazy {
-        FileRepository.getInstance(UserSessionManager.cookie)
+        FileRepository.getInstance()
     }
     private val cid: String by lazy {
         inputData.getString("cid").toString()

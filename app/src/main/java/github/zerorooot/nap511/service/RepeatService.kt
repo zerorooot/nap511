@@ -4,8 +4,9 @@ import github.zerorooot.nap511.bean.BaseResponse
 import github.zerorooot.nap511.bean.CategoryDetailResponse
 import github.zerorooot.nap511.bean.RepeatListResponse
 import github.zerorooot.nap511.bean.RepeatStatusResponse
+import github.zerorooot.nap511.util.NetworkClient
+import github.zerorooot.nap511.util.UserSessionManager
 import okhttp3.Interceptor
-import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Field
@@ -14,17 +15,16 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
 
-import java.util.concurrent.TimeUnit
-
 interface RepeatService {
     companion object {
         private var repeatService: RepeatService? = null
-        fun getInstance(cookie: String): RepeatService {
+        fun getInstance(): RepeatService {
             if (repeatService == null) {
-                val okHttpClient = github.zerorooot.nap511.util.NetworkClient.sharedOkHttpClient.newBuilder()
+                val okHttpClient = NetworkClient.sharedOkHttpClient.newBuilder()
                     .addInterceptor(Interceptor { chain ->
                         chain.proceed(
-                            chain.request().newBuilder().addHeader("Cookie", cookie).build()
+                            chain.request().newBuilder()
+                                .addHeader("Cookie", UserSessionManager.cookie).build()
                         )
                     })
                     .build()

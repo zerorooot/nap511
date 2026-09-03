@@ -28,7 +28,7 @@ class Sha1Service : Service() {
     private val okHttpClient = github.zerorooot.nap511.util.NetworkClient.sharedOkHttpClient
 
     private val fileRepository: FileRepository by lazy {
-        FileRepository.getInstance(UserSessionManager.cookie)
+        FileRepository.getInstance()
     }
 
     override fun onBind(intent: Intent?): IBinder? {

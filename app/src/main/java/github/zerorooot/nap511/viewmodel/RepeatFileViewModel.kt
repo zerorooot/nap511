@@ -29,11 +29,9 @@ data class RepeatUiState(
     val isListEndReached: Boolean = false,
 )
 
-class RepeatFileViewModel(
-    private val cookie: String
-) : ViewModel() {
+class RepeatFileViewModel : ViewModel() {
     private val repeatService: RepeatService by lazy {
-        RepeatService.getInstance(cookie)
+        RepeatService.getInstance()
     }
 
     private val _uiState = MutableStateFlow(RepeatUiState())

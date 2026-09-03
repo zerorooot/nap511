@@ -41,23 +41,23 @@ import kotlin.math.log10
 import kotlin.math.pow
 import kotlin.time.Duration.Companion.milliseconds
 
-class FileRepository(private val cookie: String) {
+class FileRepository {
     companion object {
         @Volatile
         private var INSTANCE: FileRepository? = null
-        fun getInstance(cookie: String): FileRepository {
+        fun getInstance(): FileRepository {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: FileRepository(cookie).also { INSTANCE = it }
+                INSTANCE ?: FileRepository().also { INSTANCE = it }
             }
         }
     }
 
     private val fileService: FileService by lazy {
-        FileService.getInstance(cookie)
+        FileService.getInstance()
     }
 
     private val offlineService: OfflineService by lazy {
-        OfflineService.getInstance(cookie)
+        OfflineService.getInstance()
     }
 
 
@@ -445,7 +445,7 @@ class FileRepository(private val cookie: String) {
 
         val request: Request =
             Request.Builder().url("https://proapi.115.com/app/chrome/downurl?t=$tm")
-                .addHeader("cookie", cookie)
+                .addHeader("cookie", UserSessionManager.cookie)
                 .addHeader("Content-Type", "application/x-www-form-urlencoded").addHeader(
                     "User-Agent",
                     ConfigKeyUtil.USER_AGENT
@@ -478,7 +478,7 @@ class FileRepository(private val cookie: String) {
         val downloadUrl = getDownloadUrl(pickCode, fileId) ?: return null
         val okHttpClient = github.zerorooot.nap511.util.NetworkClient.sharedOkHttpClient
         val requestDownload: Request =
-            Request.Builder().url(downloadUrl).addHeader("cookie", cookie)
+            Request.Builder().url(downloadUrl).addHeader("cookie", UserSessionManager.cookie)
                 .addHeader("Content-Type", "application/x-www-form-urlencoded").addHeader(
                     "User-Agent",
                     ConfigKeyUtil.USER_AGENT

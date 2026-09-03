@@ -13,13 +13,10 @@ import github.zerorooot.nap511.bean.ProcessDataResponse
 import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.NetworkClient
+import github.zerorooot.nap511.util.UserSessionManager
 import okhttp3.Interceptor
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.OkHttpClient
-import okhttp3.Protocol
 import okhttp3.RequestBody
-import okhttp3.Response
-import okhttp3.ResponseBody.Companion.toResponseBody
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
@@ -34,7 +31,7 @@ interface FileService {
     companion object {
         @Volatile
         private var fileService: FileService? = null
-        fun getInstance(cookie: String): FileService {
+        fun getInstance(): FileService {
             if (fileService == null) {
                 fileService = Retrofit
                     .Builder()
@@ -43,10 +40,13 @@ interface FileService {
 //                    .addConverterFactory(FileBeanConverterFactory.create())
                     //add cookie
                     .client(
-                        github.zerorooot.nap511.util.NetworkClient.sharedOkHttpClient.newBuilder()
+                        NetworkClient.sharedOkHttpClient.newBuilder()
                             .addInterceptor(Interceptor { chain ->
                                 val request = chain.request().newBuilder()
-                                    .addHeader("Cookie", cookie)
+                                    .addHeader(
+                                        "Cookie",
+                                        UserSessionManager.cookie
+                                    )
                                     .addHeader(
                                         "User-Agent",
                                         ConfigKeyUtil.USER_AGENT

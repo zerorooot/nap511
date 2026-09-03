@@ -467,7 +467,7 @@ class VideoActivity : AppCompatActivity() {
         App.instance.toast("视频地址错误！正在重新获取新链接")
         lifecycleScope.launch {
             try {
-                val fileRepository = FileRepository.getInstance(UserSessionManager.cookie)
+                val fileRepository = FileRepository.getInstance()
                 val video = fileRepository.video(videoInfo.pickCode)
                 XLog.d("playNewVideo $video")
                 this@VideoActivity.videoPlayer.playNext(video.downloadUrl, video.fileName)

@@ -1,16 +1,18 @@
 package github.zerorooot.nap511.util
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+
 object UserSessionManager {
-    @Volatile
-    var cookie: String = ""
+    var cookie: String by mutableStateOf("")
         private set
 
-    @Volatile
-    var uid: String = "0"
+    var uid: String by mutableStateOf("0")
         private set
 
-    @Volatile
-    var requestLimitCount: Int = 200
+    var requestLimitCount: Int by mutableIntStateOf(200)
         private set
 
     fun init(cookie: String, uid: String, requestLimitCount: Int) {

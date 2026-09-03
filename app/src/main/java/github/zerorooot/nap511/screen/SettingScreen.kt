@@ -31,7 +31,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringArrayResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.screenitem.EditTextPreferenceItem
@@ -77,8 +76,7 @@ fun SettingScreen(
                 context = context,
                 uri = it,
                 onSuccess = {
-                    App.instance.toast("配置导入成功，正在重启！")
-                    ProcessPhoenix.triggerRebirth(context)
+                    App.instance.toast("配置导入成功！")
                 },
                 onError = { err -> App.instance.toast("导入失败: $err") }
             )
@@ -135,8 +133,7 @@ fun SettingScreen(
                 return@SettingContent
             }
             lastClick = true
-            App.instance.toast("重启中～")
-            ProcessPhoenix.triggerRebirth(context)
+            App.instance.toast("配置与数据已同步生效！")
         }
     )
 }

@@ -1,9 +1,9 @@
 package github.zerorooot.nap511.viewmodel
 
 import android.annotation.SuppressLint
+import android.app.Application
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -15,7 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.concurrent.futures.await
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequest
@@ -62,7 +62,8 @@ import java.io.File
 
 
 @SuppressLint("MutableCollectionMutableState")
-class FileViewModel(internal val cookie: String, internal val context: Context) : ViewModel() {
+class FileViewModel(application: Application) : AndroidViewModel(application) {
+    internal val context = getApplication<Application>()
     var fileBeanList = mutableStateListOf<FileBean>()
     var unzipBeanList = mutableStateOf(ZipBeanList())
     var remainingSpace by mutableStateOf(RemainingSpaceBean())
@@ -153,7 +154,7 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     internal var textFileCache = hashMapOf<FileBean, ByteArray?>()
     var orderBean = OrderBean(OrderEnum.name, 1)
     internal val fileRepository: FileRepository by lazy {
-        FileRepository.getInstance(cookie)
+        FileRepository.getInstance()
     }
 
     internal val _launchVideoEvent = MutableSharedFlow<VideoInfoBean>()

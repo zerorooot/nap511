@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-class RecycleViewModel(private val cookie: String) :
+class RecycleViewModel :
     ViewModel() {
     private val _isRefreshing = MutableStateFlow(false)
     var isRefreshing = _isRefreshing.asStateFlow()
@@ -37,7 +37,7 @@ class RecycleViewModel(private val cookie: String) :
         private set
 
     private val fileService: FileService by lazy {
-        FileService.getInstance(cookie)
+        FileService.getInstance()
     }
 
     fun getRecycleFileList() {

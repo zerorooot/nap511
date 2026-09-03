@@ -1,12 +1,12 @@
 package github.zerorooot.nap511.viewmodel
 
-import android.content.Context
+import android.app.Application
 import android.content.Intent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.shuyu.gsyvideoplayer.listener.GSYMediaPlayerListener
 import com.shuyu.gsyvideoplayer.player.PlayerFactory
@@ -17,18 +17,20 @@ import github.zerorooot.nap511.service.AudioService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.AudioEvent
 import github.zerorooot.nap511.util.AudioEventBus
+import github.zerorooot.nap511.util.UserSessionManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
 import kotlin.time.Duration.Companion.milliseconds
 
-class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
+class AudioViewModel(application: Application) : AndroidViewModel(application) {
     private val SEEK_STEP_MS = 15000L
+    private val context = getApplication<Application>()
 
     // 假设你有 Repository 或 Api 实例，也可以通过 Hilt/Koin 注入
     val fileRepository: FileRepository by lazy {
-        FileRepository.getInstance(cookie)
+        FileRepository.getInstance()
     }
 
     var currentMusic by mutableStateOf<FileBean?>(null)
@@ -175,7 +177,7 @@ class AudioViewModel(val cookie: String, val context: Context) : ViewModel() {
                 if (playUrl.isNotEmpty()) {
                     videoManger.prepare(
                         playUrl,        // url
-                        mapOf("Cookie" to cookie),           // headers (Map<String, String>?)
+                        mapOf("Cookie" to UserSessionManager.cookie),           // headers (Map<String, String>?)
                         false,          // loop (是否循环播放)
                         playbackSpeed,           // speed (播放速度)
                         false,           // cache (是否开启缓存)
