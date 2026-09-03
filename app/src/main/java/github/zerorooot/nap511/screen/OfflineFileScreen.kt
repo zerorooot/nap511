@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat.getSystemService
 import github.zerorooot.nap511.bean.OfflineTask
+import github.zerorooot.nap511.dialog.OfflineFileInfoDialog
 import github.zerorooot.nap511.screenitem.OfflineCellItem
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel

@@ -27,6 +27,7 @@ import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.UserSessionManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -48,7 +49,7 @@ class UnzipAllFileWorker(
         applicationContext.getSystemService(NotificationManager::class.java)
 
     private val fileRepository: FileRepository by lazy {
-        FileRepository.getInstance(App.cookie)
+        FileRepository.getInstance(UserSessionManager.cookie)
     }
     private val cid: String by lazy {
         inputData.getString("cid").toString()

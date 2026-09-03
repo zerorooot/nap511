@@ -76,6 +76,7 @@ import kotlinx.coroutines.withContext
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 import java.nio.charset.Charset
+import java.util.UUID
 
 /**
  * 搜索匹配项位置信息
@@ -375,7 +376,9 @@ fun TxtReaderScreen(
                                 .align(Alignment.TopCenter),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
                         ) {
-                            itemsIndexed(paragraphs) { index, paragraph ->
+                            itemsIndexed(items = paragraphs, { _, item ->
+                                item.ifEmpty { UUID.randomUUID().toString() }
+                            }) { index, paragraph ->
                                 // 1. 动态生成高亮文本（当前选中的匹配项深色高亮，其他匹配项浅色高亮）
                                 val annotatedParagraph = remember(
                                     paragraph,

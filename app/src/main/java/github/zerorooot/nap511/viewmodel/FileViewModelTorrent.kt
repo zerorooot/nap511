@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.UserSessionManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.launch
 
@@ -17,7 +18,7 @@ internal fun FileViewModel.getTorrentTask(sha1: String) {
     viewModelScope.launch {
         runCatching {
             val sign = fileRepository.getOfflineSign().sign
-            fileRepository.getOfflineTorrentTaskList(sha1, sign, App.uid)
+            fileRepository.getOfflineTorrentTaskList(sha1, sign, UserSessionManager.uid)
         }.onSuccess { torrentTask ->
             XLog.d("getTorrentTask torrentTask $torrentTask")
             if (!torrentTask.state) {
@@ -49,7 +50,7 @@ internal fun FileViewModel.addTorrentTask(
             val offlineSign = fileRepository.getOfflineSign()
             val sign = offlineSign.sign
             val addTorrentTask = fileRepository.addOfflineTorrentTask(
-                infoHash, wanted, savePath, App.uid, sign
+                infoHash, wanted, savePath, UserSessionManager.uid, sign
             )
             if (addTorrentTask.state) {
                 refresh()

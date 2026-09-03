@@ -68,6 +68,7 @@ import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.UserSessionManager
 import kotlinx.coroutines.launch
 import okhttp3.Interceptor
 import okhttp3.MediaType
@@ -232,7 +233,7 @@ class VideoActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_video)
         val headerMap = hashMapOf(
-            "cookie" to App.cookie,
+            "cookie" to UserSessionManager.cookie,
             "User-Agent" to ConfigKeyUtil.USER_AGENT
         )
         val address = videoInfo.videoUrl.ifEmpty {
@@ -466,7 +467,7 @@ class VideoActivity : AppCompatActivity() {
         App.instance.toast("视频地址错误！正在重新获取新链接")
         lifecycleScope.launch {
             try {
-                val fileRepository = FileRepository.getInstance(App.cookie)
+                val fileRepository = FileRepository.getInstance(UserSessionManager.cookie)
                 val video = fileRepository.video(videoInfo.pickCode)
                 XLog.d("playNewVideo $video")
                 this@VideoActivity.videoPlayer.playNext(video.downloadUrl, video.fileName)

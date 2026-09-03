@@ -87,6 +87,7 @@ import github.zerorooot.nap511.bean.ForceOpenType
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.VideoInfoBean
+import github.zerorooot.nap511.dialog.ForceOpenDialog
 import github.zerorooot.nap511.screenitem.FileCellItem
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil

@@ -27,13 +27,14 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.DialogEvent
 import github.zerorooot.nap511.util.DialogEventBus
+import github.zerorooot.nap511.util.UserSessionManager
 import java.util.StringJoiner
 
 class OfflineTaskWorker(
     appContext: Context, workerParams: WorkerParameters
 ) : CoroutineWorker(appContext, workerParams) {
     private val fileRepository: FileRepository by lazy {
-        FileRepository.getInstance(App.cookie)
+        FileRepository.getInstance(UserSessionManager.cookie)
     }
 
     companion object {

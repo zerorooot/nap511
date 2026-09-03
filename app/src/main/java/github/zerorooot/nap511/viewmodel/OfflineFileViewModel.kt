@@ -14,6 +14,7 @@ import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.UserSessionManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -77,7 +78,7 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
         viewModelScope.launch {
             _isRefreshing.value = true
             runCatching {
-                val uid = App.uid
+                val uid = UserSessionManager.uid
                 val sign = fileRepository.getOfflineSign().sign
 
                 // 1. 并行发起网络请求并直接在内部处理格式化，减少 refresh 函数内的重置逻辑
@@ -157,7 +158,7 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
         _isRefreshing.value = true
         viewModelScope.launch {
             runCatching {
-                val uid = App.uid
+                val uid = UserSessionManager.uid
                 val sign = fileRepository.getOfflineSign().sign
                 val nextPage = currentPage + 1
                 val res = fileRepository.getOfflineTaskList(uid, sign, nextPage, type)

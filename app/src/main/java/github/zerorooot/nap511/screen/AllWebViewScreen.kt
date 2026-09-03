@@ -48,6 +48,7 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.UserSessionManager
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
@@ -199,7 +200,7 @@ fun WebViewScreen(onClick: () -> Unit) {
         cookieManager.setAcceptCookie(true)
         WebView.setWebContentsDebuggingEnabled(DataStoreUtil.getData(ConfigKeyUtil.LOG, false))
         // 1. 注入 Cookie
-        setRawCookieString(App.cookie)
+        setRawCookieString(UserSessionManager.cookie)
         // 2. 强制显式同步并引入物理延迟，确保 API 请求发起时 Cookie 已在磁盘就绪
         cookieManager.flush()
 
@@ -419,7 +420,7 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
 fun CaptchaWebViewScreen(fileViewModel: FileViewModel, onNav: (String) -> Unit) {
     LaunchedEffect(Unit) {
         val cookieManager = CookieManager.getInstance()
-        App.cookie.split(";").forEach { a ->
+        UserSessionManager.cookie.split(";").forEach { a ->
             cookieManager.setCookie("https://captchaapi.115.com", a)
             cookieManager.setCookie("https://webapi.115.com", a)
             cookieManager.setCookie("https://webapi.115.com/user/captcha", a)
@@ -450,7 +451,7 @@ fun CaptchaWebViewScreen(fileViewModel: FileViewModel, onNav: (String) -> Unit) 
 fun CaptchaVideoWebViewScreen(fileViewModel: FileViewModel, onNav: (String) -> Unit) {
     LaunchedEffect(Unit) {
         val cookieManager = CookieManager.getInstance()
-        App.cookie.split(";").forEach { a ->
+        UserSessionManager.cookie.split(";").forEach { a ->
             cookieManager.setCookie("https://115vod.com/captchaapi/", a)
             cookieManager.setCookie("https://115vod.com/webapi/user/captcha", a)
         }
@@ -509,7 +510,7 @@ private fun check(
     webViewRequest.headers.forEach { (t, u) -> a.addHeader(t, u) }
     //移除web添加的cookie
     a.removeHeader("cookie")
-    a.addHeader("cookie", App.cookie)
+    a.addHeader("cookie", UserSessionManager.cookie)
 
     val response = httpClient.newCall(a.build()).execute()
     val string = response.body.string()

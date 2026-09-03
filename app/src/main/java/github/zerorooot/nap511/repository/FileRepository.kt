@@ -26,6 +26,7 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.Sha1Util
+import github.zerorooot.nap511.util.UserSessionManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import okhttp3.FormBody
@@ -110,7 +111,7 @@ class FileRepository(private val cookie: String) {
         val map = HashMap<String, String>()
         map["savepath"] = ""
         map["wp_path_id"] = currentCid
-        map["uid"] = App.uid
+        map["uid"] = UserSessionManager.uid
         map["sign"] = getOfflineSign().sign
         map["time"] = (System.currentTimeMillis() / 1000).toString()
         list.forEachIndexed { index, s ->
@@ -162,7 +163,7 @@ class FileRepository(private val cookie: String) {
         aid: Int = 1,
         asc: Int = 1,
         order: String = "file_name",
-        limit: Int = App.requestLimitCount
+        limit: Int = UserSessionManager.requestLimitCount
     ): FilesBean {
         return fileService.getFiles(cid, showDir, aid, asc, order, limit)
     }
@@ -437,7 +438,7 @@ class FileRepository(private val cookie: String) {
 
     fun getDownloadUrl(pickCode: String, fileId: String): String? {
         val sha1Util = Sha1Util()
-        val okHttpClient = OkHttpClient()
+        val okHttpClient = github.zerorooot.nap511.util.NetworkClient.sharedOkHttpClient
         val tm = System.currentTimeMillis() / 1000
         val m115Encode = sha1Util.m115_encode(pickCode, tm)
         val map = FormBody.Builder().add("data", m115Encode.data).build()
@@ -475,7 +476,7 @@ class FileRepository(private val cookie: String) {
         pickCode: String, fileId: String
     ): InputStream? {
         val downloadUrl = getDownloadUrl(pickCode, fileId) ?: return null
-        val okHttpClient = OkHttpClient()
+        val okHttpClient = github.zerorooot.nap511.util.NetworkClient.sharedOkHttpClient
         val requestDownload: Request =
             Request.Builder().url(downloadUrl).addHeader("cookie", cookie)
                 .addHeader("Content-Type", "application/x-www-form-urlencoded").addHeader(

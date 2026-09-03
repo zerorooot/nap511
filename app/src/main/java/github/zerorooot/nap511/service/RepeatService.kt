@@ -21,11 +21,7 @@ interface RepeatService {
         private var repeatService: RepeatService? = null
         fun getInstance(cookie: String): RepeatService {
             if (repeatService == null) {
-                val okHttpClient = OkHttpClient().newBuilder()
-                    .connectTimeout(30, TimeUnit.SECONDS)
-                    .readTimeout(30, TimeUnit.SECONDS)
-                    .writeTimeout(30, TimeUnit.SECONDS)
-                    .retryOnConnectionFailure(true)
+                val okHttpClient = github.zerorooot.nap511.util.NetworkClient.sharedOkHttpClient.newBuilder()
                     .addInterceptor(Interceptor { chain ->
                         chain.proceed(
                             chain.request().newBuilder().addHeader("Cookie", cookie).build()

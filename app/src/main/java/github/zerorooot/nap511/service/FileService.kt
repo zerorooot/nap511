@@ -43,35 +43,16 @@ interface FileService {
 //                    .addConverterFactory(FileBeanConverterFactory.create())
                     //add cookie
                     .client(
-                        OkHttpClient().newBuilder()
+                        github.zerorooot.nap511.util.NetworkClient.sharedOkHttpClient.newBuilder()
                             .addInterceptor(Interceptor { chain ->
-                                try {
-                                    val request = chain.request().newBuilder()
-                                        .addHeader("Cookie", cookie)
-                                        .addHeader(
-                                            "User-Agent",
-                                            ConfigKeyUtil.USER_AGENT
-                                        )
-                                        .build()
-                                    val response = chain.proceed(request)
-                                    val code = response.code
-                                    if (code >= 400) {
-                                        response.close() // 关闭原始响应体，防止泄漏
-                                        // 手动抛出异常，强制进入下方的 catch 块
-                                        // 这样会复用你原本处理 SocketTimeoutException 的逻辑
-                                        throw java.io.IOException("HTTP $code error")
-                                    }
-                                    return@Interceptor response
-                                } catch (e: Exception) {
-                                    //防止java.net.SocketTimeoutException: timeout 错误
-                                    Response.Builder()
-                                        .request(chain.request())
-                                        .protocol(Protocol.HTTP_1_1)
-                                        .code(500)
-                                        .message(e.message ?: "Network error")
-                                        .body("".toResponseBody("text/plain".toMediaTypeOrNull()))
-                                        .build()
-                                }
+                                val request = chain.request().newBuilder()
+                                    .addHeader("Cookie", cookie)
+                                    .addHeader(
+                                        "User-Agent",
+                                        ConfigKeyUtil.USER_AGENT
+                                    )
+                                    .build()
+                                chain.proceed(request)
                             })
                             .build()
                     )

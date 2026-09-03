@@ -25,7 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import github.zerorooot.nap511.screen.BaseDialog
+import github.zerorooot.nap511.dialog.BaseDialog
 
 // 分组标题组件
 @Composable

@@ -83,19 +83,13 @@ class AutoTagInterceptor(
 
 @OptIn(ExperimentalFoundationApi::class)
 class App : Application(), ImageLoaderFactory {
-    private val okHttpClient by lazy { OkHttpClient() }
+    private val okHttpClient by lazy { NetworkClient.sharedOkHttpClient }
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
     private var currentToast: Toast? = null
 
     companion object {
         lateinit var instance: App
             private set
-        var cookie = ""
-        var uid = "0"
-
-        //每次请求文件数
-        var requestLimitCount by Delegates.notNull<Int>()
-
         //缓存fileListCache文件
         lateinit var cacheFile: File
     }
@@ -106,9 +100,10 @@ class App : Application(), ImageLoaderFactory {
         ComposeFoundationFlags.isNewContextMenuEnabled = false
         super.onCreate()
         instance = this
-        cookie = DataStoreUtil.getData(ConfigKeyUtil.COOKIE, "")
-        uid = DataStoreUtil.getData(ConfigKeyUtil.UID, "0")
-        requestLimitCount = DataStoreUtil.getData(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200").toInt()
+        val initialCookie = DataStoreUtil.getData(ConfigKeyUtil.COOKIE, "")
+        val initialUid = DataStoreUtil.getData(ConfigKeyUtil.UID, "0")
+        val initialLimit = DataStoreUtil.getData(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200").toIntOrNull() ?: 200
+        UserSessionManager.init(initialCookie, initialUid, initialLimit)
         cacheFile = File(this.cacheDir, "fileListCache.json")
 
         initLog()

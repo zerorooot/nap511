@@ -11,6 +11,7 @@ import github.zerorooot.nap511.bean.InitUploadBean
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.UserSessionManager
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
@@ -32,9 +33,9 @@ class TorrentTaskActivity : Activity() {
         super.onCreate(savedInstanceState)
         if (intent.action == Intent.ACTION_VIEW && intent.data != null) {
             val torrentFile = fileFromContentUri(this, intent.data!!)
-            val uid = App.uid
+            val uid = UserSessionManager.uid
             val defaultOfflineCid = DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "0")
-            initUpload(torrentFile, App.cookie, uid, defaultOfflineCid)
+            initUpload(torrentFile, UserSessionManager.cookie, uid, defaultOfflineCid)
         }
         moveTaskToBack(true);
         finishAndRemoveTask()
@@ -46,7 +47,7 @@ class TorrentTaskActivity : Activity() {
         val postBody =
             "userid=$uid&filename=${torrentFile.name}&filesize=${torrentFile.length()}&target=U_1_$target".toRequestBody()
 
-        val okHttpClient = OkHttpClient()
+        val okHttpClient = github.zerorooot.nap511.util.NetworkClient.sharedOkHttpClient
         val request: Request = Request.Builder().url(url)
             .addHeader("cookie", cookie)
             .addHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
@@ -67,7 +68,7 @@ class TorrentTaskActivity : Activity() {
                 )
 //                println(initUploadBean)
 
-                val client = OkHttpClient()
+                val client = github.zerorooot.nap511.util.NetworkClient.sharedOkHttpClient
                 val requestBody: RequestBody = MultipartBody.Builder().setType(MultipartBody.FORM)
                     .addFormDataPart("name", torrentFile.name)
                     .addFormDataPart("key", initUploadBean.key)

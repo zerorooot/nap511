@@ -63,6 +63,7 @@ import java.io.IOException
 import java.io.InputStream
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.UUID
 
 // ==================== 日志级别枚举与颜色设置 ====================
 enum class LogLevel(
@@ -123,7 +124,7 @@ object LogParser {
                     LogEntry(
                         raw = line,
                         timestamp = time,
-                        tag = tagStr.replace("-XLOG",""),
+                        tag = tagStr.replace("-XLOG", ""),
                         level = LogLevel.fromCode(levelStr),
                         message = msg
                     )
@@ -295,7 +296,9 @@ fun LogScreen(onClick: () -> Unit) {
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    itemsIndexed(parsedLogs) { index, item ->
+                    itemsIndexed(items = parsedLogs, key = { _, item ->
+                        item.timestamp.ifEmpty { UUID.randomUUID().toString() }
+                    }) { index, item ->
                         LogItemRow(
                             logEntry = item,
                             logIndex = index,

@@ -16,6 +16,7 @@ import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.UserSessionManager
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -24,10 +25,10 @@ import kotlin.concurrent.thread
 
 
 class Sha1Service : Service() {
-    private val okHttpClient = OkHttpClient()
+    private val okHttpClient = github.zerorooot.nap511.util.NetworkClient.sharedOkHttpClient
 
     private val fileRepository: FileRepository by lazy {
-        FileRepository.getInstance(App.cookie)
+        FileRepository.getInstance(UserSessionManager.cookie)
     }
 
     override fun onBind(intent: Intent?): IBinder? {

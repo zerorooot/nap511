@@ -67,11 +67,11 @@ import com.google.gson.JsonObject
 import github.zerorooot.nap511.bean.DrawerMenuItem
 import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.Route
+import github.zerorooot.nap511.dialog.ExitApp
 import github.zerorooot.nap511.factory.CookieViewModelFactory
 import github.zerorooot.nap511.screen.CaptchaVideoWebViewScreen
 import github.zerorooot.nap511.screen.CaptchaWebViewScreen
 import github.zerorooot.nap511.screen.CreateDialogs
-import github.zerorooot.nap511.screen.ExitApp
 import github.zerorooot.nap511.screen.FileScreen
 import github.zerorooot.nap511.screen.LogScreen
 import github.zerorooot.nap511.screen.LoginCredential
