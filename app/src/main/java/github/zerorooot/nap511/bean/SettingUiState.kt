@@ -27,5 +27,6 @@ data class SettingUiState(
     @SerializedName(ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION) val fabPosition: String = "End",
     @SerializedName(ConfigKeyUtil.MOVE_FAIL_FILE) val moveFailFile: String = "",
     @SerializedName(ConfigKeyUtil.DEFAULT_OFFLINE_TIME) val defaultOfflineTime: String = "5",
-    @SerializedName(ConfigKeyUtil.MAX_TXT_SIZE) val txtSize: String = "200"
+    @SerializedName(ConfigKeyUtil.MAX_TXT_SIZE) val txtSize: String = "200",
+    @SerializedName(ConfigKeyUtil.EXPANDED_SCREEN) val expandedScreenEnabled: Boolean = true
 )

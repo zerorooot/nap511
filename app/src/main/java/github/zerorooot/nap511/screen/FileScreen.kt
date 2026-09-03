@@ -125,6 +125,7 @@ import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 fun FileScreen(
     fileViewModel: FileViewModel,
     audioViewModel: AudioViewModel,
+    isExpandedScreen: Boolean,
     onNav: (Route) -> Unit,
     appBarOnClick: (String) -> Unit,
     drawerState: () -> Boolean
@@ -145,9 +146,6 @@ fun FileScreen(
     val refreshing by fileViewModel.isRefreshing.collectAsState()
     val context = LocalContext.current
     var showDialog by remember { mutableIntStateOf(-1) }
-
-    val configuration = LocalConfiguration.current
-    val isExpandedScreen = configuration.screenWidthDp >= 600
 
     val listLocation = fileViewModel.getListLocation(path)
     val listState = key(path) {

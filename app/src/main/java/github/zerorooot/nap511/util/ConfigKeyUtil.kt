@@ -149,6 +149,11 @@ class ConfigKeyUtil {
         const val DYNAMIC_COLOR = "dynamicColor"
 
         /**
+         * 是否启用大屏/宽屏模式 (ExpandedScreen)
+         */
+        const val EXPANDED_SCREEN = "expandedScreen"
+
+        /**
          * 主题色模式：跟随系统、亮色模式、暗色模式
          */
         const val THEME_MODE = "themeMode"

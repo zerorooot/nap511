@@ -49,6 +49,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.util.Consumer
@@ -241,6 +242,12 @@ class MainActivity : AppCompatActivity() {
         val drawerState = rememberDrawerState(DrawerValue.Closed)
         val scope = rememberCoroutineScope()
 
+        val isExpandedScreen =
+            (LocalConfiguration.current.screenWidthDp >= 600) && DataStoreUtil.getData(
+                ConfigKeyUtil.EXPANDED_SCREEN, true
+            )
+
+
         // 监听当前导航栈顶的路由，用于高亮显示 Drawer 中选中的 Item
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentDestination = navBackStackEntry?.destination
@@ -376,6 +383,7 @@ class MainActivity : AppCompatActivity() {
                         FileScreen(
                             fileViewModel,
                             audioViewModel,
+                            isExpandedScreen,
                             {
                                 scope.launch(Dispatchers.Main) {
                                     navController.navigate(it)
@@ -405,7 +413,8 @@ class MainActivity : AppCompatActivity() {
                     composable<Route.OfflineList> {
                         OfflineFileScreen(
                             offlineFileViewModel,
-                            fileViewModel
+                            isExpandedScreen,
+                            { fileViewModel.getFiles(it) }
                         ) {
                             when (it) {
                                 "ModalNavigationDrawerMenu" -> {
@@ -468,7 +477,7 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                     composable<Route.RecycleBin> {
-                        RecycleScreen(recycleViewModel) {
+                        RecycleScreen(recycleViewModel, isExpandedScreen) {
                             scope.launch { drawerState.open() }
                         }
                     }
@@ -533,7 +542,10 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     composable<Route.RepeatFile> {
-                        RepeatFileScreen(repeatViewModel, { scope.launch { drawerState.open() } }) {
+                        RepeatFileScreen(
+                            repeatViewModel,
+                            isExpandedScreen,
+                            { scope.launch { drawerState.open() } }) {
                             fileViewModel.getFiles(it)
                             navController.navigate(Route.MyFile) {
                                 popUpTo<Route.RepeatFile> {

@@ -10,6 +10,7 @@ import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -63,17 +64,24 @@ class SettingViewModel : ViewModel() {
     }
 
     // 5. 开关配置分组 Flow (Part 2)
-    private val switchFlow2 = combine(
+    private val switchFlow2: Flow<SwitchGroup2> = combine(
         DataStoreUtil.getDataFlow(ConfigKeyUtil.TORRENT_SORT, false),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.LOG, false),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.FORCE_LOAD_CACHE, false),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.VIDEO_LINK_MODE, false),
-        combine(
-            DataStoreUtil.getDataFlow(ConfigKeyUtil.DYNAMIC_COLOR, true),
-            DataStoreUtil.getDataFlow(ConfigKeyUtil.AUTO_JUMP_RETRY, true)
-        ) { dynamicColor, autoJumpRetry -> dynamicColor to autoJumpRetry }
-    ) { torrentSort, logEnabled, forceCache, videoLinkMode, (dynamicColor, autoJumpRetry) ->
-        SwitchGroup2(torrentSort, logEnabled, forceCache, videoLinkMode, dynamicColor, autoJumpRetry)
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.DYNAMIC_COLOR, true),
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.AUTO_JUMP_RETRY, true),
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.EXPANDED_SCREEN, true)
+    ) { values: Array<Boolean> ->
+        SwitchGroup2(
+            torrentSort = values[0],
+            logEnabled = values[1],
+            forceCache = values[2],
+            videoLinkMode = values[3],
+            dynamicColor = values[4],
+            autoJumpRetry = values[5],
+            expandedScreen = values[6]
+        )
     }
 
     // 统一暴露给 UI 的 StateFlow
@@ -108,7 +116,8 @@ class SettingViewModel : ViewModel() {
             forceLoadCache = s2.forceCache,
             videoLinkMode = s2.videoLinkMode,
             dynamicColorEnabled = s2.dynamicColor,
-            autoJumpRetry = s2.autoJumpRetry
+            autoJumpRetry = s2.autoJumpRetry,
+            expandedScreenEnabled = s2.expandedScreen
         )
     }.stateIn(
         scope = viewModelScope,
@@ -261,6 +270,7 @@ class SettingViewModel : ViewModel() {
         val forceCache: Boolean,
         val videoLinkMode: Boolean,
         val dynamicColor: Boolean,
-        val autoJumpRetry: Boolean
+        val autoJumpRetry: Boolean,
+        val expandedScreen: Boolean
     )
 }

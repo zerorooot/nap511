@@ -8,12 +8,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -36,10 +33,15 @@ import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.LazyVerticalGridScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun RecycleScreen(recycleViewModel: RecycleViewModel, onClick: () -> Unit) {
+fun RecycleScreen(
+    recycleViewModel: RecycleViewModel,
+    isExpandedScreen: Boolean,
+    onClick: () -> Unit
+) {
     LaunchedEffect(Unit) {
         recycleViewModel.getRecycleFileList()
     }
@@ -90,9 +92,6 @@ fun RecycleScreen(recycleViewModel: RecycleViewModel, onClick: () -> Unit) {
         MiddleEllipsisText(
             text = "当前文件数：${recycleFileList.size}", modifier = Modifier.padding(8.dp, 4.dp)
         )
-        val configuration = LocalConfiguration.current
-        val isExpandedScreen = configuration.screenWidthDp >= 600
-
         PullToRefreshBox(
             isRefreshing = refreshing, onRefresh = { recycleViewModel.refresh() }) {
             if (recycleFileList.isEmpty()) {

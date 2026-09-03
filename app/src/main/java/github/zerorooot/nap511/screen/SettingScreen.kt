@@ -413,7 +413,15 @@ fun SettingContent(
                 }
                 item {
                     SwitchPreferenceItem(
-                        title = "重命名自动定位光标",
+                        title = "大屏模式",
+                        summary = "在平板或大屏设备（屏幕宽度 ≥ 600dp）上启用大屏展开布局",
+                        checked = uiState.expandedScreenEnabled,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.EXPANDED_SCREEN, it) }
+                    )
+                }
+                item {
+                    SwitchPreferenceItem(
+                        title = "重命名光标定位",
                         summary = "重命名文件时，输入光标自动定位至 '@' 或 '空格' 字符后",
                         checked = uiState.positionAfterAt,
                         onCheckedChange = { onSaveConfig(ConfigKeyUtil.POSITION_AFTER_AT, it) }

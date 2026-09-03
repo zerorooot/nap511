@@ -63,6 +63,7 @@ import kotlin.math.pow
 @Composable
 fun RepeatFileScreen(
     viewModel: RepeatFileViewModel,
+    isExpandedScreen: Boolean,
     onClick: () -> Unit,
     jumpClick: (String) -> Unit
 ) {
@@ -74,9 +75,6 @@ fun RepeatFileScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     val count = uiState.statusData?.fileCount ?: "0"
     val formattedSize = formatBytes(uiState.statusData?.fileSize?.toLongOrNull() ?: 0L)
-
-    val configuration = LocalConfiguration.current
-    val isExpandedScreen = configuration.screenWidthDp >= 600
 
     // 1. 创建并监听 ListState 与 GridState
     val listState = rememberLazyListState()

@@ -10,12 +10,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -37,22 +34,24 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat.getSystemService
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.screenitem.OfflineCellItem
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import kotlinx.coroutines.launch
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.LazyVerticalGridScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 import java.util.StringJoiner
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 
 @Composable
 fun OfflineFileScreen(
     offlineFileViewModel: OfflineFileViewModel,
-    fileViewModel: FileViewModel,
+    isExpandedScreen: Boolean,
+    getFiles: (String) -> Unit,
     onClick: (String) -> Unit,
 ) {
     LaunchedEffect(Unit) {
@@ -86,7 +85,7 @@ fun OfflineFileScreen(
     val itemOnClick = { offlineTask: OfflineTask ->
         val cid = if (offlineTask.fileId == "") offlineTask.wpPathId else offlineTask.fileId
         onClick.invoke("MyFile")
-        fileViewModel.getFiles(cid)
+        getFiles.invoke(cid)
     }
 
     // 菜单操作逻辑：直接接收选中的 OfflineTask 对象
@@ -162,9 +161,6 @@ fun OfflineFileScreen(
             state = pagerState,
             modifier = Modifier.weight(1f)
         ) { page ->
-            val configuration = LocalConfiguration.current
-            val isExpandedScreen = configuration.screenWidthDp >= 600
-
             val listState = key(page) { rememberLazyListState() }
             val gridState = key(page) { rememberLazyGridState() }
 
@@ -175,11 +171,13 @@ fun OfflineFileScreen(
                     if (isExpandedScreen) {
                         val layoutInfo = gridState.layoutInfo
                         totalItems = layoutInfo.totalItemsCount
-                        lastVisibleIndex = (layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) + 1
+                        lastVisibleIndex =
+                            (layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) + 1
                     } else {
                         val layoutInfo = listState.layoutInfo
                         totalItems = layoutInfo.totalItemsCount
-                        lastVisibleIndex = (layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) + 1
+                        lastVisibleIndex =
+                            (layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) + 1
                     }
                     totalItems > 0 && lastVisibleIndex >= totalItems - 5
                 }
