@@ -40,18 +40,6 @@ class RecycleViewModel(private val cookie: String) :
         FileService.getInstance(cookie)
     }
 
-    init {
-        viewModelScope.launch {
-            dialogEventBus.events.collect { event ->
-                when (event) {
-                    is DialogEvent.OpenRecyclePasswordDialog -> isOpenRecyclePasswordDialog = true
-                    else -> { /* ignore */
-                    }
-                }
-            }
-        }
-    }
-
     fun getRecycleFileList() {
         if (recycleFileList.isNotEmpty()) {
             return

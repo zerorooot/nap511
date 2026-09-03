@@ -66,6 +66,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -143,7 +144,7 @@ fun FileScreen(
     val path by fileViewModel.currentPath.collectAsState()
     val refreshing by fileViewModel.isRefreshing.collectAsState()
     val context = LocalContext.current
-    var showDialog by remember { mutableIntStateOf(-1) }
+    var showDialog by rememberSaveable { mutableIntStateOf(-1) }
 
     val listLocation = fileViewModel.getListLocation(path)
     val listState = key(path) {
@@ -160,8 +161,8 @@ fun FileScreen(
     }
     val density = LocalDensity.current
     // 1. 设置 35dp 的防抖阈值
-    val thresholdPx = remember(density) { with(density) { 35.dp.toPx() } }
-    var isBottomBarShow by remember { mutableStateOf(true) }
+    val thresholdPx = rememberSaveable(density) { with(density) { 35.dp.toPx() } }
+    var isBottomBarShow by rememberSaveable { mutableStateOf(true) }
 
     // 2. 嵌套滚动监听
     val nestedScrollConnection = remember {
@@ -281,42 +282,45 @@ fun FileScreen(
         }
     }
 
-    fun forceOpen(openType: ForceOpenType) {
+
+    if (showDialog != -1) {
         val bean = fileViewModel.fileBeanList[showDialog]
-        fileViewModel.setRefreshingStatus(true)
-        when (openType) {
-            ForceOpenType.VIDEO -> {
-                handleVideoClick(showDialog, bean)
-            }
+        if (bean.isFolder) {
+            App.instance.toast("此功能仅支持文件，不支持文件夹")
+            showDialog = -1
+        } else {
+            ForceOpenDialog(
+                bean.name,
+                onDismissRequest = { showDialog = -1 },
+            ) {
+                fileViewModel.setRefreshingStatus(true)
+                when (it) {
+                    ForceOpenType.VIDEO -> {
+                        handleVideoClick(showDialog, bean)
+                    }
 
-            ForceOpenType.AUDIO -> {
-                handleAudioClick(bean)
-            }
+                    ForceOpenType.AUDIO -> {
+                        handleAudioClick(bean)
+                    }
 
-            ForceOpenType.IMAGE -> {
-                handlePhotoClick(bean)
-            }
+                    ForceOpenType.IMAGE -> {
+                        handlePhotoClick(bean)
+                    }
 
-            ForceOpenType.TEXT -> {
-                handleTextClick(showDialog, bean)
-            }
+                    ForceOpenType.TEXT -> {
+                        handleTextClick(showDialog, bean)
+                    }
 
-            ForceOpenType.ARCHIVE -> {
-                handleZipClick(showDialog)
-            }
+                    ForceOpenType.ARCHIVE -> {
+                        handleZipClick(showDialog)
+                    }
 
-            ForceOpenType.TORRENT -> {
-                handleTorrentClick(bean)
+                    ForceOpenType.TORRENT -> {
+                        handleTorrentClick(bean)
+                    }
+                }
             }
         }
-
-
-    }
-    if (showDialog != -1) {
-        ForceOpenDialog(
-            onDismissRequest = { showDialog = -1 },
-            onTypeSelected = ::forceOpen
-        )
     }
 
 // 记录上次点击时间，使用 longArrayOf 避免无意义的重组

@@ -108,9 +108,8 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
      */
     internal val dialogEventBus = DialogEventBus.getInstance()
 
-    // 替换原来 11 个 Boolean 状态
     var activeDialog by mutableStateOf<FileDialogState>(FileDialogState.None)
-        private set
+        internal set
 
     fun closeDialog() {
         activeDialog = FileDialogState.None
@@ -120,24 +119,8 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
     init {
         viewModelScope.launch {
             dialogEventBus.events.collect { event ->
-                activeDialog = when (event) {
-                    is DialogEvent.OpenCreateFolder -> FileDialogState.CreateFolder
-                    is DialogEvent.OpenSearch -> FileDialogState.Search
-                    is DialogEvent.OpenRenameFile -> FileDialogState.RenameFile
-                    is DialogEvent.OpenFileInfo -> FileDialogState.FileInfo
-                    is DialogEvent.OpenFileOrder -> FileDialogState.FileOrder
-                    is DialogEvent.OpenAria2Dialog -> FileDialogState.Aria2
-                    is DialogEvent.OpenUnzipDialog -> FileDialogState.Unzip
-                    is DialogEvent.OpenUnzipPasswordDialog -> FileDialogState.UnzipPassword
-                    is DialogEvent.OpenUnzipAllFileDialog -> FileDialogState.UnzipAllFile
-                    is DialogEvent.OpenCreateSelectTorrentFileDialog -> FileDialogState.CreateSelectTorrentFile
-                    is DialogEvent.RefreshFileList -> {
-                        refresh(event.cid)
-                        activeDialog
-                    }
-                    // 不属于 FileViewModel 的事件，忽略
-                    is DialogEvent.OpenOfflineDialog,
-                    is DialogEvent.OpenRecyclePasswordDialog -> activeDialog
+                when (event) {
+                    is DialogEvent.RefreshFileList -> refresh(event.cid)
                 }
             }
         }

@@ -14,8 +14,6 @@ import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import github.zerorooot.nap511.util.DialogEvent
-import github.zerorooot.nap511.util.DialogEventBus
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,22 +49,8 @@ class OfflineFileViewModel(private val cookie: String) : ViewModel() {
     lateinit var offlineTask: OfflineTask
     val urlText = mutableStateOf("")
 
-    private val dialogEventBus = DialogEventBus.getInstance()
-
     var isOpenOfflineDialog by mutableStateOf(false)
         private set
-
-    init {
-        viewModelScope.launch {
-            dialogEventBus.events.collect { event ->
-                when (event) {
-                    is DialogEvent.OpenOfflineDialog -> isOpenOfflineDialog = true
-                    else -> { /* ignore */
-                    }
-                }
-            }
-        }
-    }
 
 
     private val fileRepository: FileRepository by lazy {

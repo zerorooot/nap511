@@ -1,50 +1,48 @@
 package github.zerorooot.nap511.viewmodel
 
-import androidx.lifecycle.viewModelScope
-import github.zerorooot.nap511.util.DialogEvent
-import kotlinx.coroutines.launch
+import github.zerorooot.nap511.bean.FileDialogState
 
 
 // ==================== 公开方法：供外部触发对话框事件 ====================
 
 internal fun FileViewModel.openCreateFolderDialog() {
-    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenCreateFolder) }
+    activeDialog = FileDialogState.CreateFolder
 }
 
 internal fun FileViewModel.openSearchDialog() {
-    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenSearch) }
+    activeDialog = FileDialogState.Search
 }
 
 internal fun FileViewModel.openRenameFileDialog() {
-    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenRenameFile) }
+    activeDialog = FileDialogState.RenameFile
 }
 
 internal fun FileViewModel.openFileInfoDialog() {
-    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenFileInfo) }
+    activeDialog = FileDialogState.FileInfo
 }
 
 internal fun FileViewModel.openFileOrderDialog() {
-    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenFileOrder) }
+    activeDialog = FileDialogState.FileOrder
 }
 
 internal fun FileViewModel.openAria2Dialog() {
-    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenAria2Dialog) }
+    activeDialog = FileDialogState.Aria2
 }
 
 internal fun FileViewModel.openUnzipAllFileDialog() {
-    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenUnzipAllFileDialog) }
+    activeDialog = FileDialogState.UnzipAllFile
 }
 
 internal fun FileViewModel.openCreateSelectTorrentFileDialog() {
-    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenCreateSelectTorrentFileDialog) }
+    activeDialog = FileDialogState.CreateSelectTorrentFile
 }
 
 internal fun FileViewModel.openUnzipDialog() {
-    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenUnzipDialog) }
+    activeDialog = FileDialogState.Unzip
 }
 
 internal fun FileViewModel.openUnzipPasswordDialog() {
-    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenUnzipPasswordDialog) }
+    activeDialog = FileDialogState.UnzipPassword
 }
 
 

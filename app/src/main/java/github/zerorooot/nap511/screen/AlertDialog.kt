@@ -70,7 +70,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -123,38 +122,37 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun ForceOpenDialog(
+    fileName: String,
     onDismissRequest: () -> Unit,
     onTypeSelected: (ForceOpenType) -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismissRequest,
         title = {
-            Text(text = "强行打开为", style = MaterialTheme.typography.titleLarge)
+            Text(text = "把文件 '$fileName' 强行打开为", style = MaterialTheme.typography.titleLarge)
         },
         text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 ForceOpenType.entries.forEach { type ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                onTypeSelected(type)
-                                onDismissRequest()
-                            }
-                            .padding(vertical = 12.dp, horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = type.icon,
-                            contentDescription = type.label,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Text(
-                            text = type.label,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    }
+                    FilterChip(
+                        selected = true,
+                        onClick = {
+                            onTypeSelected(type)
+                            onDismissRequest()
+                        },
+                        label = { Text(type.label) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = type.icon,
+                                contentDescription = null,
+                                modifier = Modifier.size(FilterChipDefaults.IconSize)
+                            )
+                        }
+                    )
                 }
             }
         },

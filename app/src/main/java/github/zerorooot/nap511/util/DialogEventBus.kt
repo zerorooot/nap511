@@ -7,52 +7,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 
 sealed interface DialogEvent {
 
-    // ==================== FileViewModel 对话框 ====================
-
-    /** 新建文件夹 */
-    data object OpenCreateFolder : DialogEvent
-
-    /** 搜索 */
-    data object OpenSearch : DialogEvent
-
-    /** 重命名 */
-    data object OpenRenameFile : DialogEvent
-
-    /** 文件信息 */
-    data object OpenFileInfo : DialogEvent
-
-    /** 文件排序 */
-    data object OpenFileOrder : DialogEvent
-
-    /** Aria2 配置 */
-    data object OpenAria2Dialog : DialogEvent
-
-    /** 在线解压（选择解压路径） */
-    data object OpenUnzipDialog : DialogEvent
-
-    /** 解压密码输入 */
-    data object OpenUnzipPasswordDialog : DialogEvent
-
-
-    /** 解压所有压缩包（提前输入密码） */
-    data object OpenUnzipAllFileDialog : DialogEvent
-
-    /** 创建种子选择文件对话框 */
-    data object OpenCreateSelectTorrentFileDialog : DialogEvent
-
-
-    // ==================== OfflineFileViewModel 对话框 ====================
-
-    /** 离线任务详情 */
-    data object OpenOfflineDialog : DialogEvent
-
-
-    // ==================== RecycleViewModel 对话框 ====================
-
-    /** 回收站密码 */
-    data object OpenRecyclePasswordDialog : DialogEvent
-
-    /** OfflineTaskWorker 中的文件刷新通知*/
+    /** OfflineTaskWorker 和 RecycleViewModel 中的文件刷新通知 */
     data class RefreshFileList(val cid: String) : DialogEvent
 }
 
