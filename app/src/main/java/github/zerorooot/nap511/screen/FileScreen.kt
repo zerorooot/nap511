@@ -24,10 +24,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -471,7 +478,14 @@ fun FileScreen(
         },
         floatingActionButtonPosition = fabPosition
     ) { innerPadding ->
-        Column(modifier = Modifier.padding(innerPadding)) {
+        Column(
+            modifier = Modifier
+                .padding(
+                    top = innerPadding.calculateTopPadding(),
+                    bottom = innerPadding.calculateBottomPadding()
+                )
+                .consumeWindowInsets(innerPadding)
+        ) {
             FilePathBar(
                 pathList = fileViewModel.pathList,
                 onPathClick = {
@@ -559,6 +573,7 @@ private fun FilePathBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                 .horizontalScroll(scrollState),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -669,6 +684,7 @@ private fun FileListContent(
                         LazyVerticalGrid(
                             state = gridState,
                             columns = GridCells.Adaptive(minSize = 340.dp),
+//                            contentPadding = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal).asPaddingValues(),
                             modifier = Modifier.fillMaxSize()
                         ) {
                             gridItemsIndexed(
@@ -706,7 +722,8 @@ private fun FileListContent(
                     ) {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            state = listState
+                            state = listState,
+//                            contentPadding = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal).asPaddingValues()
                         ) {
                             itemsIndexed(
                                 items = fileBeanList,

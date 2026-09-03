@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -75,6 +77,7 @@ fun MusicDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
                 title = { Text("正在播放") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -82,11 +85,11 @@ fun MusicDetailScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        ),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ),
             )
         },
         containerColor = MaterialTheme.colorScheme.surface
@@ -428,6 +431,7 @@ fun MusicDetailScreenPreview() {
             topBar = {
                 @OptIn(ExperimentalMaterial3Api::class)
                 TopAppBar(
+                    windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
                     title = { Text("正在播放") },
                     navigationIcon = {
                         IconButton(onClick = {}) {
@@ -435,11 +439,11 @@ fun MusicDetailScreenPreview() {
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        ),
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ),
                 )
             }
         ) { paddingValues ->

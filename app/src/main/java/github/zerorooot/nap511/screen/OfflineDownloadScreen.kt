@@ -17,6 +17,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -87,6 +89,7 @@ fun OfflineDownloadScreen(
     }
     Column {
         TopAppBar(
+            windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
             title = {
                 Text(text = ConfigKeyUtil.OFFLINE_DOWNLOAD)
             },

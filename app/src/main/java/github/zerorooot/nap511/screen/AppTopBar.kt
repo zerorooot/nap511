@@ -22,6 +22,8 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,6 +48,7 @@ import github.zerorooot.nap511.ui.theme.Typography
 fun AppTopBarNormal(title: String, onClick: (name: String) -> Unit) {
 //    val contextForToast = LocalContext.current.applicationContext
     TopAppBar(
+        windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
         title = {
             Text(text = title)
         },
@@ -82,6 +85,7 @@ fun AppTopBarNormal(title: String, onClick: (name: String) -> Unit) {
 @Composable
 fun AppTopBarMultiple(title: String, onClick: (String) -> Unit) {
     TopAppBar(
+        windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
         title = {
             Text(text = title)
         },
@@ -160,6 +164,7 @@ fun AppTopBarMultiple(title: String, onClick: (String) -> Unit) {
 fun AppTopBarOfflineFile(title: String, onClick: (name: String) -> Unit) {
 //    val contextForToast = LocalContext.current.applicationContext
     TopAppBar(
+        windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
         title = {
             Text(text = title)
         },
@@ -190,6 +195,7 @@ fun AppTopBarOfflineFile(title: String, onClick: (name: String) -> Unit) {
 fun AppTopBarLogScreen(title: String, onClick: (name: String) -> Unit) {
 //    val contextForToast = LocalContext.current.applicationContext
     TopAppBar(
+        windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
         title = {
             Text(text = title)
         },
@@ -225,6 +231,7 @@ fun AppTopBarLogScreen(title: String, onClick: (name: String) -> Unit) {
 @Composable
 fun AppTopBarRepeatFile(title: String, onClick: (name: String) -> Unit) {
     TopAppBar(
+        windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
         title = {
             Text(text = title)
         },
@@ -254,6 +261,7 @@ fun AppTopBarRepeatFile(title: String, onClick: (name: String) -> Unit) {
 @Composable
 fun AppTopBarRecycle(title: String, onClick: (name: String) -> Unit) {
     TopAppBar(
+        windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
         title = {
             Text(text = title)
         },
@@ -317,6 +325,7 @@ fun TopAppBarTxtReaderNormal(
     modifier: Modifier = Modifier
 ) {
     TopAppBar(
+        windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
         modifier = modifier,
         title = {
             Column {
@@ -378,6 +387,7 @@ fun TopAppBarSearch(
     focusRequester: FocusRequester
 ) {
     TopAppBar(
+        windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
         modifier = modifier,
         title = {
             TextField(
