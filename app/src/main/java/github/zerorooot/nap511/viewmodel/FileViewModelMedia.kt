@@ -83,7 +83,12 @@ internal fun FileViewModel.updateVideoFileBean(
         )
         runCatching {
             val videoHistory = fileRepository.videoHistory(map)
-            XLog.d("更新视频时间 $videoHistory")
+            if (!videoHistory.state) {
+                App.instance.toast(videoHistory.error)
+                XLog.e("更新视频时间失败！ $videoHistory")
+            }else{
+                XLog.d("更新视频时间 $videoHistory")
+            }
         }.onFailureToastAndLog(tag = "FileViewModelMedia")
     }
 }
@@ -95,7 +100,8 @@ internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int, fi
 
         runCatching {
             val video = if (videoLinkMode) {
-                fileRepository.video(pickCode).copy(index = fileBeanIndex, isAutoRotate = isAutoRotate)
+                fileRepository.video(pickCode)
+                    .copy(index = fileBeanIndex, isAutoRotate = isAutoRotate)
             } else {
                 val (width, height) = if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
                     1080 to 1920

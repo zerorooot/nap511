@@ -19,11 +19,10 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -102,7 +101,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
-import kotlin.text.ifEmpty
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(
@@ -502,6 +500,12 @@ private fun FilePathBar(
     onPathLongClick: () -> Unit,
     onItemClick: (String) -> Unit
 ) {
+    val scrollState = rememberScrollState()
+
+    // 路径变化时自动滚动到最右侧末尾
+    LaunchedEffect(pathList.size) {
+        scrollState.animateScrollTo(scrollState.maxValue)
+    }
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -511,9 +515,11 @@ private fun FilePathBar(
                 onLongClick = onPathLongClick
             )
     ) {
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.Center
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(scrollState),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             pathList.forEachIndexed { index, path ->
                 MiddleEllipsisText(
@@ -527,7 +533,7 @@ private fun FilePathBar(
                 // 间隔符
                 if (index < pathList.size - 1) {
                     MiddleEllipsisText(
-                        text = "/",
+                        text = " / ",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(0.dp, 4.dp)

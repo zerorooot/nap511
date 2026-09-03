@@ -242,7 +242,7 @@ fun SearchDialog(
                     ) {
                         strategies.forEach { (label, icon) ->
                             FilterChip(
-                                selected = false,
+                                selected = true,
                                 onClick = { onSelectStrategy(label) },
                                 label = { Text(label) },
                                 leadingIcon = {

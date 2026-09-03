@@ -187,7 +187,7 @@ class App : Application(), ImageLoaderFactory {
                 DataStoreUtil.putDataSuspend(ConfigKeyUtil.UID, avatarBean.userId)
                 DataStoreUtil.putDataSuspend(ConfigKeyUtil.AVATAR_BEAN, gson.toJson(avatarBean))
 
-                Pair(true, "登陆成功,重启中～")
+                Pair(true, "登录成功,重启中～")
             }
         } catch (e: Exception) {
             XLog.e("checkLogin Check login failed", e)
