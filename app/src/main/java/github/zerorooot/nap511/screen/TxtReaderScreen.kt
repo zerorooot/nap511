@@ -52,6 +52,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -106,15 +107,15 @@ fun TxtReaderScreen(
 ) {
     val context = LocalContext.current
     // 状态定义
-    var currentEncoding by remember { mutableStateOf(defaultEncoding) }
-    var fontSizeSp by remember { mutableFloatStateOf(16f) }
-    var lineHeightMultiplier by remember { mutableFloatStateOf(1.5f) }
-    var showLineNumbers by remember { mutableStateOf(true) } // 行号显示开关
+    var currentEncoding by rememberSaveable { mutableStateOf(defaultEncoding) }
+    var fontSizeSp by rememberSaveable { mutableFloatStateOf(16f) }
+    var lineHeightMultiplier by rememberSaveable { mutableFloatStateOf(1.5f) }
+    var showLineNumbers by rememberSaveable { mutableStateOf(true) } // 行号显示开关
 
     // 控制UI组件显示
-    var showSettingsSheet by remember { mutableStateOf(false) }
-    var showCharsetDialog by remember { mutableStateOf(false) }
-    var showControls by remember { mutableStateOf(true) }
+    var showSettingsSheet by rememberSaveable { mutableStateOf(false) }
+    var showCharsetDialog by rememberSaveable { mutableStateOf(false) }
+    var showControls by rememberSaveable { mutableStateOf(true) }
 
     // 异步解码文本（段落切分）
     var paragraphs by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -122,9 +123,9 @@ fun TxtReaderScreen(
     var decodeError by remember { mutableStateOf<String?>(null) }
 
     // --- 新增搜索相关状态 ---
-    var isSearchOpen by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
-    var currentMatchIndex by remember { mutableIntStateOf(0) }
+    var isSearchOpen by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var currentMatchIndex by rememberSaveable { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
     // 获取当前 Window 实例
     val view = LocalView.current
@@ -334,11 +335,11 @@ fun TxtReaderScreen(
                 }
             }
         }
-    ) { innerPadding ->
+    ) { _ ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+//                .padding(innerPadding)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null

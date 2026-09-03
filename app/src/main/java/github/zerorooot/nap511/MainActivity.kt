@@ -555,8 +555,13 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                     composable<Route.TxtReader> {
-                        val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
-                        TxtReaderScreen(fileViewModel.textBodyByteArray!!, title = fileBean.name) {
+                        val fileBean = fileViewModel.fileBeanList.getOrNull(fileViewModel.selectIndex)
+                        val byteArray = fileViewModel.textBodyByteArray
+                        if (byteArray != null) {
+                            TxtReaderScreen(byteArray, title = fileBean?.name ?: "文本阅读") {
+                                navController.popBackStack()
+                            }
+                        } else {
                             navController.popBackStack()
                         }
                     }

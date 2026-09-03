@@ -168,10 +168,6 @@ fun CreateDialogs(
             UnzipAllFile(fileViewModel)
         }
 
-        is FileDialogState.TextBody -> {
-            TextBodyDialog(fileViewModel)
-        }
-
         else -> {
             fileViewModel.closeDialog()
         }

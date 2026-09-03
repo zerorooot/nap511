@@ -47,9 +47,6 @@ internal fun FileViewModel.openUnzipPasswordDialog() {
     viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenUnzipPasswordDialog) }
 }
 
-internal fun FileViewModel.openTextBodyDialog() {
-    viewModelScope.launch { dialogEventBus.emit(DialogEvent.OpenTextBodyDialog) }
-}
 
 // ==================== 关闭方法（统一重定向到 closeDialog） ====================
 

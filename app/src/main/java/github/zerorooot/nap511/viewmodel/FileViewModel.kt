@@ -129,7 +129,6 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
                     is DialogEvent.OpenAria2Dialog -> FileDialogState.Aria2
                     is DialogEvent.OpenUnzipDialog -> FileDialogState.Unzip
                     is DialogEvent.OpenUnzipPasswordDialog -> FileDialogState.UnzipPassword
-                    is DialogEvent.OpenTextBodyDialog -> FileDialogState.TextBody
                     is DialogEvent.OpenUnzipAllFileDialog -> FileDialogState.UnzipAllFile
                     is DialogEvent.OpenCreateSelectTorrentFileDialog -> FileDialogState.CreateSelectTorrentFile
                     is DialogEvent.RefreshFileList -> {
@@ -233,7 +232,11 @@ class FileViewModel(internal val cookie: String, internal val context: Context) 
         }
     }
 
+    private var isInitialized = false
+
     fun loadCacheFile() {
+        if (isInitialized) return
+        isInitialized = true
         _isRefreshing.value = true
         viewModelScope.launch(Dispatchers.IO) {
             if (!saveRequestCache) {

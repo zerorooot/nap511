@@ -572,9 +572,10 @@ fun ExitApp(onDismissRequest: () -> Unit) {
 
 @Composable
 fun TextBodyDialog(fileViewModel: FileViewModel) {
-    if (fileViewModel.textBodyByteArray != null) {
-        val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
-        TextBodyDialogScreen(fileBean.name, fileViewModel.textBodyByteArray!!) {
+    val textBytes = fileViewModel.textBodyByteArray
+    if (textBytes != null) {
+        val fileBean = fileViewModel.fileBeanList.getOrNull(fileViewModel.selectIndex)
+        TextBodyDialogScreen(fileBean?.name ?: "文本预览", textBytes) {
             if (it == "") {
                 fileViewModel.textBodyByteArray = null
                 fileViewModel.closeTextBodyDialog()
@@ -679,12 +680,12 @@ fun UnzipPassword(fileBean: FileBean, enter: (String?) -> Unit) {
  */
 @Composable
 fun UnzipDialog(fileViewModel: FileViewModel) {
-    val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
+    val fileBean = fileViewModel.fileBeanList.getOrNull(fileViewModel.selectIndex)
     val zipBeanList by fileViewModel.unzipBeanList
     LaunchedEffect(Unit) {
         fileViewModel.setRefreshingStatus(false)
     }
-    UnzipScreen(zipBeanList, fileBean.name) {
+    UnzipScreen(zipBeanList, fileBean?.name ?: "解压文件") {
         //Pair true is command,false is click event
         if (it.first) {
             when (it.second) {

@@ -10,7 +10,6 @@ sealed interface FileDialogState {
     data object Aria2 : FileDialogState
     data object Unzip : FileDialogState
     data object UnzipPassword : FileDialogState
-    data object TextBody : FileDialogState
     data object UnzipAllFile : FileDialogState
     data object CreateSelectTorrentFile : FileDialogState
 }

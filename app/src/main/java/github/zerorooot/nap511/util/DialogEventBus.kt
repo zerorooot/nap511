@@ -33,8 +33,6 @@ sealed interface DialogEvent {
     /** 解压密码输入 */
     data object OpenUnzipPasswordDialog : DialogEvent
 
-    /** 小文本查看 */
-    data object OpenTextBodyDialog : DialogEvent
 
     /** 解压所有压缩包（提前输入密码） */
     data object OpenUnzipAllFileDialog : DialogEvent
