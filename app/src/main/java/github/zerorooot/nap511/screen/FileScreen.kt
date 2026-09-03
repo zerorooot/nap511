@@ -676,7 +676,6 @@ private fun FileListContent(
                                 key = { _, item ->
                                     item.fileId.ifEmpty { item.pickCode.ifEmpty { item.uuid.toString() } }
                                 },
-                                contentType = { _, item -> item.fileIco }
                             ) { index, item ->
                                 FileCellItem(
                                     fileBean = item,
@@ -714,7 +713,6 @@ private fun FileListContent(
                                 key = { _, item ->
                                     item.fileId.ifEmpty { item.pickCode.ifEmpty { item.uuid.toString() } }
                                 },
-                                contentType = { _, item -> item.fileIco }
                             ) { index, item ->
                                 FileCellItem(
                                     fileBean = item,

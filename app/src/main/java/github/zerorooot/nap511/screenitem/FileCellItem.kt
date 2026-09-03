@@ -145,6 +145,7 @@ fun FileCellItem(
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
+                      //  horizontalArrangement = Arrangement.spacedBy(6.dp), // 明确间距
                         modifier = Modifier
                             .padding(start = 5.dp, top = 9.dp)
                             .fillMaxSize()
@@ -152,6 +153,8 @@ fun FileCellItem(
                         Text(
                             text = size,
                             style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
                         )
                         // 时长（作为独立 Badge 标签凸显）
                         if (fileBean.isVideo == 1 || fileBean.fileIco == R.drawable.mp3) {
@@ -161,24 +164,24 @@ fun FileCellItem(
                                         color = MaterialTheme.colorScheme.secondaryContainer,
                                         shape = RoundedCornerShape(4.dp)
                                     )
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
                                 Text(
                                     text = playLong,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                    maxLines = 1
                                 )
                             }
                         }
+                        // 4. 修改时间
                         Text(
                             text = time,
-                            style = MaterialTheme.typography.bodyMedium,
-//                            modifier = Modifier.fillMaxSize(),
-                            modifier = Modifier.weight(0.7f)
-//                                .padding(4.dp)
-
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-
                     }
                 }
 
