@@ -75,8 +75,12 @@ fun RepeatFileScreen(
     val count = uiState.statusData?.fileCount ?: "0"
     val formattedSize = formatBytes(uiState.statusData?.fileSize?.toLongOrNull() ?: 0L)
 
-    // 1. 创建并监听 LazyColumn 的 ListState
+    val configuration = LocalConfiguration.current
+    val isExpandedScreen = configuration.screenWidthDp >= 600
+
+    // 1. 创建并监听 ListState 与 GridState
     val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
 
     val onDeleteStrategySelect = { field: String, order: String ->
         viewModel.executeDelete(
@@ -89,15 +93,20 @@ fun RepeatFileScreen(
     }
 
     // 2. 校验触底逻辑：当滑动到倒数第 3 项以内且未在加载中时，触发 loadNextPage
-    val shouldLoadMore by remember {
+    val shouldLoadMore by remember(isExpandedScreen) {
         derivedStateOf {
-            val layoutInfo = listState.layoutInfo
-            val totalItems = layoutInfo.totalItemsCount
-            if (totalItems == 0) false
-            else {
-                val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-                lastVisibleItem >= totalItems - 3
+            val totalItems: Int
+            val lastVisibleItem: Int
+            if (isExpandedScreen) {
+                val layoutInfo = gridState.layoutInfo
+                totalItems = layoutInfo.totalItemsCount
+                lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            } else {
+                val layoutInfo = listState.layoutInfo
+                totalItems = layoutInfo.totalItemsCount
+                lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
             }
+            totalItems > 0 && lastVisibleItem >= totalItems - 3
         }
     }
 
@@ -137,8 +146,6 @@ fun RepeatFileScreen(
             text = "共${count}个重复文件，占用空间${formattedSize}",
             modifier = Modifier.padding(8.dp, 4.dp)
         )
-        val configuration = LocalConfiguration.current
-        val isExpandedScreen = configuration.screenWidthDp >= 600
 
         PullToRefreshBox(
             isRefreshing = uiState.isRefreshing,
@@ -153,7 +160,6 @@ fun RepeatFileScreen(
                     Text(text = "暂无重复文件，点击右上角进行查重")
                 }
             } else if (isExpandedScreen) {
-                val gridState = rememberLazyGridState()
                 LazyVerticalGridScrollbar(
                     state = gridState,
                     settings = ScrollbarSettings.Default.copy(

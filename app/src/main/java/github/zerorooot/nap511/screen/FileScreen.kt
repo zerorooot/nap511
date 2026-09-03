@@ -139,9 +139,18 @@ fun FileScreen(
     val context = LocalContext.current
     var showDialog by remember { mutableIntStateOf(-1) }
 
+    val configuration = LocalConfiguration.current
+    val isExpandedScreen = configuration.screenWidthDp >= 600
+
     val listLocation = fileViewModel.getListLocation(path)
     val listState = key(path) {
         rememberLazyListState(
+            listLocation.firstVisibleItemIndex,
+            listLocation.firstVisibleItemScrollOffset
+        )
+    }
+    val gridState = key(path) {
+        rememberLazyGridState(
             listLocation.firstVisibleItemIndex,
             listLocation.firstVisibleItemScrollOffset
         )
@@ -325,7 +334,11 @@ fun FileScreen(
             fileViewModel.setRefreshingStatus(true)
 
             //记录上级目录当前的位置
-            fileViewModel.setListLocationAndClickCache(i, listState)
+            if (isExpandedScreen) {
+                fileViewModel.setListLocationAndClickCache(i, gridState)
+            } else {
+                fileViewModel.setListLocationAndClickCache(i, listState)
+            }
             val fileBean = fileBeanList[i]
 
             when {
@@ -362,7 +375,11 @@ fun FileScreen(
             return
         }
         if (path != "/根目录" && !fileViewModel.isLongClickState) {
-            fileViewModel.setListLocation(path, listState)
+            if (isExpandedScreen) {
+                fileViewModel.setListLocation(path, gridState)
+            } else {
+                fileViewModel.setListLocation(path, listState)
+            }
         }
         isBottomBarShow = true
         //触发路径和数据源的改变，重组后交由上方滚动
@@ -384,7 +401,11 @@ fun FileScreen(
                 scope.launch {
                     fileViewModel.fileBeanList.sortByDescending { fileBean -> fileBean.playLong }
                     delay(10.milliseconds)
-                    listState.requestScrollToItem(0, 0)
+                    if (isExpandedScreen) {
+                        gridState.requestScrollToItem(0, 0)
+                    } else {
+                        listState.requestScrollToItem(0, 0)
+                    }
                 }
 
             }
@@ -413,70 +434,83 @@ fun FileScreen(
         }
     }
 
-    Column {
-        AnimatedContent(
-            targetState = fileViewModel.isLongClickState,
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
-            label = ""
-        ) {
-            if (it) {
-                AppTopBarMultiple(fileViewModel.appBarTitle, ::myAppBarOnClick)
-            } else {
-                AppTopBarNormal(fileViewModel.appBarTitle, ::myAppBarOnClick)
-            }
-        }
-
-        FilePathBar(
-            pathList = fileViewModel.pathList,
-            onPathClick = {
-                clipboardManager.nativeClipboardManager.setPrimaryClip(
-                    ClipData.newPlainText(
-                        "path",
-                        path
-                    )
-                )
-                App.instance.toast("$path 已复制到剪切板")
-            },
-            onPathDoubleClick = { scope.launch { listState.requestScrollToItem(0, 0) } },
-            onPathLongClick = {
-                DataStoreUtil.putData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, fileViewModel.currentCid)
-                App.instance.toast("已设置默认离线位置")
-            },
-            onItemClick = {
-                fileViewModel.getFiles(it)
-            }
-        )
-
-
-        Scaffold(
-            modifier = Modifier.nestedScroll(nestedScrollConnection),
-            bottomBar = {
-                AnimatedVisibility(
-                    visible = audioViewModel.currentMusic != null && isBottomBarShow,
-                    enter = slideInVertically(initialOffsetY = { it }),
-                    exit = slideOutVertically(targetOffsetY = { it }),
-                ) {
-                    MiniPlayerBar(audioViewModel = audioViewModel) {
-                        onNav(Route.MusicDetail)
-                    }
+    Scaffold(
+        topBar = {
+            AnimatedContent(
+                targetState = fileViewModel.isLongClickState,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = ""
+            ) {
+                if (it) {
+                    AppTopBarMultiple(fileViewModel.appBarTitle, ::myAppBarOnClick)
+                } else {
+                    AppTopBarNormal(fileViewModel.appBarTitle, ::myAppBarOnClick)
                 }
-            },
-            floatingActionButton = {
-                FileScreenFab(
-                    isCutState = fileViewModel.isCutState,
-                    visible = isBottomBarShow,
-                    onCancelCut = { fileViewModel.cancelCut() },
-                    onCutPaste = { fileViewModel.removeFile() },
-                    onAddFolder = { fileViewModel.openCreateFolderDialog() }
-                )
-            },
-            floatingActionButtonPosition = fabPosition
-        ) { _ ->
+            }
+        },
+        modifier = Modifier.nestedScroll(nestedScrollConnection),
+        bottomBar = {
+            AnimatedVisibility(
+                visible = audioViewModel.currentMusic != null && isBottomBarShow,
+                enter = slideInVertically(initialOffsetY = { it }),
+                exit = slideOutVertically(targetOffsetY = { it }),
+            ) {
+                MiniPlayerBar(audioViewModel = audioViewModel) {
+                    onNav(Route.MusicDetail)
+                }
+            }
+        },
+        floatingActionButton = {
+            FileScreenFab(
+                isCutState = fileViewModel.isCutState,
+                visible = isBottomBarShow,
+                onCancelCut = { fileViewModel.cancelCut() },
+                onCutPaste = { fileViewModel.removeFile() },
+                onAddFolder = { fileViewModel.openCreateFolderDialog() }
+            )
+        },
+        floatingActionButtonPosition = fabPosition
+    ) { innerPadding ->
+        Column(modifier = Modifier.padding(innerPadding)) {
+            FilePathBar(
+                pathList = fileViewModel.pathList,
+                onPathClick = {
+                    clipboardManager.nativeClipboardManager.setPrimaryClip(
+                        ClipData.newPlainText(
+                            "path",
+                            path
+                        )
+                    )
+                    App.instance.toast("$path 已复制到剪切板")
+                },
+                onPathDoubleClick = {
+                    scope.launch {
+                        if (isExpandedScreen) {
+                            gridState.requestScrollToItem(0, 0)
+                        } else {
+                            listState.requestScrollToItem(0, 0)
+                        }
+                    }
+                },
+                onPathLongClick = {
+                    DataStoreUtil.putData(
+                        ConfigKeyUtil.DEFAULT_OFFLINE_CID,
+                        fileViewModel.currentCid
+                    )
+                    App.instance.toast("已设置默认离线位置")
+                },
+                onItemClick = {
+                    fileViewModel.getFiles(it)
+                }
+            )
+
             FileListContent(
                 refreshing = refreshing,
                 fileBeanList = fileBeanList,
                 path = path,
                 listState = listState,
+                gridState = gridState,
+                isExpandedScreen = isExpandedScreen,
                 clickIndex = fileViewModel.clickMap.getOrDefault(path, -1),
                 onRefresh = { fileViewModel.refresh() },
                 onItemClick = ::myItemOnClick,
@@ -595,6 +629,8 @@ private fun FileListContent(
     fileBeanList: List<FileBean>,
     path: String,
     listState: LazyListState,
+    gridState: LazyGridState,
+    isExpandedScreen: Boolean,
     clickIndex: Int,
     onRefresh: () -> Unit,
     onItemClick: (Int) -> Unit,
@@ -607,9 +643,6 @@ private fun FileListContent(
     onForceOpen: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val configuration = LocalConfiguration.current
-    val isExpandedScreen = configuration.screenWidthDp >= 600
-
     PullToRefreshBox(
         isRefreshing = refreshing,
         onRefresh = onRefresh,
@@ -627,7 +660,6 @@ private fun FileListContent(
         } else {
             key(path) {
                 if (isExpandedScreen) {
-                    val gridState = rememberLazyGridState()
                     LazyVerticalGridScrollbar(
                         state = gridState,
                         settings = ScrollbarSettings.Default.copy(

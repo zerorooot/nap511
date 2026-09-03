@@ -50,7 +50,6 @@ fun RecycleScreen(recycleViewModel: RecycleViewModel, onClick: () -> Unit) {
 
     val refreshing by recycleViewModel.isRefreshing.collectAsState()
     val recycleFileList = recycleViewModel.recycleFileList
-    val listState = rememberLazyListState()
 
 
     val menuOnClick = { name: String, index: Int ->
@@ -131,6 +130,7 @@ fun RecycleScreen(recycleViewModel: RecycleViewModel, onClick: () -> Unit) {
                     }
                 }
             } else {
+                val listState = rememberLazyListState()
                 LazyColumnScrollbar(
                     state = listState, settings = ScrollbarSettings.Default.copy(
                         thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary

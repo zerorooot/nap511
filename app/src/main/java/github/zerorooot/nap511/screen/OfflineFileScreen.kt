@@ -162,15 +162,26 @@ fun OfflineFileScreen(
             state = pagerState,
             modifier = Modifier.weight(1f)
         ) { page ->
-            val listState = key(page) { rememberLazyListState() }
-            val shouldLoadMore = remember {
-                derivedStateOf {
-                    val layoutInfo = listState.layoutInfo
-                    val totalItems = layoutInfo.totalItemsCount
-                    val lastVisibleItemIndex =
-                        (layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) + 1
+            val configuration = LocalConfiguration.current
+            val isExpandedScreen = configuration.screenWidthDp >= 600
 
-                    totalItems > 0 && lastVisibleItemIndex >= totalItems - 5
+            val listState = key(page) { rememberLazyListState() }
+            val gridState = key(page) { rememberLazyGridState() }
+
+            val shouldLoadMore = remember(isExpandedScreen) {
+                derivedStateOf {
+                    val totalItems: Int
+                    val lastVisibleIndex: Int
+                    if (isExpandedScreen) {
+                        val layoutInfo = gridState.layoutInfo
+                        totalItems = layoutInfo.totalItemsCount
+                        lastVisibleIndex = (layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) + 1
+                    } else {
+                        val layoutInfo = listState.layoutInfo
+                        totalItems = layoutInfo.totalItemsCount
+                        lastVisibleIndex = (layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) + 1
+                    }
+                    totalItems > 0 && lastVisibleIndex >= totalItems - 5
                 }
             }
 // 2. 监听触底状态变化并触发加载
@@ -203,8 +214,6 @@ fun OfflineFileScreen(
                 2 -> failedList
                 else -> emptyList()
             }
-            val configuration = LocalConfiguration.current
-            val isExpandedScreen = configuration.screenWidthDp >= 600
 
             PullToRefreshBox(
                 isRefreshing = refreshing,
@@ -221,7 +230,6 @@ fun OfflineFileScreen(
                         Text("暂无记录")
                     }
                 } else if (isExpandedScreen) {
-                    val gridState = rememberLazyGridState()
                     LazyVerticalGridScrollbar(
                         state = gridState,
                         settings = ScrollbarSettings.Default.copy(
