@@ -252,7 +252,7 @@ fun SettingContent(
                 }
                 item {
                     EditTextPreferenceItem(
-                        title = "待处理离线任务",
+                        title = "暂存未下任务链接",
                         summary = if (uiState.currentOfflineTask.isEmpty()) {
                             "当前无暂存的离线任务"
                         } else {
@@ -310,7 +310,7 @@ fun SettingContent(
                 item { PreferenceCategoryHeader("文件与缓存") }
                 item {
                     EditTextPreferenceItem(
-                        title = "单页文件加载数",
+                        title = "单次请求文件数量",
                         summary = "每次请求加载 ${uiState.requestLimitCount} 个文件",
                         value = uiState.requestLimitCount,
                         isNumber = true,
@@ -351,7 +351,7 @@ fun SettingContent(
                 }
                 item {
                     SwitchPreferenceItem(
-                        title = "预加载相邻目录",
+                        title = "前后文件夹预加载",
                         summary = "进入子目录时，自动预加载前后相邻文件夹的文件数据",
                         checked = uiState.earlyLoading,
                         onCheckedChange = { onSaveConfig(ConfigKeyUtil.EARLY_LOADING, it) }
@@ -359,7 +359,7 @@ fun SettingContent(
                 }
                 item {
                     SwitchPreferenceItem(
-                        title = "种子文件按大小排序",
+                        title = "种子文件大小排序",
                         summary = "解析种子文件列表时按文件体积从大到小排列",
                         checked = uiState.torrentSort,
                         onCheckedChange = { onSaveConfig(ConfigKeyUtil.TORRENT_SORT, it) }
@@ -367,8 +367,8 @@ fun SettingContent(
                 }
                 item {
                     SwitchPreferenceItem(
-                        title = "刷新时清空目录缓存",
-                        summary = "下拉刷新时，强制清除当前目录下已缓存的文件数据",
+                        title = "下拉刷新缓存清空",
+                        summary = "下拉刷新时，强制清除当前目录下所有已缓存的文件数据",
                         checked = uiState.forceLoadCache,
                         onCheckedChange = { onSaveConfig(ConfigKeyUtil.FORCE_LOAD_CACHE, it) }
                     )
@@ -441,14 +441,14 @@ fun SettingContent(
                 item { PreferenceCategoryHeader("维护与备份") }
                 item {
                     PreferenceItem(
-                        title = "导出配置",
+                        title = "导出配置文件",
                         summary = "将当前所有应用设置导出为 JSON 配置文件",
                         onClick = onExportConfig
                     )
                 }
                 item {
                     PreferenceItem(
-                        title = "导入配置",
+                        title = "导入配置文件",
                         summary = "从 JSON 配置文件恢复应用设置并重启应用",
                         onClick = onImportConfig
                     )
@@ -462,14 +462,14 @@ fun SettingContent(
                 }
                 item {
                     PreferenceItem(
-                        title = "视频播放排错验证",
+                        title = "视频播放验证",
                         summary = "打开视频播放异常问题诊断页面",
                         onClick = { onActionClick("VerifyVideoAccount") }
                     )
                 }
                 item {
                     PreferenceItem(
-                        title = "磁力链接排错验证",
+                        title = "磁力链接验证",
                         summary = "打开磁力添加失败问题诊断页面",
                         onClick = { onActionClick("VerifyMagnetLinkAccount") }
                     )

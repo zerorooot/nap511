@@ -31,6 +31,12 @@ runtimeLivedata = "1.12.0"
 workRuntimeKtx = "2.11.2"
 xlog = "1.11.1"
 media3DatasourceOkhttp = "1.11.0"
+mockk = "1.14.11"
+kotlinxCoroutinesTest = "1.11.0"
+turbine = "1.2.1"
+robolectric = "4.16.1"
+workTesting = "2.11.2"
+androidxTestCore = "1.7.0"
 
 [libraries]
 android-request-inspector-webview = { module = "com.github.acsbendi:Android-Request-Inspector-WebView", version.ref = "androidRequestInspectorWebview" }
@@ -73,6 +79,12 @@ process-phoenix = { module = "com.jakewharton:process-phoenix", version.ref = "p
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
 xlog = { module = "com.elvishew:xlog", version.ref = "xlog" }
 androidx-media3-datasource-okhttp = { group = "androidx.media3", name = "media3-datasource-okhttp", version.ref = "media3DatasourceOkhttp" }
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutinesTest" }
+turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+androidx-work-testing = { module = "androidx.work:work-testing", version.ref = "workTesting" }
+androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTestCore" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
