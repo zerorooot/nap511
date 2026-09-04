@@ -50,7 +50,7 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.UserSessionManager
 import github.zerorooot.nap511.viewmodel.FileViewModel
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -198,7 +198,7 @@ fun WebViewScreen(onClick: () -> Unit) {
     LaunchedEffect(Unit) {
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
-        WebView.setWebContentsDebuggingEnabled(DataStoreUtil.getData(ConfigKeyUtil.LOG, false))
+        WebView.setWebContentsDebuggingEnabled(DataStoreUtil.getDataSuspend(ConfigKeyUtil.LOG, false))
         // 1. 注入 Cookie
         setRawCookieString(UserSessionManager.cookie)
         // 2. 强制显式同步并引入物理延迟，确保 API 请求发起时 Cookie 已在磁盘就绪
@@ -391,7 +391,7 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
             }
 
             if (cookie != null) {
-                runBlocking {
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                     App.instance.checkLogin(cookie)
                 }
             }

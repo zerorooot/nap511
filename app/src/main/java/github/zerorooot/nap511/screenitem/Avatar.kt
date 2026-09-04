@@ -9,7 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,6 +26,7 @@ import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 /**
  * 头像、网名、uid、已用空间
@@ -34,14 +35,15 @@ import github.zerorooot.nap511.viewmodel.FileViewModel
 fun Avatar(fileViewModel: FileViewModel) {
     val remainingSpaceBean = fileViewModel.remainingSpace
 
-    val avatarBean = remember {
-        mutableStateOf(
-            Gson().fromJson(
-                DataStoreUtil.getData(
-                    ConfigKeyUtil.AVATAR_BEAN, "{}"
-                ), AvatarBean::class.java
-            )
-        )
+    val avatarJson by DataStoreUtil.getDataFlow(ConfigKeyUtil.AVATAR_BEAN, "{}")
+        .collectAsStateWithLifecycle(initialValue = "{}")
+
+    val avatarBean = remember(avatarJson) {
+        try {
+            Gson().fromJson(avatarJson, AvatarBean::class.java) ?: AvatarBean()
+        } catch (_: Exception) {
+            AvatarBean()
+        }
     }
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -49,10 +51,10 @@ fun Avatar(fileViewModel: FileViewModel) {
     ) {
         //头像
         AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current).data(avatarBean.value.face)
+            model = ImageRequest.Builder(LocalContext.current).data(avatarBean.face)
                 .memoryCachePolicy(CachePolicy.ENABLED).diskCachePolicy(CachePolicy.ENABLED)
                 .networkCachePolicy(CachePolicy.ENABLED).scale(coil.size.Scale.FILL)
-                .memoryCacheKey(avatarBean.value.userId).diskCacheKey(avatarBean.value.userId)
+                .memoryCacheKey(avatarBean.userId).diskCacheKey(avatarBean.userId)
                 .placeholder(R.drawable.avatar).build(),
             modifier = Modifier
                 .size(100.dp)
@@ -64,14 +66,14 @@ fun Avatar(fileViewModel: FileViewModel) {
         Spacer(Modifier.height(6.dp))
         //用户名
         Text(
-            text = avatarBean.value.userName, style = MaterialTheme.typography.titleMedium
+            text = avatarBean.userName, style = MaterialTheme.typography.titleMedium
         )
         //uid
-        Text(text = avatarBean.value.userId)
+        Text(text = avatarBean.userId)
         //会员到期时间
         Text(
             text = "会员到期时间：${
-                avatarBean.value.expireString
+                avatarBean.expireString
             }", style = MaterialTheme.typography.titleSmall
         )
 //            Spacer(Modifier.height(6.dp))

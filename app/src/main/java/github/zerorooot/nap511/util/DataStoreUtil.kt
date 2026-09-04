@@ -15,7 +15,6 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 
 object DataStoreUtil {
 
@@ -87,19 +86,5 @@ object DataStoreUtil {
      */
     suspend fun clearData() {
         dataStore.edit { it.clear() }
-    }
-
-    // ==================== 3. 同步/阻塞 API（兼容非协程旧代码） ====================
-
-    fun <T : Any> getData(key: String, defaultValue: T): T = runBlocking {
-        getDataSuspend(key, defaultValue)
-    }
-
-    fun <T : Any> putData(key: String, value: T) = runBlocking {
-        putDataSuspend(key, value)
-    }
-
-    fun clearDataBlocking() = runBlocking {
-        clearData()
     }
 }

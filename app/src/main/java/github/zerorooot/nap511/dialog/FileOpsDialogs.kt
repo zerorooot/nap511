@@ -13,6 +13,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.text.TextRange
@@ -75,7 +77,8 @@ fun CreateFolderDialog(enter: (String?) -> Unit) {
 
 @Composable
 fun RenameFileDialog(name: String, enter: (String?) -> Unit) {
-    val position = DataStoreUtil.getData(ConfigKeyUtil.POSITION_AFTER_AT, false)
+    val position by DataStoreUtil.getDataFlow(ConfigKeyUtil.POSITION_AFTER_AT, false)
+        .collectAsStateWithLifecycle(initialValue = false)
     val atPosition = max(name.lastIndexOf("@"), name.lastIndexOf(" ")) + 1
     BaseDialog(
         "重命名文件", "新文件名", name, enter = enter, selection = TextRange(

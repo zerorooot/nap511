@@ -242,10 +242,10 @@ class MainActivity : AppCompatActivity() {
         val drawerState = rememberDrawerState(DrawerValue.Closed)
         val scope = rememberCoroutineScope()
 
+        val isExpandedConfig by DataStoreUtil.getDataFlow(ConfigKeyUtil.EXPANDED_SCREEN, true)
+            .collectAsStateWithLifecycle(initialValue = true)
         val isExpandedScreen =
-            (LocalConfiguration.current.screenWidthDp >= 600) && DataStoreUtil.getData(
-                ConfigKeyUtil.EXPANDED_SCREEN, true
-            )
+            (LocalConfiguration.current.screenWidthDp >= 600) && isExpandedConfig
 
 
         // 监听当前导航栈顶的路由，用于高亮显示 Drawer 中选中的 Item
@@ -256,7 +256,10 @@ class MainActivity : AppCompatActivity() {
         BackHandler(drawerState.isOpen) {
             scope.launch { drawerState.close() }
         }
-        val menuItems = remember {
+        val isLogEnabled by DataStoreUtil.getDataFlow(ConfigKeyUtil.LOG, false)
+            .collectAsStateWithLifecycle(initialValue = false)
+
+        val menuItems = remember(isLogEnabled) {
             arrayListOf(
                 DrawerMenuItem(Icons.AutoMirrored.Filled.Login, ConfigKeyUtil.LOGIN, Route.Login),
                 DrawerMenuItem(Icons.Default.Cloud, ConfigKeyUtil.MY_FILE, Route.MyFile),
@@ -279,7 +282,7 @@ class MainActivity : AppCompatActivity() {
                     Route.AdvancedSettings
                 ),
             ).apply {
-                if (DataStoreUtil.getData(ConfigKeyUtil.LOG, false)) {
+                if (isLogEnabled) {
                     this.add(
                         DrawerMenuItem(
                             Icons.Default.Android, ConfigKeyUtil.LOG_SCREEN, Route.LogScreen

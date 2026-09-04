@@ -296,7 +296,7 @@ class OfflineFileViewModel : ViewModel() {
         viewModelScope.launch {
             runCatching {
                 val map = hashMapOf("hash[0]" to offlineTask.infoHash)
-                map["uid"] = DataStoreUtil.getData(ConfigKeyUtil.UID, "")
+                map["uid"] = DataStoreUtil.getDataSuspend(ConfigKeyUtil.UID, "")
                 map["sign"] = fileRepository.getOfflineSign().sign
                 map["time"] = (System.currentTimeMillis() / 1000).toString()
                 val deleteTask = fileRepository.deleteOfflineTask(map)

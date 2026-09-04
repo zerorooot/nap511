@@ -65,7 +65,7 @@ fun CreateSelectTorrentFileDialog(
     }
 
     LaunchedEffect(Unit) {
-        isSort = DataStoreUtil.getData(ConfigKeyUtil.TORRENT_SORT, false)
+        isSort = DataStoreUtil.getDataSuspend(ConfigKeyUtil.TORRENT_SORT, false)
     }
 
     if (isSort) {

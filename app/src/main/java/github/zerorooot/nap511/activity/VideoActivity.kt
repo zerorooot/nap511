@@ -228,9 +228,18 @@ class VideoActivity : AppCompatActivity() {
     }
 
 
+    private var videoLinkMode = false
+    private var autoJumpRetry = true
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        lifecycleScope.launch {
+            videoLinkMode = DataStoreUtil.getDataSuspend(ConfigKeyUtil.VIDEO_LINK_MODE, false)
+            autoJumpRetry = DataStoreUtil.getDataSuspend(ConfigKeyUtil.AUTO_JUMP_RETRY, true)
+            val hideLoading = DataStoreUtil.getDataSuspend(ConfigKeyUtil.HIDE_LOADING_VIEW, false)
+            videoPlayer.setHideLoadingView(hideLoading)
+        }
         setContentView(R.layout.activity_video)
         val headerMap = hashMapOf(
             "cookie" to UserSessionManager.cookie,
@@ -382,9 +391,6 @@ class VideoActivity : AppCompatActivity() {
                     }"
                 )
                 if (errorBody.isEmpty()) {
-                    //重新解析并获取正确链接
-                    val videoLinkMode = DataStoreUtil.getData(ConfigKeyUtil.VIDEO_LINK_MODE, false)
-                    val autoJumpRetry = DataStoreUtil.getData(ConfigKeyUtil.AUTO_JUMP_RETRY, true)
                     if (!videoLinkMode && autoJumpRetry) {
                         playNewVideo()
                         return@VideoErrorInterceptor true

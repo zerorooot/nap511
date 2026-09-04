@@ -21,6 +21,8 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlin.concurrent.thread
 
 
@@ -36,10 +38,11 @@ class Sha1Service : Service() {
     }
 
 
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    private val serviceScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO + kotlinx.coroutines.SupervisorJob())
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val command = intent!!.getStringExtra(ConfigKeyUtil.COMMAND)
-        thread {
+        val command = intent?.getStringExtra(ConfigKeyUtil.COMMAND)
+        serviceScope.launch {
             when (command) {
                 ConfigKeyUtil.SENT_TO_ARIA2 -> {
                     val fileBeanList =
@@ -56,6 +59,11 @@ class Sha1Service : Service() {
         }
 
         return super.onStartCommand(intent, flags, startId)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        serviceScope.cancel()
     }
 
 
@@ -89,9 +97,9 @@ class Sha1Service : Service() {
     ]
     }
      */
-    private fun sendToAria2(fileBeanDownloadList: ArrayList<String>) {
-        val aria2Token = DataStoreUtil.getData(ConfigKeyUtil.ARIA2_TOKEN, "")
-        val aria2Url = DataStoreUtil.getData(
+    private suspend fun sendToAria2(fileBeanDownloadList: ArrayList<String>) {
+        val aria2Token = DataStoreUtil.getDataSuspend(ConfigKeyUtil.ARIA2_TOKEN, "")
+        val aria2Url = DataStoreUtil.getDataSuspend(
             ConfigKeyUtil.ARIA2_URL,
             ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
         ) + "?tm=${System.currentTimeMillis()}"

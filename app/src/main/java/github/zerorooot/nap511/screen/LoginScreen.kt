@@ -24,9 +24,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.FileUpload
@@ -88,10 +88,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.LoginResult
 import github.zerorooot.nap511.util.OneOneFiveAuthManager
+import github.zerorooot.nap511.util.UserSessionManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
@@ -118,7 +117,7 @@ fun LoginScreen(
 ) {
     var selectedTab by remember { mutableIntStateOf(0) } // 0: 账号密码, 1: 网页登录
     var showAdvancedSheet by remember { mutableStateOf(false) }
-    val uid = remember { DataStoreUtil.getData(ConfigKeyUtil.UID, "") }
+    val uid = UserSessionManager.uid
 
     Scaffold { padding ->
         Column(
@@ -152,8 +151,6 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("欢迎使用nap511", style = MaterialTheme.typography.headlineMedium)
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
 
             // 中部核心登录卡片
             ElevatedCard(

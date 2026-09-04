@@ -92,6 +92,7 @@ import github.zerorooot.nap511.screenitem.FileCellItem
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.cancelCut
@@ -130,17 +131,24 @@ fun FileScreen(
     appBarOnClick: (String) -> Unit,
     drawerState: () -> Boolean
 ) {
-    val fabPosition by remember {
-        mutableStateOf(
-            when (DataStoreUtil.getData(ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION, "End")) {
-                "Start" -> FabPosition.Start
-                "Center" -> FabPosition.Center
-                "End" -> FabPosition.End
-                "EndOverlay" -> FabPosition.EndOverlay
-                else -> FabPosition.End
-            }
-        )
+    val fabPositionSetting by DataStoreUtil.getDataFlow(ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION, "End")
+        .collectAsStateWithLifecycle(initialValue = "End")
+    val fabPosition = remember(fabPositionSetting) {
+        when (fabPositionSetting) {
+            "Start" -> FabPosition.Start
+            "Center" -> FabPosition.Center
+            "End" -> FabPosition.End
+            "EndOverlay" -> FabPosition.EndOverlay
+            else -> FabPosition.End
+        }
     }
+    val earlyLoading by DataStoreUtil.getDataFlow(ConfigKeyUtil.EARLY_LOADING, false)
+        .collectAsStateWithLifecycle(initialValue = false)
+    val maxTxtSizeStr by DataStoreUtil.getDataFlow(ConfigKeyUtil.MAX_TXT_SIZE, "200")
+        .collectAsStateWithLifecycle(initialValue = "200")
+    val aria2UrlConfig by DataStoreUtil.getDataFlow(ConfigKeyUtil.ARIA2_URL, ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE)
+        .collectAsStateWithLifecycle(initialValue = ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE)
+
     val fileBeanList = fileViewModel.fileBeanList
     val path by fileViewModel.currentPath.collectAsState()
     val refreshing by fileViewModel.isRefreshing.collectAsState()
@@ -227,7 +235,7 @@ fun FileScreen(
 
     fun handleFolderClick(i: Int, fileBean: FileBean) {
         isBottomBarShow = true
-        if (DataStoreUtil.getData(ConfigKeyUtil.EARLY_LOADING, false)) {
+        if (earlyLoading) {
             listOf(i - 1, i + 1)
                 .mapNotNull { fileBeanList.getOrNull(it) }
                 .filter { it.isFolder }
@@ -273,7 +281,7 @@ fun FileScreen(
     }
 
     fun handleTextClick(i: Int, fileBean: FileBean) {
-        val txtSize = DataStoreUtil.getData(ConfigKeyUtil.MAX_TXT_SIZE, "200").toInt()
+        val txtSize = maxTxtSizeStr.toIntOrNull() ?: 200
         if (fileBean.size.toLong() < txtSize * 1024) {
             fileViewModel.selectIndex = i
             fileViewModel.downloadText(fileBean, onNav)
@@ -364,9 +372,7 @@ fun FileScreen(
     }
 
     fun onMenuAria2Download(index: Int) {
-        val aria2Url =
-            DataStoreUtil.getData(ConfigKeyUtil.ARIA2_URL, ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE)
-        if (aria2Url == ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE) {
+        if (aria2UrlConfig == ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE) {
             fileViewModel.openAria2Dialog()
         } else {
             fileViewModel.startSendAria2Service(index)
@@ -508,10 +514,12 @@ fun FileScreen(
                     }
                 },
                 onPathLongClick = {
-                    DataStoreUtil.putData(
-                        ConfigKeyUtil.DEFAULT_OFFLINE_CID,
-                        fileViewModel.currentCid
-                    )
+                    scope.launch {
+                        DataStoreUtil.putDataSuspend(
+                            ConfigKeyUtil.DEFAULT_OFFLINE_CID,
+                            fileViewModel.currentCid
+                        )
+                    }
                     App.instance.toast("已设置默认离线位置")
                 },
                 onItemClick = {
@@ -692,7 +700,7 @@ private fun FileListContent(
                             gridItemsIndexed(
                                 items = fileBeanList,
                                 key = { _, item ->
-                                    item.fileId.ifEmpty { item.pickCode.ifEmpty { item.uuid.toString() } }
+                                    item.fileId.ifEmpty { item.categoryId.ifEmpty { item.pickCode } }
                                 },
                             ) { index, item ->
                                 FileCellItem(

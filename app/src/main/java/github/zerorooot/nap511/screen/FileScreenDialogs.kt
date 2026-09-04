@@ -2,6 +2,8 @@ package github.zerorooot.nap511.screen
 
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elvishew.xlog.XLog
 import com.google.gson.JsonParser
 import github.zerorooot.nap511.bean.FileDialogState
@@ -101,10 +103,11 @@ fun CreateDialogs(
         }
 
         is FileDialogState.Aria2 -> {
+            val aria2Url by DataStoreUtil.getDataFlow(
+                ConfigKeyUtil.ARIA2_URL, ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
+            ).collectAsStateWithLifecycle(initialValue = ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE)
             Aria2Dialog(
-                context = DataStoreUtil.getData(
-                    ConfigKeyUtil.ARIA2_URL, ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
-                )
+                context = aria2Url
             ) {
                 fileViewModel.closeAria2Dialog()
                 if (it != "") {

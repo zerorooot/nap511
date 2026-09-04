@@ -12,6 +12,8 @@ import androidx.work.WorkManager
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
@@ -83,34 +85,35 @@ class OfflineTaskActivity : ComponentActivity() {
 
         //非空列表
         if (urlList.isNotEmpty()) {
-            val currentOfflineTaskList =
-                DataStoreUtil.getData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
-                    .split("\n")
-                    .filter { i -> i != "" && i != " " }
-                    .toSet()
-                    .toMutableSet()
-            //添加所有
-            currentOfflineTaskList.addAll(urlList)
+            lifecycleScope.launch {
+                val currentOfflineTaskList =
+                    DataStoreUtil.getDataSuspend(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
+                        .split("\n")
+                        .filter { i -> i != "" && i != " " }
+                        .toSet()
+                        .toMutableSet()
+                //添加所有
+                currentOfflineTaskList.addAll(urlList)
 
-            addOfflineTaskByTime(currentOfflineTaskList.toList())
-
+                addOfflineTaskByTime(currentOfflineTaskList.toList())
+            }
         } else {
             App.instance.toast("仅支持以http、ftp、magnet、ed2k开头的链接")
         }
     }
 
     @SuppressLint("EnqueueWork")
-    private fun addOfflineTaskByTime(currentOfflineTaskList: List<String>) {
+    private suspend fun addOfflineTaskByTime(currentOfflineTaskList: List<String>) {
         //检查离线任务时间
         val offlineTime = try {
-            DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_TIME, "5").toLong()
+            DataStoreUtil.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_TIME, "5").toLong()
         } catch (e: Exception) {
             5L
         }
         val stringJoiner = StringJoiner("\n")
         currentOfflineTaskList.toSet().forEach { stringJoiner.add(it) }
         //写入缓存
-        DataStoreUtil.putData(
+        DataStoreUtil.putDataSuspend(
             ConfigKeyUtil.CURRENT_OFFLINE_TASK,
             stringJoiner.toString()
         )

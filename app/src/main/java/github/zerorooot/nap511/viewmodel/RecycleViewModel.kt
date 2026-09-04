@@ -67,12 +67,14 @@ class RecycleViewModel :
     }
 
     fun delete(index: Int) {
-        val password = DataStoreUtil.getData(ConfigKeyUtil.PASSWORD, "")
-        if (password == "") {
-            isOpenRecyclePasswordDialog = true
-            return
+        viewModelScope.launch {
+            val password = DataStoreUtil.getDataSuspend(ConfigKeyUtil.PASSWORD, "")
+            if (password == "") {
+                isOpenRecyclePasswordDialog = true
+                return@launch
+            }
+            delete(index, password)
         }
-        delete(index, password)
     }
 
     fun delete(index: Int, password: String, save: Boolean = false) {
@@ -94,12 +96,12 @@ class RecycleViewModel :
     }
 
     fun deleteAll() {
-        val password = DataStoreUtil.getData(ConfigKeyUtil.PASSWORD, "")
-        if (password == "") {
-            isOpenRecyclePasswordDialog = true
-            return
-        }
         viewModelScope.launch {
+            val password = DataStoreUtil.getDataSuspend(ConfigKeyUtil.PASSWORD, "")
+            if (password == "") {
+                isOpenRecyclePasswordDialog = true
+                return@launch
+            }
             val recycleCleanAll = fileService.recycleCleanAll(password)
             XLog.d("RecycleViewModel deleteAll $recycleCleanAll")
             val message = if (recycleCleanAll.state) {

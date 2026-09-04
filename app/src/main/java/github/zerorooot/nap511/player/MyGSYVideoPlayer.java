@@ -67,14 +67,16 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         initView();
     }
 
-    private void initView() {
-        batteryTextView = findViewById(R.id.batteryTextView);
-        timeTextView = findViewById(R.id.timeTextView);
-
-        if (DataStoreUtil.INSTANCE.getData(ConfigKeyUtil.HIDE_LOADING_VIEW, false)) {
+    public void setHideLoadingView(boolean hide) {
+        if (hide && findViewById(R.id.startAndLoadLayout) != null) {
             XLog.d("MyGSYVideoPlayer hide video start view");
             findViewById(R.id.startAndLoadLayout).setVisibility(GONE);
         }
+    }
+
+    private void initView() {
+        batteryTextView = findViewById(R.id.batteryTextView);
+        timeTextView = findViewById(R.id.timeTextView);
 
         mMoreScale = findViewById(R.id.moreScale);
         switchSpeed = findViewById(R.id.switchSpeed);

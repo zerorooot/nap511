@@ -79,7 +79,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
     //当前cid下的文件数量
     private var count: Int by mutableIntStateOf(0)
 
-    internal val saveRequestCache = DataStoreUtil.getData(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
+    internal var saveRequestCache by mutableStateOf(true)
 
     internal val fileListCache by lazy {
         FileCacheManager(
@@ -100,6 +100,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
 
     //页面手势
     var gesturesEnabled by mutableStateOf(true)
+        internal set
 
     var torrentBean by mutableStateOf(TorrentFileBean())
     val torrentBeanCache = hashMapOf<String, TorrentFileBean>()
@@ -119,6 +120,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
+            saveRequestCache = DataStoreUtil.getDataSuspend(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
             dialogEventBus.events.collect { event ->
                 when (event) {
                     is DialogEvent.RefreshFileList -> refresh(event.cid)
@@ -145,8 +147,11 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
 
     //相关状态
     var isLongClickState: Boolean by mutableStateOf(false)
+        internal set
     var isCutState: Boolean by mutableStateOf(false)
+        internal set
     var isSearchState: Boolean by mutableStateOf(false)
+        internal set
 
     var fileInfo by mutableStateOf(FileInfo())
 

@@ -28,16 +28,21 @@ import java.io.InputStream
 import java.io.OutputStream
 
 
-class TorrentTaskActivity : Activity() {
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+
+class TorrentTaskActivity : androidx.activity.ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (intent.action == Intent.ACTION_VIEW && intent.data != null) {
             val torrentFile = fileFromContentUri(this, intent.data!!)
             val uid = UserSessionManager.uid
-            val defaultOfflineCid = DataStoreUtil.getData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "0")
-            initUpload(torrentFile, UserSessionManager.cookie, uid, defaultOfflineCid)
+            lifecycleScope.launch {
+                val defaultOfflineCid = DataStoreUtil.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "0")
+                initUpload(torrentFile, UserSessionManager.cookie, uid, defaultOfflineCid)
+            }
         }
-        moveTaskToBack(true);
+        moveTaskToBack(true)
         finishAndRemoveTask()
     }
 

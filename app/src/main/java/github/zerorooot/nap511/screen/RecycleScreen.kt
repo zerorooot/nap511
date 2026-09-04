@@ -22,7 +22,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -47,6 +49,7 @@ fun RecycleScreen(
         recycleViewModel.getRecycleFileList()
     }
 
+    val scope = rememberCoroutineScope()
     var deleteIndex by remember {
         mutableIntStateOf(-1)
     }
@@ -76,7 +79,9 @@ fun RecycleScreen(
 
     RecyclePasswordDialog(recycleViewModel) {
         if (it != null && it != "") {
-            DataStoreUtil.putData(ConfigKeyUtil.PASSWORD, it)
+            scope.launch {
+                DataStoreUtil.putDataSuspend(ConfigKeyUtil.PASSWORD, it)
+            }
 
             if (deleteIndex == -1) {
                 recycleViewModel.deleteAll()

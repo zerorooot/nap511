@@ -85,38 +85,40 @@ internal fun FileViewModel.unzipFile() {
 }
 
 internal fun FileViewModel.unzipFile(fileBeansList: List<FileBean>, cid: String, pwd: String = "") {
-    val listType = object : TypeToken<List<FileBean>>() {}.type
-    val listJson = Gson().toJson(fileBeansList, listType)
-    val dataBuilder: Data.Builder = Data.Builder()
-    //防止输入太多导致崩溃
-    val cacheFile =
-        File(App.instance.cacheDir, "unzip_tasks_${System.currentTimeMillis()}.json")
-    cacheFile.writeText(listJson)
-    dataBuilder.putString("listPath", cacheFile.absolutePath)
-    dataBuilder.putString("cid", cid)
-    if (pwd != "") {
-        dataBuilder.putString("pwd", pwd)
+    viewModelScope.launch(Dispatchers.IO) {
+        val listType = object : TypeToken<List<FileBean>>() {}.type
+        val listJson = Gson().toJson(fileBeansList, listType)
+        val dataBuilder: Data.Builder = Data.Builder()
+        //防止输入太多导致崩溃
+        val cacheFile =
+            File(App.instance.cacheDir, "unzip_tasks_${System.currentTimeMillis()}.json")
+        cacheFile.writeText(listJson)
+        dataBuilder.putString("listPath", cacheFile.absolutePath)
+        dataBuilder.putString("cid", cid)
+        if (pwd != "") {
+            dataBuilder.putString("pwd", pwd)
+        }
+
+        //获取离线失败移动目录cid
+        val errorCid = DataStoreUtil.getDataSuspend(ConfigKeyUtil.MOVE_FAIL_FILE, "")
+            .takeIf { it.isNotEmpty() }
+            ?.let { data ->
+                fileBeanList.firstOrNull { it.isFolder && it.name == data }?.categoryId
+            }
+            ?.let { errorCid ->
+                XLog.d("FileViewModel.unzipFile设置errorCid $errorCid")
+                dataBuilder.putString("errorCid", errorCid)
+                errorCid
+            }
+
+
+        val request: OneTimeWorkRequest =
+            OneTimeWorkRequest.Builder(UnzipAllFileWorker::class.java)
+                .addTag("UnzipAllFileWorkerOneTimeWorkRequest")
+                .setInputData(dataBuilder.build()).build()
+
+        startUnzipWorker(request, cid, errorCid)
     }
-
-    //获取离线失败移动目录cid
-    val errorCid = DataStoreUtil.getData(ConfigKeyUtil.MOVE_FAIL_FILE, "")
-        .takeIf { it.isNotEmpty() }
-        ?.let { data ->
-            fileBeanList.firstOrNull { it.isFolder && it.name == data }?.categoryId
-        }
-        ?.let { errorCid ->
-            XLog.d("FileViewModel.unzipFile设置errorCid $errorCid")
-            dataBuilder.putString("errorCid", errorCid)
-            errorCid
-        }
-
-
-    val request: OneTimeWorkRequest =
-        OneTimeWorkRequest.Builder(UnzipAllFileWorker::class.java)
-            .addTag("UnzipAllFileWorkerOneTimeWorkRequest")
-            .setInputData(dataBuilder.build()).build()
-
-    startUnzipWorker(request, cid, errorCid)
 }
 
 internal fun FileViewModel.startUnzipWorker(

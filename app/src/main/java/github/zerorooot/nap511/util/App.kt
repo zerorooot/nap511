@@ -93,16 +93,27 @@ class App : Application(), ImageLoaderFactory {
         lateinit var cacheFile: File
     }
 
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Volatile
+    private var isLogEnabled = true
+
     override fun onCreate() {
         // 1.12.0 起新文字上下文菜单默认开启，但在 Dialog 内的 TextField
         // 长按/选中后剪切、复制、粘贴点击无效。回退到旧实现规避该回归。
         ComposeFoundationFlags.isNewContextMenuEnabled = false
         super.onCreate()
         instance = this
-        val initialCookie = DataStoreUtil.getData(ConfigKeyUtil.COOKIE, "")
-        val initialUid = DataStoreUtil.getData(ConfigKeyUtil.UID, "0")
-        val initialLimit = DataStoreUtil.getData(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200").toIntOrNull() ?: 200
-        UserSessionManager.init(initialCookie, initialUid, initialLimit)
+
+        appScope.launch {
+            val initialCookie = DataStoreUtil.getDataSuspend(ConfigKeyUtil.COOKIE, "")
+            val initialUid = DataStoreUtil.getDataSuspend(ConfigKeyUtil.UID, "0")
+            val initialLimit = DataStoreUtil.getDataSuspend(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200").toIntOrNull() ?: 200
+            UserSessionManager.init(initialCookie, initialUid, initialLimit)
+
+            DataStoreUtil.getDataFlow(ConfigKeyUtil.LOG, true).collect { enabled ->
+                isLogEnabled = enabled
+            }
+        }
         cacheFile = File(this.cacheDir, "fileListCache.json")
 
         initLog()
@@ -113,7 +124,7 @@ class App : Application(), ImageLoaderFactory {
         val build = LogConfiguration.Builder().tag("XLOG")
             .addInterceptor(object : AbstractFilterInterceptor() {
                 override fun reject(log: LogItem?): Boolean {
-                    return !DataStoreUtil.getData(ConfigKeyUtil.LOG, true)
+                    return !isLogEnabled
                 }
             })
             .addInterceptor(AutoTagInterceptor())
