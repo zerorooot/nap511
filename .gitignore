@@ -13,8 +13,8 @@
 local.properties
 .deepseek
 修复方案.md
-src/androidTest/
-src/test/
+app/src/androidTest/
+app/src/test/
 app/release/
 .artifacts
 .proxyai
