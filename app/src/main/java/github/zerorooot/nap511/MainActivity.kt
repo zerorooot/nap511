@@ -9,11 +9,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,9 +40,13 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -62,8 +61,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.elvishew.xlog.XLog
+import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
+import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.bean.DrawerMenuItem
 import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.Route
@@ -89,7 +90,6 @@ import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import github.zerorooot.nap511.util.UserSessionManager
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
@@ -151,12 +151,7 @@ class MainActivity : AppCompatActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    val cookie = UserSessionManager.cookie
-                    if (cookie.isEmpty()) {
-                        Login()
-                    } else {
-                        Init(cookie)
-                    }
+                    Init()
                 }
             }
         }
@@ -164,7 +159,7 @@ class MainActivity : AppCompatActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    private fun Init(cookie: String) {
+    private fun Init() {
         //初始化
         val fileViewModel: FileViewModel = viewModel()
         val offlineFileViewModel: OfflineFileViewModel = viewModel()
@@ -192,6 +187,15 @@ class MainActivity : AppCompatActivity() {
             fileViewModel.navigationEvent.collect { event ->
                 when (event) {
                     is NavEvent.NavigateToScreen -> {
+                        if (event.route == Route.Login) {
+                            navController.navigate(Route.Login) {
+                                // 弹出 MyFile，让 Login 直接替换设置页在栈中的位置，防止返回
+                                popUpTo<Route.MyFile> {
+                                    inclusive = true
+                                }
+                            }
+                            return@collect
+                        }
                         // 直接导航到真正的 UI 目标页面
                         navController.navigate(event.route)
                     }
@@ -242,6 +246,20 @@ class MainActivity : AppCompatActivity() {
         val drawerState = rememberDrawerState(DrawerValue.Closed)
         val scope = rememberCoroutineScope()
 
+        val remainingSpaceBean = fileViewModel.remainingSpace
+        val avatarJson by DataStoreUtil.getDataFlow(ConfigKeyUtil.AVATAR_BEAN, "{}")
+            .collectAsStateWithLifecycle(initialValue = "{}")
+        val avatarBean = remember(avatarJson) {
+            try {
+                Gson().fromJson(avatarJson, AvatarBean::class.java) ?: AvatarBean()
+            } catch (_: Exception) {
+                AvatarBean()
+            }
+        }
+        var navGesturesEnabled by remember { mutableStateOf(true) }
+        // 记录上一次触发返回的时间戳
+        var lastBackPressTime by remember { mutableLongStateOf(0L) }
+
         val isExpandedConfig by DataStoreUtil.getDataFlow(ConfigKeyUtil.EXPANDED_SCREEN, true)
             .collectAsStateWithLifecycle(initialValue = true)
         val isExpandedScreen =
@@ -256,12 +274,25 @@ class MainActivity : AppCompatActivity() {
         BackHandler(drawerState.isOpen) {
             scope.launch { drawerState.close() }
         }
+
+        BackHandler(drawerState.isClosed && fileViewModel.pathList.size == 1) {
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastBackPressTime < 1500L) {
+                //直接关闭应用并返回桌面
+                // finish()
+                //将应用压入后台保留状态（类似按 Home 键）
+                moveTaskToBack(true)
+            } else {
+                lastBackPressTime = currentTime
+                App.instance.toast("再滑一次返回桌面")
+            }
+        }
         val isLogEnabled by DataStoreUtil.getDataFlow(ConfigKeyUtil.LOG, false)
             .collectAsStateWithLifecycle(initialValue = false)
 
         val menuItems = remember(isLogEnabled) {
             arrayListOf(
-                DrawerMenuItem(Icons.AutoMirrored.Filled.Login, ConfigKeyUtil.LOGIN, Route.Login),
+//                DrawerMenuItem(Icons.AutoMirrored.Filled.Login, ConfigKeyUtil.LOGIN, Route.Login),
                 DrawerMenuItem(Icons.Default.Cloud, ConfigKeyUtil.MY_FILE, Route.MyFile),
                 DrawerMenuItem(
                     Icons.Default.CloudDownload,
@@ -301,7 +332,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         ModalNavigationDrawer(
-            gesturesEnabled = fileViewModel.gesturesEnabled || drawerState.isOpen,
+            gesturesEnabled = navGesturesEnabled || drawerState.isOpen,
             drawerState = drawerState,
             drawerContent = {
                 ModalDrawerSheet(
@@ -310,7 +341,7 @@ class MainActivity : AppCompatActivity() {
                         .verticalScroll(rememberScrollState())
                 ) {
                     Spacer(Modifier.height(6.dp))
-                    Avatar(fileViewModel)
+                    Avatar(remainingSpaceBean, avatarBean)
                     Spacer(Modifier.height(6.dp))
 
                     menuItems.forEach { item ->
@@ -323,7 +354,7 @@ class MainActivity : AppCompatActivity() {
                                     item.iconVector, contentDescription = item.label
                                 )
                             }, label = { Text(item.label) }, selected = isSelected, onClick = {
-                                fileViewModel.gesturesEnabled = true
+                                navGesturesEnabled = true
                                 scope.launch { drawerState.close() }
 
                                 // 优先尝试直接弹出回目标顶级页面（如果当前正处于该页面的子页面中）
@@ -351,44 +382,21 @@ class MainActivity : AppCompatActivity() {
                 // 使用 NavHost 管理页面切换
                 NavHost(
                     navController, startDestination = Route.MyFile,
-                    enterTransition = {
-                        fadeIn(animationSpec = tween(300)) + scaleIn(
-                            initialScale = 0.95f,
-                            animationSpec = tween(300)
-                        )
-                    },
-                    exitTransition = {
-                        fadeOut(animationSpec = tween(300)) + scaleOut(
-                            targetScale = 1.05f,
-                            animationSpec = tween(300)
-                        )
-                    },
-                    popEnterTransition = {
-                        fadeIn(animationSpec = tween(300)) + scaleIn(
-                            initialScale = 1.05f,
-                            animationSpec = tween(300)
-                        )
-                    },
-                    popExitTransition = {
-                        fadeOut(animationSpec = tween(300)) + scaleOut(
-                            targetScale = 0.95f,
-                            animationSpec = tween(300)
-                        )
-                    }
                 ) {
                     composable<Route.Login> {
-                        fileViewModel.gesturesEnabled = false
+                        navGesturesEnabled = false
                         Login {
                             navController.navigate(Route.MyFile) {
                                 popUpTo<Route.Login> {
                                     inclusive = true
                                 }
                             }
+                            fileViewModel.getFiles("0")
                         }
                     }
 
                     composable<Route.MyFile> {
-                        fileViewModel.gesturesEnabled = true
+                        navGesturesEnabled = true
                         FileScreen(
                             fileViewModel,
                             audioViewModel,
@@ -409,18 +417,32 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     composable<Route.OfflineDownload> {
-                        val currentPath by fileViewModel.currentPath.collectAsStateWithLifecycle()
-                        OfflineDownloadScreen(
-                            offlineFileViewModel,
-                            fileViewModel.currentCid,
-                            currentPath,
-                            { scope.launch { drawerState.open() } },
-                            { navController.navigate(Route.VerifyMagnetLinkAccount) }
-                        )
+                        LaunchedEffect(Unit) {
+                            offlineFileViewModel.quota()
+                        }
 
+                        val currentPath by fileViewModel.currentPath.collectAsStateWithLifecycle()
+                        val quotaBean by offlineFileViewModel.quotaBean.collectAsState()
+                        val urlText by offlineFileViewModel.urlText
+
+                        OfflineDownloadScreen(
+                            currentPath,
+                            quotaBean,
+                            urlText,
+                            { scope.launch { drawerState.open() } }
+                        ) { list ->
+                            offlineFileViewModel.addTask(list, fileViewModel.currentCid) {
+                                if (it) {
+                                    navController.navigate(Route.VerifyMagnetLinkAccount)
+                                }
+                            }
+                        }
                     }
 
                     composable<Route.OfflineList> {
+                        LaunchedEffect(Unit) {
+                            offlineFileViewModel.getOfflineFileList()
+                        }
                         OfflineFileScreen(
                             offlineFileViewModel,
                             isExpandedScreen,
@@ -440,7 +462,7 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     composable<Route.WebScreen> {
-                        fileViewModel.gesturesEnabled = false
+                        navGesturesEnabled = false
                         WebViewScreen {
                             scope.launch { drawerState.open() }
                         }
@@ -483,6 +505,14 @@ class MainActivity : AppCompatActivity() {
                                         }
                                     }
                                 }
+                                "Login" -> {
+                                    navController.navigate(Route.Login) {
+                                        // 弹出 AdvancedSettings，让 Login 直接替换设置页在栈中的位置
+                                        popUpTo<Route.AdvancedSettings> {
+                                            inclusive = true
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -493,21 +523,22 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     composable<Route.VerifyMagnetLinkAccount> {
-                        CaptchaWebViewScreen(fileViewModel) {
+                        CaptchaWebViewScreen(
+                            { fileViewModel.handleOfflineTask() }) {
                             when (it) {
                                 "topAppBarActionButtonOnClick" -> {
                                     scope.launch { drawerState.open() }
                                 }
 
                                 "select" -> {
-                                    scope.launch(Dispatchers.Main) {
-                                        navController.navigate(Route.MyFile) {
-                                            // 将 VerifyMagnetLinkAccount 中转页从返回栈中彻底弹出，用户返回时，就会直接退回首页，而不会退回中转页
-                                            popUpTo<Route.VerifyMagnetLinkAccount> {
-                                                inclusive = true
-                                            }
+//                                    scope.launch(Dispatchers.Main) {
+                                    navController.navigate(Route.MyFile) {
+                                        // 将 VerifyMagnetLinkAccount 中转页从返回栈中彻底弹出，用户返回时，就会直接退回首页，而不会退回中转页
+                                        popUpTo<Route.VerifyMagnetLinkAccount> {
+                                            inclusive = true
                                         }
                                     }
+//                                    }
 
                                 }
                             }
@@ -515,21 +546,21 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     composable<Route.VerifyVideoAccount> {
-                        CaptchaVideoWebViewScreen(fileViewModel) {
+                        CaptchaVideoWebViewScreen {
                             when (it) {
                                 "topAppBarActionButtonOnClick" -> {
                                     scope.launch { drawerState.open() }
                                 }
 
                                 "select" -> {
-                                    scope.launch(Dispatchers.Main) {
-                                        navController.navigate(Route.MyFile) {
-                                            // 将 VerifyVideoAccount 中转页从返回栈中彻底弹出，用户返回时，就会直接退回首页，而不会退回中转页
-                                            popUpTo<Route.VerifyVideoAccount> {
-                                                inclusive = true
-                                            }
+//                                    scope.launch(Dispatchers.Main) {
+                                    navController.navigate(Route.MyFile) {
+                                        // 将 VerifyVideoAccount 中转页从返回栈中彻底弹出，用户返回时，就会直接退回首页，而不会退回中转页
+                                        popUpTo<Route.VerifyVideoAccount> {
+                                            inclusive = true
                                         }
                                     }
+//                                    }
                                 }
                             }
                         }
@@ -552,6 +583,9 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     composable<Route.RepeatFile> {
+                        LaunchedEffect(Unit) {
+                            repeatViewModel.loadData()
+                        }
                         RepeatFileScreen(
                             repeatViewModel,
                             isExpandedScreen,
@@ -590,7 +624,7 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("UnrememberedMutableState")
     @Composable
-    private fun Login(onLoginSuccess: (() -> Unit)? = null) {
+    private fun Login(onLoginSuccess: () -> Unit) {
         val scope = rememberCoroutineScope()
         LoginScreen { credential ->
             scope.launch(Dispatchers.IO) {
@@ -641,7 +675,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 if (success) {
                     withContext(Dispatchers.Main) {
-                        onLoginSuccess?.invoke()
+                        onLoginSuccess.invoke()
                     }
                 }
             }

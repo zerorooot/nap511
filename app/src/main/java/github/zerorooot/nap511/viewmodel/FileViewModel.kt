@@ -48,6 +48,7 @@ import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.DialogEvent
 import github.zerorooot.nap511.util.DialogEventBus
 import github.zerorooot.nap511.util.FileCacheManager
+import github.zerorooot.nap511.util.UserSessionManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.worker.OfflineTaskWorker
 import kotlinx.coroutines.Dispatchers
@@ -58,6 +59,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
 import java.io.File
 
 
@@ -97,10 +99,6 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
 
     //页面导航
 //    var selectedItem by mutableStateOf(ConfigKeyUtil.MY_FILE)
-
-    //页面手势
-    var gesturesEnabled by mutableStateOf(true)
-        internal set
 
     var torrentBean by mutableStateOf(TorrentFileBean())
     val torrentBeanCache = hashMapOf<String, TorrentFileBean>()
@@ -351,8 +349,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
-            // 2. 缓存未命中，发起网络请求
-            try {
+            runCatching {
                 val files =
                     fileRepository.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
                 //请求的cid不是0,但返回的cid是0。证明请求的cid不存在
@@ -362,19 +359,36 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
                 files.fileBeanList = formatFileBeanList(files.fileBeanList)
                 // 3. 网络请求成功后写入缓存
                 setFiles(files)
-            } catch (_: NullPointerException) {
-                App.instance.toast("获取文件列表失败，建议更新您的Cookie")
-                fileListCache.clearAll()
-                DataStoreUtil.putDataSuspend(ConfigKeyUtil.COOKIE, "")
-                DataStoreUtil.putDataSuspend(ConfigKeyUtil.UID, "")
+            }.onFailure {
+                when (it) {
+                    is NullPointerException -> {
+                        App.instance.toast("获取文件列表失败，建议更新您的Cookie")
+                        fileListCache.clearAll()
+                        UserSessionManager.updateSession("", "")
+                        _navigationEvent.send(NavEvent.NavigateToScreen(Route.Login))
+                    }
 
-                _navigationEvent.send(NavEvent.NavigateToScreen(Route.Login))
-            } catch (e: Exception) {
-                e.printStackTrace()
-                App.instance.toast("${e.message}，请重试～")
-            } finally {
-                _isRefreshing.value = false
+                    is HttpException -> {
+                        if (it.code() == 405) {
+                            App.instance.toast("HttpException 405，建议更新您的Cookie")
+                            fileListCache.clearAll()
+                            UserSessionManager.updateSession("", "")
+                            _navigationEvent.send(NavEvent.NavigateToScreen(Route.Login))
+                        } else {
+                            XLog.e("getFiles HttpException ", it)
+                            App.instance.toast("${it.message}，请重试～")
+                        }
+                    }
+
+                    else -> {
+                        XLog.e("getFiles Exception ", it)
+                        App.instance.toast("${it.message}，请重试～")
+                    }
+                }
+
             }
+            _isRefreshing.value = false
+
         }
     }
 

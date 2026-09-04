@@ -28,6 +28,10 @@ object UserSessionManager {
         DataStoreUtil.putDataSuspend(ConfigKeyUtil.UID, newUid)
     }
 
+    fun updateCookie(newCookie: String) {
+        this.cookie = newCookie
+    }
+
     fun updateRequestLimitCount(count: String) {
         this.requestLimitCount = count.toInt()
     }

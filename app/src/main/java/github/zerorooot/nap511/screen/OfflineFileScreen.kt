@@ -55,10 +55,6 @@ fun OfflineFileScreen(
     getFiles: (String) -> Unit,
     onClick: (String) -> Unit,
 ) {
-    LaunchedEffect(Unit) {
-        offlineFileViewModel.getOfflineFileList()
-    }
-
     val offlineInfo by offlineFileViewModel.offlineInfo.collectAsState()
     val refreshing by offlineFileViewModel.isRefreshing.collectAsState()
 

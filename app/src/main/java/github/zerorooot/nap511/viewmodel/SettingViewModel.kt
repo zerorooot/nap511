@@ -9,6 +9,7 @@ import com.google.gson.JsonObject
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.UserSessionManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -199,10 +200,15 @@ class SettingViewModel : ViewModel() {
                 }
 
                 // 如果导入配置包含 Cookie / UID，同步更新 UserSessionManager
-                val newCookie = if (jsonObject.has(ConfigKeyUtil.COOKIE)) jsonObject.get(ConfigKeyUtil.COOKIE).asString else null
-                val newUid = if (jsonObject.has(ConfigKeyUtil.UID)) jsonObject.get(ConfigKeyUtil.UID).asString else null
+                val newCookie =
+                    if (jsonObject.has(ConfigKeyUtil.COOKIE)) jsonObject.get(ConfigKeyUtil.COOKIE).asString else null
+                val newUid =
+                    if (jsonObject.has(ConfigKeyUtil.UID)) jsonObject.get(ConfigKeyUtil.UID).asString else null
                 if (!newCookie.isNullOrEmpty()) {
-                    github.zerorooot.nap511.util.UserSessionManager.updateSession(newCookie, newUid ?: github.zerorooot.nap511.util.UserSessionManager.uid)
+                    UserSessionManager.updateSession(
+                        newCookie,
+                        newUid ?: UserSessionManager.uid
+                    )
                 }
 
                 withContext(Dispatchers.Main) { onSuccess() }

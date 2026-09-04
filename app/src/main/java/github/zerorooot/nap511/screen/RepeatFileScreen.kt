@@ -67,9 +67,7 @@ fun RepeatFileScreen(
     onClick: () -> Unit,
     jumpClick: (String) -> Unit
 ) {
-    LaunchedEffect(Unit) {
-        viewModel.loadData()
-    }
+
     val uiState by viewModel.uiState.collectAsState()
     val categoryDetail by viewModel.categoryDetail.collectAsState()
     var showDeleteDialog by remember { mutableStateOf(false) }

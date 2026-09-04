@@ -48,10 +48,9 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.NetworkClient
 import github.zerorooot.nap511.util.UserSessionManager
-import github.zerorooot.nap511.viewmodel.FileViewModel
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
@@ -83,8 +82,7 @@ fun BaseWebViewScreen(
                     trackColor = MaterialTheme.colorScheme.surfaceVariant,
                 )
             }
-        }
-    ) { paddingValues ->
+        }) { paddingValues ->
         Surface(
             modifier = Modifier
                 .fillMaxSize()
@@ -198,7 +196,11 @@ fun WebViewScreen(onClick: () -> Unit) {
     LaunchedEffect(Unit) {
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
-        WebView.setWebContentsDebuggingEnabled(DataStoreUtil.getDataSuspend(ConfigKeyUtil.LOG, false))
+        WebView.setWebContentsDebuggingEnabled(
+            DataStoreUtil.getDataSuspend(
+                ConfigKeyUtil.LOG, false
+            )
+        )
         // 1. 注入 Cookie
         setRawCookieString(UserSessionManager.cookie)
         // 2. 强制显式同步并引入物理延迟，确保 API 请求发起时 Cookie 已在磁盘就绪
@@ -209,14 +211,12 @@ fun WebViewScreen(onClick: () -> Unit) {
 
     if (isReady) {
         BaseWebViewScreen(
-            topAppBarActionButtonOnClick = onClick,
-            webViewClient = {
+            topAppBarActionButtonOnClick = onClick, webViewClient = {
                 webViewRef = it
                 webViewClient { u ->
                     currentUrl = u
                 }
-            },
-            loadUrl = initialUrl
+            }, loadUrl = initialUrl
         )
     }
 }
@@ -409,15 +409,16 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
             // 登录页面也注入诊断，防止登录也白屏
             view?.evaluateJavascript(
                 "(function() { return {url: window.location.href, title: document.title, elements: document.getElementsByTagName('*').length}; })();",
-                { result -> XLog.d("LOGIN_DIAG_DATA: $result") }
-            )
+                { result -> XLog.d("LOGIN_DIAG_DATA: $result") })
         }
     }
 
 }
 
 @Composable
-fun CaptchaWebViewScreen(fileViewModel: FileViewModel, onNav: (String) -> Unit) {
+fun CaptchaWebViewScreen(
+    handleOfflineTask: () -> Unit, onNav: (String) -> Unit
+) {
     LaunchedEffect(Unit) {
         val cookieManager = CookieManager.getInstance()
         UserSessionManager.cookie.split(";").forEach { a ->
@@ -427,16 +428,12 @@ fun CaptchaWebViewScreen(fileViewModel: FileViewModel, onNav: (String) -> Unit) 
         }
         cookieManager.flush()
     }
-
     BaseWebViewScreen(
         topAppBarActionButtonOnClick = {
             onNav.invoke("topAppBarActionButtonOnClick")
         },
         webViewClient = {
-            captchaWebViewClient(fileViewModel, it) { gesture, select ->
-                if (gesture) {
-                    fileViewModel.gesturesEnabled = true
-                }
+            captchaWebViewClient(it, handleOfflineTask) { select ->
                 if (select) {
                     onNav.invoke("select")
                 }
@@ -448,7 +445,9 @@ fun CaptchaWebViewScreen(fileViewModel: FileViewModel, onNav: (String) -> Unit) 
 }
 
 @Composable
-fun CaptchaVideoWebViewScreen(fileViewModel: FileViewModel, onNav: (String) -> Unit) {
+fun CaptchaVideoWebViewScreen(
+    onNav: (String) -> Unit
+) {
     LaunchedEffect(Unit) {
         val cookieManager = CookieManager.getInstance()
         UserSessionManager.cookie.split(";").forEach { a ->
@@ -463,10 +462,7 @@ fun CaptchaVideoWebViewScreen(fileViewModel: FileViewModel, onNav: (String) -> U
             onNav.invoke("topAppBarActionButtonOnClick")
         },
         webViewClient = {
-            captchaWebViewClient(fileViewModel, it) { gesture, select ->
-                if (gesture) {
-                    fileViewModel.gesturesEnabled = true
-                }
+            captchaWebViewClient(it) { select ->
                 if (select) {
                     onNav.invoke("select")
                 }
@@ -478,7 +474,9 @@ fun CaptchaVideoWebViewScreen(fileViewModel: FileViewModel, onNav: (String) -> U
 }
 
 fun captchaWebViewClient(
-    fileViewModel: FileViewModel, webView: WebView, handle: (Boolean, Boolean) -> Unit
+    webView: WebView,
+    handleOfflineTask: (() -> Unit)? = null,
+    nav: (Boolean) -> Unit,
 ): WebViewClient {
     return object : RequestInspectorWebViewClient(webView) {
         override fun shouldInterceptRequest(
@@ -486,14 +484,14 @@ fun captchaWebViewClient(
         ): WebResourceResponse? {
             //磁力链接验证
             if ("https://webapi.115.com/user/captcha" == webViewRequest.url) {
-                if (check("https://webapi.115.com/user/captcha", webViewRequest, handle)) {
-                    fileViewModel.handleOfflineTask()
+                if (check("https://webapi.115.com/user/captcha", webViewRequest, nav)) {
+                    handleOfflineTask?.invoke()
                     App.instance.toast("验证账号成功，重新添加链接中")
                 }
             }
             //视频验证
             if ("https://115vod.com/webapi/user/captcha" == webViewRequest.url) {
-                if (check("https://115vod.com/webapi/user/captcha", webViewRequest, handle)) {
+                if (check("https://115vod.com/webapi/user/captcha", webViewRequest, nav)) {
                     App.instance.toast("视频验证成功~")
                 }
             }
@@ -503,9 +501,9 @@ fun captchaWebViewClient(
 }
 
 private fun check(
-    url: String, webViewRequest: WebViewRequest, handle: (Boolean, Boolean) -> Unit
+    url: String, webViewRequest: WebViewRequest, nav: (Boolean) -> Unit
 ): Boolean {
-    val httpClient = OkHttpClient()
+    val httpClient = NetworkClient.sharedOkHttpClient
     val a = Request.Builder().url(url).method("POST", webViewRequest.body.toRequestBody())
     webViewRequest.headers.forEach { (t, u) -> a.addHeader(t, u) }
     //移除web添加的cookie
@@ -515,11 +513,11 @@ private fun check(
     val response = httpClient.newCall(a.build()).execute()
     val string = response.body.string()
     //启用手势，不跳转页面
-    handle.invoke(true, false)
+    nav.invoke(false)
 
     if (string.contains("{\"state\":true}")) {
         //启用手势，跳转页面
-        handle.invoke(true, true)
+        nav.invoke(true)
         return true
     }
     return false

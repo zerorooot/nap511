@@ -76,7 +76,6 @@ import kotlinx.coroutines.withContext
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 import java.nio.charset.Charset
-import java.util.UUID
 
 /**
  * 搜索匹配项位置信息
@@ -336,11 +335,14 @@ fun TxtReaderScreen(
                 }
             }
         }
-    ) { _ ->
+    ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-//                .padding(innerPadding)
+                .padding(
+                    top = innerPadding.calculateTopPadding(),
+                    bottom = innerPadding.calculateBottomPadding()
+                )
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null

@@ -29,7 +29,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +39,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
+import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 
@@ -47,16 +47,12 @@ import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OfflineDownloadScreen(
-    offlineFileViewModel: OfflineFileViewModel,
-    currentCid: String,
     path: String,
+    quotaBean: QuotaBean,
+    url: String,
     onClick: () -> Unit,
-    onNav: () -> Unit
+    onAddTask: (List<String>) -> Unit
 ) {
-    LaunchedEffect(Unit) {
-        offlineFileViewModel.quota()
-    }
-
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
@@ -66,7 +62,6 @@ fun OfflineDownloadScreen(
     val screenWidthDp = remember { with(density) { containerSize.width.toDp() } }
     val screenHeightDp = remember { with(density) { containerSize.height.toDp() } }
 
-    val quotaBean by offlineFileViewModel.quotaBean.collectAsState()
     val clickFun = { command: String, url: String ->
         when (command) {
             "sha1" -> {}
@@ -77,11 +72,7 @@ fun OfflineDownloadScreen(
                         true
                     ) || i.startsWith("magnet", true) || i.startsWith("ed2k", true)
                 }.toList()
-                offlineFileViewModel.addTask(urlList, currentCid) {
-                    if (it) {
-                        onNav.invoke()
-                    }
-                }
+                onAddTask.invoke(urlList)
             }
         }
     }
@@ -89,7 +80,7 @@ fun OfflineDownloadScreen(
     val minHeightPercentage = 0.5f // 最小高度百分比
     val maxHeightPercentage = 0.65f // 最大高度百分比
 
-    var urlText by offlineFileViewModel.urlText
+    var urlText by remember { mutableStateOf(url) }
     var urlCount by remember {
         mutableStateOf("链接")
     }

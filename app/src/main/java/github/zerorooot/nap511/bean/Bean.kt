@@ -122,7 +122,7 @@ data class RemainingSpaceBean(
     @SerializedName("all_use") val use: SpaceDetails = SpaceDetails()
 ) {
     data class SpaceDetails(
-        val size: Long = 0L,
+        val size: Long = 1L,
         @SerializedName("size_format") val sizeFormat: String = "0TB"
     )
 }
