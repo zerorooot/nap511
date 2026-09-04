@@ -40,6 +40,7 @@ import github.zerorooot.nap511.screenitem.PreferenceItem
 import github.zerorooot.nap511.screenitem.SwitchPreferenceItem
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.UserSessionManager
 import github.zerorooot.nap511.viewmodel.SettingViewModel
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
@@ -313,7 +314,10 @@ fun SettingContent(
                         summary = "每次请求加载 ${uiState.requestLimitCount} 个文件",
                         value = uiState.requestLimitCount,
                         isNumber = true,
-                        onValueSave = { onSaveConfig(ConfigKeyUtil.REQUEST_LIMIT_COUNT, it) }
+                        onValueSave = {
+                            UserSessionManager.updateRequestLimitCount(it)
+                            onSaveConfig(ConfigKeyUtil.REQUEST_LIMIT_COUNT, it)
+                        }
                     )
                 }
                 item {
@@ -402,7 +406,7 @@ fun SettingContent(
                 }
                 item {
                     SwitchPreferenceItem(
-                        title = "动态配色",
+                        title = "应用动态配色",
                         summary = "根据系统壁纸自动衍生应用配色（仅支持 Android 12+）",
                         checked = uiState.dynamicColorEnabled,
                         onCheckedChange = { onSaveConfig(ConfigKeyUtil.DYNAMIC_COLOR, it) }
@@ -410,7 +414,7 @@ fun SettingContent(
                 }
                 item {
                     SwitchPreferenceItem(
-                        title = "大屏模式",
+                        title = "大屏扩展模式",
                         summary = "在平板或大屏设备（屏幕宽度 ≥ 600dp）上启用大屏展开布局",
                         checked = uiState.expandedScreenEnabled,
                         onCheckedChange = { onSaveConfig(ConfigKeyUtil.EXPANDED_SCREEN, it) }
@@ -418,7 +422,7 @@ fun SettingContent(
                 }
                 item {
                     SwitchPreferenceItem(
-                        title = "重命名光标定位",
+                        title = "改名光标定位",
                         summary = "重命名文件时，输入光标自动定位至 '@' 或 '空格' 字符后",
                         checked = uiState.positionAfterAt,
                         onCheckedChange = { onSaveConfig(ConfigKeyUtil.POSITION_AFTER_AT, it) }
@@ -479,7 +483,7 @@ fun SettingContent(
                 }
                 item {
                     PreferenceItem(
-                        title = "重启应用",
+                        title = "强制重启应用",
                         summary = "强制重新启动应用程序",
                         onClick = onRestartApp
                     )

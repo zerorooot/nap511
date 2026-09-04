@@ -93,11 +93,14 @@ fun MusicDetailScreen(
             )
         },
         containerColor = MaterialTheme.colorScheme.surface
-    ) { paddingValues ->
+    ) { innerPadding ->
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(
+                    top = innerPadding.calculateTopPadding(),
+                    bottom = innerPadding.calculateBottomPadding()
+                )
         ) {
             val isLandscape = maxWidth > maxHeight
 

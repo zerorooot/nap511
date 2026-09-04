@@ -28,8 +28,7 @@ object UserSessionManager {
         DataStoreUtil.putDataSuspend(ConfigKeyUtil.UID, newUid)
     }
 
-    suspend fun updateRequestLimitCount(count: Int) {
-        this.requestLimitCount = count
-        DataStoreUtil.putDataSuspend(ConfigKeyUtil.REQUEST_LIMIT_COUNT, count.toString())
+    fun updateRequestLimitCount(count: String) {
+        this.requestLimitCount = count.toInt()
     }
 }
