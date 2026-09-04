@@ -360,32 +360,20 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
                 // 3. 网络请求成功后写入缓存
                 setFiles(files)
             }.onFailure {
-                when (it) {
-                    is NullPointerException -> {
-                        App.instance.toast("获取文件列表失败，建议更新您的Cookie")
-                        fileListCache.clearAll()
-                        UserSessionManager.updateSession("", "")
-                        _navigationEvent.send(NavEvent.NavigateToScreen(Route.Login))
-                    }
-
-                    is HttpException -> {
-                        if (it.code() == 405) {
-                            App.instance.toast("HttpException 405，建议更新您的Cookie")
-                            fileListCache.clearAll()
-                            UserSessionManager.updateSession("", "")
-                            _navigationEvent.send(NavEvent.NavigateToScreen(Route.Login))
-                        } else {
-                            XLog.e("getFiles HttpException ", it)
-                            App.instance.toast("${it.message}，请重试～")
-                        }
-                    }
-
-                    else -> {
-                        XLog.e("getFiles Exception ", it)
-                        App.instance.toast("${it.message}，请重试～")
-                    }
+                val expiredTip = when (it) {
+                    is NullPointerException -> "获取文件列表失败，建议更新您的Cookie"
+                    is HttpException if it.code() == 405 -> "HttpException 405，建议更新您的Cookie"
+                    else -> null
                 }
-
+                if (expiredTip != null) {
+                    App.instance.toast(expiredTip)
+                    fileListCache.clearAll()
+                    UserSessionManager.updateSession("", "")
+                    _navigationEvent.send(NavEvent.NavigateToScreen(Route.Login))
+                } else {
+                    XLog.e("getFiles Exception ", it)
+                    App.instance.toast("${it.message}，请重试～")
+                }
             }
             _isRefreshing.value = false
 

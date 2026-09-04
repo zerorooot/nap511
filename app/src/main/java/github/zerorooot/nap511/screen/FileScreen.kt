@@ -19,6 +19,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -79,6 +80,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.nativeClipboardManager
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.gson.Gson
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
@@ -92,7 +94,6 @@ import github.zerorooot.nap511.screenitem.FileCellItem
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.cancelCut
@@ -131,7 +132,10 @@ fun FileScreen(
     appBarOnClick: (String) -> Unit,
     drawerState: () -> Boolean
 ) {
-    val fabPositionSetting by DataStoreUtil.getDataFlow(ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION, "End")
+    val fabPositionSetting by DataStoreUtil.getDataFlow(
+        ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION,
+        "End"
+    )
         .collectAsStateWithLifecycle(initialValue = "End")
     val fabPosition = remember(fabPositionSetting) {
         when (fabPositionSetting) {
@@ -146,7 +150,10 @@ fun FileScreen(
         .collectAsStateWithLifecycle(initialValue = false)
     val maxTxtSizeStr by DataStoreUtil.getDataFlow(ConfigKeyUtil.MAX_TXT_SIZE, "200")
         .collectAsStateWithLifecycle(initialValue = "200")
-    val aria2UrlConfig by DataStoreUtil.getDataFlow(ConfigKeyUtil.ARIA2_URL, ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE)
+    val aria2UrlConfig by DataStoreUtil.getDataFlow(
+        ConfigKeyUtil.ARIA2_URL,
+        ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
+    )
         .collectAsStateWithLifecycle(initialValue = ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE)
 
     val fileBeanList = fileViewModel.fileBeanList
@@ -513,14 +520,14 @@ fun FileScreen(
                         }
                     }
                 },
-                onPathLongClick = {
+                onPathLongClick = { name, cid ->
                     scope.launch {
                         DataStoreUtil.putDataSuspend(
                             ConfigKeyUtil.DEFAULT_OFFLINE_CID,
-                            fileViewModel.currentCid
+                            cid
                         )
                     }
-                    App.instance.toast("已设置默认离线位置")
+                    App.instance.toast("设置默认离线位置为: $name")
                 },
                 onItemClick = {
                     fileViewModel.getFiles(it)
@@ -561,7 +568,7 @@ private fun FilePathBar(
     pathList: List<PathBean>,
     onPathClick: () -> Unit,
     onPathDoubleClick: () -> Unit,
-    onPathLongClick: () -> Unit,
+    onPathLongClick: (String, String) -> Unit,
     onItemClick: (String) -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -576,7 +583,10 @@ private fun FilePathBar(
             .combinedClickable(
                 onClick = onPathClick,
                 onDoubleClick = onPathDoubleClick,
-                onLongClick = onPathLongClick
+                onLongClick = {
+                    val path = pathList.last()
+                    onPathLongClick.invoke(path.name, path.cid)
+                }
             )
     ) {
         Row(
@@ -587,14 +597,30 @@ private fun FilePathBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             pathList.forEachIndexed { index, path ->
-                FilterChip(
-                    selected = true,
-                    onClick = { onItemClick(path.cid) },
-                    label = {
-                        Text(text = path.name.ifEmpty { "根目录" })
-                    },
-                    modifier = Modifier.padding(start = 6.dp, end = 6.dp)
-                )
+                // interactionSource 以便组件和点击修饰符同步水波纹与焦点状态
+                val interactionSource = remember { MutableInteractionSource() }
+                Box {
+                    FilterChip(
+                        selected = true,
+                        onClick = {},
+                        label = {
+                            Text(text = path.name.ifEmpty { "根目录" })
+                        },
+                        modifier = Modifier.padding(start = 6.dp, end = 6.dp),
+                        interactionSource = interactionSource
+                    )
+                    // 添加一个完全匹配尺寸的透明层，统一处理单击和长按
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .combinedClickable(
+                                interactionSource = interactionSource,
+                                indication = null, // 彻底关闭浮层的水波纹渲染，由底层 Chip 自行展示
+                                onClick = { onItemClick(path.cid) },
+                                onLongClick = { onPathLongClick.invoke(path.name, path.cid) }
+                            )
+                    )
+                }
 
                 // 间隔符
                 if (index < pathList.size - 1) {
