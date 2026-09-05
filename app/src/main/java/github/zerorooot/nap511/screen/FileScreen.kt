@@ -99,6 +99,7 @@ import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.cancelCut
 import github.zerorooot.nap511.viewmodel.cut
 import github.zerorooot.nap511.viewmodel.delete
+import github.zerorooot.nap511.viewmodel.deleteMultiple
 import github.zerorooot.nap511.viewmodel.downloadText
 import github.zerorooot.nap511.viewmodel.getFileInfo
 import github.zerorooot.nap511.viewmodel.getTorrentTask
@@ -107,7 +108,10 @@ import github.zerorooot.nap511.viewmodel.getZipListFile
 import github.zerorooot.nap511.viewmodel.openAria2Dialog
 import github.zerorooot.nap511.viewmodel.openCreateFolderDialog
 import github.zerorooot.nap511.viewmodel.openCreateSelectTorrentFileDialog
+import github.zerorooot.nap511.viewmodel.openFileOrderDialog
 import github.zerorooot.nap511.viewmodel.openRenameFileDialog
+import github.zerorooot.nap511.viewmodel.openSearchDialog
+import github.zerorooot.nap511.viewmodel.openUnzipAllFileDialog
 import github.zerorooot.nap511.viewmodel.removeFile
 import github.zerorooot.nap511.viewmodel.startSendAria2Service
 import github.zerorooot.nap511.viewmodel.updateVideoFileBean
@@ -129,7 +133,6 @@ fun FileScreen(
     audioViewModel: AudioViewModel,
     isExpandedScreen: Boolean,
     onNav: (Route) -> Unit,
-    appBarOnClick: (String) -> Unit,
     drawerState: () -> Boolean
 ) {
     val fabPositionSetting by DataStoreUtil.getDataFlow(
@@ -157,8 +160,8 @@ fun FileScreen(
         .collectAsStateWithLifecycle(initialValue = ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE)
 
     val fileBeanList = fileViewModel.fileBeanList
-    val path by fileViewModel.currentPath.collectAsState()
-    val refreshing by fileViewModel.isRefreshing.collectAsState()
+    val path by fileViewModel.currentPath.collectAsStateWithLifecycle()
+    val refreshing by fileViewModel.isRefreshing.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showDialog by rememberSaveable { mutableIntStateOf(-1) }
 
@@ -435,9 +438,22 @@ fun FileScreen(
                 fileViewModel.refresh(true)
             }
 
-            else -> {
-                appBarOnClick(name)
+            "unzipAllFile" -> {
+                fileViewModel.openUnzipAllFileDialog()
             }
+
+            "selectToUp" -> fileViewModel.selectToUp()
+            "selectToDown" -> fileViewModel.selectToDown()
+            "cut" -> fileViewModel.cut()
+            //具体实现在FileScreen#CreateDialogs()里
+            "search" -> fileViewModel.openSearchDialog()
+            "delete" -> fileViewModel.deleteMultiple()
+//            "selectAll" -> fileViewModel.selectAll()
+            "selectReverse" -> fileViewModel.selectReverse()
+            //具体实现在FileScreen#CreateDialogs()里
+            "文件排序" -> fileViewModel.openFileOrderDialog()
+            "刷新文件" -> fileViewModel.refresh()
+
         }
     }
 

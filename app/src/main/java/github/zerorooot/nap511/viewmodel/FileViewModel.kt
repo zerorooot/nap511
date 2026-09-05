@@ -76,10 +76,8 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentPath = MutableStateFlow("")
     var currentPath = _currentPath.asStateFlow()
 
-    var currentCid: String by mutableStateOf("0")
+    var currentCid by mutableStateOf("0")
 
-    //当前cid下的文件数量
-    private var count: Int by mutableIntStateOf(0)
 
     internal var saveRequestCache by mutableStateOf(true)
 
@@ -89,7 +87,8 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
             saveRequestCache
         )
     }
-    var pathList: List<PathBean> = mutableStateListOf()
+    var pathList by mutableStateOf<List<PathBean>>(emptyList())
+        private set
 
     internal var cutFileList = emptyList<FileBean>()
 
@@ -97,8 +96,6 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
     internal val _isRefreshing = MutableStateFlow(false)
     var isRefreshing = _isRefreshing.asStateFlow()
 
-    //页面导航
-//    var selectedItem by mutableStateOf(ConfigKeyUtil.MY_FILE)
 
     var torrentBean by mutableStateOf(TorrentFileBean())
     val torrentBeanCache = hashMapOf<String, TorrentFileBean>()
@@ -551,7 +548,6 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
         fileBeanList.addAll(files.fileBeanList)
 
         currentCid = files.cid
-        count = files.count
 
         pathList = files.path
 

@@ -20,6 +20,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,8 +31,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.bean.LocationBean
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.screenitem.EditTextPreferenceItem
 import github.zerorooot.nap511.screenitem.ListPreferenceItem
@@ -47,10 +48,11 @@ import my.nanihadesuka.compose.ScrollbarSettings
 
 @Composable
 fun SettingScreen(
-    viewModel: SettingViewModel = viewModel(),
+    viewModel: SettingViewModel,
     onClick: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val currentLocation by viewModel.currentLocation.collectAsStateWithLifecycle()
     var lastClick by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
@@ -114,6 +116,10 @@ fun SettingScreen(
 
     SettingContent(
         uiState = uiState,
+        currentLocation = currentLocation,
+        onSaveScrollPosition = { index, offset ->
+            viewModel.setLocation(index, offset)
+        },
         onSaveConfig = { key, value -> viewModel.saveData(key, value) },
         onActionClick = onClick,
         onExportConfig = {
@@ -143,6 +149,8 @@ fun SettingScreen(
 @Composable
 fun SettingContent(
     uiState: SettingUiState,
+    currentLocation: LocationBean,
+    onSaveScrollPosition: (Int, Int) -> Unit,
     onSaveConfig: (String, Any) -> Unit,
     onActionClick: (String) -> Unit,
     onExportConfig: () -> Unit,      // 导出回调
@@ -150,7 +158,20 @@ fun SettingContent(
     onResetConfig: () -> Unit,       // 恢复默认设置回调
     onRestartApp: () -> Unit
 ) {
-    val listState = rememberLazyListState()
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = currentLocation.firstVisibleItemIndex,
+        initialFirstVisibleItemScrollOffset = currentLocation.firstVisibleItemScrollOffset
+    )
+
+    DisposableEffect(listState) {
+        onDispose {
+            onSaveScrollPosition(
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset
+            )
+        }
+    }
+
     val fabArray = stringArrayResource(R.array.floatingActionButtonPosition)
     val themeArray = stringArrayResource(R.array.themeMode)
 

@@ -6,14 +6,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
+import github.zerorooot.nap511.bean.LocationBean
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.UserSessionManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -21,6 +24,12 @@ import kotlinx.coroutines.withContext
 
 class SettingViewModel : ViewModel() {
     private val gson = GsonBuilder().setPrettyPrinting().create()
+    internal val _currentLocation = MutableStateFlow(LocationBean(0, 0))
+    var currentLocation = _currentLocation.asStateFlow()
+
+    fun setLocation(i: Int, i1: Int) {
+        _currentLocation.value = LocationBean(i, i1)
+    }
 
     // 1. 账号与安全分组 Flow
     private val accountFlow = combine(

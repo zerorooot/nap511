@@ -18,7 +18,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudDone
@@ -95,11 +94,7 @@ import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import github.zerorooot.nap511.viewmodel.RepeatFileViewModel
-import github.zerorooot.nap511.viewmodel.cut
-import github.zerorooot.nap511.viewmodel.deleteMultiple
-import github.zerorooot.nap511.viewmodel.openFileOrderDialog
-import github.zerorooot.nap511.viewmodel.openSearchDialog
-import github.zerorooot.nap511.viewmodel.openUnzipAllFileDialog
+import github.zerorooot.nap511.viewmodel.SettingViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -166,6 +161,7 @@ class MainActivity : AppCompatActivity() {
         val recycleViewModel: RecycleViewModel = viewModel()
         val audioViewModel: AudioViewModel = viewModel()
         val repeatViewModel: RepeatFileViewModel = viewModel()
+        val settingViewModel: SettingViewModel = viewModel()
         val navController = rememberNavController()
         val context = LocalContext.current
 
@@ -209,6 +205,7 @@ class MainActivity : AppCompatActivity() {
             recycleViewModel,
             audioViewModel,
             repeatViewModel,
+            settingViewModel,
             navController
         )
 
@@ -241,6 +238,7 @@ class MainActivity : AppCompatActivity() {
         recycleViewModel: RecycleViewModel,
         audioViewModel: AudioViewModel,
         repeatViewModel: RepeatFileViewModel,
+        settingViewModel: SettingViewModel,
         navController: NavHostController
     ) {
         val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -405,8 +403,7 @@ class MainActivity : AppCompatActivity() {
                                 scope.launch(Dispatchers.Main) {
                                     navController.navigate(it)
                                 }
-                            },
-                            appBarClick(fileViewModel)
+                            }
                         ) {
                             val open = drawerState.isOpen
                             if (open) {
@@ -469,7 +466,7 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     composable<Route.AdvancedSettings> {
-                        SettingScreen {
+                        SettingScreen(settingViewModel) {
                             when (it) {
                                 "topAppBarActionButtonOnClick" -> {
                                     scope.launch { drawerState.open() }
@@ -505,6 +502,7 @@ class MainActivity : AppCompatActivity() {
                                         }
                                     }
                                 }
+
                                 "Login" -> {
                                     navController.navigate(Route.Login) {
                                         // 弹出 AdvancedSettings，让 Login 直接替换设置页在栈中的位置
@@ -686,31 +684,6 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent) // 更新 Activity 的 intent 引用，确保 fileViewModel 能捕获最新的 Deep Link
-    }
-
-    private fun appBarClick(fileViewModel: FileViewModel) = fun(name: String) {
-        when (name) {
-//                "back"->{FileScreen里}
-            //具体实现在AlertDialog#UnzipAllFile()里
-            "unzipAllFile" -> {
-                fileViewModel.openUnzipAllFileDialog()
-            }
-
-            "selectToUp" -> fileViewModel.selectToUp()
-            "selectToDown" -> fileViewModel.selectToDown()
-            "cut" -> fileViewModel.cut()
-            //具体实现在FileScreen#CreateDialogs()里
-            "search" -> fileViewModel.openSearchDialog()
-            "delete" -> fileViewModel.deleteMultiple()
-//            "selectAll" -> fileViewModel.selectAll()
-            "selectReverse" -> fileViewModel.selectReverse()
-            //具体实现在FileScreen#CreateDialogs()里
-            "文件排序" -> fileViewModel.openFileOrderDialog()
-            "刷新文件" -> fileViewModel.refresh()
-            "视频时间" -> {
-                //具体实现在FileScreen#myAppBarOnClick里
-            }
-        }
     }
 }
 
