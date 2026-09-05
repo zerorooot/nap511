@@ -69,7 +69,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
     var fileBeanList = mutableStateListOf<FileBean>()
     var unzipBeanList = mutableStateOf(ZipBeanList())
     var remainingSpace by mutableStateOf(RemainingSpaceBean())
-    var textBodyByteArray: ByteArray? = null
+    var textBodyByteArray by mutableStateOf<ByteArray?>(null)
 
     var appBarTitle by mutableStateOf(context.getString(R.string.app_name))
 

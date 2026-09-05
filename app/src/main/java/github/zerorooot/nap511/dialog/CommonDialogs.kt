@@ -61,7 +61,6 @@ import androidx.compose.ui.window.DialogProperties
 import com.google.gson.JsonObject
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
-import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import github.zerorooot.nap511.viewmodel.closeTextBodyDialog
 import kotlinx.coroutines.delay
 import java.nio.charset.Charset
@@ -263,8 +262,8 @@ fun CookieDialog(enter: (String?) -> Unit) {
 }
 
 @Composable
-fun RecyclePasswordDialog(recycleViewModel: RecycleViewModel, enter: (String?) -> Unit) {
-    if (recycleViewModel.isOpenRecyclePasswordDialog) {
+fun RecyclePasswordDialog(isOpen: Boolean, enter: (String?) -> Unit) {
+    if (isOpen) {
         BaseDialog(
             title = "请输入6位数字安全密钥",
             label = "数字安全密钥",

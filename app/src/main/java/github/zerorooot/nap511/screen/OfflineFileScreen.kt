@@ -24,7 +24,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -36,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat.getSystemService
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import github.zerorooot.nap511.bean.OfflineListCount
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.dialog.OfflineFileInfoDialog
 import github.zerorooot.nap511.screenitem.OfflineCellItem
@@ -48,6 +49,19 @@ import my.nanihadesuka.compose.ScrollbarSettings
 import java.util.StringJoiner
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 
+/**
+ * 离线文件页面的纯 UI 状态封装
+ */
+data class OfflineFileUiState(
+    val offlineInfo: OfflineListCount = OfflineListCount(),
+    val isRefreshing: Boolean = false,
+    val downloadingList: List<OfflineTask> = emptyList(),
+    val failedList: List<OfflineTask> = emptyList(),
+    val completedList: List<OfflineTask> = emptyList(),
+    val isOpenOfflineDialog: Boolean = false,
+    val selectedOfflineTask: OfflineTask? = null,
+)
+
 @Composable
 fun OfflineFileScreen(
     offlineFileViewModel: OfflineFileViewModel,
@@ -55,28 +69,74 @@ fun OfflineFileScreen(
     getFiles: (String) -> Unit,
     onClick: (String) -> Unit,
 ) {
-    val offlineInfo by offlineFileViewModel.offlineInfo.collectAsState()
-    val refreshing by offlineFileViewModel.isRefreshing.collectAsState()
+    val offlineInfo by offlineFileViewModel.offlineInfo.collectAsStateWithLifecycle()
+    val refreshing by offlineFileViewModel.isRefreshing.collectAsStateWithLifecycle()
+    val downloadingList by offlineFileViewModel.downloadingList.collectAsStateWithLifecycle()
+    val failedList by offlineFileViewModel.failedList.collectAsStateWithLifecycle()
+    val completedList by offlineFileViewModel.completedList.collectAsStateWithLifecycle()
 
-    // 1. 订阅ViewModel拆分出的 3 个独立列表
-    val downloadingList by offlineFileViewModel.downloadingList.collectAsState()
-    val failedList by offlineFileViewModel.failedList.collectAsState()
-    val completedList by offlineFileViewModel.completedList.collectAsState()
+    val uiState = OfflineFileUiState(
+        offlineInfo = offlineInfo,
+        isRefreshing = refreshing,
+        downloadingList = downloadingList,
+        failedList = failedList,
+        completedList = completedList,
+        isOpenOfflineDialog = offlineFileViewModel.isOpenOfflineDialog,
+        selectedOfflineTask = if (offlineFileViewModel.isOpenOfflineDialog) offlineFileViewModel.offlineTask else null
+    )
 
+    OfflineFileContent(
+        uiState = uiState,
+        isExpandedScreen = isExpandedScreen,
+        onRefresh = { offlineFileViewModel.refresh() },
+        onClearFinish = { offlineFileViewModel.clearFinish() },
+        onClearError = { offlineFileViewModel.clearError() },
+        onDeleteTask = { offlineFileViewModel.delete(it) },
+        onOpenTaskDialog = { offlineFileViewModel.openOfflineDialog(it) },
+        onCloseTaskDialog = { offlineFileViewModel.closeOfflineDialog() },
+        onLoadMoreCompleted = { offlineFileViewModel.loadMoreCompletedTasks() },
+        onLoadMoreDownloading = { offlineFileViewModel.loadMoreDownloadingTasks() },
+        onLoadMoreFailed = { offlineFileViewModel.loadMoreFailedTasks() },
+        getFiles = getFiles,
+        onClick = onClick
+    )
+}
+
+/**
+ * 无状态（Stateless）UI 组件：不依赖任何 ViewModel
+ */
+@Composable
+fun OfflineFileContent(
+    uiState: OfflineFileUiState,
+    isExpandedScreen: Boolean,
+    onRefresh: () -> Unit,
+    onClearFinish: () -> Unit,
+    onClearError: () -> Unit,
+    onDeleteTask: (OfflineTask) -> Unit,
+    onOpenTaskDialog: (OfflineTask) -> Unit,
+    onCloseTaskDialog: () -> Unit,
+    onLoadMoreCompleted: () -> Unit,
+    onLoadMoreDownloading: () -> Unit,
+    onLoadMoreFailed: () -> Unit,
+    getFiles: (String) -> Unit,
+    onClick: (String) -> Unit,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     // Tab 页标题及数量提示
     val tabs = listOf(
-        "完成记录 (${offlineInfo.finishedCount})",
-        "正在下载 (${offlineInfo.downloadingCount})",
-        "下载失败 (${offlineInfo.failedCount})",
+        "完成记录 (${uiState.offlineInfo.finishedCount})",
+        "正在下载 (${uiState.offlineInfo.downloadingCount})",
+        "下载失败 (${uiState.offlineInfo.failedCount})",
     )
     val pagerState = rememberPagerState(pageCount = { tabs.size })
 
-    OfflineFileInfoDialog(offlineFileViewModel) {
-        offlineFileViewModel.closeOfflineDialog()
-    }
+    OfflineFileInfoDialog(
+        isOpen = uiState.isOpenOfflineDialog,
+        task = uiState.selectedOfflineTask,
+        onDismissRequest = onCloseTaskDialog
+    )
 
     // 点击列表项逻辑：直接接收点击的 OfflineTask 对象
     val itemOnClick = { offlineTask: OfflineTask ->
@@ -89,34 +149,23 @@ fun OfflineFileScreen(
     val menuOnClick = { name: String, item: OfflineTask ->
         when (name) {
             "复制链接" -> copyDownloadUrl(context, item.url, 1)
-            "删除文件" -> offlineFileViewModel.delete(item)
-            "文件信息" -> offlineFileViewModel.openOfflineDialog(item)
+            "删除文件" -> onDeleteTask(item)
+            "文件信息" -> onOpenTaskDialog(item)
         }
     }
 
     val appBarOnClick = { name: String ->
         when (name) {
-            "刷新文件" -> offlineFileViewModel.refresh()
-            "清空已完成" -> offlineFileViewModel.clearFinish()
-            "清空已失败" -> offlineFileViewModel.clearError()
+            "刷新文件" -> onRefresh()
+            "清空已完成" -> onClearFinish()
+            "清空已失败" -> onClearError()
             "复制本页链接" -> {
                 val stringJoiner = StringJoiner("\n")
                 val allTasks = when (pagerState.currentPage) {
-                    0 -> {
-                        completedList
-                    }
-
-                    1 -> {
-                        downloadingList
-                    }
-
-                    2 -> {
-                        failedList
-                    }
-
-                    else -> {
-                        completedList
-                    }
+                    0 -> uiState.completedList
+                    1 -> uiState.downloadingList
+                    2 -> uiState.failedList
+                    else -> uiState.completedList
                 }
                 allTasks.forEach { i ->
                     stringJoiner.add(
@@ -132,11 +181,6 @@ fun OfflineFileScreen(
 
     Column {
         AppTopBarOfflineFile(ConfigKeyUtil.OFFLINE_LIST, appBarOnClick)
-
-//        MiddleEllipsisText(
-//            text = "当前下载量：${offlineInfo.totalCount}，配额：${offlineInfo.quota}/${offlineInfo.total}",
-//            modifier = Modifier.padding(8.dp, 4.dp)
-//        )
 
         // PrimaryTabRow 顶部切换栏
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
@@ -179,7 +223,8 @@ fun OfflineFileScreen(
                     totalItems > 0 && lastVisibleIndex >= totalItems - 5
                 }
             }
-// 2. 监听触底状态变化并触发加载
+
+            // 监听触底状态变化并触发加载
             LaunchedEffect(shouldLoadMore) {
                 snapshotFlow { shouldLoadMore.value }
                     .collect { isNearBottom ->
@@ -187,32 +232,23 @@ fun OfflineFileScreen(
                             return@collect
                         }
                         when (page) {
-                            0 -> {
-                                offlineFileViewModel.loadMoreCompletedTasks()
-                            }
-
-                            1 -> {
-                                offlineFileViewModel.loadMoreDownloadingTasks()
-                            }
-
-                            2 -> {
-                                offlineFileViewModel.loadMoreFailedTasks()
-                            }
+                            0 -> onLoadMoreCompleted()
+                            1 -> onLoadMoreDownloading()
+                            2 -> onLoadMoreFailed()
                         }
-
                     }
             }
 
             val currentSubList = when (page) {
-                0 -> completedList
-                1 -> downloadingList
-                2 -> failedList
+                0 -> uiState.completedList
+                1 -> uiState.downloadingList
+                2 -> uiState.failedList
                 else -> emptyList()
             }
 
             PullToRefreshBox(
-                isRefreshing = refreshing,
-                onRefresh = { offlineFileViewModel.refresh() },
+                isRefreshing = uiState.isRefreshing,
+                onRefresh = onRefresh,
                 modifier = Modifier.fillMaxSize()
             ) {
                 if (currentSubList.isEmpty()) {
@@ -272,7 +308,7 @@ fun OfflineFileScreen(
                                     offlineTask = item,
                                     index = index,
                                     itemOnClick = { _ ->
-                                        //仅当在“完成记录” Tab (page == 0) 时允许点击触发跳转
+                                        // 仅当在“完成记录” Tab (page == 0) 时允许点击触发跳转
                                         if (page == 0) {
                                             itemOnClick(item)
                                         }
@@ -281,7 +317,6 @@ fun OfflineFileScreen(
                                 )
                             }
                         }
-
                     }
                 }
             }

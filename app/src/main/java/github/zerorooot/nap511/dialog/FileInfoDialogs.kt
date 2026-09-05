@@ -35,7 +35,6 @@ import github.zerorooot.nap511.bean.InfoItem
 import github.zerorooot.nap511.bean.InfoSection
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.PathsBean
-import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 
 @Composable
 fun FileInfoDialog(
@@ -226,11 +225,12 @@ fun BaseDetailDialog(
 
 @Composable
 fun OfflineFileInfoDialog(
-    offlineFileViewModel: OfflineFileViewModel, enter: () -> Unit
+    isOpen: Boolean,
+    task: OfflineTask?,
+    onDismissRequest: () -> Unit
 ) {
-    if (offlineFileViewModel.isOpenOfflineDialog) {
-        val offlineTask = offlineFileViewModel.offlineTask
-        OfflineTaskDialog(offlineTask, onDismissRequest = enter)
+    if (isOpen && task != null) {
+        OfflineTaskDialog(task, onDismissRequest = onDismissRequest)
     }
 }
 

@@ -529,14 +529,14 @@ class MainActivity : AppCompatActivity() {
                                 }
 
                                 "select" -> {
-//                                    scope.launch(Dispatchers.Main) {
-                                    navController.navigate(Route.MyFile) {
-                                        // 将 VerifyMagnetLinkAccount 中转页从返回栈中彻底弹出，用户返回时，就会直接退回首页，而不会退回中转页
-                                        popUpTo<Route.VerifyMagnetLinkAccount> {
-                                            inclusive = true
+                                    scope.launch(Dispatchers.Main) {
+                                        navController.navigate(Route.MyFile) {
+                                            // 将 VerifyMagnetLinkAccount 中转页从返回栈中彻底弹出，用户返回时，就会直接退回首页，而不会退回中转页
+                                            popUpTo<Route.VerifyMagnetLinkAccount> {
+                                                inclusive = true
+                                            }
                                         }
                                     }
-//                                    }
 
                                 }
                             }
@@ -551,14 +551,14 @@ class MainActivity : AppCompatActivity() {
                                 }
 
                                 "select" -> {
-//                                    scope.launch(Dispatchers.Main) {
-                                    navController.navigate(Route.MyFile) {
-                                        // 将 VerifyVideoAccount 中转页从返回栈中彻底弹出，用户返回时，就会直接退回首页，而不会退回中转页
-                                        popUpTo<Route.VerifyVideoAccount> {
-                                            inclusive = true
+                                    scope.launch(Dispatchers.Main) {
+                                        navController.navigate(Route.MyFile) {
+                                            // 将 VerifyVideoAccount 中转页从返回栈中彻底弹出，用户返回时，就会直接退回首页，而不会退回中转页
+                                            popUpTo<Route.VerifyVideoAccount> {
+                                                inclusive = true
+                                            }
                                         }
                                     }
-//                                    }
                                 }
                             }
                         }
@@ -581,9 +581,6 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     composable<Route.RepeatFile> {
-                        LaunchedEffect(Unit) {
-                            repeatViewModel.loadData()
-                        }
                         RepeatFileScreen(
                             repeatViewModel,
                             isExpandedScreen,
@@ -597,15 +594,20 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                     composable<Route.TxtReader> {
+                        val byteArray = fileViewModel.textBodyByteArray
                         val fileBean =
                             fileViewModel.fileBeanList.getOrNull(fileViewModel.selectIndex)
-                        val byteArray = fileViewModel.textBodyByteArray
+
+                        LaunchedEffect(byteArray) {
+                            if (byteArray == null) {
+                                navController.popBackStack() // 安全退出
+                            }
+                        }
+
                         if (byteArray != null) {
                             TxtReaderScreen(byteArray, title = fileBean?.name ?: "文本阅读") {
                                 navController.popBackStack()
                             }
-                        } else {
-                            navController.popBackStack()
                         }
                     }
 

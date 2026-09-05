@@ -512,6 +512,7 @@ private fun check(
 
     val response = httpClient.newCall(a.build()).execute()
     val string = response.body.string()
+    XLog.d("captchaWebViewClient $string")
     //启用手势，不跳转页面
     nav.invoke(false)
 
