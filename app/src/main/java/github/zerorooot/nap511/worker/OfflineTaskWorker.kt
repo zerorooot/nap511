@@ -43,15 +43,20 @@ class OfflineTaskWorker(
 
     override suspend fun doWork(): Result {
         val listType = object : TypeToken<List<String?>?>() {}.type
-        val a: List<String> = Gson().fromJson(inputData.getString("list").toString(), listType)
+        val a: List<String> = try {
+            Gson().fromJson(inputData.getString("list").toString(), listType) ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+
         if (a.isEmpty()) {
             return Result.failure()
         }
         try {
             setForeground(getForegroundInfo())
         } catch (e: Exception) {
-            // Android 12+ 在极少数后台受限情况下启动前台服务可能失败
-            return Result.failure()
+            // Android 12+ 在后台无法启动前台服务，忽略异常继续在后台执行短任务
+            XLog.w("OfflineTaskWorker setForeground 失败，将作为普通后台任务继续运行: ${e.message}")
         }
 
 

@@ -6,8 +6,10 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.work.Constraints
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
 import com.elvishew.xlog.XLog
@@ -20,7 +22,6 @@ import github.zerorooot.nap511.worker.OfflineTaskWorker
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.StringJoiner
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 
@@ -113,12 +114,11 @@ class OfflineTaskActivity : ComponentActivity() {
                         } catch (e: Exception) {
                             5L
                         }
-                        val stringJoiner = StringJoiner("\n")
-                        currentOfflineTaskList.toSet().forEach { stringJoiner.add(it) }
+                        val stringJoiner = currentOfflineTaskList.toSet().joinToString("\n")
                         //写入缓存
                         DataStoreUtil.putDataSuspend(
                             ConfigKeyUtil.CURRENT_OFFLINE_TASK,
-                            stringJoiner.toString()
+                            stringJoiner
                         )
                         App.instance.toast("已添加 ${currentOfflineTaskList.size} 个链接，${offlineTime}分钟后开始离线下载")
                         addOfflineTaskByTime(currentOfflineTaskList.toList(), offlineTime)
@@ -142,8 +142,14 @@ class OfflineTaskActivity : ComponentActivity() {
         val data: Data = Data.Builder().putString("list", list)
             .build()
 
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
         val request: OneTimeWorkRequest =
-            OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java).setInputData(data)
+            OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java)
+                .setInputData(data)
+                .setConstraints(constraints)
                 .addTag(ConfigKeyUtil.OFFLINE_TASK_WORKER)
                 .setInitialDelay(offlineTime, TimeUnit.MINUTES)
                 .build()
