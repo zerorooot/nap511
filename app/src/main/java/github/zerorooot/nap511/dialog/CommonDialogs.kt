@@ -88,6 +88,10 @@ fun BaseDialog(
     }
     val focusRequester = remember { FocusRequester() }
 
+    LaunchedEffect(context, selection) {
+        text = TextFieldValue(text = context, selection = selection)
+    }
+
     AlertDialog(
         modifier = Modifier.width(IntrinsicSize.Max),
         onDismissRequest = {
@@ -385,6 +389,10 @@ fun Aria2Dialog(context: String, enter: (String) -> Unit) {
                 text = context, selection = TextRange(context.length)
             )
         )
+    }
+
+    LaunchedEffect(context) {
+        urlText = TextFieldValue(text = context, selection = TextRange(context.length))
     }
 
     var tokenText by remember {

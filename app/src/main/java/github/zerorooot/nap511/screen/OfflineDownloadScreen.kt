@@ -73,6 +73,9 @@ fun OfflineDownloadScreen(
     val maxHeightPercentage = 0.65f // 最大高度百分比
 
     var urlText by remember { mutableStateOf(url) }
+    LaunchedEffect(url) {
+        urlText = url
+    }
     var urlCount by remember {
         mutableStateOf("链接")
     }

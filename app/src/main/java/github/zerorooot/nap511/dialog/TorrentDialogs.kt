@@ -58,7 +58,7 @@ fun CreateSelectTorrentFileDialog(
     val savePath = torrentBean.torrentName
 
     var isSort by remember { mutableStateOf(false) }
-    val torrentFileListWeb = remember {
+    val torrentFileListWeb = remember(torrentBean) {
         mutableStateListOf<TorrentFileListWeb>().apply {
             addAll(torrentBean.torrentFileListWeb)
         }
