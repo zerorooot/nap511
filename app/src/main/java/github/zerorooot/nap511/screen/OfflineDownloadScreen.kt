@@ -40,9 +40,15 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.bean.QuotaBean
+import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
+import java.util.regex.Pattern
 
+// 40位十六进制哈希正则 (BTih v1 标准)
+private val HEX_40_PATTERN = Pattern.compile("^[0-9a-fA-F]{40}$")
+
+// 32位Base32哈希正则 (早期或简短版磁力链标准)
+private val BASE32_32_PATTERN = Pattern.compile("^[a-zA-Z2-7]{32}$")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,20 +68,6 @@ fun OfflineDownloadScreen(
     val screenWidthDp = remember { with(density) { containerSize.width.toDp() } }
     val screenHeightDp = remember { with(density) { containerSize.height.toDp() } }
 
-    val clickFun = { command: String, url: String ->
-        when (command) {
-            "sha1" -> {}
-            "offline" -> {
-                val urlList = url.split("\n").filter { i ->
-                    i.startsWith("http", true) || i.startsWith(
-                        "ftp",
-                        true
-                    ) || i.startsWith("magnet", true) || i.startsWith("ed2k", true)
-                }.toList()
-                onAddTask.invoke(urlList)
-            }
-        }
-    }
 
     val minHeightPercentage = 0.5f // 最小高度百分比
     val maxHeightPercentage = 0.65f // 最大高度百分比
@@ -85,20 +77,31 @@ fun OfflineDownloadScreen(
         mutableStateOf("链接")
     }
 
+    fun handleUrl(url: String): List<String> {
+        val urlList = url.split("\n").map { i ->
+            //支持复制无头磁力链接
+            val a = i.replace(Regex("&dn=.*"), "").trim()
+            if (HEX_40_PATTERN.matcher(a).matches() || BASE32_32_PATTERN.matcher(a)
+                    .matches()
+            ) {
+                "magnet:?xt=urn:btih:$a"
+            } else {
+                a
+            }
+        }.filter { i ->
+            i.startsWith("http", true) || i.startsWith(
+                "ftp", true
+            ) || i.startsWith("magnet", true) || i.startsWith("ed2k", true)
+        }.toSet().toList()
+        return urlList
+    }
+
     fun onUrlTextChange(it: String) {
         urlText = it
-        if (it.isNotBlank()) {
-            val size = it.split("\n")
-                .filter { i ->
-                    i.startsWith("http", true) || i.startsWith(
-                        "ftp",
-                        true
-                    ) || i.startsWith("magnet", true) || i.startsWith("ed2k", true)
-                }
-                .size
-            urlCount = "当前总共${size}个链接"
+        urlCount = if (it.isNotBlank()) {
+            "当前总共${handleUrl(it).size}个链接"
         } else {
-            urlCount = "链接"
+            "链接"
         }
     }
     LaunchedEffect(Unit) {
@@ -106,9 +109,14 @@ fun OfflineDownloadScreen(
     }
 
     val onStartDownload = {
-        clickFun.invoke("offline", urlText)
         urlText = ""
         urlCount = "链接"
+        val urlList = handleUrl(urlText)
+        if (urlList.isEmpty()) {
+            App.instance.toast("请输入下载链接")
+        } else {
+            onAddTask.invoke(urlList)
+        }
     }
 
     Scaffold(

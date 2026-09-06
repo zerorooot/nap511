@@ -45,8 +45,11 @@
         <activity
             android:name=".activity.OfflineTaskActivity"
             android:exported="true"
-            android:launchMode="standard"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:launchMode="singleInstance"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@style/Theme.TransparentNoAnimation"
             tools:ignore="AppLinkUrlError">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

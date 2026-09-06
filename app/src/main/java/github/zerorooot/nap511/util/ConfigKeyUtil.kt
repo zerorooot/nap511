@@ -77,6 +77,11 @@ class ConfigKeyUtil {
         const val DEFAULT_OFFLINE_CID = "defaultOfflineCid"
 
         /**
+         * 默认离线位置，仅在setting中展示使用
+         */
+        const val DEFAULT_OFFLINE_PATH = "defaultOfflinePath"
+
+        /**
          * 默认请求个数，默认为100，具体在设置中设置
          */
         const val REQUEST_LIMIT_COUNT = "requestLimitCount"

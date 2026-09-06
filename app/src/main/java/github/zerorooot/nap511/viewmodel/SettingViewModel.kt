@@ -41,14 +41,22 @@ class SettingViewModel : ViewModel() {
     }
 
     // 2. Aria2 与下载分组 Flow
-    private val aria2Flow = combine(
+    private val aria2Flow: Flow<Aria2Group> = combine(
         DataStoreUtil.getDataFlow(ConfigKeyUtil.ARIA2_URL, ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.ARIA2_TOKEN, ""),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.DEFAULT_OFFLINE_CID, ""),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.DEFAULT_OFFLINE_TIME, "5"),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
-    ) { url, token, cid, time, task ->
-        Aria2Group(url, token, cid, time, task)
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.CURRENT_OFFLINE_TASK, ""),
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, "")
+    ) { values: Array<String> ->
+        Aria2Group(
+            url = values[0],
+            token = values[1],
+            cid = values[2],
+            time = values[3],
+            task = values[4],
+            cidPath = values[5]
+        )
     }
 
     // 3. 界面偏好分组 Flow
@@ -62,42 +70,42 @@ class SettingViewModel : ViewModel() {
         PrefGroup(fabPos, limit, moveFail, txtSize, themeMode)
     }
 
-    // 4. 开关配置分组 Flow (Part 1)
-    private val switchFlow1 = combine(
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.AUTO_ROTATE, false),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.HIDE_LOADING_VIEW, false),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.EARLY_LOADING, false),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.SAVE_REQUEST_CACHE, true),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.POSITION_AFTER_AT, false)
-    ) { autoRotate, hideLoading, earlyLoading, saveCache, positionAfterAt ->
-        SwitchGroup1(autoRotate, hideLoading, earlyLoading, saveCache, positionAfterAt)
-    }
-
     // 5. 开关配置分组 Flow (Part 2)
-    private val switchFlow2: Flow<SwitchGroup2> = combine(
+    private val switchFlow2: Flow<SwitchGroup> = combine(
         DataStoreUtil.getDataFlow(ConfigKeyUtil.TORRENT_SORT, false),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.LOG, false),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.FORCE_LOAD_CACHE, false),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.VIDEO_LINK_MODE, false),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.DYNAMIC_COLOR, true),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.AUTO_JUMP_RETRY, true),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.EXPANDED_SCREEN, true)
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.EXPANDED_SCREEN, true),
+
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.AUTO_ROTATE, false),
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.HIDE_LOADING_VIEW, false),
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.EARLY_LOADING, false),
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.SAVE_REQUEST_CACHE, true),
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.POSITION_AFTER_AT, false)
     ) { values: Array<Boolean> ->
-        SwitchGroup2(
+        SwitchGroup(
             torrentSort = values[0],
             logEnabled = values[1],
             forceCache = values[2],
             videoLinkMode = values[3],
             dynamicColor = values[4],
             autoJumpRetry = values[5],
-            expandedScreen = values[6]
+            expandedScreen = values[6],
+            autoRotate = values[7],
+            hideLoading = values[8],
+            earlyLoading = values[9],
+            saveCache = values[10],
+            positionAfterAt = values[11],
         )
     }
 
     // 统一暴露给 UI 的 StateFlow
     val uiState: StateFlow<SettingUiState> = combine(
-        accountFlow, aria2Flow, uiPrefFlow, switchFlow1, switchFlow2
-    ) { account, aria2, uiPref, s1, s2 ->
+        accountFlow, aria2Flow, uiPrefFlow, switchFlow2
+    ) { account, aria2, uiPref, s2 ->
         SettingUiState(
             // 账号
             uid = account.first,
@@ -107,6 +115,7 @@ class SettingViewModel : ViewModel() {
             aria2Url = aria2.url,
             aria2Token = aria2.token,
             defaultOfflineCid = aria2.cid,
+            defaultOfflinePath = aria2.cidPath,
             defaultOfflineTime = aria2.time,
             currentOfflineTask = aria2.task,
             // 界面
@@ -116,11 +125,11 @@ class SettingViewModel : ViewModel() {
             txtSize = uiPref.txtSize,
             themeMode = uiPref.themeMode,
             // 开关
-            autoRotateEnabled = s1.autoRotate,
-            hideLoadingView = s1.hideLoading,
-            earlyLoading = s1.earlyLoading,
-            saveRequestCache = s1.saveCache,
-            positionAfterAt = s1.positionAfterAt,
+            autoRotateEnabled = s2.autoRotate,
+            hideLoadingView = s2.hideLoading,
+            earlyLoading = s2.earlyLoading,
+            saveRequestCache = s2.saveCache,
+            positionAfterAt = s2.positionAfterAt,
             torrentSort = s2.torrentSort,
             logEnabled = s2.logEnabled,
             forceLoadCache = s2.forceCache,
@@ -264,6 +273,7 @@ class SettingViewModel : ViewModel() {
         val url: String,
         val token: String,
         val cid: String,
+        val cidPath: String,
         val time: String,
         val task: String
     )
@@ -278,15 +288,12 @@ class SettingViewModel : ViewModel() {
     )
 
 
-    private data class SwitchGroup1(
+    private data class SwitchGroup(
         val autoRotate: Boolean,
         val hideLoading: Boolean,
         val earlyLoading: Boolean,
         val saveCache: Boolean,
-        val positionAfterAt: Boolean
-    )
-
-    private data class SwitchGroup2(
+        val positionAfterAt: Boolean,
         val torrentSort: Boolean,
         val logEnabled: Boolean,
         val forceCache: Boolean,

@@ -60,7 +60,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -541,6 +540,15 @@ fun FileScreen(
                         DataStoreUtil.putDataSuspend(
                             ConfigKeyUtil.DEFAULT_OFFLINE_CID,
                             cid
+                        )
+
+                        val index = fileViewModel.pathList.indexOfFirst { it.cid == cid }
+                        val pathString =
+                            fileViewModel.pathList.take(index + 1)
+                                .joinToString(separator = "/") { it.name }
+                        DataStoreUtil.putDataSuspend(
+                            ConfigKeyUtil.DEFAULT_OFFLINE_PATH,
+                            pathString
                         )
                     }
                     App.instance.toast("设置默认离线位置为: $name")
