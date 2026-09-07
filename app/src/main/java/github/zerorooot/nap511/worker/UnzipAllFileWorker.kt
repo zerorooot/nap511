@@ -27,7 +27,6 @@ import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
-import github.zerorooot.nap511.util.UserSessionManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -98,6 +97,7 @@ class UnzipAllFileWorker(
 
         // 2. 初始化进度和通知
         val size = fileBeanList.size
+        val name = fileBeanList[0].name
         setForegroundAsync(createForegroundInfo("解压中", "正在解压中", 0, size))
 
         val sj = StringJoiner("\n")
@@ -122,18 +122,19 @@ class UnzipAllFileWorker(
                 }
                 updateNotification("解压中", i + 1, size, progressMsg)
             }
-            return@withContext sentMessage(sj.toString(), false, size, unzipFailList)
+            return@withContext sentMessage(sj.toString(), false, name, size, unzipFailList)
         } catch (e: CancellationException) {
             XLog.e("UnzipAllFileWorker CancellationException 任务被取消: ${e.message}")
         }
 
-        return@withContext sentMessage(sj.toString(), true, size, unzipFailList)
+        return@withContext sentMessage(sj.toString(), true, name, size, unzipFailList)
 
     }
 
     private suspend fun sentMessage(
         unzipResult: String,
         isCancel: Boolean,
+        name: String,
         size: Int,
         unzipFailList: List<FileBean>
     ): Result {
@@ -141,6 +142,7 @@ class UnzipAllFileWorker(
         val isAllSuccess = !isCancel && unzipResult.isEmpty()
         val message = when {
             isCancel -> "🔙任务被取消"
+            (size == 1) -> "$name 解压完成！"
             isAllSuccess -> "${size}个文件解压完成！"
             else -> "❎ ${unzipFailList.size}个文件解压失败！"
         }
