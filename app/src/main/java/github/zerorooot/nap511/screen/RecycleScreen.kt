@@ -125,8 +125,8 @@ fun RecycleContent(
 ) {
     val menuOnClick = { name: String, index: Int ->
         when (name) {
-            "还原" -> onRevert(index)
-            "删除" -> onDelete(index)
+            "还原文件" -> onRevert(index)
+            "删除文件" -> onDelete(index)
         }
     }
 

@@ -188,7 +188,7 @@ fun FileCellItem(
                 val dispatchMenuClick: (String, Int) -> Unit = { name, _ ->
                     when (name) {
                         "剪切" -> onCut?.invoke(index)
-                        "删除" -> onDelete?.invoke(index)
+                        "删除文件" -> onDelete?.invoke(index)
                         "重命名" -> onRename?.invoke(index)
                         "文件信息" -> onFileInfo?.invoke(index)
                         "通过aria2下载" -> onAria2Download?.invoke(index)

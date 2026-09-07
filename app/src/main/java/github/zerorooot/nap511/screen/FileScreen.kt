@@ -478,7 +478,11 @@ fun FileScreen(
                 label = ""
             ) {
                 if (it) {
-                    AppTopBarMultiple(fileViewModel.appBarTitle, ::myAppBarOnClick)
+                    AppTopBarMultiple(
+                        title = fileViewModel.appBarTitle,
+                        isExpandedScreen = isExpandedScreen,
+                        onClick = ::myAppBarOnClick
+                    )
                 } else {
                     AppTopBarNormal(fileViewModel.appBarTitle, ::myAppBarOnClick)
                 }

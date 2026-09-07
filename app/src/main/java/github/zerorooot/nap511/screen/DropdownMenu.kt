@@ -2,14 +2,38 @@ package github.zerorooot.nap511.screen
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.AutoFixHigh
+import androidx.compose.material.icons.outlined.Cancel
+import androidx.compose.material.icons.outlined.CleaningServices
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.ContentCut
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DeleteSweep
+import androidx.compose.material.icons.outlined.DoneAll
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.FindInPage
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Restore
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.VerticalAlignBottom
+import androidx.compose.material.icons.outlined.VerticalAlignTop
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,30 +42,28 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringArrayResource
-import github.zerorooot.nap511.R
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+
+data class DropdownMenuItemSpec(
+    val text: String,
+    val icon: ImageVector? = null,
+    val isDestructive: Boolean = false
+)
 
 @Composable
 private fun MyDropdownMenu(
-    listItems: List<String>,
+    listItems: List<DropdownMenuItemSpec>,
     modifier: Modifier,
     icon: @Composable () -> Unit,
     onClick: (String, Int) -> Unit
 ) {
-//    val disabledItem = 2
-//    val contextForToast = LocalContext.current.applicationContext
-
-    // state of the menu
     var expanded by remember {
         mutableStateOf(false)
     }
 
     Box(
-//        contentAlignment = Alignment.Center,
-//        modifier = Modifier.fillMaxHeight()
         modifier = modifier
-//        Modifier.wrapContentSize(Alignment.TopEnd)
     ) {
         IconButton(
             content = icon,
@@ -49,22 +71,38 @@ private fun MyDropdownMenu(
                 expanded = true
             }
         )
-        // drop down menu
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = {
                 expanded = false
-            }
+            },
+            shape = RoundedCornerShape(16.dp)
         ) {
-            // adding items
-            listItems.forEachIndexed { itemIndex, itemValue ->
+            listItems.forEachIndexed { itemIndex, item ->
+                val isDelete = item.isDestructive || item.text.contains("删除")
+                if (isDelete && itemIndex > 0) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                }
                 DropdownMenuItem(
                     onClick = {
-                        onClick.invoke(itemValue, itemIndex)
+                        onClick.invoke(item.text, itemIndex)
                         expanded = false
                     },
-//                    enabled = (itemIndex == disabledItem),
-                    text = { Text(text = itemValue) }
+                    text = {
+                        Text(
+                            text = item.text,
+                            color = if (isDelete) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                        )
+                    },
+                    leadingIcon = item.icon?.let { imageVector ->
+                        {
+                            Icon(
+                                imageVector = imageVector,
+                                contentDescription = item.text,
+                                tint = if (isDelete) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 )
             }
         }
@@ -73,24 +111,38 @@ private fun MyDropdownMenu(
 
 @Composable
 fun FileMoreMenu(onClick: (String, Int) -> Unit) {
-    val listOf = stringArrayResource(id = R.array.fileMenu).toList()
+    val listOf = listOf(
+        DropdownMenuItemSpec("剪切", Icons.Outlined.ContentCut),
+        DropdownMenuItemSpec("重命名", Icons.Outlined.Edit),
+        DropdownMenuItemSpec("文件信息", Icons.Outlined.Info),
+        DropdownMenuItemSpec("强行打开为", Icons.AutoMirrored.Outlined.OpenInNew),
+        DropdownMenuItemSpec("通过aria2下载", Icons.Outlined.Download),
+        DropdownMenuItemSpec("删除文件", Icons.Outlined.Delete, isDestructive = true)
+    )
     BaseMoreMenu(listOf, onClick)
 }
 
 @Composable
 fun RecycleMoreMenu(onClick: (String, Int) -> Unit) {
-    val listOf = stringArrayResource(id = R.array.recycleMenu).toList()
+    val listOf = listOf(
+        DropdownMenuItemSpec("还原文件", Icons.Outlined.Restore),
+        DropdownMenuItemSpec("删除文件", Icons.Outlined.Delete, isDestructive = true)
+    )
     BaseMoreMenu(listOf, onClick)
 }
 
 @Composable
 fun OfflineFileMoreMenu(onClick: (String, Int) -> Unit) {
-    val listOf = stringArrayResource(id = R.array.offlineFileMenu).toList()
+    val listOf = listOf(
+        DropdownMenuItemSpec("复制链接", Icons.Outlined.ContentCopy),
+        DropdownMenuItemSpec("文件信息", Icons.Outlined.Info),
+        DropdownMenuItemSpec("删除文件", Icons.Outlined.Delete, isDestructive = true)
+    )
     BaseMoreMenu(listOf, onClick)
 }
 
 @Composable
-fun BaseMoreMenu(listOf: List<String>, onClick: (String, Int) -> Unit) {
+fun BaseMoreMenu(listOf: List<DropdownMenuItemSpec>, onClick: (String, Int) -> Unit) {
     MyDropdownMenu(
         listOf,
         Modifier
@@ -100,9 +152,8 @@ fun BaseMoreMenu(listOf: List<String>, onClick: (String, Int) -> Unit) {
             Icon(
                 imageVector = Icons.Default.MoreVert,
                 contentDescription = "Open Options",
-                tint = Color(0xFF85BCFF),
-                modifier = Modifier
-                    .fillMaxSize()
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp)
             )
         }, onClick
     )
@@ -110,32 +161,50 @@ fun BaseMoreMenu(listOf: List<String>, onClick: (String, Int) -> Unit) {
 
 @Composable
 fun FileAppTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
-    val listOf = stringArrayResource(id = R.array.appBarMenu).toList()
-//    val listOf = listOf("按文件名称排序", "按创建时间排序", "按修改时间排序","刷新")
+    val listOf = listOf(
+        DropdownMenuItemSpec("缓存清空", Icons.Outlined.CleaningServices),
+        DropdownMenuItemSpec("文件排序", Icons.AutoMirrored.Outlined.Sort),
+        DropdownMenuItemSpec("刷新文件", Icons.Outlined.Refresh),
+        DropdownMenuItemSpec("视频时间", Icons.Outlined.Schedule)
+    )
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }
 
 @Composable
 fun OfflineFileAppTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
-    val listOf = stringArrayResource(id = R.array.offlineFileAppBarMenu).toList()
+    val listOf = listOf(
+        DropdownMenuItemSpec("刷新文件", Icons.Outlined.Refresh),
+        DropdownMenuItemSpec("复制本页链接", Icons.Outlined.ContentCopy),
+        DropdownMenuItemSpec("清空已完成", Icons.Outlined.DoneAll),
+        DropdownMenuItemSpec("清空已失败", Icons.Outlined.Cancel, isDestructive = true)
+    )
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }
 
 @Composable
 fun LogScreenTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
-    val listOf = stringArrayResource(id = R.array.logScreenAppBarMenu).toList()
-//    val listOf = listOf("滚动顶部", "滚动底部", "清空日志","导出日志")
+    val listOf = listOf(
+        DropdownMenuItemSpec("滚动顶部", Icons.Outlined.VerticalAlignTop),
+        DropdownMenuItemSpec("滚动底部", Icons.Outlined.VerticalAlignBottom),
+        DropdownMenuItemSpec("导出日志", Icons.Outlined.Share),
+        DropdownMenuItemSpec("刷新日志", Icons.Outlined.Refresh),
+        DropdownMenuItemSpec("清空日志", Icons.Outlined.DeleteSweep, isDestructive = true),
+    )
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }
 
 @Composable
 fun RepeatFileTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
-    val listOf = listOf("开始查重", "一键去重", "删空文件")
+    val listOf = listOf(
+        DropdownMenuItemSpec("开始查重", Icons.Outlined.FindInPage),
+        DropdownMenuItemSpec("一键去重", Icons.Outlined.AutoFixHigh),
+        DropdownMenuItemSpec("删空文件", Icons.Outlined.Delete, isDestructive = true)
+    )
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }
 
 @Composable
-private fun BaseAppTorBarMenu(listOf: List<String>, onClick: (String, Int) -> Unit) {
+private fun BaseAppTorBarMenu(listOf: List<DropdownMenuItemSpec>, onClick: (String, Int) -> Unit) {
     MyDropdownMenu(
         listOf,
         Modifier.wrapContentSize(Alignment.TopEnd),

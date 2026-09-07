@@ -1,8 +1,16 @@
 package github.zerorooot.nap511.screen
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -22,13 +30,13 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.only
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -83,7 +91,11 @@ fun AppTopBarNormal(title: String, onClick: (name: String) -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppTopBarMultiple(title: String, onClick: (String) -> Unit) {
+fun AppTopBarMultiple(
+    title: String,
+    isExpandedScreen: Boolean = false,
+    onClick: (String) -> Unit
+) {
     TopAppBar(
         windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
         title = {
@@ -104,59 +116,106 @@ fun AppTopBarMultiple(title: String, onClick: (String) -> Unit) {
             }
         },
         actions = {
-            TopAppBarActionButton(
-                Icons.Default.ArrowUpward,
-                description = "up"
-            ) {
-                onClick.invoke("selectToUp")
+            if (isExpandedScreen) {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState())
+                ) {
+                    TopAppBarActionTextButton(
+                        imageVector = Icons.Default.ArrowUpward,
+                        label = "向上选",
+                        onClick = { onClick.invoke("selectToUp") }
+                    )
+                    TopAppBarActionTextButton(
+                        imageVector = Icons.Default.ArrowDownward,
+                        label = "向下选",
+                        onClick = { onClick.invoke("selectToDown") }
+                    )
+                    TopAppBarActionTextButton(
+                        imageVector = Icons.Default.ContentCut,
+                        label = "剪切",
+                        onClick = { onClick.invoke("cut") }
+                    )
+                    TopAppBarActionTextButton(
+                        imageVector = Icons.Default.Delete,
+                        label = "删除",
+                        onClick = { onClick.invoke("delete") }
+                    )
+                    TopAppBarActionTextButton(
+                        imageVector = Icons.Default.SelectAll,
+                        label = "反选",
+                        onClick = { onClick.invoke("selectReverse") }
+                    )
+                    TopAppBarActionTextButton(
+                        imageVector = Icons.Default.Cloud,
+                        label = "解压",
+                        onClick = { onClick.invoke("unzipAllFile") }
+                    )
+                }
+            } else {
+                TopAppBarActionButton(
+                    Icons.Default.ArrowUpward,
+                    description = "up"
+                ) {
+                    onClick.invoke("selectToUp")
+                }
+                TopAppBarActionButton(
+                    Icons.Default.ArrowDownward,
+                    description = "down"
+                ) {
+                    onClick.invoke("selectToDown")
+                }
+                TopAppBarActionButton(
+                    Icons.Default.ContentCut,
+                    description = "Cut"
+                ) {
+                    onClick.invoke("cut")
+                }
+                TopAppBarActionButton(
+                    Icons.Default.Delete,
+                    description = "delete"
+                ) {
+                    onClick.invoke("delete")
+                }
+                TopAppBarActionButton(
+                    Icons.Default.SelectAll,
+                    description = "ic_baseline_select_reverse_24"
+                ) {
+                    onClick.invoke("selectReverse")
+                }
+                TopAppBarActionButton(
+                    Icons.Default.Cloud,
+                    description = "unzip file"
+                ) {
+                    onClick.invoke("unzipAllFile")
+                }
             }
-            TopAppBarActionButton(
-                Icons.Default.ArrowDownward,
-                description = "down"
-            ) {
-                onClick.invoke("selectToDown")
-            }
-            // cut icon
-            TopAppBarActionButton(
-                Icons.Default.ContentCut,
-                description = "Cut"
-            ) {
-                onClick.invoke("cut")
-            }
-
-            TopAppBarActionButton(
-                Icons.Default.Delete,
-                description = "delete"
-            ) {
-                onClick.invoke("delete")
-            }
-//            TopAppBarActionButton(
-//                painter = painterResource(id = R.drawable.ic_baseline_select_all_24),
-//                description = "ic_baseline_select_all_24"
-//            ) {
-//                onClick.invoke("selectAll")
-//            }
-            TopAppBarActionButton(
-                Icons.Default.SelectAll,
-                description = "ic_baseline_select_reverse_24"
-            ) {
-                onClick.invoke("selectReverse")
-            }
-            //R.drawable.baseline_cloud_download_24
-            TopAppBarActionButton(
-                Icons.Default.Cloud,
-                description = "unzip file"
-            ) {
-                onClick.invoke("unzipAllFile")
-            }
-//            TopAppBarActionButton(
-//                painter = painterResource(id = R.drawable.baseline_close_24),
-//                description = "ic_baseline_select_all_24"
-//            ) {
-//                onClick.invoke("close")
-//            }
         }
     )
+}
+
+@Composable
+private fun TopAppBarActionTextButton(
+    imageVector: ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    TextButton(
+        onClick = onClick,
+        colors = ButtonDefaults.textButtonColors(
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+    ) {
+        Icon(
+            imageVector = imageVector,
+            contentDescription = label,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
