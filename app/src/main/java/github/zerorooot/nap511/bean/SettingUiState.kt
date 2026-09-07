@@ -29,5 +29,6 @@ data class SettingUiState(
     @SerializedName(ConfigKeyUtil.MOVE_FAIL_FILE) val moveFailFile: String = "",
     @SerializedName(ConfigKeyUtil.DEFAULT_OFFLINE_TIME) val defaultOfflineTime: String = "5",
     @SerializedName(ConfigKeyUtil.MAX_TXT_SIZE) val txtSize: String = "200",
-    @SerializedName(ConfigKeyUtil.EXPANDED_SCREEN) val expandedScreenEnabled: Boolean = true
+    @SerializedName(ConfigKeyUtil.EXPANDED_SCREEN) val expandedScreenEnabled: Boolean = true,
+    @SerializedName(ConfigKeyUtil.EXPANDED_SCREEN_THRESHOLD) val expandedScreenThreshold: String = "600"
 )

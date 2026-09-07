@@ -60,14 +60,22 @@ class SettingViewModel : ViewModel() {
     }
 
     // 3. 界面偏好分组 Flow
-    private val uiPrefFlow = combine(
+    private val uiPrefFlow: Flow<PrefGroup> = combine(
         DataStoreUtil.getDataFlow(ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION, "End"),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200"),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.MOVE_FAIL_FILE, ""),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.MAX_TXT_SIZE, "200"),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.THEME_MODE, "跟随系统")
-    ) { fabPos, limit, moveFail, txtSize, themeMode ->
-        PrefGroup(fabPos, limit, moveFail, txtSize, themeMode)
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.THEME_MODE, "跟随系统"),
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.EXPANDED_SCREEN_THRESHOLD, "600")
+    ) { values: Array<String> ->
+        PrefGroup(
+            fabPos = values[0],
+            limit = values[1],
+            moveFail = values[2],
+            txtSize = values[3],
+            themeMode = values[4],
+            expandedThreshold = values[5]
+        )
     }
 
     // 5. 开关配置分组 Flow (Part 2)
@@ -124,6 +132,7 @@ class SettingViewModel : ViewModel() {
             moveFailFile = uiPref.moveFail,
             txtSize = uiPref.txtSize,
             themeMode = uiPref.themeMode,
+            expandedScreenThreshold = uiPref.expandedThreshold,
             // 开关
             autoRotateEnabled = s2.autoRotate,
             hideLoadingView = s2.hideLoading,
@@ -284,7 +293,8 @@ class SettingViewModel : ViewModel() {
         val limit: String,
         val moveFail: String,
         val txtSize: String,
-        val themeMode: String
+        val themeMode: String,
+        val expandedThreshold: String
     )
 
 

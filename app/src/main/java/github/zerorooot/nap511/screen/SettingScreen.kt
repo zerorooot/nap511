@@ -437,19 +437,29 @@ fun SettingContent(
                     )
                 }
                 item {
-                    SwitchPreferenceItem(
-                        title = "应用动态配色",
-                        summary = "根据系统壁纸自动衍生应用配色（仅支持 Android 12+）",
-                        checked = uiState.dynamicColorEnabled,
-                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.DYNAMIC_COLOR, it) }
+                    EditTextPreferenceItem(
+                        title = "大屏宽度阈值",
+                        summary = "屏幕宽度达到 ${uiState.expandedScreenThreshold} dp 时触发大屏布局",
+                        value = uiState.expandedScreenThreshold,
+                        isNumber = true,
+                        enabled = uiState.expandedScreenEnabled,
+                        onValueSave = { onSaveConfig(ConfigKeyUtil.EXPANDED_SCREEN_THRESHOLD, it) }
                     )
                 }
                 item {
                     SwitchPreferenceItem(
                         title = "大屏扩展模式",
-                        summary = "在平板或大屏设备（屏幕宽度 ≥ 600dp）上启用大屏展开布局",
+                        summary = "在平板或大屏设备（屏幕宽度 ≥ ${uiState.expandedScreenThreshold}dp）上启用大屏展开布局",
                         checked = uiState.expandedScreenEnabled,
                         onCheckedChange = { onSaveConfig(ConfigKeyUtil.EXPANDED_SCREEN, it) }
+                    )
+                }
+                item {
+                    SwitchPreferenceItem(
+                        title = "应用动态配色",
+                        summary = "根据系统壁纸自动衍生应用配色（仅支持 Android 12+）",
+                        checked = uiState.dynamicColorEnabled,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.DYNAMIC_COLOR, it) }
                     )
                 }
                 item {

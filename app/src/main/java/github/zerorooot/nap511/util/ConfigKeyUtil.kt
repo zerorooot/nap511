@@ -159,6 +159,11 @@ class ConfigKeyUtil {
         const val EXPANDED_SCREEN = "expandedScreen"
 
         /**
+         * 大屏/宽屏模式触发宽度阈值（dp）
+         */
+        const val EXPANDED_SCREEN_THRESHOLD = "expandedScreenThreshold"
+
+        /**
          * 主题色模式：跟随系统、亮色模式、暗色模式
          */
         const val THEME_MODE = "themeMode"

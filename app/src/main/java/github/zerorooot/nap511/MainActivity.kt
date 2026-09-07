@@ -260,8 +260,14 @@ class MainActivity : AppCompatActivity() {
 
         val isExpandedConfig by DataStoreUtil.getDataFlow(ConfigKeyUtil.EXPANDED_SCREEN, true)
             .collectAsStateWithLifecycle(initialValue = true)
+        val expandedScreenThresholdStr by DataStoreUtil.getDataFlow(
+            ConfigKeyUtil.EXPANDED_SCREEN_THRESHOLD,
+            "600"
+        ).collectAsStateWithLifecycle(initialValue = "600")
+        val expandedScreenThreshold = expandedScreenThresholdStr.toIntOrNull() ?: 600
+
         val isExpandedScreen =
-            (LocalConfiguration.current.screenWidthDp >= 600) && isExpandedConfig
+            (LocalConfiguration.current.screenWidthDp >= expandedScreenThreshold) && isExpandedConfig
 
 
         // 监听当前导航栈顶的路由，用于高亮显示 Drawer 中选中的 Item
