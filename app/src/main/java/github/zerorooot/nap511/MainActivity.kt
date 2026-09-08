@@ -264,7 +264,8 @@ class MainActivity : AppCompatActivity() {
             ConfigKeyUtil.EXPANDED_SCREEN_THRESHOLD,
             "600"
         ).collectAsStateWithLifecycle(initialValue = "600")
-        val expandedScreenThreshold = expandedScreenThresholdStr.toIntOrNull() ?: 600
+        val expandedScreenThreshold =
+            expandedScreenThresholdStr.toInt().takeIf { i -> i > 0 } ?: 600
 
         val isExpandedScreen =
             (LocalConfiguration.current.screenWidthDp >= expandedScreenThreshold) && isExpandedConfig
@@ -274,7 +275,7 @@ class MainActivity : AppCompatActivity() {
             "340"
         ).collectAsStateWithLifecycle(initialValue = "340")
         val gridCellMinSize = remember(gridCellMinSizeStr) {
-            (gridCellMinSizeStr.toIntOrNull() ?: 340).dp
+            (gridCellMinSizeStr.toInt().takeIf { i -> i > 0 } ?: 340).dp
         }
 
 
@@ -293,6 +294,7 @@ class MainActivity : AppCompatActivity() {
                 //直接关闭应用并返回桌面
                 // finish()
                 //将应用压入后台保留状态（类似按 Home 键）
+                fileViewModel.deleteIndividualFile()
                 moveTaskToBack(true)
             } else {
                 lastBackPressTime = currentTime

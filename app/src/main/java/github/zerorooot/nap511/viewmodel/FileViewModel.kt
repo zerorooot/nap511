@@ -14,7 +14,6 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.unit.dp
 import androidx.concurrent.futures.await
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
@@ -420,7 +419,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
                 if (expiredTip != null) {
                     App.instance.toast(expiredTip)
                     fileListCache.clearAll()
-                    UserSessionManager.updateSession("", "")
+                    UserSessionManager.clearSession()
                     _navigationEvent.send(NavEvent.NavigateToScreen(Route.Login))
                 } else {
                     XLog.e("getFiles Exception ", it)
@@ -475,10 +474,8 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
 
     }
 
-    override fun onCleared() {
-        viewModelScope.launch {
-            fileListCache.deleteIndividualFile()
-        }
+    fun deleteIndividualFile() {
+        fileListCache.deleteIndividualFile()
     }
 
     fun refresh(forceCache: Boolean = false) {

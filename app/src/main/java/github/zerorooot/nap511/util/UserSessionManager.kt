@@ -28,6 +28,10 @@ object UserSessionManager {
         DataStoreUtil.putDataSuspend(ConfigKeyUtil.UID, newUid)
     }
 
+    suspend fun clearSession() {
+        updateSession("", "")
+    }
+
     fun updateCookie(newCookie: String) {
         this.cookie = newCookie
     }

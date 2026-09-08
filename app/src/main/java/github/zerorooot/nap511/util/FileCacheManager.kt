@@ -4,14 +4,14 @@ import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import github.zerorooot.nap511.bean.FilesBean
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.StringJoiner
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.time.Duration.Companion.minutes
 
 data class CacheWrapper(
     val data: FilesBean,
@@ -41,22 +41,31 @@ class FileCacheManager(
     fun getDate(key: String): FilesBean? = memoryCache[key]?.data
 
     suspend fun loadAllCache() = withContext(Dispatchers.IO) {
-        deleteIndividualFile()
+        // 立即异步启动加载 "0"
+        async { getDiskCache("0") }.await()?.let {
+            memoryCache["0"] = it
+        }
+        // 并发加载其他文件
+        cacheDir.listFiles()?.map { file ->
+            async {
+                val key = file.name.substringBeforeLast(".")
+                getDiskCache(key)?.let {
+                    memoryCache[key] = it
+                }
+            }
+        }?.awaitAll()
     }
 
-    suspend fun deleteIndividualFile() = withContext(Dispatchers.IO) {
-        val diskCache = getDiskCache("0") ?: return@withContext
-        memoryCache["0"] = diskCache
+     fun deleteIndividualFile() {
+        val diskCache = memoryCache["0"] ?: return
 
         val fileList =
             cacheDir.listFiles()?.map { i -> i.name.substringBeforeLast(".") }?.toMutableList()
-                ?: return@withContext
+                ?: return
         fileList.remove("0")
 
-        suspend fun walk(cid: String) {
-            val walkCache = getDiskCache(cid) ?: return
-
-            memoryCache[cid] = walkCache
+        fun walk(cid: String) {
+            val walkCache = memoryCache[cid] ?: return
             val folderList = walkCache.data.fileBeanList.filter { it.isFolder }
             for (item in folderList) {
                 walk(item.categoryId)
@@ -71,7 +80,7 @@ class FileCacheManager(
         }
         val length = fileList.size
         if (length == 0) {
-            return@withContext
+            return
         }
 
         val stringJoiner = StringJoiner("；")
@@ -82,7 +91,7 @@ class FileCacheManager(
             deleteDiskFile(i)
         }
 
-        XLog.d("deleteIndividualFile 删除${length}个单一文件\n$stringJoiner")
+        XLog.d("deleteIndividualFile 删除${length}个单一文件 $stringJoiner")
     }
 
 

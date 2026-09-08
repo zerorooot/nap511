@@ -8,6 +8,7 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import github.zerorooot.nap511.bean.LocationBean
 import github.zerorooot.nap511.bean.SettingUiState
+import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.UserSessionManager
@@ -160,6 +161,12 @@ class SettingViewModel : ViewModel() {
      * 通用配置保存函数
      */
     fun <T : Any> saveData(key: String, newValue: T) {
+        // 过滤出是字符串且小于 0 的数字，命中时弹出提示并中断执行
+        (newValue as? String)?.toDoubleOrNull()?.takeIf { it <= 0.0 }?.run {
+            App.instance.toast("保存失败，数字不能小于0")
+            return
+        }
+
         viewModelScope.launch {
             DataStoreUtil.putDataSuspend(key, newValue)
         }

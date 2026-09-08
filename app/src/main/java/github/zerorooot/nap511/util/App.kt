@@ -45,35 +45,30 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 class AutoTagInterceptor(
-    private val defaultTag: String = "XLOG",
-    private val maxTagLength: Int = 23
+    private val defaultTag: String = "XLOG"
 ) : Interceptor {
     override fun intercept(log: LogItem): LogItem {
         // 仅当用户未显式调用 XLog.tag("CustomTag") 时，才通过堆栈动态推导
         if (log.tag == defaultTag) {
-            log.tag = resolveCallerClassName()
+            log.tag = resolveCallerTag()
         }
         return log
     }
 
-    private fun resolveCallerClassName(): String {
+    private fun resolveCallerTag(): String {
         val stackTrace = Throwable().stackTrace
         val caller = stackTrace.firstOrNull { element ->
             val className = element.className
             !className.startsWith("com.elvishew.xlog.") &&
                     !className.startsWith("java.lang.") &&
                     !className.startsWith("dalvik.system.") &&
-                    !className.contains(AutoTagInterceptor::class.java.simpleName)
+                    !className.contains("AutoTagInterceptor")
         } ?: return defaultTag
 
         // 提取简短类名，去除包名前缀及内部类、匿名类的 '$' 符号
         val simpleName = caller.className.substringAfterLast('.').substringBefore('$')
-        val string = if (simpleName.length > maxTagLength) {
-            simpleName.substring(0, maxTagLength)
-        } else {
-            simpleName
-        }
-        return "$string-$defaultTag"
+        val tagWithMethod = "$simpleName.${caller.methodName}"
+        return "${tagWithMethod}-$defaultTag"
     }
 }
 
@@ -102,6 +97,7 @@ class App : Application(), ImageLoaderFactory {
         ComposeFoundationFlags.isNewContextMenuEnabled = false
         super.onCreate()
         instance = this
+        cacheFile = File(this.cacheDir, "fileListCache.json")
 
         appScope.launch {
             val initialCookie = DataStoreUtil.getDataSuspend(ConfigKeyUtil.COOKIE, "")
@@ -111,13 +107,9 @@ class App : Application(), ImageLoaderFactory {
                     ?: 200
             UserSessionManager.init(initialCookie, initialUid, initialLimit)
 
-            DataStoreUtil.getDataFlow(ConfigKeyUtil.LOG, false).collect { enabled ->
-                isLogEnabled = enabled
-            }
+            isLogEnabled = DataStoreUtil.getDataSuspend(ConfigKeyUtil.LOG, false)
+            initLog()
         }
-        cacheFile = File(this.cacheDir, "fileListCache.json")
-
-        initLog()
     }
 
     fun initLog() {
