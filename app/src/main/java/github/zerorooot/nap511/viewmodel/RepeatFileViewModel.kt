@@ -91,7 +91,7 @@ class RepeatFileViewModel : ViewModel() {
             val repeatList = getRepeatList(offset = 0)
             //清空list,防止日志里的内容过多
             val copy = repeatList.copy(data = emptyList())
-            XLog.d("repeatList: $copy")
+            XLog.v("repeatList: $copy")
 
             val list = repeatList.data
             val total = repeatList.count.toIntOrNull() ?: 0
@@ -145,7 +145,7 @@ class RepeatFileViewModel : ViewModel() {
                 )
             }
             val forceRefresh = repeatService.forceRefresh()
-            XLog.d("forceRefresh: $forceRefresh")
+            XLog.i("forceRefresh: $forceRefresh")
             val message = if (forceRefresh.state) {
                 "已提交全盘排重请求"
             } else {
@@ -168,7 +168,7 @@ class RepeatFileViewModel : ViewModel() {
     fun executeDelete(field: String, order: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
-            XLog.d("executeDelete: $field $order")
+            XLog.i("executeDelete: $field $order")
             val deleteRepeatFiles = repeatService.deleteRepeatFiles(field, order)
             XLog.d("deleteRepeatFiles: $deleteRepeatFiles")
 
@@ -184,14 +184,14 @@ class RepeatFileViewModel : ViewModel() {
 
             delay(300.milliseconds)
             val clearEmpty = repeatService.clearEmpty()
-            XLog.d("clearEmpty: $clearEmpty")
+            XLog.i("clearEmpty: $clearEmpty")
         }
     }
 
     fun clearEmptyFile() {
         viewModelScope.launch {
             val clearEmpty = repeatService.clearEmpty()
-            XLog.d("clearEmpty: $clearEmpty")
+            XLog.i("clearEmpty: $clearEmpty")
             App.instance.toast(clearEmpty.message)
         }
     }

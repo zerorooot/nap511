@@ -263,7 +263,7 @@ fun webViewClient(onUrl: (String) -> Unit): WebViewClient {
                 newHeaders.remove("X-Requested-With")
                 // 注意：如果只是返回 null，WebView 仍会发送原请求。
                 // 这里我们仅做日志记录，具体修改 headers 可能需要拦截并重新发起（略复杂）
-                XLog.d("WebView stripped X-Requested-With for $url")
+                XLog.v("WebView stripped X-Requested-With for $url")
             }
             return null
         }
@@ -387,7 +387,7 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
             val url = webViewRequest.url
             if (url in urlList) {
                 cookie = CookieManager.getInstance().getCookie(url)
-                XLog.d("$url cookie $cookie")
+                XLog.v("$url cookie $cookie")
             }
 
             if (cookie != null) {
@@ -409,7 +409,7 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
             // 登录页面也注入诊断，防止登录也白屏
             view?.evaluateJavascript(
                 "(function() { return {url: window.location.href, title: document.title, elements: document.getElementsByTagName('*').length}; })();",
-                { result -> XLog.d("LOGIN_DIAG_DATA: $result") })
+                { result -> XLog.v("LOGIN_DIAG_DATA: $result") })
         }
     }
 

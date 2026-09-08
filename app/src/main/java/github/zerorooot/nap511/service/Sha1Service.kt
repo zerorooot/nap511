@@ -143,7 +143,7 @@ class Sha1Service : Service() {
         val message = try {
             val response = okHttpClient.newCall(request).execute()
             val bodyJson = JsonParser.parseString(response.body.string()).getAsJsonObject()
-            XLog.d("aria2 json $bodyJson")
+            XLog.v("aria2 json $bodyJson")
             if (bodyJson.has("error")) {
                 "下载失败，${
                     bodyJson.getAsJsonObject("error").get("message").asString

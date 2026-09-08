@@ -226,7 +226,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
         if (uri.scheme == "nap511" && uri.host == "detail") {
             val command = uri.lastPathSegment // "check" 或 "copy"
             val param = uri.getQueryParameter("param") ?: ""
-            XLog.d("FileViewModel handleDeepLink $uri")
+            XLog.i("FileViewModel handleDeepLink $uri")
             when (command) {
                 "addTask" -> {
                     XLog.d(param)

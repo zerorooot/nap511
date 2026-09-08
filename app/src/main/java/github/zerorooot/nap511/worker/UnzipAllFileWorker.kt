@@ -93,7 +93,7 @@ class UnzipAllFileWorker(
             ?: return@withContext createFailureResult("$taskFilePath 不存在！！")
 
         val password = inputData.getString("pwd")
-        XLog.d("UnzipAllFileWorker password:$password  cid: $cid  fileBeanList:$fileBeanList")
+        XLog.i("UnzipAllFileWorker password:$password  cid: $cid  fileBeanList:$fileBeanList")
 
         // 2. 初始化进度和通知
         val size = fileBeanList.size
@@ -124,7 +124,7 @@ class UnzipAllFileWorker(
             }
             return@withContext sentMessage(sj.toString(), false, name, size, unzipFailList)
         } catch (e: CancellationException) {
-            XLog.e("UnzipAllFileWorker CancellationException 任务被取消: ${e.message}")
+            XLog.w("UnzipAllFileWorker CancellationException 任务被取消: ${e.message}")
         }
 
         return@withContext sentMessage(sj.toString(), true, name, size, unzipFailList)
@@ -149,7 +149,7 @@ class UnzipAllFileWorker(
 
         // 2. 统一处理通知、日志和 Toast
         showCompletionNotification(isAllSuccess, message, unzipResult, cid)
-        XLog.d("showCompletionNotification $message\n$unzipResult")
+        XLog.i("showCompletionNotification $message\n$unzipResult")
         App.instance.toast(message)
 
         // 3. 统一构建返回的 Data
@@ -200,7 +200,7 @@ class UnzipAllFileWorker(
 
         } catch (e: DecompressionLoadingException) {
             val message = e.message ?: run { "正在进行云解压，请稍等..." }
-            XLog.d("UnzipAllFileWorker DecompressionLoadingException ${fileBean.name} : ${e.message}")
+            XLog.w("UnzipAllFileWorker DecompressionLoadingException ${fileBean.name} : ${e.message}")
             return Pair(false, message)
         } catch (e: CancellationException) {
             throw e
@@ -276,7 +276,7 @@ class UnzipAllFileWorker(
         // 节流阀逻辑保持不变，这对于性能至关重要
         if (force || currentTime - lastUpdateTime > UPDATE_INTERVAL) {
             lastUpdateTime = currentTime
-            XLog.d("updateProgressNotification $content")
+            XLog.v("updateProgressNotification $content")
             try {
                 val build =
                     createNotification(titleString, content, "$progress/$max", progress, max)

@@ -128,7 +128,7 @@ class App : Application(), ImageLoaderFactory {
             .flattener(ClassicFlattener())
             .build()
         XLog.init(build, AndroidPrinter(true), print);
-        XLog.d("-----------------------init-----------------------------------")
+        XLog.i("-----------------------init-----------------------------------")
     }
 
     private val toastScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -167,7 +167,7 @@ class App : Application(), ImageLoaderFactory {
                 }
 
                 val bodyStr = response.body.string()
-                XLog.d("checkLogin avatarResp: $bodyStr")
+                XLog.v("checkLogin avatarResp: $bodyStr")
 
                 // 4. 一次性反序列化，避免 Gson 嵌套双重解析
                 val type = object : TypeToken<Base115Response<AvatarBean>>() {}.type

@@ -36,7 +36,7 @@ internal fun FileViewModel.getZipListFile(
             }.onSuccess { status ->
                 when (status) {
                     is ZipStatus.Encrypted -> {
-                        XLog.d("${fileBean.name} 是加密压缩包，拦截流程并弹窗")
+                        XLog.i("${fileBean.name} 是加密压缩包，拦截流程并弹窗")
                         openUnzipPasswordDialog()
                         setRefreshingStatus(false)
                         isInterrupted = true
@@ -55,7 +55,7 @@ internal fun FileViewModel.getZipListFile(
 
                     is ZipStatus.Loading -> {
                         val message = "正在进行云解压，请稍等...(${status.progress}%)"
-                        XLog.d("${fileBean.name} 要云解压，$message")
+                        XLog.i("${fileBean.name} 要云解压，$message")
                         App.instance.toast(message)
                         setRefreshingStatus(false)
                         isInterrupted = true

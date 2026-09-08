@@ -93,7 +93,7 @@ class RecycleViewModel : ViewModel() {
             if (index !in currentList.indices) return@launch
             val item = currentList[index]
             val revert = fileService.recycleClean(item.id, password)
-            XLog.d("RecycleViewModel delete $revert")
+            XLog.i("RecycleViewModel delete $revert")
             val message = if (revert.state) {
                 _recycleFileList.update { list -> list.filterIndexed { i, _ -> i != index } }
                 if (save) {
@@ -116,7 +116,7 @@ class RecycleViewModel : ViewModel() {
                 return@launch
             }
             val recycleCleanAll = fileService.recycleCleanAll(password)
-            XLog.d("RecycleViewModel deleteAll $recycleCleanAll")
+            XLog.i("RecycleViewModel deleteAll $recycleCleanAll")
             val message = if (recycleCleanAll.state) {
                 _recycleFileList.value = emptyList()
                 "清除成功"
@@ -134,7 +134,7 @@ class RecycleViewModel : ViewModel() {
             val item = currentList[index]
             val revert = fileService.revert(item.id)
             val message = if (revert.state) {
-                XLog.d("RecycleViewModel revert $revert")
+                XLog.i("RecycleViewModel revert $revert")
                 val cid = item.cid
                 dialogEventBus.emit(DialogEvent.RefreshFileList(cid))
                 _recycleFileList.update { list -> list.filterIndexed { i, _ -> i != index } }

@@ -369,7 +369,7 @@ class VideoActivity : AppCompatActivity() {
                 } else {
                     "UNKNOWN_ERROR"
                 }
-            XLog.d("$title 播放失败 $errorStatus")
+            XLog.e("$title 播放失败 $errorStatus")
             Toast.makeText(baseContext, errorStatus, Toast.LENGTH_SHORT).show()
             finish()
         }
@@ -475,7 +475,7 @@ class VideoActivity : AppCompatActivity() {
             try {
                 val fileRepository = FileRepository.getInstance()
                 val video = fileRepository.video(videoInfo.pickCode)
-                XLog.d("playNewVideo $video")
+                XLog.i("playNewVideo $video")
                 this@VideoActivity.videoPlayer.playNext(video.downloadUrl, video.fileName)
             } catch (e: Exception) {
                 isReloadingVideo = false // 异常时重置标志位

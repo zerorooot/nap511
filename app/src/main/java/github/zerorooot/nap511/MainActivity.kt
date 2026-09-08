@@ -687,7 +687,7 @@ class MainActivity : AppCompatActivity() {
                             App.instance.checkLogin(cookie)
                         } catch (e: Exception) {
                             App.instance.toast("解析配置失败")
-                            XLog.d("LoginScreen LoginCredential.ConfigFile jsonString ${credential.rawJson}")
+                            XLog.e("LoginScreen LoginCredential.ConfigFile jsonString ${credential.rawJson}", e)
                             false
                         }
                     }

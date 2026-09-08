@@ -593,7 +593,7 @@ fun writeToPublicExternalStorage(
                 resolver.openOutputStream(it)?.use { outputStream ->
                     outputStream.write(content.toByteArray())
                     App.instance.toast("导出成功，日志文件保存至Downloads目录，文件名为:$fileName")
-                    XLog.d("FileWrite File written to Downloads: $uri")
+                    XLog.i("FileWrite File written to Downloads: $uri")
                 }
             }
         } else {
@@ -603,7 +603,7 @@ fun writeToPublicExternalStorage(
             )
             try {
                 file.writeText(content)
-                XLog.d("FileWrite File written to: ${file.absolutePath}")
+                XLog.i("FileWrite File written to: ${file.absolutePath}")
             } catch (e: IOException) {
                 e.printStackTrace()
                 XLog.e("FileWrite Error writing file: $e")

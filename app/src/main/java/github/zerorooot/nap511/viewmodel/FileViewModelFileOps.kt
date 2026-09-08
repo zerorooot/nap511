@@ -115,7 +115,6 @@ internal fun FileViewModel.delete(index: Int) {
         val beforeClickMap = clickMap.getOrDefault(currentCid, 0)
         val beforeImageBeanCache = imageBeanCache.getOrDefault(currentCid, hashMapOf())
 
-        // XLog.d("FileViewModel.delete before fileListCache size ${fileListCache.size}")
         //提前删除，优化速度
         fileBeanList.remove(fileBean)
         fileListCache[currentCid]!!.fileBeanList.remove(fileBean)
@@ -126,7 +125,6 @@ internal fun FileViewModel.delete(index: Int) {
             removeFolderCacheRecursively(fileBean.categoryId)
         }
 
-        //    XLog.d("FileViewModel.delete after fileListCache size ${fileListCache.size}")
         //delete image bean
         imageBeanCache[currentCid]?.remove(index)
 
@@ -183,8 +181,6 @@ internal fun FileViewModel.deleteMultiple() {
         val beforeFileListCache = fileListCache[cid]
         val beforeClickMap = clickMap.getOrDefault(cid, 0)
 
-        //  XLog.d("FileViewModel.deleteMultiple before fileListCache size ${fileListCache.size}")
-
         val mapOf = hashMapOf<String, String>()
         mapOf["ignore_warn"] = "1"
         mapOf["pid"] = cid
@@ -201,8 +197,6 @@ internal fun FileViewModel.deleteMultiple() {
         fileBeanList.removeAll(filter)
         fileListCache[cid]!!.fileBeanList = ArrayList(fileBeanList)
         clickMap[cid] = clickMap.getOrDefault(cid, 0) - filter.size
-
-        //  XLog.d("FileViewModel.deleteMultiple after fileListCache size ${fileListCache.size}")
 
         recoverFromLongPress()
 

@@ -381,7 +381,7 @@ class OneOneFiveAuthManager {
                 override fun onResponse(call: Call, response: Response) {
                     response.use {
                         val bodyString = it.body.string()
-                        XLog.d("OneOneFiveAuthManager executeRequest [${request.url}] -> $bodyString")
+                        XLog.v("OneOneFiveAuthManager executeRequest [${request.url}] -> $bodyString")
                         if (continuation.isActive) continuation.resume(bodyString)
                     }
                 }

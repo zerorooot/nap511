@@ -38,7 +38,7 @@ class OfflineTaskActivity : ComponentActivity() {
 
         val dataUri: Uri? = intent?.data
         if (dataUri == null && intent.action != Intent.ACTION_PROCESS_TEXT) {
-            XLog.d("OfflineTaskActivity 未接收到任何链接数据 intent: $intent")
+            XLog.w("OfflineTaskActivity 未接收到任何链接数据 intent: $intent")
             finishAndRemoveTask()
             return
         }
@@ -95,7 +95,7 @@ class OfflineTaskActivity : ComponentActivity() {
                         ) || i.startsWith("magnet", true) || i.startsWith("ed2k", true)
                     }.toSet()
 
-                    XLog.d("OfflineTaskActivity $tag urlList: $urlList")
+                    XLog.i("OfflineTaskActivity $tag urlList: $urlList")
 
                     //非空列表
                     if (urlList.isNotEmpty()) {

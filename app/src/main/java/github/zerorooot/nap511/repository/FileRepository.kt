@@ -103,7 +103,7 @@ class FileRepository {
         list: List<String>, currentCid: String, handle: (Boolean) -> Unit
     ): Pair<Boolean, String> {
         val downloadPath = setDownloadPath(currentCid)
-        XLog.d("add task downloadPath $downloadPath")
+        XLog.i("add task downloadPath $downloadPath")
         if (!downloadPath.state) {
             App.instance.toast("设置离线位置失败，默认保存到\"云下载\"目录")
         }
@@ -237,7 +237,7 @@ class FileRepository {
             cid, unzipFolderName
         )
         val returnCid = createFolderMessage.let { if (it.cid == "") cid else it.cid }
-        XLog.d("createFolderAndReturnCid $createFolderMessage  inputCid:$cid returnCid:$returnCid ")
+        XLog.i("createFolderAndReturnCid $createFolderMessage  inputCid:$cid returnCid:$returnCid ")
         return returnCid
     }
 
@@ -259,7 +259,7 @@ class FileRepository {
     ): Pair<Boolean, String> {
         var state: Boolean
         val unzipFile = fileService.unzipFile(pickCode, zipFileCid, files, dirs)
-        XLog.d("unzipFile JsonElement $unzipFile")
+        XLog.v("unzipFile JsonElement $unzipFile")
         //解压失败时处理 unzipFile {"state":false,"message":"压缩包已损坏，无法解压","code":51005,"data":[]}
         //{"state":false,"message":"参数错误。","code":990002,"data":[]}
         state = unzipFile.state
@@ -284,7 +284,7 @@ class FileRepository {
 
         for (i in 1..100) {
             val json = fileService.unzipFileProcess(extractId)
-            XLog.d("unzipFile process $i $json")
+            XLog.v("unzipFile process $i $json")
             state = json.state
             if (!state) {
                 message = json.message
@@ -311,7 +311,7 @@ class FileRepository {
         //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
         val checkDecryptZip = fileService.getDecryptZipProcess(pickCode)
         val asInt = checkDecryptZip.data.extractStatus.unzipStatus
-        XLog.d("Get files/push_extract tryToExtract.checkDecryptZip $checkDecryptZip")
+        XLog.v("Get files/push_extract tryToExtract.checkDecryptZip $checkDecryptZip")
         //之前解压过，密码在115缓存中
         if (asInt == 1) {
             return true
@@ -325,7 +325,7 @@ class FileRepository {
         for (i in 1..100) {
             val json = fileService.getDecryptZipProcess(pickCode)
             val process = json.data.extractStatus.progress
-            XLog.d("tryToExtract zip $i $json")
+            XLog.v("tryToExtract zip $i $json")
             if (process == 100) {
                 return true
             }
@@ -385,7 +385,7 @@ class FileRepository {
     suspend fun decryptZip(pickCode: String, secret: String): Boolean {
         //{"state":true,"message":"","code":"","data":{"unzip_status":4}}
         val json = fileService.decryptZip(pickCode, secret)
-        XLog.d("Post files/push_extract decryptZip $json")
+        XLog.v("Post files/push_extract decryptZip $json")
         val asInt = json.data.unzipStatus
         //4 is success,6 is decrypt error,1 is having been done
         return asInt != 6
@@ -400,7 +400,7 @@ class FileRepository {
             //官网显示正在服务器解压 {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":1,"progress":5}}}
             //官网显示正在服务器解压,意味着加密或者非加密文件{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":0,"progress":0}}}
             //官网显示正在服务器解压,意味着加密或者非加密文件{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":2,"progress":30}}}
-            XLog.d("Get files/push_extract checkZipStatus $response")
+            XLog.v("Get files/push_extract checkZipStatus $response")
             if (!response.state) {
                 ZipStatus.UnsupportedOrError(response.message)
             } else {
@@ -410,7 +410,7 @@ class FileRepository {
                 // 2. 特殊状态码二次校验
                 if (unzipStatus == 0 || unzipStatus == 2) {
                     val encryptResponse = fileService.checkEncryptionStatus(pickCode)
-                    XLog.d("checkEncryptionStatus: $encryptResponse")
+                    XLog.v("checkEncryptionStatus: $encryptResponse")
 
                     if (!encryptResponse.state) {
                         return ZipStatus.UnsupportedOrError(encryptResponse.message)
@@ -427,7 +427,7 @@ class FileRepository {
                 }
             }
         } catch (e: CancellationException) {
-            XLog.d("checkZipStatus 任务被取消 $e")
+            XLog.w("checkZipStatus 任务被取消 $e")
             ZipStatus.UnsupportedOrError("任务被取消")
         } catch (e: Exception) {
             // 4. 捕获网络异常、Json语法解析异常等，确保不崩溃
@@ -454,11 +454,11 @@ class FileRepository {
         val response = okHttpClient.newCall(request).execute()
 
         val returnJson = JsonParser.parseString(response.body.string()).asJsonObject
-        XLog.d("FileRepository getDownloadUrl returnJson $returnJson")
+        XLog.v("FileRepository getDownloadUrl returnJson $returnJson")
 
         val data = returnJson.get("data").asString
         val m115Decode = sha1Util.m115_decode(data, m115Encode.key)
-        XLog.d("FileRepository getDownloadUrl m115Decode $m115Decode")
+        XLog.v("FileRepository getDownloadUrl m115Decode $m115Decode")
 
         //{"fileId":{"file_name":"a","file_size":"0","pick_code":"pick_code","url":false}}
         val downloadUrl = try {
@@ -468,7 +468,7 @@ class FileRepository {
             XLog.e("FileRepository getDownloadUrl error ${JsonParser.parseString(m115Decode)}", e)
             null
         }
-        XLog.d("FileRepository getDownloadUrl downloadUrl $downloadUrl")
+        XLog.i("FileRepository getDownloadUrl downloadUrl $downloadUrl")
         return downloadUrl;
     }
 
