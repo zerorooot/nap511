@@ -25,6 +25,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.zerorooot.nap511.bean.RecycleBean
@@ -56,6 +57,7 @@ data class RecycleUiState(
 fun RecycleScreen(
     recycleViewModel: RecycleViewModel,
     isExpandedScreen: Boolean,
+    gridCellMinSize: Dp,
     onClick: () -> Unit
 ) {
     LaunchedEffect(Unit) {
@@ -67,16 +69,11 @@ fun RecycleScreen(
         mutableIntStateOf(-1)
     }
 
-    val refreshing by recycleViewModel.isRefreshing.collectAsStateWithLifecycle()
-
-    val uiState = RecycleUiState(
-        recycleFileList = recycleViewModel.recycleFileList,
-        isRefreshing = refreshing,
-        isOpenRecyclePasswordDialog = recycleViewModel.isOpenRecyclePasswordDialog
-    )
+    val uiState by recycleViewModel.uiState.collectAsStateWithLifecycle()
 
     RecycleContent(
         uiState = uiState,
+        gridCellMinSize = gridCellMinSize,
         isExpandedScreen = isExpandedScreen,
         onRefresh = { recycleViewModel.refresh() },
         onRevert = { index -> recycleViewModel.revert(index) },
@@ -115,6 +112,7 @@ fun RecycleScreen(
 @Composable
 fun RecycleContent(
     uiState: RecycleUiState,
+    gridCellMinSize: Dp,
     isExpandedScreen: Boolean,
     onRefresh: () -> Unit,
     onRevert: (index: Int) -> Unit,
@@ -171,7 +169,7 @@ fun RecycleContent(
                 ) {
                     LazyVerticalGrid(
                         state = gridState,
-                        columns = GridCells.Adaptive(minSize = 340.dp),
+                        columns = GridCells.Adaptive(minSize = gridCellMinSize),
                         modifier = Modifier.fillMaxSize()
                     ) {
                         gridItemsIndexed(

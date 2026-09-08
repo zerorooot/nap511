@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.util
 
+
 import android.app.Application
 import android.content.Context
 import android.content.Intent
@@ -19,6 +20,7 @@ import com.elvishew.xlog.LogItem
 import com.elvishew.xlog.XLog
 import com.elvishew.xlog.flattener.ClassicFlattener
 import com.elvishew.xlog.interceptor.AbstractFilterInterceptor
+import com.elvishew.xlog.interceptor.Interceptor
 import com.elvishew.xlog.printer.AndroidPrinter
 import com.elvishew.xlog.printer.file.FilePrinter
 import com.elvishew.xlog.printer.file.clean.FileLastModifiedCleanStrategy
@@ -35,17 +37,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import kotlin.properties.Delegates
-
-
-import com.elvishew.xlog.interceptor.Interceptor
 
 class AutoTagInterceptor(
     private val defaultTag: String = "XLOG",
@@ -89,13 +86,15 @@ class App : Application(), ImageLoaderFactory {
     companion object {
         lateinit var instance: App
             private set
+
         //缓存fileListCache文件
         lateinit var cacheFile: File
     }
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     @Volatile
-    private var isLogEnabled = true
+    private var isLogEnabled = false
 
     override fun onCreate() {
         // 1.12.0 起新文字上下文菜单默认开启，但在 Dialog 内的 TextField
@@ -107,10 +106,12 @@ class App : Application(), ImageLoaderFactory {
         appScope.launch {
             val initialCookie = DataStoreUtil.getDataSuspend(ConfigKeyUtil.COOKIE, "")
             val initialUid = DataStoreUtil.getDataSuspend(ConfigKeyUtil.UID, "0")
-            val initialLimit = DataStoreUtil.getDataSuspend(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200").toIntOrNull() ?: 200
+            val initialLimit =
+                DataStoreUtil.getDataSuspend(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200").toIntOrNull()
+                    ?: 200
             UserSessionManager.init(initialCookie, initialUid, initialLimit)
 
-            DataStoreUtil.getDataFlow(ConfigKeyUtil.LOG, true).collect { enabled ->
+            DataStoreUtil.getDataFlow(ConfigKeyUtil.LOG, false).collect { enabled ->
                 isLogEnabled = enabled
             }
         }
@@ -201,7 +202,6 @@ class App : Application(), ImageLoaderFactory {
         toast(pair.second)
         return@withContext pair.first
     }
-
 
 
     /**

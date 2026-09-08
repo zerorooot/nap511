@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -32,7 +31,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -47,8 +46,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.elvishew.xlog.XLog
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.zerorooot.nap511.bean.CategoryDetailResponse
 import github.zerorooot.nap511.screenitem.RepeatFileCardItem
+import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.RepeatFileViewModel
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.LazyVerticalGridScrollbar
@@ -64,14 +66,14 @@ import kotlin.math.pow
 fun RepeatFileScreen(
     viewModel: RepeatFileViewModel,
     isExpandedScreen: Boolean,
+    gridCellMinSize: Dp,
     onClick: () -> Unit,
     jumpClick: (String) -> Unit
 ) {
     LaunchedEffect(Unit) {
         viewModel.loadData()
     }
-    val uiState by viewModel.uiState.collectAsState()
-    val categoryDetail by viewModel.categoryDetail.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showDeleteDialog by remember { mutableStateOf(false) }
     val count = uiState.statusData?.fileCount ?: "0"
     val formattedSize = formatBytes(uiState.statusData?.fileSize?.toLongOrNull() ?: 0L)
@@ -166,7 +168,7 @@ fun RepeatFileScreen(
                 ) {
                     LazyVerticalGrid(
                         state = gridState,
-                        columns = GridCells.Adaptive(minSize = 340.dp),
+                        columns = GridCells.Adaptive(minSize = gridCellMinSize),
                         modifier = Modifier.fillMaxSize()
                     ) {
                         gridItems(uiState.fileList, key = { it.fileId }) { item ->
@@ -200,7 +202,7 @@ fun RepeatFileScreen(
     }
 
     // 3. 文件详情弹窗与去重策略弹窗绑定
-    categoryDetail?.let { detail ->
+    uiState.categoryDetail?.let { detail ->
         FileDetailDialog(
             detail = detail,
             onDismiss = { viewModel.dismissCategoryDetail() },

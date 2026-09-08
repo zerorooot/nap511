@@ -16,6 +16,7 @@ import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.NetworkClient
 import github.zerorooot.nap511.util.UserSessionManager
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
@@ -27,7 +28,7 @@ import kotlin.concurrent.thread
 
 
 class Sha1Service : Service() {
-    private val okHttpClient = github.zerorooot.nap511.util.NetworkClient.sharedOkHttpClient
+    private val okHttpClient = NetworkClient.sharedOkHttpClient
 
     private val fileRepository: FileRepository by lazy {
         FileRepository.getInstance()
@@ -101,7 +102,7 @@ class Sha1Service : Service() {
         val aria2Token = DataStoreUtil.getDataSuspend(ConfigKeyUtil.ARIA2_TOKEN, "")
         val aria2Url = DataStoreUtil.getDataSuspend(
             ConfigKeyUtil.ARIA2_URL,
-            ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
+            ""
         ) + "?tm=${System.currentTimeMillis()}"
 
         val paramsJsonArray = JsonArray()

@@ -66,7 +66,8 @@ class SettingViewModel : ViewModel() {
         DataStoreUtil.getDataFlow(ConfigKeyUtil.MOVE_FAIL_FILE, ""),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.MAX_TXT_SIZE, "200"),
         DataStoreUtil.getDataFlow(ConfigKeyUtil.THEME_MODE, "跟随系统"),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.EXPANDED_SCREEN_THRESHOLD, "600")
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.EXPANDED_SCREEN_THRESHOLD, "600"),
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.GRID_CELL_MIN_SIZE, "340")
     ) { values: Array<String> ->
         PrefGroup(
             fabPos = values[0],
@@ -74,7 +75,8 @@ class SettingViewModel : ViewModel() {
             moveFail = values[2],
             txtSize = values[3],
             themeMode = values[4],
-            expandedThreshold = values[5]
+            expandedThreshold = values[5],
+            gridCellMinSize = values[6]
         )
     }
 
@@ -133,6 +135,7 @@ class SettingViewModel : ViewModel() {
             txtSize = uiPref.txtSize,
             themeMode = uiPref.themeMode,
             expandedScreenThreshold = uiPref.expandedThreshold,
+            gridCellMinSize = uiPref.gridCellMinSize,
             // 开关
             autoRotateEnabled = s2.autoRotate,
             hideLoadingView = s2.hideLoading,
@@ -257,6 +260,7 @@ class SettingViewModel : ViewModel() {
                 val currentUid = DataStoreUtil.getDataSuspend(ConfigKeyUtil.UID, "0")
                 val currentCookie = DataStoreUtil.getDataSuspend(ConfigKeyUtil.COOKIE, "")
                 val currentAvatar = DataStoreUtil.getDataSuspend(ConfigKeyUtil.AVATAR_BEAN, "")
+                val password = DataStoreUtil.getDataSuspend(ConfigKeyUtil.PASSWORD, "")
 
                 DataStoreUtil.clearData()
 
@@ -268,6 +272,9 @@ class SettingViewModel : ViewModel() {
                 }
                 if (currentAvatar.isNotEmpty()) {
                     DataStoreUtil.putDataSuspend(ConfigKeyUtil.AVATAR_BEAN, currentAvatar)
+                }
+                if (password.isNotEmpty()) {
+                    DataStoreUtil.putDataSuspend(ConfigKeyUtil.PASSWORD, password)
                 }
 
                 withContext(Dispatchers.Main) { onSuccess() }
@@ -294,7 +301,8 @@ class SettingViewModel : ViewModel() {
         val moveFail: String,
         val txtSize: String,
         val themeMode: String,
-        val expandedThreshold: String
+        val expandedThreshold: String,
+        val gridCellMinSize: String
     )
 
 

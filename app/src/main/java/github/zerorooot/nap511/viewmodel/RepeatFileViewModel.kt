@@ -11,10 +11,14 @@ import github.zerorooot.nap511.bean.RepeatStatusData
 import github.zerorooot.nap511.screen.formatBytes
 import github.zerorooot.nap511.service.RepeatService
 import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.DataStoreUtil
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
@@ -27,6 +31,7 @@ data class RepeatUiState(
     val isLoadingList: Boolean = false,
     val isRefreshing: Boolean = false,
     val isListEndReached: Boolean = false,
+    val categoryDetail: CategoryDetailResponse? = null
 )
 
 class RepeatFileViewModel : ViewModel() {
@@ -35,11 +40,22 @@ class RepeatFileViewModel : ViewModel() {
     }
 
     private val _uiState = MutableStateFlow(RepeatUiState())
-    val uiState: StateFlow<RepeatUiState> = _uiState.asStateFlow()
 
     // 存储当前选中的文件分类详情（控制弹窗显示）
     private val _categoryDetail = MutableStateFlow<CategoryDetailResponse?>(null)
-    val categoryDetail: StateFlow<CategoryDetailResponse?> = _categoryDetail.asStateFlow()
+
+    val uiState: StateFlow<RepeatUiState> = combine(
+        _uiState,
+        _categoryDetail
+    ) { state, categoryDetail ->
+        state.copy(
+            categoryDetail = categoryDetail
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = RepeatUiState()
+    )
 
     // 1. 初始化或重新加载全部数据
     fun loadData() {

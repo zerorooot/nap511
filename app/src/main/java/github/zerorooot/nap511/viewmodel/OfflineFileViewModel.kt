@@ -18,45 +18,88 @@ import github.zerorooot.nap511.util.UserSessionManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 
+/**
+ * 离线文件页面的纯 UI 状态封装
+ */
+data class OfflineFileUiState(
+    val offlineInfo: OfflineListCount = OfflineListCount(),
+    val isRefreshing: Boolean = false,
+    val downloadingList: List<OfflineTask> = emptyList(),
+    val failedList: List<OfflineTask> = emptyList(),
+    val completedList: List<OfflineTask> = emptyList(),
+    val isOpenOfflineDialog: Boolean = false,
+    val selectedOfflineTask: OfflineTask? = null
+)
+
 class OfflineFileViewModel : ViewModel() {
     private val _isRefreshing = MutableStateFlow(false)
-    var isRefreshing = _isRefreshing.asStateFlow()
-
     private var downloadingTask by mutableStateOf(OfflineInfo())
     private val _downloadingList = MutableStateFlow<List<OfflineTask>>(emptyList())
-    val downloadingList = _downloadingList.asStateFlow()
 
     private var failedTask by mutableStateOf(OfflineInfo())
     private val _failedList = MutableStateFlow<List<OfflineTask>>(emptyList())
-    val failedList = _failedList.asStateFlow()
 
     private var completedTask by mutableStateOf(OfflineInfo())
     private val _completedList = MutableStateFlow<List<OfflineTask>>(emptyList())
-    val completedList = _completedList.asStateFlow()
-
 
     private val _offlineInfo = MutableStateFlow(OfflineListCount())
-    var offlineInfo = _offlineInfo.asStateFlow()
 
     private val _quotaBean = MutableStateFlow(QuotaBean(1500, 1500))
     var quotaBean = _quotaBean.asStateFlow()
 
-    lateinit var offlineTask: OfflineTask
+    private val _isOpenOfflineDialog = MutableStateFlow(false)
+    private val _selectedOfflineTask = MutableStateFlow<OfflineTask?>(null)
     val urlText = mutableStateOf("")
-
-    var isOpenOfflineDialog by mutableStateOf(false)
-        private set
-
 
     private val fileRepository: FileRepository by lazy {
         FileRepository.getInstance()
     }
+
+    val uiState: StateFlow<OfflineFileUiState> = combine(
+        _offlineInfo,
+        _isRefreshing,
+        _downloadingList,
+        _failedList,
+        _completedList,
+        _isOpenOfflineDialog,
+        _selectedOfflineTask
+    ) { values: Array<Any?> ->
+        val offlineInfo = values[0] as OfflineListCount
+        val refreshing = values[1] as Boolean
+        @Suppress("UNCHECKED_CAST")
+        val downloadingList = values[2] as List<OfflineTask>
+        @Suppress("UNCHECKED_CAST")
+        val failedList = values[3] as List<OfflineTask>
+        @Suppress("UNCHECKED_CAST")
+        val completedList = values[4] as List<OfflineTask>
+        val isOpenDialog = values[5] as Boolean
+        val selectedTask = values[6] as OfflineTask?
+
+        OfflineFileUiState(
+            offlineInfo = offlineInfo,
+            isRefreshing = refreshing,
+            downloadingList = downloadingList,
+            failedList = failedList,
+            completedList = completedList,
+            isOpenOfflineDialog = isOpenDialog,
+            selectedOfflineTask = selectedTask
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = OfflineFileUiState()
+    )
+
 
     /**
      * 首次进入页面时加载（若三项均为空则触发请求）
@@ -284,12 +327,13 @@ class OfflineFileViewModel : ViewModel() {
      * 3. 支持直接传入 OfflineTask 打开详情弹窗
      */
     fun openOfflineDialog(task: OfflineTask) {
-        isOpenOfflineDialog = true
-        offlineTask = task
+        _selectedOfflineTask.value = task
+        _isOpenOfflineDialog.value = true
     }
 
     fun closeOfflineDialog() {
-        isOpenOfflineDialog = false
+        _isOpenOfflineDialog.value = false
+        _selectedOfflineTask.value = null
     }
 
     fun delete(offlineTask: OfflineTask) {

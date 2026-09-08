@@ -7,12 +7,14 @@ import android.content.ClipboardManager
 import android.content.Intent
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.material3.FabPosition
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.dp
 import androidx.concurrent.futures.await
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
@@ -55,12 +57,24 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 import java.io.File
+
+data class FileUiState(
+    val path: String = "",
+    val isRefreshing: Boolean = false,
+    val earlyLoading: Boolean = false,
+    val maxTxtSizeStr: String = "200",
+    val aria2UrlConfig: String = ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE,
+    val fabPosition: FabPosition = FabPosition.End
+)
 
 
 @SuppressLint("MutableCollectionMutableState")
@@ -74,7 +88,6 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
     var appBarTitle by mutableStateOf(context.getString(R.string.app_name))
 
     private val _currentPath = MutableStateFlow("")
-    var currentPath = _currentPath.asStateFlow()
 
     var currentCid by mutableStateOf("0")
 
@@ -94,7 +107,49 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
 
 
     internal val _isRefreshing = MutableStateFlow(false)
-    var isRefreshing = _isRefreshing.asStateFlow()
+
+    val uiState: StateFlow<FileUiState> = combine(
+        _currentPath,
+        _isRefreshing,
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.EARLY_LOADING, false),
+        DataStoreUtil.getDataFlow(ConfigKeyUtil.MAX_TXT_SIZE, "200"),
+        DataStoreUtil.getDataFlow(
+            ConfigKeyUtil.ARIA2_URL,
+            ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
+        ),
+        DataStoreUtil.getDataFlow(
+            ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION,
+            "End"
+        )
+    ) { values: Array<Any?> ->
+        val path = values[0] as String
+        val refreshing = values[1] as Boolean
+        val earlyLoading = values[2] as Boolean
+        val maxTxtSizeStr = values[3] as String
+        val aria2UrlConfig = values[4] as String
+        val fabPosStr = values[5] as String
+
+        val fabPosition = when (fabPosStr) {
+            "Start" -> FabPosition.Start
+            "Center" -> FabPosition.Center
+            "End" -> FabPosition.End
+            "EndOverlay" -> FabPosition.EndOverlay
+            else -> FabPosition.End
+        }
+
+        FileUiState(
+            path = path,
+            isRefreshing = refreshing,
+            earlyLoading = earlyLoading,
+            maxTxtSizeStr = maxTxtSizeStr,
+            aria2UrlConfig = aria2UrlConfig,
+            fabPosition = fabPosition
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = FileUiState()
+    )
 
 
     var torrentBean by mutableStateOf(TorrentFileBean())

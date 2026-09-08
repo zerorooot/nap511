@@ -164,6 +164,11 @@ class ConfigKeyUtil {
         const val EXPANDED_SCREEN_THRESHOLD = "expandedScreenThreshold"
 
         /**
+         * 网格布局最小单元格宽度（dp）
+         */
+        const val GRID_CELL_MIN_SIZE = "gridCellMinSize"
+
+        /**
          * 主题色模式：跟随系统、亮色模式、暗色模式
          */
         const val THEME_MODE = "themeMode"

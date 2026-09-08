@@ -1,15 +1,12 @@
 package github.zerorooot.nap511.viewmodel
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
+import github.zerorooot.nap511.screen.RecycleUiState
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -17,31 +14,45 @@ import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.DialogEvent
 import github.zerorooot.nap511.util.DialogEventBus
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-class RecycleViewModel :
-    ViewModel() {
+class RecycleViewModel : ViewModel() {
     private val _isRefreshing = MutableStateFlow(false)
-    var isRefreshing = _isRefreshing.asStateFlow()
-
     private val _recycleInfo = MutableStateFlow(RecycleInfo())
-
-    var recycleFileList = mutableStateListOf<RecycleBean>()
+    private val _recycleFileList = MutableStateFlow<List<RecycleBean>>(emptyList())
+    private val _isOpenRecyclePasswordDialog = MutableStateFlow(false)
 
     private val dialogEventBus = DialogEventBus.getInstance()
-
-    var isOpenRecyclePasswordDialog by mutableStateOf(false)
-        private set
 
     private val fileService: FileService by lazy {
         FileService.getInstance()
     }
 
+    val uiState: StateFlow<RecycleUiState> = combine(
+        _recycleFileList,
+        _isRefreshing,
+        _isOpenRecyclePasswordDialog
+    ) { recycleFileList, isRefreshing, isOpenPasswordDialog ->
+        RecycleUiState(
+            recycleFileList = recycleFileList,
+            isRefreshing = isRefreshing,
+            isOpenRecyclePasswordDialog = isOpenPasswordDialog
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = RecycleUiState()
+    )
+
     fun getRecycleFileList() {
-        if (recycleFileList.isNotEmpty()) {
+        if (_recycleFileList.value.isNotEmpty()) {
             return
         }
         viewModelScope.launch {
@@ -51,8 +62,7 @@ class RecycleViewModel :
                 val recycleBeanList = _recycleInfo.value.recycleBeanList
                 if (recycleBeanList.isNotEmpty()) {
                     setRecycleBean(recycleBeanList)
-                    recycleFileList.clear()
-                    recycleFileList.addAll(recycleBeanList)
+                    _recycleFileList.value = recycleBeanList
                 }
 
             } catch (e: NullPointerException) {
@@ -70,7 +80,7 @@ class RecycleViewModel :
         viewModelScope.launch {
             val password = DataStoreUtil.getDataSuspend(ConfigKeyUtil.PASSWORD, "")
             if (password == "") {
-                isOpenRecyclePasswordDialog = true
+                _isOpenRecyclePasswordDialog.value = true
                 return@launch
             }
             delete(index, password)
@@ -79,10 +89,13 @@ class RecycleViewModel :
 
     fun delete(index: Int, password: String, save: Boolean = false) {
         viewModelScope.launch {
-            val revert = fileService.recycleClean(recycleFileList[index].id, password)
+            val currentList = _recycleFileList.value
+            if (index !in currentList.indices) return@launch
+            val item = currentList[index]
+            val revert = fileService.recycleClean(item.id, password)
             XLog.d("RecycleViewModel delete $revert")
             val message = if (revert.state) {
-                recycleFileList.removeAt(index)
+                _recycleFileList.update { list -> list.filterIndexed { i, _ -> i != index } }
                 if (save) {
                     DataStoreUtil.putDataSuspend(ConfigKeyUtil.PASSWORD, password)
                 }
@@ -99,13 +112,13 @@ class RecycleViewModel :
         viewModelScope.launch {
             val password = DataStoreUtil.getDataSuspend(ConfigKeyUtil.PASSWORD, "")
             if (password == "") {
-                isOpenRecyclePasswordDialog = true
+                _isOpenRecyclePasswordDialog.value = true
                 return@launch
             }
             val recycleCleanAll = fileService.recycleCleanAll(password)
             XLog.d("RecycleViewModel deleteAll $recycleCleanAll")
             val message = if (recycleCleanAll.state) {
-                recycleFileList.clear()
+                _recycleFileList.value = emptyList()
                 "清除成功"
             } else {
                 "清除失败，${recycleCleanAll.error}"
@@ -116,12 +129,15 @@ class RecycleViewModel :
 
     fun revert(index: Int) {
         viewModelScope.launch {
-            val revert = fileService.revert(recycleFileList[index].id)
+            val currentList = _recycleFileList.value
+            if (index !in currentList.indices) return@launch
+            val item = currentList[index]
+            val revert = fileService.revert(item.id)
             val message = if (revert.state) {
                 XLog.d("RecycleViewModel revert $revert")
-                val cid = recycleFileList[index].cid
+                val cid = item.cid
                 dialogEventBus.emit(DialogEvent.RefreshFileList(cid))
-                recycleFileList.removeAt(index)
+                _recycleFileList.update { list -> list.filterIndexed { i, _ -> i != index } }
                 "恢复成功"
             } else {
                 "恢复失败，${revert.error}"
@@ -131,11 +147,11 @@ class RecycleViewModel :
     }
 
     fun closeDialog() {
-        isOpenRecyclePasswordDialog = false
+        _isOpenRecyclePasswordDialog.value = false
     }
 
     fun refresh() {
-        recycleFileList.clear()
+        _recycleFileList.value = emptyList()
         getRecycleFileList()
     }
 

@@ -33,14 +33,14 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.core.content.ContextCompat.getSystemService
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import github.zerorooot.nap511.bean.OfflineListCount
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.dialog.OfflineFileInfoDialog
 import github.zerorooot.nap511.screenitem.OfflineCellItem
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.viewmodel.OfflineFileUiState
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import kotlinx.coroutines.launch
 import my.nanihadesuka.compose.LazyColumnScrollbar
@@ -49,44 +49,20 @@ import my.nanihadesuka.compose.ScrollbarSettings
 import java.util.StringJoiner
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 
-/**
- * 离线文件页面的纯 UI 状态封装
- */
-data class OfflineFileUiState(
-    val offlineInfo: OfflineListCount = OfflineListCount(),
-    val isRefreshing: Boolean = false,
-    val downloadingList: List<OfflineTask> = emptyList(),
-    val failedList: List<OfflineTask> = emptyList(),
-    val completedList: List<OfflineTask> = emptyList(),
-    val isOpenOfflineDialog: Boolean = false,
-    val selectedOfflineTask: OfflineTask? = null,
-)
 
 @Composable
 fun OfflineFileScreen(
     offlineFileViewModel: OfflineFileViewModel,
     isExpandedScreen: Boolean,
+    gridCellMinSize: Dp,
     getFiles: (String) -> Unit,
     onClick: (String) -> Unit,
 ) {
-    val offlineInfo by offlineFileViewModel.offlineInfo.collectAsStateWithLifecycle()
-    val refreshing by offlineFileViewModel.isRefreshing.collectAsStateWithLifecycle()
-    val downloadingList by offlineFileViewModel.downloadingList.collectAsStateWithLifecycle()
-    val failedList by offlineFileViewModel.failedList.collectAsStateWithLifecycle()
-    val completedList by offlineFileViewModel.completedList.collectAsStateWithLifecycle()
-
-    val uiState = OfflineFileUiState(
-        offlineInfo = offlineInfo,
-        isRefreshing = refreshing,
-        downloadingList = downloadingList,
-        failedList = failedList,
-        completedList = completedList,
-        isOpenOfflineDialog = offlineFileViewModel.isOpenOfflineDialog,
-        selectedOfflineTask = if (offlineFileViewModel.isOpenOfflineDialog) offlineFileViewModel.offlineTask else null
-    )
+    val uiState by offlineFileViewModel.uiState.collectAsStateWithLifecycle()
 
     OfflineFileContent(
         uiState = uiState,
+        gridCellMinSize = gridCellMinSize,
         isExpandedScreen = isExpandedScreen,
         onRefresh = { offlineFileViewModel.refresh() },
         onClearFinish = { offlineFileViewModel.clearFinish() },
@@ -108,6 +84,7 @@ fun OfflineFileScreen(
 @Composable
 fun OfflineFileContent(
     uiState: OfflineFileUiState,
+    gridCellMinSize: Dp,
     isExpandedScreen: Boolean,
     onRefresh: () -> Unit,
     onClearFinish: () -> Unit,
@@ -269,7 +246,7 @@ fun OfflineFileContent(
                     ) {
                         LazyVerticalGrid(
                             state = gridState,
-                            columns = GridCells.Adaptive(minSize = 340.dp),
+                            columns = GridCells.Adaptive(minSize = gridCellMinSize),
                             modifier = Modifier.fillMaxSize()
                         ) {
                             gridItemsIndexed(

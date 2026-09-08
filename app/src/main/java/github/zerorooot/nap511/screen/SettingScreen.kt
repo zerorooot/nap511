@@ -447,6 +447,16 @@ fun SettingContent(
                     )
                 }
                 item {
+                    EditTextPreferenceItem(
+                        title = "网格最小宽度",
+                        summary = "网格布局单列最小宽度为 ${uiState.gridCellMinSize} dp",
+                        value = uiState.gridCellMinSize,
+                        isNumber = true,
+                        enabled = uiState.expandedScreenEnabled,
+                        onValueSave = { onSaveConfig(ConfigKeyUtil.GRID_CELL_MIN_SIZE, it) }
+                    )
+                }
+                item {
                     SwitchPreferenceItem(
                         title = "大屏扩展模式",
                         summary = "在平板或大屏设备（屏幕宽度 ≥ ${uiState.expandedScreenThreshold}dp）上启用大屏展开布局",

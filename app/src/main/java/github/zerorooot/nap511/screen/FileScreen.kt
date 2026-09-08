@@ -49,7 +49,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -78,6 +77,7 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.nativeClipboardManager
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.gson.Gson
@@ -131,36 +131,15 @@ fun FileScreen(
     fileViewModel: FileViewModel,
     audioViewModel: AudioViewModel,
     isExpandedScreen: Boolean,
+    gridCellMinSize: Dp,
     onNav: (Route) -> Unit,
     drawerState: () -> Boolean
 ) {
-    val fabPositionSetting by DataStoreUtil.getDataFlow(
-        ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION,
-        "End"
-    )
-        .collectAsStateWithLifecycle(initialValue = "End")
-    val fabPosition = remember(fabPositionSetting) {
-        when (fabPositionSetting) {
-            "Start" -> FabPosition.Start
-            "Center" -> FabPosition.Center
-            "End" -> FabPosition.End
-            "EndOverlay" -> FabPosition.EndOverlay
-            else -> FabPosition.End
-        }
-    }
-    val earlyLoading by DataStoreUtil.getDataFlow(ConfigKeyUtil.EARLY_LOADING, false)
-        .collectAsStateWithLifecycle(initialValue = false)
-    val maxTxtSizeStr by DataStoreUtil.getDataFlow(ConfigKeyUtil.MAX_TXT_SIZE, "200")
-        .collectAsStateWithLifecycle(initialValue = "200")
-    val aria2UrlConfig by DataStoreUtil.getDataFlow(
-        ConfigKeyUtil.ARIA2_URL,
-        ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
-    )
-        .collectAsStateWithLifecycle(initialValue = ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE)
+    val uiState by fileViewModel.uiState.collectAsStateWithLifecycle()
 
     val fileBeanList = fileViewModel.fileBeanList
-    val path by fileViewModel.currentPath.collectAsStateWithLifecycle()
-    val refreshing by fileViewModel.isRefreshing.collectAsStateWithLifecycle()
+    val path = uiState.path
+    val refreshing = uiState.isRefreshing
     val context = LocalContext.current
     var showDialog by rememberSaveable { mutableIntStateOf(-1) }
 
@@ -244,7 +223,7 @@ fun FileScreen(
 
     fun handleFolderClick(i: Int, fileBean: FileBean) {
         isBottomBarShow = true
-        if (earlyLoading) {
+        if (uiState.earlyLoading) {
             listOf(i - 1, i + 1)
                 .mapNotNull { fileBeanList.getOrNull(it) }
                 .filter { it.isFolder }
@@ -290,7 +269,7 @@ fun FileScreen(
     }
 
     fun handleTextClick(i: Int, fileBean: FileBean) {
-        val txtSize = maxTxtSizeStr.toIntOrNull() ?: 200
+        val txtSize = uiState.maxTxtSizeStr.toIntOrNull() ?: 200
         if (fileBean.size.toLong() < txtSize * 1024) {
             fileViewModel.selectIndex = i
             fileViewModel.downloadText(fileBean, onNav)
@@ -381,7 +360,7 @@ fun FileScreen(
     }
 
     fun onMenuAria2Download(index: Int) {
-        if (aria2UrlConfig == ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE) {
+        if (uiState.aria2UrlConfig == ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE) {
             fileViewModel.openAria2Dialog()
         } else {
             fileViewModel.startSendAria2Service(index)
@@ -509,7 +488,7 @@ fun FileScreen(
                 onAddFolder = { fileViewModel.openCreateFolderDialog() }
             )
         },
-        floatingActionButtonPosition = fabPosition
+        floatingActionButtonPosition = uiState.fabPosition
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -568,6 +547,7 @@ fun FileScreen(
                 path = path,
                 listState = listState,
                 gridState = gridState,
+                gridCellMinSize = gridCellMinSize,
                 isExpandedScreen = isExpandedScreen,
                 clickIndex = fileViewModel.clickMap.getOrDefault(path, -1),
                 onRefresh = { fileViewModel.refresh() },
@@ -709,6 +689,7 @@ private fun FileListContent(
     path: String,
     listState: LazyListState,
     gridState: LazyGridState,
+    gridCellMinSize: Dp,
     isExpandedScreen: Boolean,
     clickIndex: Int,
     onRefresh: () -> Unit,
@@ -747,7 +728,7 @@ private fun FileListContent(
                     ) {
                         LazyVerticalGrid(
                             state = gridState,
-                            columns = GridCells.Adaptive(minSize = 340.dp),
+                            columns = GridCells.Adaptive(minSize = gridCellMinSize),
 //                            contentPadding = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal).asPaddingValues(),
                             modifier = Modifier.fillMaxSize()
                         ) {
