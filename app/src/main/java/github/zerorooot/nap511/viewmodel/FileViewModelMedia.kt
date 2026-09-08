@@ -41,7 +41,7 @@ internal fun FileViewModel.getImage(fileBeanList: List<FileBean>, indexOf: Int) 
             newMap[indexOf] = imageBean
 
             imageBeanCache[currentCid] = newMap
-        }.onFailureToastAndLog(tag = "FileViewModelMedia")
+        }.onFailureToastAndLog()
     }
 }
 
@@ -89,7 +89,7 @@ internal fun FileViewModel.updateVideoFileBean(
             }else{
                 XLog.d("更新视频时间 $videoHistory")
             }
-        }.onFailureToastAndLog(tag = "FileViewModelMedia")
+        }.onFailureToastAndLog()
     }
 }
 
@@ -119,7 +119,7 @@ internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int, fi
             }
             XLog.d("FileViewModel getVideoInfo $video")
             _launchVideoEvent.emit(video)
-        }.onFailureToastAndLog(tag = "FileViewModelMedia")
+        }.onFailureToastAndLog()
         setRefreshingStatus(false)
     }
 }
@@ -138,7 +138,7 @@ internal fun FileViewModel.downloadText(fileBean: FileBean, onNav: (Route) -> Un
                 }
                 bytes = downloadInputStream.readBytes()
                 textFileCache[fileBean] = bytes
-            }.onFailureToastAndLog(tag = "FileViewModelMedia")
+            }.onFailureToastAndLog()
         }
         if (bytes != null) {
             textBodyByteArray = bytes

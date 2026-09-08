@@ -69,7 +69,7 @@ internal fun FileViewModel.removeFile() {
             }
         }.onSuccess { message ->
             App.instance.toast(message)
-        }.onFailureToastAndLog(tag = "FileViewModel")
+        }.onFailureToastAndLog()
     }
 }
 
@@ -87,7 +87,7 @@ internal fun FileViewModel.createFolder(folderName: String) {
             }
         }.onSuccess { message ->
             App.instance.toast(message)
-        }.onFailureToastAndLog(tag = "FileViewModel")
+        }.onFailureToastAndLog()
     }
 }
 
@@ -102,7 +102,7 @@ internal fun FileViewModel.getFileInfo(index: Int) {
                 fileRepository.getFileInfo(fileBean.fileId)
             }
             openFileInfoDialog()
-        }.onFailureToastAndLog(tag = "FileViewModel")
+        }.onFailureToastAndLog()
         _isRefreshing.value = false
     }
 }
@@ -144,7 +144,7 @@ internal fun FileViewModel.delete(index: Int) {
             }
         }.onSuccess { message ->
             App.instance.toast(message)
-        }.onFailureToastAndLog(tag = "FileViewModel")
+        }.onFailureToastAndLog()
     }
 }
 
@@ -170,7 +170,7 @@ internal fun FileViewModel.rename(name: String) {
             }
         }.onSuccess { message ->
             App.instance.toast(message)
-        }.onFailureToastAndLog(tag = "FileViewModel")
+        }.onFailureToastAndLog()
     }
 }
 
@@ -212,7 +212,7 @@ internal fun FileViewModel.deleteMultiple() {
             }
         }.onSuccess { message ->
             App.instance.toast(message)
-        }.onFailureToastAndLog(tag = "FileViewModel")
+        }.onFailureToastAndLog()
     }
 }
 

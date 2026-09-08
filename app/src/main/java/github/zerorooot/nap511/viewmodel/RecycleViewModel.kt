@@ -13,6 +13,7 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.DialogEvent
 import github.zerorooot.nap511.util.DialogEventBus
+import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -89,60 +90,66 @@ class RecycleViewModel : ViewModel() {
 
     fun delete(index: Int, password: String, save: Boolean = false) {
         viewModelScope.launch {
-            val currentList = _recycleFileList.value
-            if (index !in currentList.indices) return@launch
-            val item = currentList[index]
-            val revert = fileService.recycleClean(item.id, password)
-            XLog.i("RecycleViewModel delete $revert")
-            val message = if (revert.state) {
-                _recycleFileList.update { list -> list.filterIndexed { i, _ -> i != index } }
-                if (save) {
-                    DataStoreUtil.putDataSuspend(ConfigKeyUtil.PASSWORD, password)
+            runCatching {
+                val currentList = _recycleFileList.value
+                if (index !in currentList.indices) return@launch
+                val item = currentList[index]
+                val revert = fileService.recycleClean(item.id, password)
+                XLog.i("RecycleViewModel delete $revert")
+                val message = if (revert.state) {
+                    _recycleFileList.update { list -> list.filterIndexed { i, _ -> i != index } }
+                    if (save) {
+                        DataStoreUtil.putDataSuspend(ConfigKeyUtil.PASSWORD, password)
+                    }
+                    "删除成功"
+                } else {
+                    DataStoreUtil.putDataSuspend(ConfigKeyUtil.PASSWORD, "")
+                    "删除失败，${revert.errorMsg}"
                 }
-                "删除成功"
-            } else {
-                DataStoreUtil.putDataSuspend(ConfigKeyUtil.PASSWORD, "")
-                "删除失败，${revert.errorMsg}"
-            }
-            App.instance.toast(message)
+                App.instance.toast(message)
+            }.onFailureToastAndLog()
         }
     }
 
     fun deleteAll() {
         viewModelScope.launch {
-            val password = DataStoreUtil.getDataSuspend(ConfigKeyUtil.PASSWORD, "")
-            if (password == "") {
-                _isOpenRecyclePasswordDialog.value = true
-                return@launch
-            }
-            val recycleCleanAll = fileService.recycleCleanAll(password)
-            XLog.i("RecycleViewModel deleteAll $recycleCleanAll")
-            val message = if (recycleCleanAll.state) {
-                _recycleFileList.value = emptyList()
-                "清除成功"
-            } else {
-                "清除失败，${recycleCleanAll.error}"
-            }
-            App.instance.toast(message)
+            runCatching {
+                val password = DataStoreUtil.getDataSuspend(ConfigKeyUtil.PASSWORD, "")
+                if (password == "") {
+                    _isOpenRecyclePasswordDialog.value = true
+                    return@launch
+                }
+                val recycleCleanAll = fileService.recycleCleanAll(password)
+                XLog.i("RecycleViewModel deleteAll $recycleCleanAll")
+                val message = if (recycleCleanAll.state) {
+                    _recycleFileList.value = emptyList()
+                    "清除成功"
+                } else {
+                    "清除失败，${recycleCleanAll.error}"
+                }
+                App.instance.toast(message)
+            }.onFailureToastAndLog()
         }
     }
 
     fun revert(index: Int) {
         viewModelScope.launch {
-            val currentList = _recycleFileList.value
-            if (index !in currentList.indices) return@launch
-            val item = currentList[index]
-            val revert = fileService.revert(item.id)
-            val message = if (revert.state) {
-                XLog.i("RecycleViewModel revert $revert")
-                val cid = item.cid
-                dialogEventBus.emit(DialogEvent.RefreshFileList(cid))
-                _recycleFileList.update { list -> list.filterIndexed { i, _ -> i != index } }
-                "恢复成功"
-            } else {
-                "恢复失败，${revert.error}"
-            }
-            App.instance.toast(message)
+            runCatching {
+                val currentList = _recycleFileList.value
+                if (index !in currentList.indices) return@launch
+                val item = currentList[index]
+                val revert = fileService.revert(item.id)
+                val message = if (revert.state) {
+                    XLog.i("RecycleViewModel revert $revert")
+                    val cid = item.cid
+                    dialogEventBus.emit(DialogEvent.RefreshFileList(cid))
+                    _recycleFileList.update { list -> list.filterIndexed { i, _ -> i != index } }
+                    "恢复成功"
+                } else {
+                    "恢复失败，${revert.error}"
+                }
+                App.instance.toast(message)
+            }.onFailureToastAndLog()
         }
     }
 

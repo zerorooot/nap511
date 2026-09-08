@@ -11,8 +11,7 @@ import github.zerorooot.nap511.bean.RepeatStatusData
 import github.zerorooot.nap511.screen.formatBytes
 import github.zerorooot.nap511.service.RepeatService
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -61,8 +60,11 @@ class RepeatFileViewModel : ViewModel() {
     fun loadData() {
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
-            loadStatus()
-            refreshList()
+            runCatching {
+                loadStatus()
+                refreshListInternal()
+            }.onFailureToastAndLog()
+            _uiState.update { it.copy(isRefreshing = false) }
         }
     }
 
@@ -75,38 +77,43 @@ class RepeatFileViewModel : ViewModel() {
 
     }
 
+    private suspend fun refreshListInternal() {
+        loadStatus()
+        _uiState.update {
+            it.copy(
+                isLoadingList = true,
+                offset = 0,
+                isListEndReached = false,
+                isRefreshing = true
+            )
+        }
+        val repeatList = getRepeatList(offset = 0)
+        //清空list,防止日志里的内容过多
+        val copy = repeatList.copy(data = emptyList())
+        XLog.v("repeatList: $copy")
+
+        val list = repeatList.data
+        val total = repeatList.count.toIntOrNull() ?: 0
+        _uiState.update {
+            it.copy(
+                fileList = list,
+                totalCount = total,
+                offset = list.size,
+                isLoadingList = false,
+                isRefreshing = false,
+                isListEndReached = list.size >= total || list.isEmpty()
+            )
+        }
+    }
 
     // 3. 刷新列表（重置 offset 并拉取首页）
     fun refreshList() {
         viewModelScope.launch {
-            loadStatus()
-            _uiState.update {
-                it.copy(
-                    isLoadingList = true,
-                    offset = 0,
-                    isListEndReached = false,
-                    isRefreshing = true
-                )
-            }
-            val repeatList = getRepeatList(offset = 0)
-            //清空list,防止日志里的内容过多
-            val copy = repeatList.copy(data = emptyList())
-            XLog.v("repeatList: $copy")
-
-            val list = repeatList.data
-            val total = repeatList.count.toIntOrNull() ?: 0
-            _uiState.update {
-                it.copy(
-                    fileList = list,
-                    totalCount = total,
-                    offset = list.size,
-                    isLoadingList = false,
-                    isRefreshing = false,
-                    isListEndReached = list.size >= total || list.isEmpty()
-                )
-            }
+            runCatching {
+                refreshListInternal()
+            }.onFailureToastAndLog()
+            _uiState.update { it.copy(isLoadingList = false, isRefreshing = false) }
         }
-
     }
 
 
@@ -117,22 +124,24 @@ class RepeatFileViewModel : ViewModel() {
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingList = true, isRefreshing = true) }
-            val repeatList = getRepeatList(offset = currentState.offset)
-            val newList = repeatList.data
-            val total = repeatList.count.toIntOrNull() ?: 0
-            _uiState.update { state ->
-                val updatedList = state.fileList + newList
-                state.copy(
-                    fileList = updatedList,
-                    totalCount = total,
-                    offset = updatedList.size,
-                    isLoadingList = false,
-                    isRefreshing = false,
-                    isListEndReached = updatedList.size >= total || newList.isEmpty()
-                )
-            }
+            runCatching {
+                val repeatList = getRepeatList(offset = currentState.offset)
+                val newList = repeatList.data
+                val total = repeatList.count.toIntOrNull() ?: 0
+                _uiState.update { state ->
+                    val updatedList = state.fileList + newList
+                    state.copy(
+                        fileList = updatedList,
+                        totalCount = total,
+                        offset = updatedList.size,
+                        isLoadingList = false,
+                        isRefreshing = false,
+                        isListEndReached = updatedList.size >= total || newList.isEmpty()
+                    )
+                }
+            }.onFailureToastAndLog()
+            _uiState.update { it.copy(isLoadingList = false, isRefreshing = false) }
         }
-
     }
 
 
@@ -144,18 +153,20 @@ class RepeatFileViewModel : ViewModel() {
                     isRefreshing = true
                 )
             }
-            val forceRefresh = repeatService.forceRefresh()
-            XLog.i("forceRefresh: $forceRefresh")
-            val message = if (forceRefresh.state) {
-                "已提交全盘排重请求"
-            } else {
-                forceRefresh.message
-            }
-            App.instance.toast(message)
+            runCatching {
+                val forceRefresh = repeatService.forceRefresh()
+                XLog.i("forceRefresh: $forceRefresh")
+                val message = if (forceRefresh.state) {
+                    "已提交全盘排重请求"
+                } else {
+                    forceRefresh.message
+                }
+                App.instance.toast(message)
 
-            delay(300.milliseconds)
-            refreshList()
-
+                delay(300.milliseconds)
+                refreshListInternal()
+            }.onFailureToastAndLog()
+            _uiState.update { it.copy(isRefreshing = false) }
         }
     }
 
@@ -168,39 +179,45 @@ class RepeatFileViewModel : ViewModel() {
     fun executeDelete(field: String, order: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
-            XLog.i("executeDelete: $field $order")
-            val deleteRepeatFiles = repeatService.deleteRepeatFiles(field, order)
-            XLog.d("deleteRepeatFiles: $deleteRepeatFiles")
+            runCatching {
+                XLog.i("executeDelete: $field $order")
+                val deleteRepeatFiles = repeatService.deleteRepeatFiles(field, order)
+                XLog.d("deleteRepeatFiles: $deleteRepeatFiles")
 
-            val a = if (deleteRepeatFiles.state) {
-                _uiState.update { RepeatUiState() }
-                "去重指令执行成功"
-            } else {
-                deleteRepeatFiles.message
-            }
+                val a = if (deleteRepeatFiles.state) {
+                    _uiState.update { RepeatUiState() }
+                    "去重指令执行成功"
+                } else {
+                    deleteRepeatFiles.message
+                }
 
-            App.instance.toast(a)
+                App.instance.toast(a)
+
+                delay(300.milliseconds)
+                val clearEmpty = repeatService.clearEmpty()
+                XLog.i("clearEmpty: $clearEmpty")
+            }.onFailureToastAndLog()
             _uiState.update { it.copy(isRefreshing = false) }
-
-            delay(300.milliseconds)
-            val clearEmpty = repeatService.clearEmpty()
-            XLog.i("clearEmpty: $clearEmpty")
         }
     }
 
     fun clearEmptyFile() {
         viewModelScope.launch {
-            val clearEmpty = repeatService.clearEmpty()
-            XLog.i("clearEmpty: $clearEmpty")
-            App.instance.toast(clearEmpty.message)
+            runCatching {
+                val clearEmpty = repeatService.clearEmpty()
+                XLog.i("clearEmpty: $clearEmpty")
+                App.instance.toast(clearEmpty.message)
+            }.onFailureToastAndLog()
         }
     }
 
     fun fetchCategoryDetail(cid: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
-            val categoryDetail1 = repeatService.getCategoryDetail(cid)
-            _categoryDetail.value = categoryDetail1
+            runCatching {
+                val categoryDetail1 = repeatService.getCategoryDetail(cid)
+                _categoryDetail.value = categoryDetail1
+            }.onFailureToastAndLog()
             _uiState.update { it.copy(isRefreshing = false) }
         }
     }

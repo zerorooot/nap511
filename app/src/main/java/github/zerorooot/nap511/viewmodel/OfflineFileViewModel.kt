@@ -17,6 +17,7 @@ import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.UserSessionManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -121,29 +122,31 @@ class OfflineFileViewModel : ViewModel() {
         viewModelScope.launch {
             _isRefreshing.value = true
             runCatching {
-                val uid = UserSessionManager.uid
-                val sign = fileRepository.getOfflineSign().sign
+                coroutineScope {
+                    val uid = UserSessionManager.uid
+                    val sign = fileRepository.getOfflineSign().sign
 
-                // 1. 并行发起网络请求并直接在内部处理格式化，减少 refresh 函数内的重置逻辑
-                val infoDeferred = async { fileRepository.getOfflineTaskCount() }
-                val downloadingDeferred =
-                    async { fetchTaskListAndProcess(uid, sign, OfflineTaskType.DownloadingList) }
-                val failedDeferred =
-                    async { fetchTaskListAndProcess(uid, sign, OfflineTaskType.FailedList) }
-                val completedDeferred =
-                    async { fetchTaskListAndProcess(uid, sign, OfflineTaskType.CompletedList) }
+                    // 1. 并行发起网络请求并直接在内部处理格式化，减少 refresh 函数内的重置逻辑
+                    val infoDeferred = async { fileRepository.getOfflineTaskCount() }
+                    val downloadingDeferred =
+                        async { fetchTaskListAndProcess(uid, sign, OfflineTaskType.DownloadingList) }
+                    val failedDeferred =
+                        async { fetchTaskListAndProcess(uid, sign, OfflineTaskType.FailedList) }
+                    val completedDeferred =
+                        async { fetchTaskListAndProcess(uid, sign, OfflineTaskType.CompletedList) }
 
-                // 2. 集中等待结果
-                val downloadingRes = downloadingDeferred.await()
-                val failedRes = failedDeferred.await()
-                val completedRes = completedDeferred.await()
-                val infoRes = infoDeferred.await()
+                    // 2. 集中等待结果
+                    val downloadingRes = downloadingDeferred.await()
+                    val failedRes = failedDeferred.await()
+                    val completedRes = completedDeferred.await()
+                    val infoRes = infoDeferred.await()
 
-                // 3. 分离并统一更新 UI 状态
-                updateTasksState(downloadingRes, failedRes, completedRes)
+                    // 3. 分离并统一更新 UI 状态
+                    updateTasksState(downloadingRes, failedRes, completedRes)
 
-                _offlineInfo.value = infoRes
-            }.onFailureToastAndLog(tag = "OfflineFileViewModel", customMsg = "刷新离线任务列表失败")
+                    _offlineInfo.value = infoRes
+                }
+            }.onFailureToastAndLog(customMsg = "刷新离线任务列表失败")
             _isRefreshing.value = false
         }
     }
@@ -211,7 +214,7 @@ class OfflineFileViewModel : ViewModel() {
                     // 5. 追加新数据并更新页码
                     applyTaskResult(type, res)
                 }
-            }.onFailureToastAndLog(tag = "OfflineFileViewModel", customMsg = "加载下一页失败")
+            }.onFailureToastAndLog(customMsg = "加载下一页失败")
             _isRefreshing.value = false
         }
     }
@@ -285,7 +288,7 @@ class OfflineFileViewModel : ViewModel() {
                 }
             }.onSuccess { message ->
                 App.instance.toast(message)
-            }.onFailureToastAndLog(tag = "OfflineFileViewModel")
+            }.onFailureToastAndLog()
         }
     }
 
@@ -301,7 +304,7 @@ class OfflineFileViewModel : ViewModel() {
                 }
             }.onSuccess { message ->
                 App.instance.toast(message)
-            }.onFailureToastAndLog(tag = "OfflineFileViewModel")
+            }.onFailureToastAndLog()
         }
     }
 
@@ -311,7 +314,7 @@ class OfflineFileViewModel : ViewModel() {
                 fileRepository.quota()
             }.onSuccess { quotaData ->
                 _quotaBean.value = quotaData
-            }.onFailureToastAndLog(tag = "OfflineFileViewModel")
+            }.onFailureToastAndLog()
         }
     }
 
@@ -319,7 +322,7 @@ class OfflineFileViewModel : ViewModel() {
         viewModelScope.launch {
             runCatching {
                 fileRepository.addOfflineTask(list, currentCid, handle)
-            }.onFailureToastAndLog(tag = "OfflineFileViewModel")
+            }.onFailureToastAndLog()
         }
     }
 
@@ -352,7 +355,7 @@ class OfflineFileViewModel : ViewModel() {
                 }
             }.onSuccess { message ->
                 App.instance.toast(message)
-            }.onFailureToastAndLog(tag = "OfflineFileViewModel")
+            }.onFailureToastAndLog()
         }
     }
 }

@@ -61,7 +61,7 @@ internal fun FileViewModel.getZipListFile(
                         isInterrupted = true
                     }
                 }
-            }.onFailureToastAndLog(tag = "FileViewModelZip")
+            }.onFailureToastAndLog()
 
             if (isInterrupted) return@launch
         }
@@ -71,7 +71,7 @@ internal fun FileViewModel.getZipListFile(
         }.onSuccess { zipList ->
             unzipBeanList.value = zipList
             openUnzipDialog()
-        }.onFailureToastAndLog(tag = "FileViewModelZip")
+        }.onFailureToastAndLog()
     }
 }
 
@@ -164,6 +164,6 @@ internal fun FileViewModel.decryptZip(secret: String) {
             } else {
                 App.instance.toast("服务器解压中～")
             }
-        }.onFailureToastAndLog(tag = "FileViewModelZip")
+        }.onFailureToastAndLog()
     }
 }

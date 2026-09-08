@@ -302,7 +302,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
                     fileRepository.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
                 files.fileBeanList = formatFileBeanList(files.fileBeanList)
                 fileListCache[cid] = files
-            }.onFailureToastAndLog(tag = "FileViewModel")
+            }.onFailureToastAndLog()
         }
     }
 
@@ -382,7 +382,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
                     val spaceInfoJson = gson.getAsJsonObject("data").get("space_info")
                     remainingSpace = Gson().fromJson(spaceInfoJson, RemainingSpaceBean::class.java)
                 }
-            }.onFailureToastAndLog(tag = "FileViewModel")
+            }.onFailureToastAndLog()
         }
     }
 
@@ -446,7 +446,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     App.instance.toast("排序失败")
                 }
-            }.onFailureToastAndLog(tag = "FileViewModel")
+            }.onFailureToastAndLog()
         }
     }
 
@@ -542,7 +542,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
                 fileBeanList.clear()
                 fileBeanList.addAll(files.fileBeanList)
                 appBarTitle = "搜索 - $searchKey"
-            }.onFailureToastAndLog(tag = "FileViewModel")
+            }.onFailureToastAndLog()
             _isRefreshing.value = false
         }
     }
@@ -557,7 +557,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
                 fileBeanList.clear()
                 fileBeanList.addAll(files.fileBeanList)
                 appBarTitle = "过滤 - $name"
-            }.onFailureToastAndLog(tag = "FileViewModel")
+            }.onFailureToastAndLog()
             _isRefreshing.value = false
         }
     }

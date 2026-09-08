@@ -50,25 +50,13 @@ class AutoTagInterceptor(
     override fun intercept(log: LogItem): LogItem {
         // 仅当用户未显式调用 XLog.tag("CustomTag") 时，才通过堆栈动态推导
         if (log.tag == defaultTag) {
-            log.tag = resolveCallerTag()
+            val callerTag = resolveCallerTag(
+                defaultTag = defaultTag,
+                ignoredPackages = listOf("com.elvishew.xlog.", "AutoTagInterceptor")
+            )
+            log.tag = if (callerTag == defaultTag) defaultTag else "$callerTag-$defaultTag"
         }
         return log
-    }
-
-    private fun resolveCallerTag(): String {
-        val stackTrace = Throwable().stackTrace
-        val caller = stackTrace.firstOrNull { element ->
-            val className = element.className
-            !className.startsWith("com.elvishew.xlog.") &&
-                    !className.startsWith("java.lang.") &&
-                    !className.startsWith("dalvik.system.") &&
-                    !className.contains("AutoTagInterceptor")
-        } ?: return defaultTag
-
-        // 提取简短类名，去除包名前缀及内部类、匿名类的 '$' 符号
-        val simpleName = caller.className.substringAfterLast('.').substringBefore('$')
-        val tagWithMethod = "$simpleName.${caller.methodName}"
-        return "${tagWithMethod}-$defaultTag"
     }
 }
 

@@ -38,7 +38,7 @@ internal fun FileViewModel.getTorrentTask(sha1: String) {
             torrentTask.torrentFileListWeb.removeIf { f -> f.wanted == -1 }
             torrentTask.fileCount = torrentTask.torrentFileListWeb.size
             torrentBean = torrentTask
-        }.onFailureToastAndLog(tag = "FileViewModelTorrent")
+        }.onFailureToastAndLog()
     }
 }
 
@@ -63,6 +63,6 @@ internal fun FileViewModel.addTorrentTask(
             }
         }.onSuccess { message ->
             App.instance.toast(message)
-        }.onFailureToastAndLog(tag = "FileViewModelTorrent")
+        }.onFailureToastAndLog()
     }
 }
