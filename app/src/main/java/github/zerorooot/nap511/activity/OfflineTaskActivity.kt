@@ -126,7 +126,7 @@ class OfflineTaskActivity : ComponentActivity() {
                             "根目录"
                         ).substringAfterLast("/")
 
-                        App.instance.toast("已添加到链接到’$path‘，共${currentOfflineTaskList.size}个链接，${offlineTime}分钟后开始离线下载")
+                        App.instance.toast("已添加到’$path‘，共${currentOfflineTaskList.size}个链接，${offlineTime}分钟后开始离线下载")
                         addOfflineTaskByTime(currentOfflineTaskList.toList(), offlineTime)
                     } else {
                         App.instance.toast("仅支持以http、ftp、magnet、ed2k开头的链接")

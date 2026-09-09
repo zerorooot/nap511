@@ -260,7 +260,6 @@ fun FileScreen(
 
     fun handleTorrentClick(fileBean: FileBean) {
         fileViewModel.getTorrentTask(fileBean.sha1)
-        fileViewModel.openCreateSelectTorrentFileDialog()
     }
 
     fun handleZipClick(i: Int) {
@@ -609,7 +608,7 @@ private fun FilePathBar(
                 val interactionSource = remember { MutableInteractionSource() }
                 Box {
                     FilterChip(
-                        selected = true,
+                        selected = (index != pathList.size - 1),
                         onClick = {},
                         label = {
                             Text(text = path.name.ifEmpty { "根目录" })

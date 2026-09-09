@@ -3,6 +3,7 @@ package github.zerorooot.nap511.viewmodel
 import android.annotation.SuppressLint
 import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.viewModelScope
+import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.RenameBean
@@ -101,6 +102,7 @@ internal fun FileViewModel.getFileInfo(index: Int) {
             } else {
                 fileRepository.getFileInfo(fileBean.fileId)
             }
+            XLog.d("file ${fileBean.name} fileInfo $fileInfo ; file bean $fileBean")
             openFileInfoDialog()
         }.onFailureToastAndLog()
         _isRefreshing.value = false
@@ -235,7 +237,7 @@ private val TXT_EXTS = setOf(
     "go", "sh", "css", "scss", "sass", "less", "class", "hpp", "cc", "hex", "hxx",
     "cxx", "c++", "cs", "py", "pl", "pm", "md", "cue", "utf", "dpt", "ofd", "eto",
     "ets", "mhtml", "mht", "uof", "dot", "wpt", "dotx", "docm", "dotm", "ett", "xlt",
-    "pptm", "ppsm", "potx", "potm", "csv", "xml", "html", "htm"
+    "pptm", "ppsm", "potx", "potm", "csv", "xml", "html", "htm", "url"
 )
 
 // 2. 改造函数：入参和返回值均为 List，利用 .map() 生成全新的不可变列表

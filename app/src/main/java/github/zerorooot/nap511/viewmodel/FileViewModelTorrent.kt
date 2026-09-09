@@ -11,10 +11,15 @@ import kotlinx.coroutines.launch
 
 internal fun FileViewModel.getTorrentTask(sha1: String) {
     torrentBean = TorrentFileBean()
+    // 命中缓存的情况
     if (torrentBeanCache.contains(sha1)) {
         torrentBean = torrentBeanCache[sha1]!!
+        openCreateSelectTorrentFileDialog()
+        setRefreshingStatus(false)
         return
     }
+
+    // 网络请求的情况
     viewModelScope.launch {
         runCatching {
             val sign = fileRepository.getOfflineSign().sign
@@ -23,7 +28,7 @@ internal fun FileViewModel.getTorrentTask(sha1: String) {
             XLog.d("getTorrentTask torrentTask $torrentTask")
             if (!torrentTask.state) {
                 App.instance.toast(torrentTask.errorMessage)
-                _isRefreshing.value = false
+                setRefreshingStatus(false)
                 return@onSuccess
             }
             torrentTask.fileSizeString = android.text.format.Formatter.formatFileSize(
@@ -38,7 +43,13 @@ internal fun FileViewModel.getTorrentTask(sha1: String) {
             torrentTask.torrentFileListWeb.removeIf { f -> f.wanted == -1 }
             torrentTask.fileCount = torrentTask.torrentFileListWeb.size
             torrentBean = torrentTask
-        }.onFailureToastAndLog()
+
+            // 数据准备完毕后打开对话框并关闭 Loading
+            openCreateSelectTorrentFileDialog()
+            setRefreshingStatus(false)
+        }.onFailure {
+            setRefreshingStatus(false)
+        }
     }
 }
 

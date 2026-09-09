@@ -42,15 +42,15 @@ import github.zerorooot.nap511.screenitem.AutoSizableTextField
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import my.nanihadesuka.compose.LazyColumnScrollbar
+import my.nanihadesuka.compose.ScrollbarSettings
 
 @Composable
 fun CreateSelectTorrentFileDialog(
     torrentBean: TorrentFileBean,
-    onStopRefreshing: () -> Unit,
     enter: (infoHash: String, savePath: String, wanted: String) -> Unit
 ) {
     if (!torrentBean.state) {
-        onStopRefreshing.invoke()
         return
     }
 
@@ -71,7 +71,6 @@ fun CreateSelectTorrentFileDialog(
     if (isSort) {
         torrentFileListWeb.sortByDescending { it.size }
     }
-    onStopRefreshing.invoke()
 
     SelectTorrentFileDialog(
         torrentFileListWeb.toList(), torrentBean.fileCount, torrentBean.fileSizeString
@@ -197,39 +196,46 @@ private fun SelectTorrentFileDialog(
                 minFontSize = 30.sp,
                 maxLines = 2
             )
-            LazyColumn(
-                state = listState
+            LazyColumnScrollbar(
+                state = listState,
+                settings = ScrollbarSettings.Default.copy(
+                    thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
+                )
             ) {
-                itemsIndexed(items = torrentFileListWeb, key = { _, item ->
-                    item.hashCode()
-                }) { index, item ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .selectable(
-                                selected = isSelectedItem(index), onClick = {
-                                    onChangeState(index, item)
-                                }, role = Role.RadioButton
+                LazyColumn(
+                    state = listState
+                ) {
+                    itemsIndexed(items = torrentFileListWeb, key = { _, item ->
+                        item.hashCode()
+                    }) { index, item ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .selectable(
+                                    selected = isSelectedItem(index), onClick = {
+                                        onChangeState(index, item)
+                                    }, role = Role.RadioButton
+                                )
+                                .padding(8.dp)
+                        ) {
+                            Icon(
+                                modifier = Modifier.padding(end = 16.dp),
+                                imageVector = if (isSelectedItem(index)) {
+                                    Icons.Outlined.CheckBox
+                                } else {
+                                    Icons.Outlined.CheckBoxOutlineBlank
+                                },
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
                             )
-                            .padding(8.dp)
-                    ) {
-                        Icon(
-                            modifier = Modifier.padding(end = 16.dp),
-                            imageVector = if (isSelectedItem(index)) {
-                                Icons.Outlined.CheckBox
-                            } else {
-                                Icons.Outlined.CheckBoxOutlineBlank
-                            },
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        DynamicEllipsizedTextView(
-                            text = item.path,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text(
-                            text = item.sizeString, modifier = Modifier.weight(0.5f),
-                        )
+                            DynamicEllipsizedTextView(
+                                text = item.path,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                text = item.sizeString, modifier = Modifier.weight(0.5f),
+                            )
+                        }
                     }
                 }
             }

@@ -269,7 +269,7 @@ fun SettingContent(
                         title = "默认离线保存目录",
                         summary = if (uiState.defaultOfflinePath.isEmpty()) "长按目录可设置为默认位置" else "默认离线位置为: ${uiState.defaultOfflinePath}",
                         value = uiState.defaultOfflineCid,
-                        label = "请输入文件夹CID",
+                        label = "文件夹CID",
                         onValueSave = { onSaveConfig(ConfigKeyUtil.DEFAULT_OFFLINE_CID, it) }
                     )
                 }

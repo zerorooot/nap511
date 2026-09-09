@@ -112,13 +112,13 @@ fun OfflineDownloadScreen(
     }
 
     val onStartDownload = {
-        urlText = ""
-        urlCount = "链接"
         val urlList = handleUrl(urlText)
         if (urlList.isEmpty()) {
             App.instance.toast("请输入下载链接")
         } else {
             onAddTask.invoke(urlList)
+            urlText = ""
+            urlCount = "链接"
         }
     }
 

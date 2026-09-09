@@ -143,7 +143,6 @@ fun CreateDialogs(
             val torrentBean = fileViewModel.torrentBean
             CreateSelectTorrentFileDialog(
                 torrentBean,
-                { fileViewModel.setRefreshingStatus(false) }
             ) { infoHash, savePath, wanted ->
                 fileViewModel.closeCreateSelectTorrentFileDialog()
                 if (wanted.isEmpty()) {
