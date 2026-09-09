@@ -145,7 +145,7 @@ fun FileCellItem(
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                      //  horizontalArrangement = Arrangement.spacedBy(6.dp), // 明确间距
+                        //  horizontalArrangement = Arrangement.spacedBy(6.dp), // 明确间距
                         modifier = Modifier
                             .padding(start = 5.dp, top = 9.dp)
                             .fillMaxSize()
@@ -187,12 +187,12 @@ fun FileCellItem(
 
                 val dispatchMenuClick: (String, Int) -> Unit = { name, _ ->
                     when (name) {
-                        "剪切" -> onCut?.invoke(index)
+                        "剪切文件" -> onCut?.invoke(index)
                         "删除文件" -> onDelete?.invoke(index)
-                        "重命名" -> onRename?.invoke(index)
+                        "重新命名" -> onRename?.invoke(index)
                         "文件信息" -> onFileInfo?.invoke(index)
-                        "通过aria2下载" -> onAria2Download?.invoke(index)
-                        "强行打开为" -> onForceOpen?.invoke(index)
+                        "Aria2下载" -> onAria2Download?.invoke(index)
+                        "强行打开" -> onForceOpen?.invoke(index)
                     }
                 }
                 FileMoreMenu(onClick = dispatchMenuClick)

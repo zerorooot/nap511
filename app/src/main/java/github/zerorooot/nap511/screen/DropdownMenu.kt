@@ -113,11 +113,11 @@ private fun MyDropdownMenu(
 @Composable
 fun FileMoreMenu(onClick: (String, Int) -> Unit) {
     val listOf = listOf(
-        DropdownMenuItemSpec("剪切", Icons.Outlined.ContentCut),
-        DropdownMenuItemSpec("重命名", Icons.Outlined.Edit),
+        DropdownMenuItemSpec("剪切文件", Icons.Outlined.ContentCut),
+        DropdownMenuItemSpec("重新命名", Icons.Outlined.Edit),
         DropdownMenuItemSpec("文件信息", Icons.Outlined.Info),
-        DropdownMenuItemSpec("强行打开为", Icons.AutoMirrored.Outlined.OpenInNew),
-        DropdownMenuItemSpec("通过aria2下载", Icons.Outlined.Download),
+        DropdownMenuItemSpec("强行打开", Icons.AutoMirrored.Outlined.OpenInNew),
+        DropdownMenuItemSpec("Aria2下载", Icons.Outlined.Download),
         DropdownMenuItemSpec("删除文件", Icons.Outlined.Delete, isDestructive = true)
     )
     BaseMoreMenu(listOf, onClick)
