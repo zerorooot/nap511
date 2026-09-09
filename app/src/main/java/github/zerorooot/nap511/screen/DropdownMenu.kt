@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.VerticalAlignBottom
 import androidx.compose.material.icons.outlined.VerticalAlignTop
 import androidx.compose.material3.DropdownMenu
@@ -199,6 +200,18 @@ fun RepeatFileTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
         DropdownMenuItemSpec("开始查重", Icons.Outlined.FindInPage),
         DropdownMenuItemSpec("一键去重", Icons.Outlined.AutoFixHigh),
         DropdownMenuItemSpec("删空文件", Icons.Outlined.Delete, isDestructive = true)
+    )
+    BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
+}
+
+@Composable
+fun HtmlWebViewTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
+    val listOf = listOf(
+        DropdownMenuItemSpec("页面刷新", Icons.Outlined.Refresh),
+        DropdownMenuItemSpec("页内查找", Icons.Outlined.FindInPage),
+        DropdownMenuItemSpec("外部打开", Icons.AutoMirrored.Outlined.OpenInNew),
+        DropdownMenuItemSpec("分享链接", Icons.Outlined.Share),
+        DropdownMenuItemSpec("修改编码", Icons.Outlined.Translate)
     )
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }

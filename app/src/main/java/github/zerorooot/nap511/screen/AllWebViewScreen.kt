@@ -55,6 +55,28 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
 @SuppressLint("SetJavaScriptEnabled")
+fun WebView.applyDefaultSettings() {
+    settings.apply {
+        javaScriptEnabled = true
+        loadWithOverviewMode = true
+        useWideViewPort = true
+        javaScriptCanOpenWindowsAutomatically = true
+        setSupportZoom(true)
+        builtInZoomControls = true
+        displayZoomControls = false
+        domStorageEnabled = true
+        databaseEnabled = true
+        textZoom = 100
+        cacheMode = WebSettings.LOAD_NO_CACHE
+        mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+        mediaPlaybackRequiresUserGesture = false
+        allowFileAccess = true
+        allowContentAccess = true
+    }
+    settings.userAgentString = ConfigKeyUtil.USER_AGENT
+}
+
+@SuppressLint("SetJavaScriptEnabled")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BaseWebViewScreen(
@@ -94,25 +116,7 @@ fun BaseWebViewScreen(
                     WebView(context).apply {
                         webViewInstance = this
                         this.webViewClient = webViewClient.invoke(this)
-                        settings.apply {
-                            javaScriptEnabled = true
-                            loadWithOverviewMode = true
-                            useWideViewPort = true
-                            javaScriptCanOpenWindowsAutomatically = true
-                            setSupportZoom(true)
-                            builtInZoomControls = true
-                            displayZoomControls = false
-                            domStorageEnabled = true
-                            databaseEnabled = true
-                            textZoom = 100
-                            cacheMode = WebSettings.LOAD_NO_CACHE
-                            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                            // 关键：桌面版可能需要这些
-                            mediaPlaybackRequiresUserGesture = false
-                            allowFileAccess = true
-                            allowContentAccess = true
-                        }
-                        settings.userAgentString = ConfigKeyUtil.USER_AGENT
+                        applyDefaultSettings()
                         CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
                         webChromeClient = object : WebChromeClient() {

@@ -80,6 +80,9 @@ import androidx.compose.ui.platform.nativeClipboardManager
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.annotation.ExperimentalCoilApi
+import coil.imageLoader
+import coil.memory.MemoryCache
 import com.google.gson.Gson
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
@@ -100,13 +103,13 @@ import github.zerorooot.nap511.viewmodel.cut
 import github.zerorooot.nap511.viewmodel.delete
 import github.zerorooot.nap511.viewmodel.deleteMultiple
 import github.zerorooot.nap511.viewmodel.downloadText
+import github.zerorooot.nap511.viewmodel.downloadWeb
 import github.zerorooot.nap511.viewmodel.getFileInfo
 import github.zerorooot.nap511.viewmodel.getTorrentTask
 import github.zerorooot.nap511.viewmodel.getVideoInfo
 import github.zerorooot.nap511.viewmodel.getZipListFile
 import github.zerorooot.nap511.viewmodel.openAria2Dialog
 import github.zerorooot.nap511.viewmodel.openCreateFolderDialog
-import github.zerorooot.nap511.viewmodel.openCreateSelectTorrentFileDialog
 import github.zerorooot.nap511.viewmodel.openFileOrderDialog
 import github.zerorooot.nap511.viewmodel.openRenameFileDialog
 import github.zerorooot.nap511.viewmodel.openSearchDialog
@@ -124,7 +127,7 @@ import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 
 @OptIn(
     ExperimentalFoundationApi::class,
-    ExperimentalMaterial3Api::class
+    ExperimentalMaterial3Api::class, ExperimentalCoilApi::class
 )
 @Composable
 fun FileScreen(
@@ -142,6 +145,7 @@ fun FileScreen(
     val refreshing = uiState.isRefreshing
     val context = LocalContext.current
     var showDialog by rememberSaveable { mutableIntStateOf(-1) }
+    val imageLoader = context.imageLoader
 
     val listLocation = fileViewModel.getListLocation(path)
     val listState = key(path) {
@@ -267,14 +271,26 @@ fun FileScreen(
         fileViewModel.getZipListFile()
     }
 
-    fun handleTextClick(i: Int, fileBean: FileBean) {
+    fun checkAndDownloadFile(i: Int, fileBean: FileBean, action: () -> Unit) {
         val txtSize = uiState.maxTxtSizeStr.toIntOrNull() ?: 200
         if (fileBean.size.toLong() < txtSize * 1024) {
             fileViewModel.selectIndex = i
-            fileViewModel.downloadText(fileBean, onNav)
+            action()
         } else {
             fileViewModel.setRefreshingStatus(false)
             App.instance.toast("仅支持打开${txtSize}kb以下的文件")
+        }
+    }
+
+    fun handleTextClick(i: Int, fileBean: FileBean) {
+        checkAndDownloadFile(i, fileBean) {
+            fileViewModel.downloadText(fileBean, onNav)
+        }
+    }
+
+    fun handleWebClick(i: Int, fileBean: FileBean) {
+        checkAndDownloadFile(i, fileBean) {
+            fileViewModel.downloadWeb(fileBean, onNav)
         }
     }
 
@@ -305,6 +321,10 @@ fun FileScreen(
 
                     ForceOpenType.TEXT -> {
                         handleTextClick(showDialog, bean)
+                    }
+
+                    ForceOpenType.WEB -> {
+                        handleWebClick(showDialog, bean)
                     }
 
                     ForceOpenType.ARCHIVE -> {
@@ -350,6 +370,7 @@ fun FileScreen(
                 fileBean.fileIco == R.drawable.torrent -> handleTorrentClick(fileBean)
                 fileBean.fileIco == R.drawable.zip -> handleZipClick(i)
                 fileBean.fileIco == R.drawable.txt -> handleTextClick(i, fileBean)
+                fileBean.fileIco == R.drawable.web -> handleWebClick(i, fileBean)
                 fileBean.fileIco == R.drawable.mp3 -> handleAudioClick(fileBean)
                 fileBean.photoThumb.isNotEmpty() -> handlePhotoClick(fileBean)
                 else -> fileViewModel.setRefreshingStatus(false)
@@ -549,7 +570,14 @@ fun FileScreen(
                 gridCellMinSize = gridCellMinSize,
                 isExpandedScreen = isExpandedScreen,
                 clickIndex = fileViewModel.clickMap.getOrDefault(path, -1),
-                onRefresh = { fileViewModel.refresh() },
+                onRefresh = {
+                    //手动清除对应 image fileId 的内存和磁盘缓存，触发重新下载
+                    fileViewModel.fileBeanList.forEach { fileBean->
+                        imageLoader.memoryCache?.remove(MemoryCache.Key(fileBean.fileId))
+                        imageLoader.diskCache?.remove(fileBean.fileId)
+                    }
+                    fileViewModel.refresh()
+                },
                 onItemClick = ::myItemOnClick,
                 onItemLongClick = ::itemOnLongClick,
                 onCut = { fileViewModel.cut(it) },

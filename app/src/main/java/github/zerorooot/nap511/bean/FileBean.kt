@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -26,6 +27,7 @@ enum class ForceOpenType(
     AUDIO("音频", Icons.Default.AudioFile),
     IMAGE("图像", Icons.Default.Image),
     TEXT("文本", Icons.Default.Description),
+    WEB("网页", Icons.Default.Language),
     ARCHIVE("压缩", Icons.Default.FolderZip),
     TORRENT("种子", Icons.AutoMirrored.Filled.InsertDriveFile)
 }

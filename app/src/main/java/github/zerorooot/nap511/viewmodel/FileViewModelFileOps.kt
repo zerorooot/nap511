@@ -237,7 +237,10 @@ private val TXT_EXTS = setOf(
     "go", "sh", "css", "scss", "sass", "less", "class", "hpp", "cc", "hex", "hxx",
     "cxx", "c++", "cs", "py", "pl", "pm", "md", "cue", "utf", "dpt", "ofd", "eto",
     "ets", "mhtml", "mht", "uof", "dot", "wpt", "dotx", "docm", "dotm", "ett", "xlt",
-    "pptm", "ppsm", "potx", "potm", "csv", "xml", "html", "htm", "url"
+    "pptm", "ppsm", "potx", "potm", "csv", "xml", "url"
+)
+private val HTML_EXTS = setOf(
+    "html", "htm"
 )
 
 // 2. 改造函数：入参和返回值均为 List，利用 .map() 生成全新的不可变列表
@@ -296,6 +299,7 @@ internal fun FileViewModel.formatFileBeanList(fileBeanList: List<FileBean>): Arr
                 R.drawable.mp4
             }
 
+            fileBean.icoString in HTML_EXTS -> R.drawable.web
             fileBean.icoString in ZIP_EXTS -> R.drawable.zip
             fileBean.icoString in IMG_EXTS -> R.drawable.png
             fileBean.icoString in TXT_EXTS -> R.drawable.txt

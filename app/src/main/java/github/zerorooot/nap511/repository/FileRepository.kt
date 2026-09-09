@@ -25,12 +25,12 @@ import github.zerorooot.nap511.service.OfflineService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.util.NetworkClient
 import github.zerorooot.nap511.util.Sha1Util
 import github.zerorooot.nap511.util.UserSessionManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import okhttp3.FormBody
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
 import java.io.InputStream
@@ -438,7 +438,7 @@ class FileRepository {
 
     fun getDownloadUrl(pickCode: String, fileId: String): String? {
         val sha1Util = Sha1Util()
-        val okHttpClient = github.zerorooot.nap511.util.NetworkClient.sharedOkHttpClient
+        val okHttpClient = NetworkClient.sharedOkHttpClient
         val tm = System.currentTimeMillis() / 1000
         val m115Encode = sha1Util.m115_encode(pickCode, tm)
         val map = FormBody.Builder().add("data", m115Encode.data).build()
@@ -476,7 +476,7 @@ class FileRepository {
         pickCode: String, fileId: String
     ): InputStream? {
         val downloadUrl = getDownloadUrl(pickCode, fileId) ?: return null
-        val okHttpClient = github.zerorooot.nap511.util.NetworkClient.sharedOkHttpClient
+        val okHttpClient = NetworkClient.sharedOkHttpClient
         val requestDownload: Request =
             Request.Builder().url(downloadUrl).addHeader("cookie", UserSessionManager.cookie)
                 .addHeader("Content-Type", "application/x-www-form-urlencoded").addHeader(

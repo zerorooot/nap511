@@ -82,6 +82,7 @@ import github.zerorooot.nap511.screen.OfflineFileScreen
 import github.zerorooot.nap511.screen.RecycleScreen
 import github.zerorooot.nap511.screen.RepeatFileScreen
 import github.zerorooot.nap511.screen.SettingScreen
+import github.zerorooot.nap511.screen.HtmlWebViewScreen
 import github.zerorooot.nap511.screen.TxtReaderScreen
 import github.zerorooot.nap511.screen.WebViewScreen
 import github.zerorooot.nap511.screenitem.Avatar
@@ -633,6 +634,26 @@ class MainActivity : AppCompatActivity() {
                     composable<Route.MusicDetail> {
                         MusicDetailScreen(audioViewModel) {
                             navController.popBackStack()
+                        }
+                    }
+
+                    composable<Route.HtmlWebViewScreen> {
+                        val byteArray = fileViewModel.webBodyByteArray
+                        val fileBean =
+                            fileViewModel.fileBeanList.getOrNull(fileViewModel.selectIndex)
+
+                        LaunchedEffect(byteArray) {
+                            if (byteArray == null) {
+                                navController.popBackStack()
+                            }
+                        }
+
+                        if (byteArray != null) {
+                            navGesturesEnabled = false
+                            HtmlWebViewScreen(byteArray, title = fileBean?.name ?: "网页") {
+                                navGesturesEnabled = true
+                                navController.popBackStack()
+                            }
                         }
                     }
 

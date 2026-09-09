@@ -3,6 +3,7 @@ package github.zerorooot.nap511.screen
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -49,23 +50,34 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import github.zerorooot.nap511.ui.theme.Typography
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppTopBarNormal(title: String, onClick: (name: String) -> Unit) {
-//    val contextForToast = LocalContext.current.applicationContext
+fun BaseTopAppBar(
+    title: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    navigationIcon: @Composable () -> Unit = {},
+    actions: @Composable RowScope.() -> Unit = {},
+) {
     TopAppBar(
+        title = title,
+        modifier = modifier,
+        navigationIcon = navigationIcon,
+        actions = actions,
         windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
-        title = {
-            Text(text = title)
-        },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
             titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        ),
+        )
+    )
+}
+
+@Composable
+fun AppTopBarNormal(title: String, onClick: (name: String) -> Unit) {
+    BaseTopAppBar(
+        title = { Text(text = title) },
         navigationIcon = {
             TopAppBarActionButton(
                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
@@ -75,7 +87,6 @@ fun AppTopBarNormal(title: String, onClick: (name: String) -> Unit) {
             }
         },
         actions = {
-            // search icon
             TopAppBarActionButton(
                 imageVector = Icons.Rounded.Search,
                 description = "Search"
@@ -89,24 +100,14 @@ fun AppTopBarNormal(title: String, onClick: (name: String) -> Unit) {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppTopBarMultiple(
     title: String,
     isExpandedScreen: Boolean = false,
     onClick: (String) -> Unit
 ) {
-    TopAppBar(
-        windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
-        title = {
-            Text(text = title)
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        ),
+    BaseTopAppBar(
+        title = { Text(text = title) },
         navigationIcon = {
             IconButton(onClick = { onClick.invoke("back") }) {
                 Icon(
@@ -218,21 +219,10 @@ private fun TopAppBarActionTextButton(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppTopBarOfflineFile(title: String, onClick: (name: String) -> Unit) {
-//    val contextForToast = LocalContext.current.applicationContext
-    TopAppBar(
-        windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
-        title = {
-            Text(text = title)
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        ),
+    BaseTopAppBar(
+        title = { Text(text = title) },
         navigationIcon = {
             TopAppBarActionButton(
                 imageVector = Icons.Rounded.Menu,
@@ -249,21 +239,10 @@ fun AppTopBarOfflineFile(title: String, onClick: (name: String) -> Unit) {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppTopBarLogScreen(title: String, onClick: (name: String) -> Unit) {
-//    val contextForToast = LocalContext.current.applicationContext
-    TopAppBar(
-        windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
-        title = {
-            Text(text = title)
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        ),
+    BaseTopAppBar(
+        title = { Text(text = title) },
         navigationIcon = {
             TopAppBarActionButton(
                 imageVector = Icons.Rounded.Menu,
@@ -286,20 +265,10 @@ fun AppTopBarLogScreen(title: String, onClick: (name: String) -> Unit) {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppTopBarRepeatFile(title: String, onClick: (name: String) -> Unit) {
-    TopAppBar(
-        windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
-        title = {
-            Text(text = title)
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        ),
+    BaseTopAppBar(
+        title = { Text(text = title) },
         navigationIcon = {
             TopAppBarActionButton(
                 imageVector = Icons.Rounded.Menu,
@@ -316,20 +285,10 @@ fun AppTopBarRepeatFile(title: String, onClick: (name: String) -> Unit) {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppTopBarRecycle(title: String, onClick: (name: String) -> Unit) {
-    TopAppBar(
-        windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
-        title = {
-            Text(text = title)
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        ),
+    BaseTopAppBar(
+        title = { Text(text = title) },
         navigationIcon = {
             TopAppBarActionButton(
                 imageVector = Icons.Rounded.Menu,
@@ -365,12 +324,9 @@ fun TopAppBarActionButton(
         if (painter != null) {
             Icon(painter = painter, contentDescription = description)
         }
-
     }
 }
 
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopAppBarTxtReaderNormal(
     title: String,
@@ -383,8 +339,7 @@ fun TopAppBarTxtReaderNormal(
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    TopAppBar(
-        windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
+    BaseTopAppBar(
         modifier = modifier,
         title = {
             Column {
@@ -421,17 +376,10 @@ fun TopAppBarTxtReaderNormal(
             IconButton(onClick = onSettingsClick) {
                 Icon(Icons.Default.Settings, contentDescription = "阅读设置")
             }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        )
+        }
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopAppBarSearch(
     searchQuery: String,
@@ -445,8 +393,7 @@ fun TopAppBarSearch(
     placeholderText: String = "搜索...",
     focusRequester: FocusRequester
 ) {
-    TopAppBar(
-        windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
+    BaseTopAppBar(
         modifier = modifier,
         title = {
             TextField(
@@ -490,17 +437,10 @@ fun TopAppBarSearch(
             ) {
                 Icon(Icons.Default.KeyboardArrowDown, contentDescription = "下一个")
             }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        )
+        }
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopAppBarTxtReaderSearch(
     searchQuery: String,
@@ -526,4 +466,3 @@ fun TopAppBarTxtReaderSearch(
         focusRequester = focusRequester
     )
 }
-
