@@ -86,7 +86,7 @@ internal fun FileViewModel.updateVideoFileBean(
             if (!videoHistory.state) {
                 App.instance.toast(videoHistory.error)
                 XLog.e("更新视频时间失败！ $videoHistory")
-            }else{
+            } else {
                 XLog.d("更新视频时间 $videoHistory")
             }
         }.onFailureToastAndLog()
@@ -97,11 +97,19 @@ internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int, fi
     viewModelScope.launch {
         val isAutoRotate = DataStoreUtil.getDataSuspend(ConfigKeyUtil.AUTO_ROTATE, false)
         val videoLinkMode = DataStoreUtil.getDataSuspend(ConfigKeyUtil.VIDEO_LINK_MODE, false)
+        val autoJumpRetry = DataStoreUtil.getDataSuspend(ConfigKeyUtil.AUTO_JUMP_RETRY, true)
+        val hideLoading = DataStoreUtil.getDataSuspend(ConfigKeyUtil.HIDE_LOADING_VIEW, false)
 
         runCatching {
             val video = if (videoLinkMode) {
                 fileRepository.video(pickCode)
-                    .copy(index = fileBeanIndex, isAutoRotate = isAutoRotate)
+                    .copy(
+                        index = fileBeanIndex,
+                        isAutoRotate = isAutoRotate,
+                        videoLinkMode = true,
+                        autoJumpRetry = autoJumpRetry,
+                        hideLoading = hideLoading
+                    )
             } else {
                 val (width, height) = if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
                     1080 to 1920
@@ -114,6 +122,9 @@ internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int, fi
                     index = fileBeanIndex,
                     fileName = fileName,
                     pickCode = pickCode,
+                    videoLinkMode = false,
+                    autoJumpRetry = autoJumpRetry,
+                    hideLoading = hideLoading,
                     videoUrl = "http://115.com/api/video/m3u8/${pickCode}.m3u8"
                 )
             }

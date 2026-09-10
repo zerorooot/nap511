@@ -227,19 +227,19 @@ class VideoActivity : AppCompatActivity() {
         videoInfo.isAutoRotate
     }
 
-
-    private var videoLinkMode = false
-    private var autoJumpRetry = true
+    private val videoLinkMode by lazy {
+        videoInfo.videoLinkMode
+    }
+    private val autoJumpRetry by lazy {
+        videoInfo.autoJumpRetry
+    }
+    private val hideLoading by lazy {
+        videoInfo.hideLoading
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        lifecycleScope.launch {
-            videoLinkMode = DataStoreUtil.getDataSuspend(ConfigKeyUtil.VIDEO_LINK_MODE, false)
-            autoJumpRetry = DataStoreUtil.getDataSuspend(ConfigKeyUtil.AUTO_JUMP_RETRY, true)
-            val hideLoading = DataStoreUtil.getDataSuspend(ConfigKeyUtil.HIDE_LOADING_VIEW, false)
-            videoPlayer.setHideLoadingView(hideLoading)
-        }
         setContentView(R.layout.activity_video)
         val headerMap = hashMapOf(
             "cookie" to UserSessionManager.cookie,
@@ -250,6 +250,7 @@ class VideoActivity : AppCompatActivity() {
         }
         val title = videoInfo.fileName
         videoPlayer = findViewById(R.id.pre_video_player)
+        videoPlayer.setHideLoadingView(hideLoading)
 
         initGSYExoPlayerWithOkHttp(this.applicationContext)
         PlayerFactory.setPlayManager(Exo2PlayerManager::class.java)

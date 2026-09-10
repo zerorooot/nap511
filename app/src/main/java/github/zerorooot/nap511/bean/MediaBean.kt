@@ -26,8 +26,12 @@ data class VideoInfoBean(
     @SerializedName("user_rotate") var userRotate: Int = 0,
     @SerializedName("user_turn") var userTurn: Int = 0,
     @SerializedName("origin_file_url") var originFileUrl: String = "",
-    var index: Int = -1,
-    var isAutoRotate: Boolean = false,
+    val index: Int = -1,
+    val isAutoRotate: Boolean = false,
+    val videoLinkMode: Boolean = false,
+    val autoJumpRetry: Boolean = true,
+    val hideLoading: Boolean = false,
+
     @SerializedName("download_url")
     private val rawDownloadUrl: Any? = null
 ) {
