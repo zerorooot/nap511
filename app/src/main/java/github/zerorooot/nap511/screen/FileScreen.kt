@@ -93,6 +93,7 @@ import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.dialog.ForceOpenDialog
 import github.zerorooot.nap511.screenitem.FileCellItem
+import github.zerorooot.nap511.screenitem.ImageCellItem
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
@@ -144,7 +145,8 @@ fun FileScreen(
     val path = uiState.path
     val refreshing = uiState.isRefreshing
     val context = LocalContext.current
-    var showDialog by rememberSaveable { mutableIntStateOf(-1) }
+    var showForceOpenDialog by rememberSaveable { mutableIntStateOf(-1) }
+    var isImagePreviewMode by rememberSaveable { mutableStateOf(false) }
     val imageLoader = context.imageLoader
 
     val listLocation = fileViewModel.getListLocation(path)
@@ -295,20 +297,20 @@ fun FileScreen(
     }
 
 
-    if (showDialog != -1) {
-        val bean = fileViewModel.fileBeanList[showDialog]
+    if (showForceOpenDialog != -1) {
+        val bean = fileViewModel.fileBeanList[showForceOpenDialog]
         if (bean.isFolder) {
             App.instance.toast("此功能仅支持文件，不支持文件夹")
-            showDialog = -1
+            showForceOpenDialog = -1
         } else {
             ForceOpenDialog(
                 bean.name,
-                onDismissRequest = { showDialog = -1 },
+                onDismissRequest = { showForceOpenDialog = -1 },
             ) {
                 fileViewModel.setRefreshingStatus(true)
                 when (it) {
                     ForceOpenType.VIDEO -> {
-                        handleVideoClick(showDialog, bean)
+                        handleVideoClick(showForceOpenDialog, bean)
                     }
 
                     ForceOpenType.AUDIO -> {
@@ -320,15 +322,15 @@ fun FileScreen(
                     }
 
                     ForceOpenType.TEXT -> {
-                        handleTextClick(showDialog, bean)
+                        handleTextClick(showForceOpenDialog, bean)
                     }
 
                     ForceOpenType.WEB -> {
-                        handleWebClick(showDialog, bean)
+                        handleWebClick(showForceOpenDialog, bean)
                     }
 
                     ForceOpenType.ARCHIVE -> {
-                        handleZipClick(showDialog)
+                        handleZipClick(showForceOpenDialog)
                     }
 
                     ForceOpenType.TORRENT -> {
@@ -357,7 +359,7 @@ fun FileScreen(
             fileViewModel.setRefreshingStatus(true)
 
             //记录上级目录当前的位置
-            if (isExpandedScreen) {
+            if (isExpandedScreen || isImagePreviewMode) {
                 fileViewModel.setListLocationAndClickCache(i, gridState)
             } else {
                 fileViewModel.setListLocationAndClickCache(i, listState)
@@ -397,7 +399,7 @@ fun FileScreen(
             return
         }
         if (path != "/根目录" && !fileViewModel.isLongClickState) {
-            if (isExpandedScreen) {
+            if (isExpandedScreen || isImagePreviewMode) {
                 fileViewModel.setListLocation(path, gridState)
             } else {
                 fileViewModel.setListLocation(path, listState)
@@ -419,11 +421,15 @@ fun FileScreen(
                 onBack()
             }
 
+            "图片预览" -> {
+                isImagePreviewMode = !isImagePreviewMode
+            }
+
             "视频时间" -> {
                 scope.launch {
                     fileViewModel.fileBeanList.sortByDescending { fileBean -> fileBean.playLong }
                     delay(10.milliseconds)
-                    if (isExpandedScreen) {
+                    if (isExpandedScreen || isImagePreviewMode) {
                         gridState.requestScrollToItem(0, 0)
                     } else {
                         listState.requestScrollToItem(0, 0)
@@ -531,7 +537,7 @@ fun FileScreen(
                 },
                 onPathDoubleClick = {
                     scope.launch {
-                        if (isExpandedScreen) {
+                        if (isExpandedScreen || isImagePreviewMode) {
                             gridState.requestScrollToItem(0, 0)
                         } else {
                             listState.requestScrollToItem(0, 0)
@@ -569,10 +575,11 @@ fun FileScreen(
                 gridState = gridState,
                 gridCellMinSize = gridCellMinSize,
                 isExpandedScreen = isExpandedScreen,
+                isImagePreviewMode = isImagePreviewMode,
                 clickIndex = fileViewModel.clickMap.getOrDefault(path, -1),
                 onRefresh = {
                     //手动清除对应 image fileId 的内存和磁盘缓存，触发重新下载
-                    fileViewModel.fileBeanList.forEach { fileBean->
+                    fileViewModel.fileBeanList.forEach { fileBean ->
                         imageLoader.memoryCache?.remove(MemoryCache.Key(fileBean.fileId))
                         imageLoader.diskCache?.remove(fileBean.fileId)
                     }
@@ -591,7 +598,7 @@ fun FileScreen(
                     fileViewModel.getFileInfo(index)
                 },
                 onAria2Download = ::onMenuAria2Download,
-                onForceOpen = { index -> showDialog = index }
+                onForceOpen = { index -> showForceOpenDialog = index }
             )
         }
     }
@@ -728,7 +735,8 @@ private fun FileListContent(
     onFileInfo: (Int) -> Unit,
     onAria2Download: (Int) -> Unit,
     onForceOpen: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isImagePreviewMode: Boolean = false
 ) {
     PullToRefreshBox(
         isRefreshing = refreshing,
@@ -745,8 +753,8 @@ private fun FileListContent(
                 Text("暂无文件")
             }
         } else {
-            key(path) {
-                if (isExpandedScreen) {
+            key(path, isImagePreviewMode) {
+                if (isExpandedScreen || isImagePreviewMode) {
                     LazyVerticalGridScrollbar(
                         state = gridState,
                         settings = ScrollbarSettings.Default.copy(
@@ -765,23 +773,38 @@ private fun FileListContent(
                                     item.fileId.ifEmpty { item.categoryId.ifEmpty { item.pickCode } }
                                 },
                             ) { index, item ->
-                                FileCellItem(
-                                    fileBean = item,
-                                    index = index,
-                                    clickIndex = clickIndex,
-                                    modifier = Modifier.animateItem(
-                                        fadeInSpec = null,
-                                        fadeOutSpec = null
-                                    ),
-                                    itemOnClick = onItemClick,
-                                    itemOnLongClick = onItemLongClick,
-                                    onCut = onCut,
-                                    onDelete = onDelete,
-                                    onRename = onRename,
-                                    onFileInfo = onFileInfo,
-                                    onForceOpen = onForceOpen,
-                                    onAria2Download = onAria2Download
-                                )
+                                if (isImagePreviewMode) {
+                                    ImageCellItem(
+                                        fileBean = item,
+                                        index = index,
+                                        gridCellMinSize = gridCellMinSize,
+                                        clickIndex = clickIndex,
+                                        modifier = Modifier.animateItem(
+                                            fadeInSpec = null,
+                                            fadeOutSpec = null
+                                        ),
+                                        itemOnClick = onItemClick,
+                                        itemOnLongClick = onItemLongClick
+                                    )
+                                } else {
+                                    FileCellItem(
+                                        fileBean = item,
+                                        index = index,
+                                        clickIndex = clickIndex,
+                                        modifier = Modifier.animateItem(
+                                            fadeInSpec = null,
+                                            fadeOutSpec = null
+                                        ),
+                                        itemOnClick = onItemClick,
+                                        itemOnLongClick = onItemLongClick,
+                                        onCut = onCut,
+                                        onDelete = onDelete,
+                                        onRename = onRename,
+                                        onFileInfo = onFileInfo,
+                                        onForceOpen = onForceOpen,
+                                        onAria2Download = onAria2Download
+                                    )
+                                }
                             }
                         }
                     }

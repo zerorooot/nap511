@@ -21,6 +21,7 @@ import androidx.compose.material.icons.outlined.DoneAll
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FindInPage
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Restore
@@ -163,6 +164,7 @@ fun BaseMoreMenu(listOf: List<DropdownMenuItemSpec>, onClick: (String, Int) -> U
 @Composable
 fun FileAppTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
     val listOf = listOf(
+        DropdownMenuItemSpec("大图模式", Icons.Outlined.Image),
         DropdownMenuItemSpec("缓存清空", Icons.Outlined.CleaningServices),
         DropdownMenuItemSpec("文件排序", Icons.AutoMirrored.Outlined.Sort),
         DropdownMenuItemSpec("刷新文件", Icons.Outlined.Refresh),
@@ -209,7 +211,6 @@ fun HtmlWebViewTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
     val listOf = listOf(
         DropdownMenuItemSpec("页面刷新", Icons.Outlined.Refresh),
         DropdownMenuItemSpec("页内查找", Icons.Outlined.FindInPage),
-        DropdownMenuItemSpec("外部打开", Icons.AutoMirrored.Outlined.OpenInNew),
         DropdownMenuItemSpec("分享链接", Icons.Outlined.Share),
         DropdownMenuItemSpec("修改编码", Icons.Outlined.Translate)
     )
