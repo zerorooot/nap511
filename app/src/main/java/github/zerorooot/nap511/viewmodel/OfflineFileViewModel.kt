@@ -11,9 +11,9 @@ import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.OfflineTaskType
 import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.repository.FileRepository
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.UserSessionManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.async
@@ -343,7 +343,7 @@ class OfflineFileViewModel : ViewModel() {
         viewModelScope.launch {
             runCatching {
                 val map = hashMapOf("hash[0]" to offlineTask.infoHash)
-                map["uid"] = DataStoreUtil.getDataSuspend(ConfigKeyUtil.UID, "")
+                map["uid"] = SettingsRepository.getDataSuspend(ConfigKeyUtil.UID, "")
                 map["sign"] = fileRepository.getOfflineSign().sign
                 map["time"] = (System.currentTimeMillis() / 1000).toString()
                 val deleteTask = fileRepository.deleteOfflineTask(map)

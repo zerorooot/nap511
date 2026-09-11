@@ -79,6 +79,8 @@ import github.zerorooot.nap511.screen.LoginScreen
 import github.zerorooot.nap511.screen.MusicDetailScreen
 import github.zerorooot.nap511.screen.MyPhotoScreen
 import github.zerorooot.nap511.screen.OfflineDownloadScreen
+import github.zerorooot.nap511.bean.SettingUiState
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.screen.OfflineFileScreen
 import github.zerorooot.nap511.screen.RecycleScreen
 import github.zerorooot.nap511.screen.RepeatFileScreen
@@ -89,7 +91,6 @@ import github.zerorooot.nap511.screenitem.Avatar
 import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
@@ -108,10 +109,10 @@ class MainActivity : AppCompatActivity() {
         initializeViewTreeOwners()
         enableEdgeToEdge()
         setContent {
-            val dynamicColor by DataStoreUtil.getDataFlow(ConfigKeyUtil.DYNAMIC_COLOR, true)
-                .collectAsStateWithLifecycle(initialValue = true)
-            val themeMode by DataStoreUtil.getDataFlow(ConfigKeyUtil.THEME_MODE, "跟随系统")
-                .collectAsStateWithLifecycle(initialValue = "跟随系统")
+            val settingUiState by SettingsRepository.getInstance().settingUiStateFlow
+                .collectAsStateWithLifecycle(initialValue = SettingUiState())
+            val dynamicColor = settingUiState.dynamicColorEnabled
+            val themeMode = settingUiState.themeMode
 
             val darkTheme = when (themeMode) {
                 "亮色模式" -> false
@@ -240,8 +241,10 @@ class MainActivity : AppCompatActivity() {
         val drawerState = rememberDrawerState(DrawerValue.Closed)
         val scope = rememberCoroutineScope()
 
+        val uiState by settingViewModel.uiState.collectAsStateWithLifecycle()
+
         val remainingSpaceBean = fileViewModel.remainingSpace
-        val avatarJson by DataStoreUtil.getDataFlow(ConfigKeyUtil.AVATAR_BEAN, "{}")
+        val avatarJson by SettingsRepository.getDataFlow(ConfigKeyUtil.AVATAR_BEAN, "{}")
             .collectAsStateWithLifecycle(initialValue = "{}")
         val avatarBean = remember(avatarJson) {
             try {
@@ -254,24 +257,17 @@ class MainActivity : AppCompatActivity() {
         // 记录上一次触发返回的时间戳
         var lastBackPressTime by remember { mutableLongStateOf(0L) }
 
-        val isExpandedConfig by DataStoreUtil.getDataFlow(ConfigKeyUtil.EXPANDED_SCREEN, true)
-            .collectAsStateWithLifecycle(initialValue = true)
-        val expandedScreenThresholdStr by DataStoreUtil.getDataFlow(
-            ConfigKeyUtil.EXPANDED_SCREEN_THRESHOLD,
-            "600"
-        ).collectAsStateWithLifecycle(initialValue = "600")
+        val isExpandedConfig = uiState.expandedScreenEnabled
+        val expandedScreenThresholdStr = uiState.expandedScreenThreshold
         val expandedScreenThreshold =
-            expandedScreenThresholdStr.toInt().takeIf { i -> i > 0 } ?: 600
+            expandedScreenThresholdStr.toIntOrNull()?.takeIf { i -> i > 0 } ?: 600
 
         val isExpandedScreen =
             (LocalConfiguration.current.screenWidthDp >= expandedScreenThreshold) && isExpandedConfig
 
-        val gridCellMinSizeStr by DataStoreUtil.getDataFlow(
-            ConfigKeyUtil.GRID_CELL_MIN_SIZE,
-            "340"
-        ).collectAsStateWithLifecycle(initialValue = "340")
+        val gridCellMinSizeStr = uiState.gridCellMinSize
         val gridCellMinSize = remember(gridCellMinSizeStr) {
-            (gridCellMinSizeStr.toInt().takeIf { i -> i > 0 } ?: 340).dp
+            (gridCellMinSizeStr.toIntOrNull()?.takeIf { i -> i > 0 } ?: 340).dp
         }
 
 
@@ -297,8 +293,7 @@ class MainActivity : AppCompatActivity() {
                 App.instance.toast("再滑一次返回桌面")
             }
         }
-        val isLogEnabled by DataStoreUtil.getDataFlow(ConfigKeyUtil.LOG, false)
-            .collectAsStateWithLifecycle(initialValue = false)
+        val isLogEnabled = uiState.logEnabled
 
         val menuItems = remember(isLogEnabled) {
             arrayListOf(
@@ -683,17 +678,17 @@ class MainActivity : AppCompatActivity() {
                                 if (element.isJsonPrimitive) {
                                     val primitive = element.asJsonPrimitive
                                     when {
-                                        primitive.isBoolean -> DataStoreUtil.putDataSuspend(
+                                        primitive.isBoolean -> SettingsRepository.saveData(
                                             key,
                                             primitive.asBoolean
                                         )
 
-                                        primitive.isString -> DataStoreUtil.putDataSuspend(
+                                        primitive.isString -> SettingsRepository.saveData(
                                             key,
                                             primitive.asString
                                         )
 
-                                        primitive.isNumber -> DataStoreUtil.putDataSuspend(
+                                        primitive.isNumber -> SettingsRepository.saveData(
                                             key,
                                             primitive.asNumber
                                         )

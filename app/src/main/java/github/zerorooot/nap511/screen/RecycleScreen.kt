@@ -31,8 +31,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.dialog.RecyclePasswordDialog
 import github.zerorooot.nap511.screenitem.RecycleCellItem
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import kotlinx.coroutines.launch
 import my.nanihadesuka.compose.LazyColumnScrollbar
@@ -85,7 +85,7 @@ fun RecycleScreen(
         onPasswordEntered = { password ->
             if (!password.isNullOrEmpty()) {
                 scope.launch {
-                    DataStoreUtil.putDataSuspend(ConfigKeyUtil.PASSWORD, password)
+                    SettingsRepository.saveData(ConfigKeyUtil.PASSWORD, password)
                 }
 
                 if (deleteIndex == -1) {

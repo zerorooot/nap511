@@ -21,8 +21,8 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.ForceOpenType
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import kotlin.math.max
 
 @Composable
@@ -77,7 +77,7 @@ fun CreateFolderDialog(enter: (String?) -> Unit) {
 
 @Composable
 fun RenameFileDialog(name: String, enter: (String?) -> Unit) {
-    val position by DataStoreUtil.getDataFlow(ConfigKeyUtil.POSITION_AFTER_AT, false)
+    val position by SettingsRepository.getDataFlow(ConfigKeyUtil.POSITION_AFTER_AT, false)
         .collectAsStateWithLifecycle(initialValue = false)
     val atPosition = max(name.lastIndexOf("@"), name.lastIndexOf(" ")) + 1
     BaseDialog(

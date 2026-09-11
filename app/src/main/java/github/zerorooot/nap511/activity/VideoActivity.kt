@@ -67,7 +67,6 @@ import github.zerorooot.nap511.player.MyGSYVideoPlayer
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.UserSessionManager
 import kotlinx.coroutines.launch
 import okhttp3.Interceptor

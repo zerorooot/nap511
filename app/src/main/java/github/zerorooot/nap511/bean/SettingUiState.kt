@@ -4,7 +4,7 @@ import com.google.gson.annotations.SerializedName
 import github.zerorooot.nap511.util.ConfigKeyUtil
 
 data class SettingUiState(
-    @SerializedName(ConfigKeyUtil.UID) val uid: String = "0",
+    @SerializedName(ConfigKeyUtil.UID) val uid: String = "",
     @SerializedName(ConfigKeyUtil.COOKIE) val cookie: String = "cookie",
     @SerializedName(ConfigKeyUtil.PASSWORD) val password: String = "",
     @SerializedName(ConfigKeyUtil.ARIA2_URL) val aria2Url: String = "",

@@ -45,9 +45,9 @@ import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.repository.FileRepository
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.DialogEvent
 import github.zerorooot.nap511.util.DialogEventBus
 import github.zerorooot.nap511.util.FileCacheManager
@@ -113,13 +113,13 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
     val uiState: StateFlow<FileUiState> = combine(
         _currentPath,
         _isRefreshing,
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.EARLY_LOADING, false),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.MAX_TXT_SIZE, "200"),
-        DataStoreUtil.getDataFlow(
+        SettingsRepository.getDataFlow(ConfigKeyUtil.EARLY_LOADING, false),
+        SettingsRepository.getDataFlow(ConfigKeyUtil.MAX_TXT_SIZE, "200"),
+        SettingsRepository.getDataFlow(
             ConfigKeyUtil.ARIA2_URL,
             ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
         ),
-        DataStoreUtil.getDataFlow(
+        SettingsRepository.getDataFlow(
             ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION,
             "End"
         )
@@ -172,7 +172,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            saveRequestCache = DataStoreUtil.getDataSuspend(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
+            saveRequestCache = SettingsRepository.getDataSuspend(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
             dialogEventBus.events.collect { event ->
                 when (event) {
                     is DialogEvent.RefreshFileList -> refresh(event.cid)
@@ -497,7 +497,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
         recoverFromLongPress()
         val refreshCurrent = (cid == currentCid)
         viewModelScope.launch {
-            if (DataStoreUtil.getDataSuspend(ConfigKeyUtil.FORCE_LOAD_CACHE, false) || forceCache) {
+            if (SettingsRepository.getDataSuspend(ConfigKeyUtil.FORCE_LOAD_CACHE, false) || forceCache) {
                 removeFolderCacheRecursively(cid)
             }
             fileListCache.remove(cid)
@@ -649,7 +649,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
 
             // 获取并过滤本地缓存任务
             val currentOfflineTask =
-                DataStoreUtil.getDataSuspend(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
+                SettingsRepository.getDataSuspend(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
                     .split("\n")
                     .filter { i -> i.isNotBlank() } // 简化过滤逻辑
                     .toSet()

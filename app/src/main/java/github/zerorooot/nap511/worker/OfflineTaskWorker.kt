@@ -24,7 +24,7 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.OfflineTaskActivity
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.DialogEvent
 import github.zerorooot.nap511.util.DialogEventBus
 import java.util.StringJoiner
@@ -66,8 +66,8 @@ class OfflineTaskWorker(
         }
 
 
-        val cid = DataStoreUtil.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
-        val path = DataStoreUtil.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, "根目录/云下载")
+        val cid = SettingsRepository.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
+        val path = SettingsRepository.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, "根目录/云下载")
             .substringAfterLast("/")
         val addTaskReturn = fileRepository.addOfflineTask(a, cid) {}
 
@@ -77,7 +77,7 @@ class OfflineTaskWorker(
         val message = if (state) "成功添加任务到'$path'目录" else addTaskReturn.second
         if (state) {
             //清空缓存
-            DataStoreUtil.putDataSuspend(
+            SettingsRepository.saveData(
                 ConfigKeyUtil.CURRENT_OFFLINE_TASK,
                 ""
             )

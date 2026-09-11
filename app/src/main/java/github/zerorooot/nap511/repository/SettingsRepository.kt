@@ -1,35 +1,67 @@
 package github.zerorooot.nap511.repository
 
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.doublePreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.JsonObject
 import github.zerorooot.nap511.bean.SettingUiState
+import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.UserSessionManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 
 class SettingsRepository {
 
     companion object {
         @Volatile
         private var INSTANCE: SettingsRepository? = null
+
         fun getInstance(): SettingsRepository {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: SettingsRepository().also { INSTANCE = it }
             }
         }
+
+        /**
+         * 静态快捷调用的单项 Flow 获取
+         */
+        fun <T : Any> getDataFlow(key: String, defaultValue: T): Flow<T> =
+            getInstance().getDataFlow(key, defaultValue)
+
+        /**
+         * 静态快捷调用的单项挂起读取
+         */
+        suspend fun <T : Any> getDataSuspend(key: String, defaultValue: T): T =
+            getInstance().getDataSuspend(key, defaultValue)
+
+        /**
+         * 静态快捷调用的单项保存
+         */
+        suspend fun <T : Any> saveData(key: String, newValue: T) =
+            getInstance().saveData(key, newValue)
     }
 
-
     /**
-     * 获取指定 Key 的 Flow 数据流
+     * 获取指定 Key 的 Flow 数据流（轻量读取单个 Key）
      */
     fun <T : Any> getDataFlow(key: String, defaultValue: T): Flow<T> {
         return DataStoreUtil.getDataFlow(key, defaultValue)
     }
 
     /**
-     * 挂起函数获取指定 Key 的当前值
+     * 挂起函数获取指定 Key 的当前值（轻量读取单个 Key）
      */
     suspend fun <T : Any> getDataSuspend(key: String, defaultValue: T): T {
         return DataStoreUtil.getDataSuspend(key, defaultValue)
@@ -117,7 +149,7 @@ class SettingsRepository {
     }
 
     /**
-     * 统一暴露设置状态的 Flow
+     * 统一暴露设置状态的 Flow (建议在 ViewModel / UI 层收集此整体状态)
      */
     val settingUiStateFlow: Flow<SettingUiState> = combine(
         accountFlow, aria2Flow, uiPrefFlow, switchFlow
@@ -199,7 +231,7 @@ class SettingsRepository {
 
         DataStoreUtil.clearData()
 
-        if (currentUid != "") {
+        if (currentUid.isNotEmpty()) {
             DataStoreUtil.putDataSuspend(ConfigKeyUtil.UID, currentUid)
         }
         if (currentCookie.isNotEmpty()) {
@@ -210,6 +242,52 @@ class SettingsRepository {
         }
         if (password.isNotEmpty()) {
             DataStoreUtil.putDataSuspend(ConfigKeyUtil.PASSWORD, password)
+        }
+    }
+
+    // =========================================================================
+    //  私有 DataStore 存取工具：仅限 SettingsRepository 内部访问
+    // =========================================================================
+    private object DataStoreUtil {
+        private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "Setting")
+
+        private val dataStore: DataStore<Preferences>
+            get() = App.instance.applicationContext.dataStore
+
+        @Suppress("UNCHECKED_CAST")
+        private fun <T> getValueKey(key: String, defaultValue: T): Preferences.Key<T> {
+            return when (defaultValue) {
+                is Int -> intPreferencesKey(key)
+                is Long -> longPreferencesKey(key)
+                is String -> stringPreferencesKey(key)
+                is Boolean -> booleanPreferencesKey(key)
+                is Float -> floatPreferencesKey(key)
+                is Double -> doublePreferencesKey(key)
+                is Set<*> -> stringSetPreferencesKey(key)
+                else -> throw IllegalArgumentException("Unsupported DataStore type for key: $key")
+            } as Preferences.Key<T>
+        }
+
+        fun <T : Any> getDataFlow(key: String, defaultValue: T): Flow<T> {
+            val prefKey = getValueKey(key, defaultValue)
+            return dataStore.data.map { preferences ->
+                preferences[prefKey] ?: defaultValue
+            }
+        }
+
+        suspend fun <T : Any> getDataSuspend(key: String, defaultValue: T): T {
+            return getDataFlow(key, defaultValue).first()
+        }
+
+        suspend fun <T : Any> putDataSuspend(key: String, value: T) {
+            val prefKey = getValueKey(key, value)
+            dataStore.edit { preferences ->
+                preferences[prefKey] = value
+            }
+        }
+
+        suspend fun clearData() {
+            dataStore.edit { it.clear() }
         }
     }
 

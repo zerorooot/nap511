@@ -23,8 +23,6 @@ import java.util.Locale;
 import java.util.Objects;
 
 import github.zerorooot.nap511.R;
-import github.zerorooot.nap511.util.ConfigKeyUtil;
-import github.zerorooot.nap511.util.DataStoreUtil;
 
 public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     private TextView mMoreScale;

@@ -13,9 +13,9 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.repository.FileRepository
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.NetworkClient
 import github.zerorooot.nap511.util.UserSessionManager
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -99,8 +99,8 @@ class Sha1Service : Service() {
     }
      */
     private suspend fun sendToAria2(fileBeanDownloadList: ArrayList<String>) {
-        val aria2Token = DataStoreUtil.getDataSuspend(ConfigKeyUtil.ARIA2_TOKEN, "")
-        val aria2Url = DataStoreUtil.getDataSuspend(
+        val aria2Token = SettingsRepository.getDataSuspend(ConfigKeyUtil.ARIA2_TOKEN, "")
+        val aria2Url = SettingsRepository.getDataSuspend(
             ConfigKeyUtil.ARIA2_URL,
             ""
         ) + "?tm=${System.currentTimeMillis()}"

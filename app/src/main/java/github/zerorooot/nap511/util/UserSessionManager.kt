@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import github.zerorooot.nap511.repository.SettingsRepository
 
 object UserSessionManager {
     var cookie: String by mutableStateOf("")
@@ -24,8 +25,8 @@ object UserSessionManager {
     suspend fun updateSession(newCookie: String, newUid: String) {
         this.cookie = newCookie
         this.uid = newUid
-        DataStoreUtil.putDataSuspend(ConfigKeyUtil.COOKIE, newCookie)
-        DataStoreUtil.putDataSuspend(ConfigKeyUtil.UID, newUid)
+        SettingsRepository.saveData(ConfigKeyUtil.COOKIE, newCookie)
+        SettingsRepository.saveData(ConfigKeyUtil.UID, newUid)
     }
 
     suspend fun clearSession() {

@@ -39,9 +39,9 @@ import androidx.compose.ui.unit.sp
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.TorrentFileListWeb
 import github.zerorooot.nap511.screenitem.AutoSizableTextField
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 
@@ -65,7 +65,7 @@ fun CreateSelectTorrentFileDialog(
     }
 
     LaunchedEffect(Unit) {
-        isSort = DataStoreUtil.getDataSuspend(ConfigKeyUtil.TORRENT_SORT, false)
+        isSort = SettingsRepository.getDataSuspend(ConfigKeyUtil.TORRENT_SORT, false)
     }
 
     if (isSort) {

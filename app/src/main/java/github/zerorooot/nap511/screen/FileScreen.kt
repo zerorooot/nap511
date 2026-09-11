@@ -102,9 +102,9 @@ import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.dialog.ForceOpenDialog
 import github.zerorooot.nap511.screenitem.FileCellItem
 import github.zerorooot.nap511.screenitem.ImageCellItem
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.cancelCut
@@ -523,11 +523,11 @@ fun FileScreen(
             },
             onPathLongClick = { name, cid ->
                 scope.launch {
-                    DataStoreUtil.putDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, cid)
+                    SettingsRepository.saveData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, cid)
                     val index = fileViewModel.pathList.indexOfFirst { it.cid == cid }
                     val pathString = fileViewModel.pathList.take(index + 1)
                         .joinToString(separator = "/") { it.name }
-                    DataStoreUtil.putDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, pathString)
+                    SettingsRepository.saveData(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, pathString)
                 }
                 App.instance.toast("设置默认离线位置为: $name")
             },

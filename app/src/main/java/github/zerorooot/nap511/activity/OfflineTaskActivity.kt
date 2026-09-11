@@ -23,9 +23,9 @@ import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.worker.OfflineTaskWorker
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
@@ -118,7 +118,7 @@ class OfflineTaskActivity : ComponentActivity() {
 
                     // 获取并过滤本地缓存任务
                     val currentOfflineTask =
-                        DataStoreUtil.getDataSuspend(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
+                        SettingsRepository.getDataSuspend(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
                             .split("\n")
                             .filter { i -> i.isNotBlank() } // 简化过滤逻辑
                             .toSet()
@@ -184,7 +184,7 @@ class OfflineTaskActivity : ComponentActivity() {
                     //非空列表
                     if (urlList.isNotEmpty()) {
                         val currentOfflineTaskList =
-                            DataStoreUtil.getDataSuspend(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
+                            SettingsRepository.getDataSuspend(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
                                 .split("\n")
                                 .filter { i -> i != "" && i != " " }
                                 .toSet()
@@ -193,18 +193,18 @@ class OfflineTaskActivity : ComponentActivity() {
                         currentOfflineTaskList.addAll(urlList)
                         //检查离线任务时间
                         val offlineTime = try {
-                            DataStoreUtil.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_TIME, "5")
+                            SettingsRepository.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_TIME, "5")
                                 .toLong()
                         } catch (e: Exception) {
                             5L
                         }
                         val stringJoiner = currentOfflineTaskList.toSet().joinToString("\n")
                         //写入缓存
-                        DataStoreUtil.putDataSuspend(
+                        SettingsRepository.saveData(
                             ConfigKeyUtil.CURRENT_OFFLINE_TASK,
                             stringJoiner
                         )
-                        val allPath = DataStoreUtil.getDataSuspend(
+                        val allPath = SettingsRepository.getDataSuspend(
                             ConfigKeyUtil.DEFAULT_OFFLINE_PATH,
                             "根目录/云下载"
                         )

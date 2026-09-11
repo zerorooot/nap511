@@ -26,7 +26,7 @@ import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
+import github.zerorooot.nap511.repository.SettingsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -220,7 +220,7 @@ class UnzipAllFileWorker(
     }
 
     private suspend fun handleFailedFiles(unzipFailList: List<FileBean>): String? {
-        val data = DataStoreUtil.getDataSuspend(ConfigKeyUtil.MOVE_FAIL_FILE, "")
+        val data = SettingsRepository.getDataSuspend(ConfigKeyUtil.MOVE_FAIL_FILE, "")
         if (data.isEmpty()) {
             XLog.d("handleFailedFiles 不移动解压失败的文件")
         }

@@ -20,9 +20,9 @@ import github.zerorooot.nap511.dialog.SearchDialog
 import github.zerorooot.nap511.dialog.UnzipAllFile
 import github.zerorooot.nap511.dialog.UnzipDialog
 import github.zerorooot.nap511.dialog.UnzipPassword
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.addTorrentTask
 import github.zerorooot.nap511.viewmodel.closeAria2Dialog
@@ -103,7 +103,7 @@ fun CreateDialogs(
         }
 
         is FileDialogState.Aria2 -> {
-            val aria2Url by DataStoreUtil.getDataFlow(
+            val aria2Url by SettingsRepository.getDataFlow(
                 ConfigKeyUtil.ARIA2_URL, ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
             ).collectAsStateWithLifecycle(initialValue = ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE)
             Aria2Dialog(

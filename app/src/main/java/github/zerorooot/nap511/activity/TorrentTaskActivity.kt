@@ -1,22 +1,23 @@
 package github.zerorooot.nap511.activity
 
-import android.app.Activity
+
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import androidx.lifecycle.lifecycleScope
 import com.google.gson.Gson
 import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.InitUploadBean
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.UserSessionManager
+import kotlinx.coroutines.launch
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
@@ -27,10 +28,6 @@ import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 
-
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
-
 class TorrentTaskActivity : androidx.activity.ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,7 +35,8 @@ class TorrentTaskActivity : androidx.activity.ComponentActivity() {
             val torrentFile = fileFromContentUri(this, intent.data!!)
             val uid = UserSessionManager.uid
             lifecycleScope.launch {
-                val defaultOfflineCid = DataStoreUtil.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "0")
+                val defaultOfflineCid =
+                    SettingsRepository.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
                 initUpload(torrentFile, UserSessionManager.cookie, uid, defaultOfflineCid)
             }
         }

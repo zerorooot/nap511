@@ -24,7 +24,6 @@ import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.OfflineService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.NetworkClient
 import github.zerorooot.nap511.util.Sha1Util
 import github.zerorooot.nap511.util.UserSessionManager
@@ -127,13 +126,13 @@ class FileRepository {
             }
             //把失败的离线链接保存起来
             val currentOfflineTaskList =
-                DataStoreUtil.getDataSuspend(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "").split("\n")
+                SettingsRepository.getDataSuspend(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "").split("\n")
                     .filter { i -> i != "" && i != " " }.toSet().toMutableList()
             currentOfflineTaskList.addAll(list)
             val stringJoiner = StringJoiner("\n")
             currentOfflineTaskList.toSet().forEach { stringJoiner.add(it) }
             //写入缓存
-            DataStoreUtil.putDataSuspend(
+            SettingsRepository.saveData(
                 ConfigKeyUtil.CURRENT_OFFLINE_TASK, stringJoiner.toString()
             )
             "任务添加失败，${addTask.errorMsg}"

@@ -8,10 +8,10 @@ import com.google.gson.Gson
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.VideoInfoBean
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -95,10 +95,10 @@ internal fun FileViewModel.updateVideoFileBean(
 
 internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int, fileName: String) {
     viewModelScope.launch {
-        val isAutoRotate = DataStoreUtil.getDataSuspend(ConfigKeyUtil.AUTO_ROTATE, false)
-        val videoLinkMode = DataStoreUtil.getDataSuspend(ConfigKeyUtil.VIDEO_LINK_MODE, false)
-        val autoJumpRetry = DataStoreUtil.getDataSuspend(ConfigKeyUtil.AUTO_JUMP_RETRY, true)
-        val hideLoading = DataStoreUtil.getDataSuspend(ConfigKeyUtil.HIDE_LOADING_VIEW, false)
+        val isAutoRotate = SettingsRepository.getDataSuspend(ConfigKeyUtil.AUTO_ROTATE, false)
+        val videoLinkMode = SettingsRepository.getDataSuspend(ConfigKeyUtil.VIDEO_LINK_MODE, false)
+        val autoJumpRetry = SettingsRepository.getDataSuspend(ConfigKeyUtil.AUTO_JUMP_RETRY, true)
+        val hideLoading = SettingsRepository.getDataSuspend(ConfigKeyUtil.HIDE_LOADING_VIEW, false)
 
         runCatching {
             val video = if (videoLinkMode) {

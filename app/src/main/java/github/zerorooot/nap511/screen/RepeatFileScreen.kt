@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -38,19 +37,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.elvishew.xlog.XLog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.CategoryDetailResponse
 import github.zerorooot.nap511.screenitem.RepeatFileCardItem
-import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.viewmodel.RepeatFileViewModel
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.LazyVerticalGridScrollbar
@@ -60,6 +57,7 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.log10
 import kotlin.math.pow
+import androidx.compose.foundation.lazy.grid.items as gridItems
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

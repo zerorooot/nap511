@@ -31,6 +31,7 @@ import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.bean.Base115Response
+import github.zerorooot.nap511.repository.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -88,14 +89,14 @@ class App : Application(), ImageLoaderFactory {
         cacheFile = File(this.cacheDir, "fileListCache.json")
 
         appScope.launch {
-            val initialCookie = DataStoreUtil.getDataSuspend(ConfigKeyUtil.COOKIE, "")
-            val initialUid = DataStoreUtil.getDataSuspend(ConfigKeyUtil.UID, "")
+            val initialCookie = SettingsRepository.getDataSuspend(ConfigKeyUtil.COOKIE, "")
+            val initialUid = SettingsRepository.getDataSuspend(ConfigKeyUtil.UID, "")
             val initialLimit =
-                DataStoreUtil.getDataSuspend(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200").toIntOrNull()
+                SettingsRepository.getDataSuspend(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200").toIntOrNull()
                     ?: 200
             UserSessionManager.init(initialCookie, initialUid, initialLimit)
 
-            isLogEnabled = DataStoreUtil.getDataSuspend(ConfigKeyUtil.LOG, false)
+            isLogEnabled = SettingsRepository.getDataSuspend(ConfigKeyUtil.LOG, false)
             initLog()
         }
     }
@@ -170,7 +171,7 @@ class App : Application(), ImageLoaderFactory {
 
                 // 6. 持久化数据并同步更新会话
                 UserSessionManager.updateSession(cookie, avatarBean.userId)
-                DataStoreUtil.putDataSuspend(ConfigKeyUtil.AVATAR_BEAN, gson.toJson(avatarBean))
+                SettingsRepository.saveData(ConfigKeyUtil.AVATAR_BEAN, gson.toJson(avatarBean))
 
                 Pair(true, "登录成功～")
             }
@@ -265,8 +266,8 @@ class App : Application(), ImageLoaderFactory {
                         val errorMsg = bodyJson.getAsJsonObject("error")?.get("message")?.asString
                         "aria2配置失败, $errorMsg"
                     } else {
-                        DataStoreUtil.putDataSuspend(ConfigKeyUtil.ARIA2_URL, aria2Url)
-                        DataStoreUtil.putDataSuspend(ConfigKeyUtil.ARIA2_TOKEN, aria2Token)
+                        SettingsRepository.saveData(ConfigKeyUtil.ARIA2_URL, aria2Url)
+                        SettingsRepository.saveData(ConfigKeyUtil.ARIA2_TOKEN, aria2Token)
                         "aria2配置成功，请重新下载文件"
                     }
                 }

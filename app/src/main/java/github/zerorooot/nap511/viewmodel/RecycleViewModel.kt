@@ -7,10 +7,10 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.screen.RecycleUiState
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
 import github.zerorooot.nap511.util.DialogEvent
 import github.zerorooot.nap511.util.DialogEventBus
 import github.zerorooot.nap511.util.onFailureToastAndLog
@@ -79,7 +79,7 @@ class RecycleViewModel : ViewModel() {
 
     fun delete(index: Int) {
         viewModelScope.launch {
-            val password = DataStoreUtil.getDataSuspend(ConfigKeyUtil.PASSWORD, "")
+            val password = SettingsRepository.getDataSuspend(ConfigKeyUtil.PASSWORD, "")
             if (password == "") {
                 _isOpenRecyclePasswordDialog.value = true
                 return@launch
@@ -99,11 +99,11 @@ class RecycleViewModel : ViewModel() {
                 val message = if (revert.state) {
                     _recycleFileList.update { list -> list.filterIndexed { i, _ -> i != index } }
                     if (save) {
-                        DataStoreUtil.putDataSuspend(ConfigKeyUtil.PASSWORD, password)
+                        SettingsRepository.saveData(ConfigKeyUtil.PASSWORD, password)
                     }
                     "删除成功"
                 } else {
-                    DataStoreUtil.putDataSuspend(ConfigKeyUtil.PASSWORD, "")
+                    SettingsRepository.saveData(ConfigKeyUtil.PASSWORD, "")
                     "删除失败，${revert.errorMsg}"
                 }
                 App.instance.toast(message)
@@ -114,7 +114,7 @@ class RecycleViewModel : ViewModel() {
     fun deleteAll() {
         viewModelScope.launch {
             runCatching {
-                val password = DataStoreUtil.getDataSuspend(ConfigKeyUtil.PASSWORD, "")
+                val password = SettingsRepository.getDataSuspend(ConfigKeyUtil.PASSWORD, "")
                 if (password == "") {
                     _isOpenRecyclePasswordDialog.value = true
                     return@launch
