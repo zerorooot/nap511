@@ -280,6 +280,14 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
         isInitialized = true
         _isRefreshing.value = true
         viewModelScope.launch(Dispatchers.IO) {
+            // 优先校验登录状态
+            if (UserSessionManager.cookie.isBlank()) {
+                _isRefreshing.value = false
+                // 未登录：静默发送跳转登录页事件
+                _navigationEvent.send(NavEvent.NavigateToScreen(Route.Login))
+                return@launch
+            }
+
             if (!saveRequestCache) {
                 // 不保存磁盘缓存时，仅清理硬盘旧文件，保留内存缓存
                 fileListCache.clearDiskOnly()
@@ -420,7 +428,6 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
                     else -> null
                 }
                 if (expiredTip != null) {
-                    App.instance.toast(expiredTip)
                     fileListCache.clearAll()
                     UserSessionManager.clearSession()
                     _navigationEvent.send(NavEvent.NavigateToScreen(Route.Login))

@@ -72,6 +72,7 @@ import github.zerorooot.nap511.screen.CaptchaVideoWebViewScreen
 import github.zerorooot.nap511.screen.CaptchaWebViewScreen
 import github.zerorooot.nap511.screen.CreateDialogs
 import github.zerorooot.nap511.screen.FileScreen
+import github.zerorooot.nap511.screen.HtmlWebViewScreen
 import github.zerorooot.nap511.screen.LogScreen
 import github.zerorooot.nap511.screen.LoginCredential
 import github.zerorooot.nap511.screen.LoginScreen
@@ -82,7 +83,6 @@ import github.zerorooot.nap511.screen.OfflineFileScreen
 import github.zerorooot.nap511.screen.RecycleScreen
 import github.zerorooot.nap511.screen.RepeatFileScreen
 import github.zerorooot.nap511.screen.SettingScreen
-import github.zerorooot.nap511.screen.HtmlWebViewScreen
 import github.zerorooot.nap511.screen.TxtReaderScreen
 import github.zerorooot.nap511.screen.WebViewScreen
 import github.zerorooot.nap511.screenitem.Avatar
@@ -169,11 +169,6 @@ class MainActivity : AppCompatActivity() {
 
         LaunchedEffect(Unit) {
             fileViewModel.loadCacheFile()
-            //允许通知， 方便离线下载交互 OfflineTaskActivity
-            if (!App.instance.isNotificationEnabled(this@MainActivity)) {
-                App.instance.toast("检测到未开启通知权限，为保证交互效果，建议开启")
-                App.instance.goToNotificationSetting(this@MainActivity)
-            }
             //检测添加的离线链接。防止因为种种原因，app添加离线链接，但链接没有上传到115
             fileViewModel.handleOfflineTask()
 
@@ -401,12 +396,13 @@ class MainActivity : AppCompatActivity() {
                     composable<Route.Login> {
                         navGesturesEnabled = false
                         Login {
+                            fileViewModel.getRemainingSpace()
+                            fileViewModel.getFiles("0")
                             navController.navigate(Route.MyFile) {
                                 popUpTo<Route.Login> {
                                     inclusive = true
                                 }
                             }
-                            fileViewModel.getFiles("0")
                         }
                     }
 
@@ -708,7 +704,10 @@ class MainActivity : AppCompatActivity() {
                             App.instance.checkLogin(cookie)
                         } catch (e: Exception) {
                             App.instance.toast("解析配置失败")
-                            XLog.e("LoginScreen LoginCredential.ConfigFile jsonString ${credential.rawJson}", e)
+                            XLog.e(
+                                "LoginScreen LoginCredential.ConfigFile jsonString ${credential.rawJson}",
+                                e
+                            )
                             false
                         }
                     }

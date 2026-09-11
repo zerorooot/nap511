@@ -89,7 +89,7 @@ class App : Application(), ImageLoaderFactory {
 
         appScope.launch {
             val initialCookie = DataStoreUtil.getDataSuspend(ConfigKeyUtil.COOKIE, "")
-            val initialUid = DataStoreUtil.getDataSuspend(ConfigKeyUtil.UID, "0")
+            val initialUid = DataStoreUtil.getDataSuspend(ConfigKeyUtil.UID, "")
             val initialLimit =
                 DataStoreUtil.getDataSuspend(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200").toIntOrNull()
                     ?: 200

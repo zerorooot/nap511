@@ -9,7 +9,7 @@ object UserSessionManager {
     var cookie: String by mutableStateOf("")
         private set
 
-    var uid: String by mutableStateOf("0")
+    var uid: String by mutableStateOf("")
         private set
 
     var requestLimitCount: Int by mutableIntStateOf(200)
