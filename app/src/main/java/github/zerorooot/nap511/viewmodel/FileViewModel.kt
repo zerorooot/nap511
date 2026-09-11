@@ -18,7 +18,9 @@ import androidx.concurrent.futures.await
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.Constraints
 import androidx.work.Data
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -564,7 +566,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
     }
 
 
-//    fun selectAll() {
+    //    fun selectAll() {
 //        val a = arrayListOf<FileBean>()
 //        fileBeanList.forEach { i ->
 //            i.isSelect = true
@@ -574,6 +576,9 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
 //        fileBeanList.addAll(a)
 //        appBarTitle = fileBeanList.size.toString()
 //    }
+    fun sortByVideoTime() {
+        fileBeanList.sortByDescending { it.playLong }
+    }
 
     fun selectReverse() {
         val updatedList = fileBeanList.map { it.copy(isSelect = !it.isSelect) }
@@ -661,9 +666,14 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
             val data = Data.Builder().putString("list", list)
                 .build()
 
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
+
             val request = OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java)
                 .addTag(ConfigKeyUtil.OFFLINE_TASK_WORKER)
                 .setInputData(data)
+                .setConstraints(constraints)
                 .build()
 
             workManager.enqueue(request)

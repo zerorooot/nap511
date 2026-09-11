@@ -118,12 +118,10 @@ import github.zerorooot.nap511.viewmodel.openUnzipAllFileDialog
 import github.zerorooot.nap511.viewmodel.removeFile
 import github.zerorooot.nap511.viewmodel.startSendAria2Service
 import github.zerorooot.nap511.viewmodel.updateVideoFileBean
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.LazyVerticalGridScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
-import kotlin.time.Duration.Companion.milliseconds
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 
 @OptIn(
@@ -426,16 +424,12 @@ fun FileScreen(
             }
 
             "视频时间" -> {
-                scope.launch {
-                    fileViewModel.fileBeanList.sortByDescending { fileBean -> fileBean.playLong }
-                    delay(10.milliseconds)
-                    if (isExpandedScreen || isImagePreviewMode) {
-                        gridState.requestScrollToItem(0, 0)
-                    } else {
-                        listState.requestScrollToItem(0, 0)
-                    }
+                fileViewModel.sortByVideoTime()
+                if (isExpandedScreen || isImagePreviewMode) {
+                    gridState.requestScrollToItem(0, 0)
+                } else {
+                    listState.requestScrollToItem(0, 0)
                 }
-
             }
 
             "缓存清空" -> {

@@ -21,6 +21,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.MainActivity
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.activity.OfflineTaskActivity
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DataStoreUtil
@@ -52,6 +53,11 @@ class OfflineTaskWorker(
         if (a.isEmpty()) {
             return Result.failure()
         }
+
+        val notificationManager =
+            applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.cancel(OfflineTaskActivity.PENDING_NOTIFICATION_ID)
+
         try {
             setForeground(getForegroundInfo())
         } catch (e: Exception) {
@@ -61,12 +67,14 @@ class OfflineTaskWorker(
 
 
         val cid = DataStoreUtil.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
+        val path = DataStoreUtil.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, "根目录/云下载")
+            .substringAfterLast("/")
         val addTaskReturn = fileRepository.addOfflineTask(a, cid) {}
 
         XLog.i("OfflineTaskWorker cid $cid addTaskReturn $addTaskReturn task size=${a.size} currentOfflineTask: $a")
 
         val state = addTaskReturn.first
-        val message = addTaskReturn.second
+        val message = if (state) "成功添加任务到'$path'目录" else addTaskReturn.second
         if (state) {
             //清空缓存
             DataStoreUtil.putDataSuspend(
@@ -75,7 +83,10 @@ class OfflineTaskWorker(
             )
         }
         XLog.v("OfflineTaskWorker checkOfflineTask $message")
-        toast(message, a, cid)
+        //只有失败才弹通知
+        if (!state) {
+            toast(message, a, cid)
+        }
         val addTaskData = Data.Builder()
             .putBoolean("state", state)
             .putString("return", message)
