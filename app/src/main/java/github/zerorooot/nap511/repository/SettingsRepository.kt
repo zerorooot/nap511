@@ -17,10 +17,16 @@ import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.UserSessionManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 
 class SettingsRepository {
 
@@ -52,6 +58,9 @@ class SettingsRepository {
         suspend fun <T : Any> saveData(key: String, newValue: T) =
             getInstance().saveData(key, newValue)
     }
+
+    // 独立的作用域，用于后台预热 DataStore
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
      * 获取指定 Key 的 Flow 数据流（轻量读取单个 Key）
@@ -149,9 +158,10 @@ class SettingsRepository {
     }
 
     /**
-     * 统一暴露设置状态的 Flow (建议在 ViewModel / UI 层收集此整体状态)
+     * 统一暴露设置状态的 StateFlow (支持预热与状态复用)
+     * 将 Flow 提升为预热的 StateFlow（Eagerly 立即启动）
      */
-    val settingUiStateFlow: Flow<SettingUiState> = combine(
+    val settingUiStateFlow: StateFlow<SettingUiState> = combine(
         accountFlow, aria2Flow, uiPrefFlow, switchFlow
     ) { account, aria2, uiPref, s2 ->
         SettingUiState(
@@ -188,7 +198,12 @@ class SettingsRepository {
             autoJumpRetry = s2.autoJumpRetry,
             expandedScreenEnabled = s2.expandedScreen
         )
-    }
+    }.stateIn(
+        scope = repositoryScope,
+        // 只要单例创建，立即开始在后台读取加载
+        started = SharingStarted.Eagerly,
+        initialValue = SettingUiState()
+    )
 
     /**
      * 保存单个配置项
@@ -213,8 +228,10 @@ class SettingsRepository {
         }
 
         // 如果导入配置包含 Cookie / UID，同步更新 UserSessionManager
-        val newCookie = if (jsonObject.has(ConfigKeyUtil.COOKIE)) jsonObject.get(ConfigKeyUtil.COOKIE).asString else null
-        val newUid = if (jsonObject.has(ConfigKeyUtil.UID)) jsonObject.get(ConfigKeyUtil.UID).asString else null
+        val newCookie =
+            if (jsonObject.has(ConfigKeyUtil.COOKIE)) jsonObject.get(ConfigKeyUtil.COOKIE).asString else null
+        val newUid =
+            if (jsonObject.has(ConfigKeyUtil.UID)) jsonObject.get(ConfigKeyUtil.UID).asString else null
         if (!newCookie.isNullOrEmpty()) {
             UserSessionManager.updateSession(newCookie, newUid ?: UserSessionManager.uid)
         }

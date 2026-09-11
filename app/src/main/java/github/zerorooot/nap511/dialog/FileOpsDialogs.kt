@@ -14,11 +14,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.ForceOpenType
 import github.zerorooot.nap511.repository.SettingsRepository
@@ -34,7 +34,10 @@ fun ForceOpenDialog(
     AlertDialog(
         onDismissRequest = onDismissRequest,
         title = {
-            Text(text = "把文件 '$fileName' 强行打开为", style = MaterialTheme.typography.titleLarge)
+            Text(
+                text = "把文件 '$fileName' 强行打开为",
+                style = MaterialTheme.typography.titleLarge
+            )
         },
         text = {
             FlowRow(
@@ -76,9 +79,7 @@ fun CreateFolderDialog(enter: (String?) -> Unit) {
 }
 
 @Composable
-fun RenameFileDialog(name: String, enter: (String?) -> Unit) {
-    val position by SettingsRepository.getDataFlow(ConfigKeyUtil.POSITION_AFTER_AT, false)
-        .collectAsStateWithLifecycle(initialValue = false)
+fun RenameFileDialog(name: String, position: Boolean, enter: (String?) -> Unit) {
     val atPosition = max(name.lastIndexOf("@"), name.lastIndexOf(" ")) + 1
     BaseDialog(
         "重命名文件", "新文件名", name, enter = enter, selection = TextRange(

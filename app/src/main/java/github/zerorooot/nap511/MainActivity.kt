@@ -67,7 +67,9 @@ import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.bean.DrawerMenuItem
 import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.Route
+import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.dialog.ExitApp
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.screen.CaptchaVideoWebViewScreen
 import github.zerorooot.nap511.screen.CaptchaWebViewScreen
 import github.zerorooot.nap511.screen.CreateDialogs
@@ -79,8 +81,6 @@ import github.zerorooot.nap511.screen.LoginScreen
 import github.zerorooot.nap511.screen.MusicDetailScreen
 import github.zerorooot.nap511.screen.MyPhotoScreen
 import github.zerorooot.nap511.screen.OfflineDownloadScreen
-import github.zerorooot.nap511.bean.SettingUiState
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.screen.OfflineFileScreen
 import github.zerorooot.nap511.screen.RecycleScreen
 import github.zerorooot.nap511.screen.RepeatFileScreen
@@ -109,8 +109,10 @@ class MainActivity : AppCompatActivity() {
         initializeViewTreeOwners()
         enableEdgeToEdge()
         setContent {
-            val settingUiState by SettingsRepository.getInstance().settingUiStateFlow
-                .collectAsStateWithLifecycle(initialValue = SettingUiState())
+            val settingsRepository = SettingsRepository.getInstance()
+            val initialUiState = remember { settingsRepository.settingUiStateFlow.value }
+            val settingUiState by settingsRepository.settingUiStateFlow
+                .collectAsStateWithLifecycle(initialValue = initialUiState)
             val dynamicColor = settingUiState.dynamicColorEnabled
             val themeMode = settingUiState.themeMode
 
@@ -148,7 +150,7 @@ class MainActivity : AppCompatActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    Init()
+                    Init(settingUiState = settingUiState)
                 }
             }
         }
@@ -156,7 +158,9 @@ class MainActivity : AppCompatActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    private fun Init() {
+    private fun Init(
+        settingUiState: SettingUiState
+    ) {
         //初始化
         val fileViewModel: FileViewModel = viewModel()
         val offlineFileViewModel: OfflineFileViewModel = viewModel()
@@ -203,10 +207,11 @@ class MainActivity : AppCompatActivity() {
             audioViewModel,
             repeatViewModel,
             settingViewModel,
+            settingUiState,
             navController
         )
 
-        CreateDialogs(fileViewModel) {
+        CreateDialogs(fileViewModel, settingUiState) {
             navController.navigate(it)
         }
 
@@ -236,12 +241,11 @@ class MainActivity : AppCompatActivity() {
         audioViewModel: AudioViewModel,
         repeatViewModel: RepeatFileViewModel,
         settingViewModel: SettingViewModel,
+        uiState: SettingUiState,
         navController: NavHostController
     ) {
         val drawerState = rememberDrawerState(DrawerValue.Closed)
         val scope = rememberCoroutineScope()
-
-        val uiState by settingViewModel.uiState.collectAsStateWithLifecycle()
 
         val remainingSpaceBean = fileViewModel.remainingSpace
         val avatarJson by SettingsRepository.getDataFlow(ConfigKeyUtil.AVATAR_BEAN, "{}")
@@ -405,6 +409,7 @@ class MainActivity : AppCompatActivity() {
                         navGesturesEnabled = true
                         FileScreen(
                             fileViewModel,
+                            uiState,
                             audioViewModel,
                             isExpandedScreen,
                             gridCellMinSize,

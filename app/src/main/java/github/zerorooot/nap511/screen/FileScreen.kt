@@ -98,6 +98,7 @@ import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ForceOpenType
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.Route
+import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.dialog.ForceOpenDialog
 import github.zerorooot.nap511.screenitem.FileCellItem
@@ -139,17 +140,26 @@ import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 @Composable
 fun FileScreen(
     fileViewModel: FileViewModel,
+    settingUiState: SettingUiState,
     audioViewModel: AudioViewModel,
     isExpandedScreen: Boolean,
     gridCellMinSize: Dp,
     onNav: (Route) -> Unit,
     drawerState: () -> Boolean
 ) {
-    val uiState by fileViewModel.uiState.collectAsStateWithLifecycle()
+    val fileUiState by fileViewModel.uiState.collectAsStateWithLifecycle()
+
+    val fabPosition = when (settingUiState.fabPosition) {
+        "Start" -> FabPosition.Start
+        "Center" -> FabPosition.Center
+        "End" -> FabPosition.End
+        "EndOverlay" -> FabPosition.EndOverlay
+        else -> FabPosition.End
+    }
 
     val fileBeanList = fileViewModel.fileBeanList
-    val path = uiState.path
-    val refreshing = uiState.isRefreshing
+    val path = fileUiState.path
+    val refreshing = fileUiState.isRefreshing
     val context = LocalContext.current
     var showForceOpenDialog by rememberSaveable { mutableIntStateOf(-1) }
     var isImagePreviewMode by rememberSaveable { mutableStateOf(false) }
@@ -245,7 +255,7 @@ fun FileScreen(
 
     fun handleFolderClick(i: Int, fileBean: FileBean) {
         isBottomBarShow = true
-        if (uiState.earlyLoading) {
+        if (settingUiState.earlyLoading) {
             listOf(i - 1, i + 1)
                 .mapNotNull { fileBeanList.getOrNull(it) }
                 .filter { it.isFolder }
@@ -290,7 +300,7 @@ fun FileScreen(
     }
 
     fun checkAndDownloadFile(i: Int, fileBean: FileBean, action: () -> Unit) {
-        val txtSize = uiState.maxTxtSizeStr.toIntOrNull() ?: 200
+        val txtSize = settingUiState.txtSize.toIntOrNull() ?: 200
         if (fileBean.size.toLong() < txtSize * 1024) {
             fileViewModel.selectIndex = i
             action()
@@ -398,7 +408,7 @@ fun FileScreen(
     }
 
     fun onMenuAria2Download(index: Int) {
-        if (uiState.aria2UrlConfig == ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE) {
+        if (settingUiState.aria2Url.ifEmpty { ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE } == ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE) {
             fileViewModel.openAria2Dialog()
         } else {
             fileViewModel.startSendAria2Service(index)
@@ -563,7 +573,7 @@ fun FileScreen(
         isBottomBarShow = isBottomBarShow,
         hasCurrentMusic = audioViewModel.currentMusic != null,
         isCutState = fileViewModel.isCutState,
-        fabPosition = uiState.fabPosition,
+        fabPosition = fabPosition,
         nestedScrollConnection = nestedScrollConnection,
         audioViewModel = audioViewModel,
         onAppBarClick = ::myAppBarOnClick,

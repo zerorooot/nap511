@@ -2,14 +2,13 @@ package github.zerorooot.nap511.screen
 
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elvishew.xlog.XLog
 import com.google.gson.JsonParser
 import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.bean.Route
+import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.dialog.Aria2Dialog
 import github.zerorooot.nap511.dialog.CreateFolderDialog
 import github.zerorooot.nap511.dialog.CreateSelectTorrentFileDialog
@@ -20,7 +19,6 @@ import github.zerorooot.nap511.dialog.SearchDialog
 import github.zerorooot.nap511.dialog.UnzipAllFile
 import github.zerorooot.nap511.dialog.UnzipDialog
 import github.zerorooot.nap511.dialog.UnzipPassword
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
@@ -41,13 +39,14 @@ import github.zerorooot.nap511.viewmodel.rename
 @Composable
 fun CreateDialogs(
     fileViewModel: FileViewModel,
+    settingUiState: SettingUiState,
     onNav: (Route) -> Unit
 ) {
     when (fileViewModel.activeDialog) {
         //重命名
         is FileDialogState.RenameFile -> {
             val name = fileViewModel.fileBeanList[fileViewModel.selectIndex].name
-            RenameFileDialog(name) {
+            RenameFileDialog(name, settingUiState.positionAfterAt) {
                 if (it != null && it != "") {
                     fileViewModel.rename(it)
                 }
@@ -103,9 +102,7 @@ fun CreateDialogs(
         }
 
         is FileDialogState.Aria2 -> {
-            val aria2Url by SettingsRepository.getDataFlow(
-                ConfigKeyUtil.ARIA2_URL, ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
-            ).collectAsStateWithLifecycle(initialValue = ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE)
+            val aria2Url = settingUiState.aria2Url
             Aria2Dialog(
                 context = aria2Url
             ) {

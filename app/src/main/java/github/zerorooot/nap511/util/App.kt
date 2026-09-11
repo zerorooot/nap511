@@ -88,6 +88,9 @@ class App : Application(), ImageLoaderFactory {
         instance = this
         cacheFile = File(this.cacheDir, "fileListCache.json")
 
+        // 预热 SettingsRepository，在应用进程启动时即触发后台异步预读 DataStore
+        SettingsRepository.getInstance()
+
         appScope.launch {
             val initialCookie = SettingsRepository.getDataSuspend(ConfigKeyUtil.COOKIE, "")
             val initialUid = SettingsRepository.getDataSuspend(ConfigKeyUtil.UID, "")

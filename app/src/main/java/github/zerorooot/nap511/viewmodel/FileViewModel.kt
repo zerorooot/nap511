@@ -70,11 +70,7 @@ import java.io.File
 
 data class FileUiState(
     val path: String = "",
-    val isRefreshing: Boolean = false,
-    val earlyLoading: Boolean = false,
-    val maxTxtSizeStr: String = "200",
-    val aria2UrlConfig: String = ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE,
-    val fabPosition: FabPosition = FabPosition.End
+    val isRefreshing: Boolean = false
 )
 
 
@@ -112,40 +108,11 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
 
     val uiState: StateFlow<FileUiState> = combine(
         _currentPath,
-        _isRefreshing,
-        SettingsRepository.getDataFlow(ConfigKeyUtil.EARLY_LOADING, false),
-        SettingsRepository.getDataFlow(ConfigKeyUtil.MAX_TXT_SIZE, "200"),
-        SettingsRepository.getDataFlow(
-            ConfigKeyUtil.ARIA2_URL,
-            ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE
-        ),
-        SettingsRepository.getDataFlow(
-            ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION,
-            "End"
-        )
-    ) { values: Array<Any?> ->
-        val path = values[0] as String
-        val refreshing = values[1] as Boolean
-        val earlyLoading = values[2] as Boolean
-        val maxTxtSizeStr = values[3] as String
-        val aria2UrlConfig = values[4] as String
-        val fabPosStr = values[5] as String
-
-        val fabPosition = when (fabPosStr) {
-            "Start" -> FabPosition.Start
-            "Center" -> FabPosition.Center
-            "End" -> FabPosition.End
-            "EndOverlay" -> FabPosition.EndOverlay
-            else -> FabPosition.End
-        }
-
+        _isRefreshing
+    ) { path, refreshing ->
         FileUiState(
             path = path,
-            isRefreshing = refreshing,
-            earlyLoading = earlyLoading,
-            maxTxtSizeStr = maxTxtSizeStr,
-            aria2UrlConfig = aria2UrlConfig,
-            fabPosition = fabPosition
+            isRefreshing = refreshing
         )
     }.stateIn(
         scope = viewModelScope,
