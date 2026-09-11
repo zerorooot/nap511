@@ -8,22 +8,20 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import github.zerorooot.nap511.bean.LocationBean
 import github.zerorooot.nap511.bean.SettingUiState
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DataStoreUtil
-import github.zerorooot.nap511.util.UserSessionManager
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class SettingViewModel : ViewModel() {
+class SettingViewModel(
+    private val settingsRepository: SettingsRepository = SettingsRepository.getInstance()
+) : ViewModel() {
     private val gson = GsonBuilder().setPrettyPrinting().create()
     internal val _currentLocation = MutableStateFlow(LocationBean(0, 0))
     var currentLocation = _currentLocation.asStateFlow()
@@ -32,126 +30,8 @@ class SettingViewModel : ViewModel() {
         _currentLocation.value = LocationBean(i, i1)
     }
 
-    // 1. 账号与安全分组 Flow
-    private val accountFlow = combine(
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.UID, "0"),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.COOKIE, ""),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.PASSWORD, "")
-    ) { uid, cookie, password ->
-        Triple(uid, cookie, password)
-    }
-
-    // 2. Aria2 与下载分组 Flow
-    private val aria2Flow: Flow<Aria2Group> = combine(
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.ARIA2_URL, ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.ARIA2_TOKEN, ""),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.DEFAULT_OFFLINE_CID, ""),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.DEFAULT_OFFLINE_TIME, "5"),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.CURRENT_OFFLINE_TASK, ""),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, "")
-    ) { values: Array<String> ->
-        Aria2Group(
-            url = values[0],
-            token = values[1],
-            cid = values[2],
-            time = values[3],
-            task = values[4],
-            cidPath = values[5]
-        )
-    }
-
-    // 3. 界面偏好分组 Flow
-    private val uiPrefFlow: Flow<PrefGroup> = combine(
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION, "End"),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200"),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.MOVE_FAIL_FILE, ""),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.MAX_TXT_SIZE, "200"),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.THEME_MODE, "跟随系统"),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.EXPANDED_SCREEN_THRESHOLD, "600"),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.GRID_CELL_MIN_SIZE, "340")
-    ) { values: Array<String> ->
-        PrefGroup(
-            fabPos = values[0],
-            limit = values[1],
-            moveFail = values[2],
-            txtSize = values[3],
-            themeMode = values[4],
-            expandedThreshold = values[5],
-            gridCellMinSize = values[6]
-        )
-    }
-
-    // 5. 开关配置分组 Flow (Part 2)
-    private val switchFlow2: Flow<SwitchGroup> = combine(
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.TORRENT_SORT, false),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.LOG, false),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.FORCE_LOAD_CACHE, false),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.VIDEO_LINK_MODE, false),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.DYNAMIC_COLOR, true),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.AUTO_JUMP_RETRY, true),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.EXPANDED_SCREEN, true),
-
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.AUTO_ROTATE, false),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.HIDE_LOADING_VIEW, false),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.EARLY_LOADING, false),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.SAVE_REQUEST_CACHE, true),
-        DataStoreUtil.getDataFlow(ConfigKeyUtil.POSITION_AFTER_AT, false)
-    ) { values: Array<Boolean> ->
-        SwitchGroup(
-            torrentSort = values[0],
-            logEnabled = values[1],
-            forceCache = values[2],
-            videoLinkMode = values[3],
-            dynamicColor = values[4],
-            autoJumpRetry = values[5],
-            expandedScreen = values[6],
-            autoRotate = values[7],
-            hideLoading = values[8],
-            earlyLoading = values[9],
-            saveCache = values[10],
-            positionAfterAt = values[11],
-        )
-    }
-
-    // 统一暴露给 UI 的 StateFlow
-    val uiState: StateFlow<SettingUiState> = combine(
-        accountFlow, aria2Flow, uiPrefFlow, switchFlow2
-    ) { account, aria2, uiPref, s2 ->
-        SettingUiState(
-            // 账号
-            uid = account.first,
-            cookie = account.second,
-            password = account.third,
-            // Aria2
-            aria2Url = aria2.url,
-            aria2Token = aria2.token,
-            defaultOfflineCid = aria2.cid,
-            defaultOfflinePath = aria2.cidPath,
-            defaultOfflineTime = aria2.time,
-            currentOfflineTask = aria2.task,
-            // 界面
-            fabPosition = uiPref.fabPos,
-            requestLimitCount = uiPref.limit,
-            moveFailFile = uiPref.moveFail,
-            txtSize = uiPref.txtSize,
-            themeMode = uiPref.themeMode,
-            expandedScreenThreshold = uiPref.expandedThreshold,
-            gridCellMinSize = uiPref.gridCellMinSize,
-            // 开关
-            autoRotateEnabled = s2.autoRotate,
-            hideLoadingView = s2.hideLoading,
-            earlyLoading = s2.earlyLoading,
-            saveRequestCache = s2.saveCache,
-            positionAfterAt = s2.positionAfterAt,
-            torrentSort = s2.torrentSort,
-            logEnabled = s2.logEnabled,
-            forceLoadCache = s2.forceCache,
-            videoLinkMode = s2.videoLinkMode,
-            dynamicColorEnabled = s2.dynamicColor,
-            autoJumpRetry = s2.autoJumpRetry,
-            expandedScreenEnabled = s2.expandedScreen
-        )
-    }.stateIn(
+    // 从 SettingsRepository 订阅统一暴露的状态 Flow
+    val uiState: StateFlow<SettingUiState> = settingsRepository.settingUiStateFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000), // 当无界面订阅 5 秒后自动停止收集，节省资源
         initialValue = SettingUiState()
@@ -168,7 +48,7 @@ class SettingViewModel : ViewModel() {
         }
 
         viewModelScope.launch {
-            DataStoreUtil.putDataSuspend(key, newValue)
+            settingsRepository.saveData(key, newValue)
         }
     }
 
@@ -196,7 +76,7 @@ class SettingViewModel : ViewModel() {
     }
 
     /**
-     * 导入配置：解析为 JsonObject 后自动遍历类型并存入 DataStore
+     * 导入配置：通过 SettingsRepository 解析并存入 DataStore
      */
     fun importConfig(
         context: Context,
@@ -213,40 +93,8 @@ class SettingViewModel : ViewModel() {
                 // 解析为 JsonObject
                 val jsonObject = gson.fromJson(jsonString, JsonObject::class.java)
 
-                // 动态遍历并保存到 DataStore
-                jsonObject.entrySet().forEach { (key, element) ->
-                    if (element.isJsonPrimitive) {
-                        val primitive = element.asJsonPrimitive
-                        when {
-                            primitive.isBoolean -> DataStoreUtil.putDataSuspend(
-                                key,
-                                primitive.asBoolean
-                            )
-
-                            primitive.isString -> DataStoreUtil.putDataSuspend(
-                                key,
-                                primitive.asString
-                            )
-
-                            primitive.isNumber -> DataStoreUtil.putDataSuspend(
-                                key,
-                                primitive.asNumber
-                            )
-                        }
-                    }
-                }
-
-                // 如果导入配置包含 Cookie / UID，同步更新 UserSessionManager
-                val newCookie =
-                    if (jsonObject.has(ConfigKeyUtil.COOKIE)) jsonObject.get(ConfigKeyUtil.COOKIE).asString else null
-                val newUid =
-                    if (jsonObject.has(ConfigKeyUtil.UID)) jsonObject.get(ConfigKeyUtil.UID).asString else null
-                if (!newCookie.isNullOrEmpty()) {
-                    UserSessionManager.updateSession(
-                        newCookie,
-                        newUid ?: UserSessionManager.uid
-                    )
-                }
+                // 通过 Repository 保存
+                settingsRepository.importConfig(jsonObject)
 
                 withContext(Dispatchers.Main) { onSuccess() }
             } catch (e: Exception) {
@@ -264,67 +112,11 @@ class SettingViewModel : ViewModel() {
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val currentUid = DataStoreUtil.getDataSuspend(ConfigKeyUtil.UID, "0")
-                val currentCookie = DataStoreUtil.getDataSuspend(ConfigKeyUtil.COOKIE, "")
-                val currentAvatar = DataStoreUtil.getDataSuspend(ConfigKeyUtil.AVATAR_BEAN, "")
-                val password = DataStoreUtil.getDataSuspend(ConfigKeyUtil.PASSWORD, "")
-
-                DataStoreUtil.clearData()
-
-                if (currentUid != "0") {
-                    DataStoreUtil.putDataSuspend(ConfigKeyUtil.UID, currentUid)
-                }
-                if (currentCookie.isNotEmpty()) {
-                    DataStoreUtil.putDataSuspend(ConfigKeyUtil.COOKIE, currentCookie)
-                }
-                if (currentAvatar.isNotEmpty()) {
-                    DataStoreUtil.putDataSuspend(ConfigKeyUtil.AVATAR_BEAN, currentAvatar)
-                }
-                if (password.isNotEmpty()) {
-                    DataStoreUtil.putDataSuspend(ConfigKeyUtil.PASSWORD, password)
-                }
-
+                settingsRepository.resetConfig()
                 withContext(Dispatchers.Main) { onSuccess() }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { onError(e.localizedMessage ?: "恢复默认设置失败") }
             }
         }
     }
-
-    // 内部聚合数据结构辅助类
-    private data class Aria2Group(
-        val url: String,
-        val token: String,
-        val cid: String,
-        val cidPath: String,
-        val time: String,
-        val task: String
-    )
-
-    // 内部聚合数据结构辅助类
-    private data class PrefGroup(
-        val fabPos: String,
-        val limit: String,
-        val moveFail: String,
-        val txtSize: String,
-        val themeMode: String,
-        val expandedThreshold: String,
-        val gridCellMinSize: String
-    )
-
-
-    private data class SwitchGroup(
-        val autoRotate: Boolean,
-        val hideLoading: Boolean,
-        val earlyLoading: Boolean,
-        val saveCache: Boolean,
-        val positionAfterAt: Boolean,
-        val torrentSort: Boolean,
-        val logEnabled: Boolean,
-        val forceCache: Boolean,
-        val videoLinkMode: Boolean,
-        val dynamicColor: Boolean,
-        val autoJumpRetry: Boolean,
-        val expandedScreen: Boolean
-    )
 }
