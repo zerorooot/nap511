@@ -54,6 +54,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -152,7 +153,6 @@ fun FileScreen(
     val context = LocalContext.current
     var showForceOpenDialog by rememberSaveable { mutableIntStateOf(-1) }
     var isImagePreviewMode by rememberSaveable { mutableStateOf(false) }
-    val imageLoader = context.imageLoader
 
     var isNotificationEnabled by remember {
         mutableStateOf(App.instance.isNotificationEnabled(context))
@@ -405,8 +405,6 @@ fun FileScreen(
         }
     }
 
-    val scope = rememberCoroutineScope()
-
     // ============================================================
     // Phase 2.3: Extract onBackClick
     // ============================================================
@@ -473,8 +471,6 @@ fun FileScreen(
         }
     }
 
-    val clipboardManager = LocalClipboard.current
-
     // ============================================================
     // Phase 4: inline itemOnLongClick (no remember needed)
     // ============================================================
@@ -487,148 +483,243 @@ fun FileScreen(
         }
     }
 
+    val scope = rememberCoroutineScope()
+    val clipboardManager = LocalClipboard.current
+    val imageLoader = context.imageLoader
+
+    val contentActions = remember(
+        path,
+        isExpandedScreen,
+        isImagePreviewMode,
+        gridState,
+        listState,
+        imageLoader,
+        clipboardManager,
+        scope,
+        context
+    ) {
+        FileContentActions(
+            onOpenNotificationSettings = {
+                val intent = Intent("android.settings.APP_NOTIFICATION_SETTINGS").apply {
+                    putExtra("android.provider.extra.APP_PACKAGE", context.packageName)
+                }
+                notificationSettingLauncher.launch(intent)
+            },
+            onDismissNotificationBanner = { isNotificationBannerDismissed = true },
+            onPathClick = {
+                clipboardManager.nativeClipboardManager.setPrimaryClip(
+                    ClipData.newPlainText("path", path)
+                )
+                App.instance.toast("$path 已复制到剪切板")
+            },
+            onPathDoubleClick = {
+                scope.launch {
+                    if (isExpandedScreen || isImagePreviewMode) {
+                        gridState.requestScrollToItem(0, 0)
+                    } else {
+                        listState.requestScrollToItem(0, 0)
+                    }
+                }
+            },
+            onPathLongClick = { name, cid ->
+                scope.launch {
+                    DataStoreUtil.putDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, cid)
+                    val index = fileViewModel.pathList.indexOfFirst { it.cid == cid }
+                    val pathString = fileViewModel.pathList.take(index + 1)
+                        .joinToString(separator = "/") { it.name }
+                    DataStoreUtil.putDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, pathString)
+                }
+                App.instance.toast("设置默认离线位置为: $name")
+            },
+            onPathItemClick = { fileViewModel.getFiles(it) },
+            onRefresh = {
+                fileBeanList.forEach { fileBean ->
+                    imageLoader.memoryCache?.remove(MemoryCache.Key(fileBean.fileId))
+                    imageLoader.diskCache?.remove(fileBean.fileId)
+                }
+                fileViewModel.refresh()
+            },
+            onItemClick = ::myItemOnClick,
+            onItemLongClick = ::itemOnLongClick,
+            onCut = { fileViewModel.cut(it) },
+            onDelete = { fileViewModel.delete(it) },
+            onRename = { index ->
+                fileViewModel.selectIndex = index
+                fileViewModel.openRenameFileDialog()
+            },
+            onFileInfo = { index ->
+                fileViewModel.selectIndex = index
+                fileViewModel.getFileInfo(index)
+            },
+            onAria2Download = ::onMenuAria2Download,
+            onForceOpen = { showForceOpenDialog = it }
+        )
+    }
+
+    FileScaffold(
+        isLongClickState = fileViewModel.isLongClickState,
+        appBarTitle = fileViewModel.appBarTitle,
+        isExpandedScreen = isExpandedScreen,
+        isBottomBarShow = isBottomBarShow,
+        hasCurrentMusic = audioViewModel.currentMusic != null,
+        isCutState = fileViewModel.isCutState,
+        fabPosition = uiState.fabPosition,
+        nestedScrollConnection = nestedScrollConnection,
+        audioViewModel = audioViewModel,
+        onAppBarClick = ::myAppBarOnClick,
+        onMusicDetailNav = { onNav(Route.MusicDetail) },
+        onCancelCut = { fileViewModel.cancelCut() },
+        onCutPaste = { fileViewModel.removeFile() },
+        onAddFolder = { fileViewModel.openCreateFolderDialog() }
+    ) { innerPadding ->
+        FileScreenContent(
+            innerPadding = innerPadding,
+            path = path,
+            pathList = fileViewModel.pathList,
+            fileBeanList = fileBeanList,
+            refreshing = refreshing,
+            clickIndex = fileViewModel.clickMap.getOrDefault(path, -1),
+            isNotificationEnabled = isNotificationEnabled,
+            isNotificationBannerDismissed = isNotificationBannerDismissed,
+            isExpandedScreen = isExpandedScreen,
+            isImagePreviewMode = isImagePreviewMode,
+            gridState = gridState,
+            listState = listState,
+            gridCellMinSize = gridCellMinSize,
+            actions = contentActions
+        )
+    }
+}
+
+
+@Composable
+private fun FileScaffold(
+    isLongClickState: Boolean,
+    appBarTitle: String,
+    isExpandedScreen: Boolean,
+    isBottomBarShow: Boolean,
+    hasCurrentMusic: Boolean,
+    isCutState: Boolean,
+    fabPosition: FabPosition,
+    nestedScrollConnection: NestedScrollConnection,
+    audioViewModel: AudioViewModel,
+    onAppBarClick: (String) -> Unit,
+    onMusicDetailNav: () -> Unit,
+    onCancelCut: () -> Unit,
+    onCutPaste: () -> Unit,
+    onAddFolder: () -> Unit,
+    content: @Composable (PaddingValues) -> Unit
+) {
     Scaffold(
         topBar = {
             AnimatedContent(
-                targetState = fileViewModel.isLongClickState,
+                targetState = isLongClickState,
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
                 label = ""
             ) {
                 if (it) {
                     AppTopBarMultiple(
-                        title = fileViewModel.appBarTitle,
+                        title = appBarTitle,
                         isExpandedScreen = isExpandedScreen,
-                        onClick = ::myAppBarOnClick
+                        onClick = onAppBarClick
                     )
                 } else {
-                    AppTopBarNormal(fileViewModel.appBarTitle, ::myAppBarOnClick)
+                    AppTopBarNormal(appBarTitle, onAppBarClick)
                 }
             }
         },
         modifier = Modifier.nestedScroll(nestedScrollConnection),
         bottomBar = {
             AnimatedVisibility(
-                visible = audioViewModel.currentMusic != null && isBottomBarShow,
+                visible = hasCurrentMusic && isBottomBarShow,
                 enter = slideInVertically(initialOffsetY = { it }),
                 exit = slideOutVertically(targetOffsetY = { it }),
             ) {
                 MiniPlayerBar(audioViewModel = audioViewModel) {
-                    onNav(Route.MusicDetail)
+                    onMusicDetailNav()
                 }
             }
         },
         floatingActionButton = {
             FileScreenFab(
-                isCutState = fileViewModel.isCutState,
+                isCutState = isCutState,
                 visible = isBottomBarShow,
-                onCancelCut = { fileViewModel.cancelCut() },
-                onCutPaste = { fileViewModel.removeFile() },
-                onAddFolder = { fileViewModel.openCreateFolderDialog() }
+                onCancelCut = onCancelCut,
+                onCutPaste = onCutPaste,
+                onAddFolder = onAddFolder
             )
         },
-        floatingActionButtonPosition = uiState.fabPosition
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .padding(
-                    top = innerPadding.calculateTopPadding(),
-                    bottom = innerPadding.calculateBottomPadding()
-                )
-                .consumeWindowInsets(innerPadding)
-        ) {
-            AnimatedVisibility(
-                visible = !isNotificationEnabled && !isNotificationBannerDismissed,
-                enter = fadeIn() + slideInVertically(),
-                exit = fadeOut() + slideOutVertically()
-            ) {
-                NotificationPermissionBanner(
-                    onOpenSettings = {
-                        val intent = Intent("android.settings.APP_NOTIFICATION_SETTINGS").apply {
-                            putExtra("android.provider.extra.APP_PACKAGE", context.packageName)
-                        }
-                        notificationSettingLauncher.launch(intent)
-                    },
-                    onDismiss = { isNotificationBannerDismissed = true }
-                )
-            }
+        floatingActionButtonPosition = fabPosition,
+        content = content
+    )
+}
 
-            FilePathBar(
-                pathList = fileViewModel.pathList,
-                onPathClick = {
-                    clipboardManager.nativeClipboardManager.setPrimaryClip(
-                        ClipData.newPlainText(
-                            "path",
-                            path
-                        )
-                    )
-                    App.instance.toast("$path 已复制到剪切板")
-                },
-                onPathDoubleClick = {
-                    scope.launch {
-                        if (isExpandedScreen || isImagePreviewMode) {
-                            gridState.requestScrollToItem(0, 0)
-                        } else {
-                            listState.requestScrollToItem(0, 0)
-                        }
-                    }
-                },
-                onPathLongClick = { name, cid ->
-                    scope.launch {
-                        DataStoreUtil.putDataSuspend(
-                            ConfigKeyUtil.DEFAULT_OFFLINE_CID,
-                            cid
-                        )
-
-                        val index = fileViewModel.pathList.indexOfFirst { it.cid == cid }
-                        val pathString =
-                            fileViewModel.pathList.take(index + 1)
-                                .joinToString(separator = "/") { it.name }
-                        DataStoreUtil.putDataSuspend(
-                            ConfigKeyUtil.DEFAULT_OFFLINE_PATH,
-                            pathString
-                        )
-                    }
-                    App.instance.toast("设置默认离线位置为: $name")
-                },
-                onItemClick = {
-                    fileViewModel.getFiles(it)
-                }
+@OptIn(ExperimentalCoilApi::class)
+@Composable
+private fun FileScreenContent(
+    innerPadding: PaddingValues,
+    path: String,
+    pathList: List<PathBean>,
+    fileBeanList: List<FileBean>,
+    refreshing: Boolean,
+    clickIndex: Int,
+    isNotificationEnabled: Boolean,
+    isNotificationBannerDismissed: Boolean,
+    isExpandedScreen: Boolean,
+    isImagePreviewMode: Boolean,
+    gridState: LazyGridState,
+    listState: LazyListState,
+    gridCellMinSize: Dp,
+    actions: FileContentActions,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .padding(
+                top = innerPadding.calculateTopPadding(),
+                bottom = innerPadding.calculateBottomPadding()
             )
-
-            FileListContent(
-                refreshing = refreshing,
-                fileBeanList = fileBeanList,
-                path = path,
-                listState = listState,
-                gridState = gridState,
-                gridCellMinSize = gridCellMinSize,
-                isExpandedScreen = isExpandedScreen,
-                isImagePreviewMode = isImagePreviewMode,
-                clickIndex = fileViewModel.clickMap.getOrDefault(path, -1),
-                onRefresh = {
-                    //手动清除对应 image fileId 的内存和磁盘缓存，触发重新下载
-                    fileViewModel.fileBeanList.forEach { fileBean ->
-                        imageLoader.memoryCache?.remove(MemoryCache.Key(fileBean.fileId))
-                        imageLoader.diskCache?.remove(fileBean.fileId)
-                    }
-                    fileViewModel.refresh()
-                },
-                onItemClick = ::myItemOnClick,
-                onItemLongClick = ::itemOnLongClick,
-                onCut = { fileViewModel.cut(it) },
-                onDelete = { fileViewModel.delete(it) },
-                onRename = { index ->
-                    fileViewModel.selectIndex = index
-                    fileViewModel.openRenameFileDialog()
-                },
-                onFileInfo = { index ->
-                    fileViewModel.selectIndex = index
-                    fileViewModel.getFileInfo(index)
-                },
-                onAria2Download = ::onMenuAria2Download,
-                onForceOpen = { index -> showForceOpenDialog = index }
+            .consumeWindowInsets(innerPadding)
+    ) {
+        AnimatedVisibility(
+            visible = !isNotificationEnabled && !isNotificationBannerDismissed,
+            enter = fadeIn() + slideInVertically(),
+            exit = fadeOut() + slideOutVertically()
+        ) {
+            NotificationPermissionBanner(
+                onOpenSettings = actions.onOpenNotificationSettings,
+                onDismiss = actions.onDismissNotificationBanner
             )
         }
+
+        FilePathBar(
+            pathList = pathList,
+            onPathClick = actions.onPathClick,
+            onPathDoubleClick = actions.onPathDoubleClick,
+            onPathLongClick = actions.onPathLongClick,
+            onItemClick = actions.onPathItemClick
+        )
+
+        FileListContent(
+            refreshing = refreshing,
+            fileBeanList = fileBeanList,
+            path = path,
+            listState = listState,
+            gridState = gridState,
+            gridCellMinSize = gridCellMinSize,
+            isExpandedScreen = isExpandedScreen,
+            isImagePreviewMode = isImagePreviewMode,
+            clickIndex = clickIndex,
+            onRefresh = actions.onRefresh,
+            onItemClick = actions.onItemClick,
+            onItemLongClick = actions.onItemLongClick,
+            onCut = actions.onCut,
+            onDelete = actions.onDelete,
+            onRename = actions.onRename,
+            onFileInfo = actions.onFileInfo,
+            onAria2Download = actions.onAria2Download,
+            onForceOpen = actions.onForceOpen
+        )
     }
 }
 
@@ -941,3 +1032,24 @@ private fun NotificationPermissionBanner(
         }
     }
 }
+
+/**
+ * 文件内容区域 UI 交互事件封装
+ */
+private data class FileContentActions(
+    val onOpenNotificationSettings: () -> Unit,
+    val onDismissNotificationBanner: () -> Unit,
+    val onPathClick: () -> Unit,
+    val onPathDoubleClick: () -> Unit,
+    val onPathLongClick: (name: String, cid: String) -> Unit,
+    val onPathItemClick: (cid: String) -> Unit,
+    val onRefresh: () -> Unit,
+    val onItemClick: (Int) -> Unit,
+    val onItemLongClick: (Int) -> Unit,
+    val onCut: (Int) -> Unit,
+    val onDelete: (Int) -> Unit,
+    val onRename: (Int) -> Unit,
+    val onFileInfo: (Int) -> Unit,
+    val onAria2Download: (Int) -> Unit,
+    val onForceOpen: (Int) -> Unit
+)
