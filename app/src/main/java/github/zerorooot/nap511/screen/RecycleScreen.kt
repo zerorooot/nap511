@@ -129,10 +129,11 @@ fun RecycleContent(
         }
     }
 
-    val appBarOnClick = { name: String ->
-        when (name) {
-            "清空所有文件" -> onDeleteAll()
-            "ModalNavigationDrawerMenu" -> onClick()
+    val appBarOnClick = { action: AppBarAction ->
+        when (action) {
+            TopBarAction.CLEAR_ALL_RECYCLE -> onDeleteAll()
+            TopBarAction.DRAWER_MENU -> onClick()
+            else -> {}
         }
     }
 

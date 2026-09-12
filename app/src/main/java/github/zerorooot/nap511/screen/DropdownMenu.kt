@@ -46,11 +46,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 
+sealed interface AppBarAction {
+    val label: String
+    val icon: ImageVector?
+}
+
 enum class MenuItemAction(
-    val label: String,
-    val icon: ImageVector,
+    override val label: String,
+    override val icon: ImageVector,
     val isDestructive: Boolean = false
-) {
+) : AppBarAction {
     // 文件列表菜单项
     CUT_FILE("剪切文件", Icons.Outlined.ContentCut),
     RENAME_FILE("重新命名", Icons.Outlined.Edit),

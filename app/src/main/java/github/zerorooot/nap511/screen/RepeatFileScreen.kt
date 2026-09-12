@@ -114,8 +114,8 @@ fun RepeatFileScreen(
             viewModel.loadNextPage()
         }
     }
-    val appBarOnClick = { name: Any ->
-        when (name) {
+    val appBarOnClick = { action: AppBarAction ->
+        when (action) {
             MenuItemAction.ONE_KEY_DEDUP -> {
                 showDeleteDialog = true
             }
@@ -128,9 +128,11 @@ fun RepeatFileScreen(
                 viewModel.clearEmptyFile()
             }
 
-            "ModalNavigationDrawerMenu" -> {
+            TopBarAction.DRAWER_MENU -> {
                 onClick.invoke()
             }
+
+            else -> {}
         }
     }
 

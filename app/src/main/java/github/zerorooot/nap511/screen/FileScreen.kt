@@ -180,7 +180,7 @@ fun FileScreen(
         val threshold = settingUiState.autoImagePreviewCount.toIntOrNull() ?: 0
         if (threshold > 0 && !refreshing) {
             val imageCount = fileBeanList.count { it.photoThumb.isNotEmpty() }
-            isImagePreviewMode = imageCount > threshold
+            isImagePreviewMode = isImagePreviewMode || (imageCount > threshold)
         }
     }
 
@@ -228,11 +228,11 @@ fun FileScreen(
     // 1. 设置 35dp 的防抖阈值
     val thresholdPx = rememberSaveable(density) { with(density) { 35.dp.toPx() } }
     var isBottomBarShow by rememberSaveable { mutableStateOf(true) }
+    var isTopBarShow by rememberSaveable { mutableStateOf(true) }
 
     // 2. 嵌套滚动监听
     val nestedScrollConnection = remember {
         var accumulatedDelta = 0f
-
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 val delta = available.y
@@ -245,11 +245,23 @@ fun FileScreen(
                 accumulatedDelta += delta
 
                 // 【关键点】增加状态判断 (`&& isBottomBarShow` / `&& !isBottomBarShow`)，防止重复更新状态引发卡顿
-                if (accumulatedDelta < -thresholdPx && isBottomBarShow) {
-                    isBottomBarShow = false
-                } else if (accumulatedDelta > thresholdPx && !isBottomBarShow) {
-                    isBottomBarShow = true
+                if (accumulatedDelta < -thresholdPx) {
+                    if (isImagePreviewMode) {
+                        isTopBarShow = false
+                    }
+                    if (isBottomBarShow) {
+                        isBottomBarShow = false
+                    }
                 }
+                if (accumulatedDelta > thresholdPx) {
+                    if (isImagePreviewMode) {
+                        isTopBarShow = true
+                    }
+                    if (!isBottomBarShow) {
+                        isBottomBarShow = true
+                    }
+                }
+
                 return Offset.Zero
             }
         }
@@ -489,10 +501,23 @@ fun FileScreen(
         fileViewModel.refresh(forceCache)
     }
 
-    fun myAppBarOnClick(name: Any) {
-        when (name) {
-            "back" -> {
+    fun myAppBarOnClick(action: AppBarAction) {
+        when (action) {
+            TopBarAction.BACK -> {
                 onBack()
+            }
+
+            TopBarAction.SEARCH -> {
+                fileViewModel.openSearchDialog()
+            }
+
+            TopBarAction.SELECT_UP -> fileViewModel.selectToUp()
+            TopBarAction.SELECT_DOWN -> fileViewModel.selectToDown()
+            TopBarAction.CUT -> fileViewModel.cut()
+            TopBarAction.DELETE -> fileViewModel.deleteMultiple()
+            TopBarAction.SELECT_REVERSE -> fileViewModel.selectReverse()
+            TopBarAction.UNZIP_ALL -> {
+                fileViewModel.openUnzipAllFileDialog()
             }
 
             MenuItemAction.GALLERY_MODE -> {
@@ -508,28 +533,12 @@ fun FileScreen(
                 }
             }
 
-//            "强制刷新" -> {
-//                refresh(true)
-//            }
-
-            "unzipAllFile" -> {
-                fileViewModel.openUnzipAllFileDialog()
-            }
-
-            "selectToUp" -> fileViewModel.selectToUp()
-            "selectToDown" -> fileViewModel.selectToDown()
-            "cut" -> fileViewModel.cut()
-            //具体实现在FileScreen#CreateDialogs()里
-            "search" -> fileViewModel.openSearchDialog()
-            "delete" -> fileViewModel.deleteMultiple()
-//            "selectAll" -> fileViewModel.selectAll()
-            "selectReverse" -> fileViewModel.selectReverse()
-            //具体实现在FileScreen#CreateDialogs()里
             MenuItemAction.FILE_SORT -> fileViewModel.openFileOrderDialog()
             MenuItemAction.REFRESH_FILES -> {
                 refresh(true)
             }
 
+            else -> {}
         }
     }
 
@@ -631,6 +640,7 @@ fun FileScreen(
         appBarTitle = fileViewModel.appBarTitle,
         isExpandedScreen = isExpandedScreen,
         isBottomBarShow = isBottomBarShow,
+        isTopBarShow = isTopBarShow,
         hasCurrentMusic = audioViewModel.currentMusic != null,
         isCutState = fileViewModel.isCutState,
         fabPosition = fabPosition,
@@ -649,6 +659,7 @@ fun FileScreen(
             fileBeanList = fileBeanList,
             refreshing = refreshing,
             clickIndex = fileViewModel.clickMap.getOrDefault(path, -1),
+            isTopBarShow = isTopBarShow,
             isNotificationEnabled = isNotificationEnabled,
             isNotificationBannerDismissed = isNotificationBannerDismissed,
             isIgnoringBatteryOptimizations = isIgnoringBatteryOptimizations,
@@ -678,12 +689,13 @@ private fun FileScaffold(
     appBarTitle: String,
     isExpandedScreen: Boolean,
     isBottomBarShow: Boolean,
+    isTopBarShow: Boolean,
     hasCurrentMusic: Boolean,
     isCutState: Boolean,
     fabPosition: FabPosition,
     nestedScrollConnection: NestedScrollConnection,
     audioViewModel: AudioViewModel,
-    onAppBarClick: (Any) -> Unit,
+    onAppBarClick: (AppBarAction) -> Unit,
     onMusicDetailNav: () -> Unit,
     onCancelCut: () -> Unit,
     onCutPaste: () -> Unit,
@@ -692,19 +704,25 @@ private fun FileScaffold(
 ) {
     Scaffold(
         topBar = {
-            AnimatedContent(
-                targetState = isLongClickState,
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = ""
+            AnimatedVisibility(
+                visible = isTopBarShow,
+                enter = fadeIn() + slideInVertically(),
+                exit = fadeOut() + slideOutVertically()
             ) {
-                if (it) {
-                    AppTopBarMultiple(
-                        title = appBarTitle,
-                        isExpandedScreen = isExpandedScreen,
-                        onClick = onAppBarClick
-                    )
-                } else {
-                    AppTopBarNormal(appBarTitle, onAppBarClick)
+                AnimatedContent(
+                    targetState = isLongClickState,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = ""
+                ) {
+                    if (it) {
+                        AppTopBarMultiple(
+                            title = appBarTitle,
+                            isExpandedScreen = isExpandedScreen,
+                            onClick = onAppBarClick
+                        )
+                    } else {
+                        AppTopBarNormal(appBarTitle, onAppBarClick)
+                    }
                 }
             }
         },
@@ -743,6 +761,7 @@ private fun FileScreenContent(
     fileBeanList: List<FileBean>,
     refreshing: Boolean,
     clickIndex: Int,
+    isTopBarShow: Boolean,
     isNotificationEnabled: Boolean,
     isNotificationBannerDismissed: Boolean,
     isIgnoringBatteryOptimizations: Boolean,
@@ -792,13 +811,19 @@ private fun FileScreenContent(
             }
         }
 
-        FilePathBar(
-            pathList = pathList,
-            onPathClick = actions.onPathClick,
-            onPathDoubleClick = actions.onPathDoubleClick,
-            onPathLongClick = actions.onPathLongClick,
-            onItemClick = actions.onPathItemClick
-        )
+        AnimatedVisibility(
+            visible = isTopBarShow,
+            enter = fadeIn() + slideInVertically(),
+            exit = fadeOut() + slideOutVertically()
+        ) {
+            FilePathBar(
+                pathList = pathList,
+                onPathClick = actions.onPathClick,
+                onPathDoubleClick = actions.onPathDoubleClick,
+                onPathLongClick = actions.onPathLongClick,
+                onItemClick = actions.onPathItemClick
+            )
+        }
 
         FileListContent(
             refreshing = refreshing,

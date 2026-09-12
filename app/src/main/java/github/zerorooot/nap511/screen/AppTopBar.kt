@@ -74,8 +74,26 @@ fun BaseTopAppBar(
     )
 }
 
+enum class TopBarAction(
+    override val label: String,
+    override val icon: ImageVector? = null
+) : AppBarAction {
+    BACK("返回", Icons.AutoMirrored.Rounded.ArrowBack),
+    DRAWER_MENU("抽屉菜单", Icons.Rounded.Menu),
+    SEARCH("搜索", Icons.Rounded.Search),
+
+    SELECT_UP("向上选", Icons.Default.ArrowUpward),
+    SELECT_DOWN("向下选", Icons.Default.ArrowDownward),
+    CUT("剪切", Icons.Default.ContentCut),
+    DELETE("删除", Icons.Default.Delete),
+    SELECT_REVERSE("反选", Icons.Default.SelectAll),
+    UNZIP_ALL("解压", Icons.Default.Cloud),
+
+    CLEAR_ALL_RECYCLE("清空所有文件", Icons.Default.DeleteForever)
+}
+
 @Composable
-fun AppTopBarNormal(title: String, onClick: (Any) -> Unit) {
+fun AppTopBarNormal(title: String, onClick: (AppBarAction) -> Unit) {
     BaseTopAppBar(
         title = { Text(text = title) },
         navigationIcon = {
@@ -83,7 +101,7 @@ fun AppTopBarNormal(title: String, onClick: (Any) -> Unit) {
                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                 description = "navigationIcon"
             ) {
-                onClick.invoke("back")
+                onClick.invoke(TopBarAction.BACK)
             }
         },
         actions = {
@@ -91,7 +109,7 @@ fun AppTopBarNormal(title: String, onClick: (Any) -> Unit) {
                 imageVector = Icons.Rounded.Search,
                 description = "Search"
             ) {
-                onClick.invoke("search")
+                onClick.invoke(TopBarAction.SEARCH)
             }
             FileAppTopBarDropdownMenu(onClick = { itemValue, _ ->
                 onClick.invoke(itemValue)
@@ -104,12 +122,12 @@ fun AppTopBarNormal(title: String, onClick: (Any) -> Unit) {
 fun AppTopBarMultiple(
     title: String,
     isExpandedScreen: Boolean = false,
-    onClick: (String) -> Unit
+    onClick: (AppBarAction) -> Unit
 ) {
     BaseTopAppBar(
         title = { Text(text = title) },
         navigationIcon = {
-            IconButton(onClick = { onClick.invoke("back") }) {
+            IconButton(onClick = { onClick.invoke(TopBarAction.BACK) }) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                     contentDescription = "navigationIcon"
@@ -123,33 +141,33 @@ fun AppTopBarMultiple(
                 ) {
                     TopAppBarActionTextButton(
                         imageVector = Icons.Default.ArrowUpward,
-                        label = "向上选",
-                        onClick = { onClick.invoke("selectToUp") }
+                        label = TopBarAction.SELECT_UP.label,
+                        onClick = { onClick.invoke(TopBarAction.SELECT_UP) }
                     )
                     TopAppBarActionTextButton(
                         imageVector = Icons.Default.ArrowDownward,
-                        label = "向下选",
-                        onClick = { onClick.invoke("selectToDown") }
+                        label = TopBarAction.SELECT_DOWN.label,
+                        onClick = { onClick.invoke(TopBarAction.SELECT_DOWN) }
                     )
                     TopAppBarActionTextButton(
                         imageVector = Icons.Default.ContentCut,
-                        label = "剪切",
-                        onClick = { onClick.invoke("cut") }
+                        label = TopBarAction.CUT.label,
+                        onClick = { onClick.invoke(TopBarAction.CUT) }
                     )
                     TopAppBarActionTextButton(
                         imageVector = Icons.Default.Delete,
-                        label = "删除",
-                        onClick = { onClick.invoke("delete") }
+                        label = TopBarAction.DELETE.label,
+                        onClick = { onClick.invoke(TopBarAction.DELETE) }
                     )
                     TopAppBarActionTextButton(
                         imageVector = Icons.Default.SelectAll,
-                        label = "反选",
-                        onClick = { onClick.invoke("selectReverse") }
+                        label = TopBarAction.SELECT_REVERSE.label,
+                        onClick = { onClick.invoke(TopBarAction.SELECT_REVERSE) }
                     )
                     TopAppBarActionTextButton(
                         imageVector = Icons.Default.Cloud,
-                        label = "解压",
-                        onClick = { onClick.invoke("unzipAllFile") }
+                        label = TopBarAction.UNZIP_ALL.label,
+                        onClick = { onClick.invoke(TopBarAction.UNZIP_ALL) }
                     )
                 }
             } else {
@@ -157,37 +175,37 @@ fun AppTopBarMultiple(
                     Icons.Default.ArrowUpward,
                     description = "up"
                 ) {
-                    onClick.invoke("selectToUp")
+                    onClick.invoke(TopBarAction.SELECT_UP)
                 }
                 TopAppBarActionButton(
                     Icons.Default.ArrowDownward,
                     description = "down"
                 ) {
-                    onClick.invoke("selectToDown")
+                    onClick.invoke(TopBarAction.SELECT_DOWN)
                 }
                 TopAppBarActionButton(
                     Icons.Default.ContentCut,
                     description = "Cut"
                 ) {
-                    onClick.invoke("cut")
+                    onClick.invoke(TopBarAction.CUT)
                 }
                 TopAppBarActionButton(
                     Icons.Default.Delete,
                     description = "delete"
                 ) {
-                    onClick.invoke("delete")
+                    onClick.invoke(TopBarAction.DELETE)
                 }
                 TopAppBarActionButton(
                     Icons.Default.SelectAll,
                     description = "ic_baseline_select_reverse_24"
                 ) {
-                    onClick.invoke("selectReverse")
+                    onClick.invoke(TopBarAction.SELECT_REVERSE)
                 }
                 TopAppBarActionButton(
                     Icons.Default.Cloud,
                     description = "unzip file"
                 ) {
-                    onClick.invoke("unzipAllFile")
+                    onClick.invoke(TopBarAction.UNZIP_ALL)
                 }
             }
         }
@@ -220,7 +238,7 @@ private fun TopAppBarActionTextButton(
 }
 
 @Composable
-fun AppTopBarOfflineFile(title: String, onClick: (Any) -> Unit) {
+fun AppTopBarOfflineFile(title: String, onClick: (AppBarAction) -> Unit) {
     BaseTopAppBar(
         title = { Text(text = title) },
         navigationIcon = {
@@ -228,7 +246,7 @@ fun AppTopBarOfflineFile(title: String, onClick: (Any) -> Unit) {
                 imageVector = Icons.Rounded.Menu,
                 description = "navigationIcon"
             ) {
-                onClick.invoke("ModalNavigationDrawerMenu")
+                onClick.invoke(TopBarAction.DRAWER_MENU)
             }
         },
         actions = {
@@ -240,7 +258,7 @@ fun AppTopBarOfflineFile(title: String, onClick: (Any) -> Unit) {
 }
 
 @Composable
-fun AppTopBarLogScreen(title: String, onClick: (Any) -> Unit) {
+fun AppTopBarLogScreen(title: String, onClick: (AppBarAction) -> Unit) {
     BaseTopAppBar(
         title = { Text(text = title) },
         navigationIcon = {
@@ -248,7 +266,7 @@ fun AppTopBarLogScreen(title: String, onClick: (Any) -> Unit) {
                 imageVector = Icons.Rounded.Menu,
                 description = "navigationIcon"
             ) {
-                onClick.invoke("ModalNavigationDrawerMenu")
+                onClick.invoke(TopBarAction.DRAWER_MENU)
             }
         },
         actions = {
@@ -256,7 +274,7 @@ fun AppTopBarLogScreen(title: String, onClick: (Any) -> Unit) {
                 imageVector = Icons.Default.Search,
                 description = "搜索"
             ) {
-                onClick.invoke("搜索")
+                onClick.invoke(TopBarAction.SEARCH)
             }
             LogScreenTopBarDropdownMenu(onClick = { itemValue, _ ->
                 onClick.invoke(itemValue)
@@ -266,7 +284,7 @@ fun AppTopBarLogScreen(title: String, onClick: (Any) -> Unit) {
 }
 
 @Composable
-fun AppTopBarRepeatFile(title: String, onClick: (Any) -> Unit) {
+fun AppTopBarRepeatFile(title: String, onClick: (AppBarAction) -> Unit) {
     BaseTopAppBar(
         title = { Text(text = title) },
         navigationIcon = {
@@ -274,7 +292,7 @@ fun AppTopBarRepeatFile(title: String, onClick: (Any) -> Unit) {
                 imageVector = Icons.Rounded.Menu,
                 description = "navigationIcon"
             ) {
-                onClick.invoke("ModalNavigationDrawerMenu")
+                onClick.invoke(TopBarAction.DRAWER_MENU)
             }
         },
         actions = {
@@ -286,7 +304,7 @@ fun AppTopBarRepeatFile(title: String, onClick: (Any) -> Unit) {
 }
 
 @Composable
-fun AppTopBarRecycle(title: String, onClick: (name: String) -> Unit) {
+fun AppTopBarRecycle(title: String, onClick: (AppBarAction) -> Unit) {
     BaseTopAppBar(
         title = { Text(text = title) },
         navigationIcon = {
@@ -294,14 +312,14 @@ fun AppTopBarRecycle(title: String, onClick: (name: String) -> Unit) {
                 imageVector = Icons.Rounded.Menu,
                 description = "navigationIcon"
             ) {
-                onClick.invoke("ModalNavigationDrawerMenu")
+                onClick.invoke(TopBarAction.DRAWER_MENU)
             }
         },
         actions = {
-            IconButton(onClick = { onClick.invoke("清空所有文件") }) {
+            IconButton(onClick = { onClick.invoke(TopBarAction.CLEAR_ALL_RECYCLE) }) {
                 Icon(
                     Icons.Default.DeleteForever,
-                    contentDescription = "清空所有文件"
+                    contentDescription = TopBarAction.CLEAR_ALL_RECYCLE.label
                 )
             }
         }

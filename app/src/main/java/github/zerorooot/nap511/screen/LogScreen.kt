@@ -226,9 +226,9 @@ fun LogScreen(onClick: () -> Unit) {
         }
     }
 
-    val appBarOnClick: (Any) -> Unit = { name ->
+    val appBarOnClick: (AppBarAction) -> Unit = { name ->
         when (name) {
-            "搜索" -> {
+            TopBarAction.SEARCH -> {
                 isSearchOpen = true
             }
 
@@ -269,7 +269,7 @@ fun LogScreen(onClick: () -> Unit) {
                 }
             }
 
-            "ModalNavigationDrawerMenu" -> onClick.invoke()
+            TopBarAction.DRAWER_MENU -> onClick.invoke()
             else -> {}
         }
     }

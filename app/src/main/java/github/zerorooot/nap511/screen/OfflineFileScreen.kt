@@ -132,7 +132,7 @@ fun OfflineFileContent(
         }
     }
 
-    val appBarOnClick = { action: Any ->
+    val appBarOnClick = { action: AppBarAction ->
         when (action) {
             MenuItemAction.REFRESH_FILES -> onRefresh()
             MenuItemAction.CLEAR_COMPLETED -> onClearFinish()
@@ -153,7 +153,8 @@ fun OfflineFileContent(
                 copyDownloadUrl(context, stringJoiner.toString(), allTasks.size)
             }
 
-            "ModalNavigationDrawerMenu" -> onClick.invoke("ModalNavigationDrawerMenu")
+            TopBarAction.DRAWER_MENU -> onClick.invoke("ModalNavigationDrawerMenu")
+            else -> {}
         }
     }
 
