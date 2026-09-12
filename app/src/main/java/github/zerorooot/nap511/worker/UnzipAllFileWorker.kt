@@ -98,7 +98,13 @@ class UnzipAllFileWorker(
         // 2. 初始化进度和通知
         val size = fileBeanList.size
         val name = fileBeanList[0].name
-        setForegroundAsync(createForegroundInfo("解压中", "正在解压中", 0, size))
+
+        try {
+            setForegroundAsync(createForegroundInfo("解压中", "正在解压中", 0, size))
+        } catch (e: Exception) {
+            // Android 12+ 在后台无法启动前台服务，忽略异常继续在后台执行短任务
+            XLog.w("UnzipAllFileWorker setForeground 失败，将作为普通后台任务继续运行: ${e.message}")
+        }
 
         val sj = StringJoiner("\n")
         val unzipFailList = arrayListOf<FileBean>()
@@ -390,7 +396,7 @@ class UnzipAllFileWorker(
         titleString: String, detailedText: String, progress: Int, max: Int
     ): ForegroundInfo {
         val build =
-            createNotification(titleString, detailedText, "⚙\uFE0F初始化", progress, max).build()
+            createNotification(titleString, detailedText, "初始化", progress, max).build()
         // Android 14 前台服务类型适配
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             return ForegroundInfo(

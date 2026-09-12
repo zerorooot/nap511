@@ -170,6 +170,14 @@ fun FileScreen(
     var showForceOpenDialog by rememberSaveable { mutableIntStateOf(-1) }
     var isImagePreviewMode by rememberSaveable { mutableStateOf(false) }
 
+    LaunchedEffect(path, refreshing, fileBeanList.toList(), settingUiState.autoImagePreviewCount) {
+        val threshold = settingUiState.autoImagePreviewCount.toIntOrNull() ?: 0
+        if (threshold > 0 && !refreshing) {
+            val imageCount = fileBeanList.count { it.photoThumb.isNotEmpty() }
+            isImagePreviewMode = imageCount > threshold
+        }
+    }
+
     var isNotificationEnabled by remember {
         mutableStateOf(App.instance.isNotificationEnabled(context))
     }

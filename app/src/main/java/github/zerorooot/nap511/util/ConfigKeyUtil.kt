@@ -124,6 +124,11 @@ class ConfigKeyUtil {
         const val IMAGE_HD_PREVIEW = "imageHdPreview"
 
         /**
+         * 当图片文件数量大于此阈值时，自动切换大图预览模式
+         */
+        const val AUTO_IMAGE_PREVIEW_COUNT = "autoImagePreviewCount"
+
+        /**
          * 支持打开xx kb以下的文件
          */
         const val MAX_TXT_SIZE = "MaxTxtSize"

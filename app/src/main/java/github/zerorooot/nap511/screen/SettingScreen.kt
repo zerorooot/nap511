@@ -374,6 +374,15 @@ fun SettingContent(
                     )
                 }
                 item {
+                    EditTextPreferenceItem(
+                        title = "自动切换大图模式",
+                        summary = "当图片文件数量大于 ${uiState.autoImagePreviewCount} 个时，自动切换大图模式",
+                        value = uiState.autoImagePreviewCount,
+                        isNumber = true,
+                        onValueSave = { onSaveConfig(ConfigKeyUtil.AUTO_IMAGE_PREVIEW_COUNT, it) }
+                    )
+                }
+                item {
                     SwitchPreferenceItem(
                         title = "开启请求磁盘缓存",
                         summary = "将请求的文件列表缓存至本地存储，提升再次加载速度",

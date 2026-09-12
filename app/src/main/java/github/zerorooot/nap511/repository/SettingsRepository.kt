@@ -112,7 +112,8 @@ class SettingsRepository {
         getDataFlow(ConfigKeyUtil.MAX_TXT_SIZE, "200"),
         getDataFlow(ConfigKeyUtil.THEME_MODE, "跟随系统"),
         getDataFlow(ConfigKeyUtil.EXPANDED_SCREEN_THRESHOLD, "600"),
-        getDataFlow(ConfigKeyUtil.GRID_CELL_MIN_SIZE, "340")
+        getDataFlow(ConfigKeyUtil.GRID_CELL_MIN_SIZE, "340"),
+        getDataFlow(ConfigKeyUtil.AUTO_IMAGE_PREVIEW_COUNT, "1150")
     ) { values: Array<String> ->
         PrefGroup(
             fabPos = values[0],
@@ -121,7 +122,8 @@ class SettingsRepository {
             txtSize = values[3],
             themeMode = values[4],
             expandedThreshold = values[5],
-            gridCellMinSize = values[6]
+            gridCellMinSize = values[6],
+            autoImagePreviewCount = values[7]
         )
     }
 
@@ -186,6 +188,7 @@ class SettingsRepository {
             themeMode = uiPref.themeMode,
             expandedScreenThreshold = uiPref.expandedThreshold,
             gridCellMinSize = uiPref.gridCellMinSize,
+            autoImagePreviewCount = uiPref.autoImagePreviewCount,
             // 开关
             autoRotateEnabled = s2.autoRotate,
             hideLoadingView = s2.hideLoading,
@@ -328,7 +331,8 @@ class SettingsRepository {
         val txtSize: String,
         val themeMode: String,
         val expandedThreshold: String,
-        val gridCellMinSize: String
+        val gridCellMinSize: String,
+        val autoImagePreviewCount: String
     )
 
     private data class SwitchGroup(
