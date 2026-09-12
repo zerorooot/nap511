@@ -71,7 +71,7 @@ enum class MenuItemAction(
     COPY_LINK("复制链接", Icons.Outlined.ContentCopy),
 
     // 文件页顶栏菜单项
-    GALLERY_MODE("大图模式", Icons.Outlined.Image),
+    GALLERY_MODE("瀑布视图", Icons.Outlined.Image),
     FILE_SORT("文件排序", Icons.AutoMirrored.Outlined.Sort),
     REFRESH_FILES("刷新文件", Icons.Outlined.Refresh),
     VIDEO_SCHEDULE("视频时间", Icons.Outlined.Schedule),
