@@ -9,12 +9,15 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,7 +26,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
@@ -32,12 +34,14 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 
 
+// 全局内存缓存图片宽高比，避免快速滑动和 Item 离屏复用时高度重置引发瀑布流跳动闪烁
+private val aspectRatioCache = mutableMapOf<String, Float>()
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ImageCellItem(
     fileBean: FileBean,
     index: Int,
-    gridCellMinSize: Dp,
     //删除会有动画
     modifier: Modifier = Modifier,
     clickIndex: Int = -1,
@@ -47,6 +51,12 @@ fun ImageCellItem(
     val image = fileBean.fileIco
     val name = fileBean.name
     val imageData = fileBean.photoThumb.ifEmpty { image }
+    val cacheKey = fileBean.fileId.ifEmpty { fileBean.photoThumb.ifEmpty { name } }
+
+    // 优先读取缓存的宽高比，未缓存时默认 1.0f (正方形)
+    var aspectRatio by remember(cacheKey) {
+        mutableFloatStateOf(aspectRatioCache[cacheKey] ?: 1.0f)
+    }
 
     Card(
         shape = MaterialTheme.shapes.medium,
@@ -61,7 +71,7 @@ fun ImageCellItem(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = modifier
-            .width(gridCellMinSize)
+            .fillMaxWidth()
             .padding(4.dp)
             .combinedClickable(
                 onClick = { itemOnClick.invoke(index) },
@@ -75,7 +85,7 @@ fun ImageCellItem(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(0.8f) // 1:1.5 长方形，图片高度随宽度自动计算
+                    .aspectRatio(aspectRatio.coerceIn(0.65f, 1.5f))
                     .padding(4.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -101,9 +111,19 @@ fun ImageCellItem(
                             .diskCacheKey(fileBean.fileId)
                             .placeholder(image)
                             .error(image)
-                            .crossfade(true)
+                            .crossfade(false) // 关闭淡入淡出动画，避免快速滑动时图片闪烁
                             .build(),
                         contentDescription = "File Thumbnail",
+                        onSuccess = { successState ->
+                            val drawable = successState.result.drawable
+                            if (drawable.intrinsicWidth > 0 && drawable.intrinsicHeight > 0) {
+                                val newRatio = drawable.intrinsicWidth.toFloat() / drawable.intrinsicHeight.toFloat()
+                                if (aspectRatio != newRatio) {
+                                    aspectRatioCache[cacheKey] = newRatio
+                                    aspectRatio = newRatio
+                                }
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxSize()
                             .clip(MaterialTheme.shapes.medium),// 设置圆角曲率与 Card 保持一致
@@ -140,11 +160,11 @@ fun ImageCellItemPreview() {
     ImageCellItem(
         fileBean = copy,
         index = 1,
-        gridCellMinSize = 160.dp,
         clickIndex = -1,
         itemOnClick = {},
         itemOnLongClick = {}
     )
 }
+
 
 

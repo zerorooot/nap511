@@ -262,17 +262,15 @@ class MainActivity : AppCompatActivity() {
         var lastBackPressTime by remember { mutableLongStateOf(0L) }
 
         val isExpandedConfig = uiState.expandedScreenEnabled
-        val expandedScreenThresholdStr = uiState.expandedScreenThreshold
+
         val expandedScreenThreshold =
-            expandedScreenThresholdStr.toIntOrNull()?.takeIf { i -> i > 0 } ?: 600
+            uiState.expandedScreenThreshold.toIntOrNull()?.takeIf { i -> i > 0 } ?: 600
 
         val isExpandedScreen =
             (LocalConfiguration.current.screenWidthDp >= expandedScreenThreshold) && isExpandedConfig
 
-        val gridCellMinSizeStr = uiState.gridCellMinSize
-        val gridCellMinSize = remember(gridCellMinSizeStr) {
-            (gridCellMinSizeStr.toIntOrNull()?.takeIf { i -> i > 0 } ?: 340).dp
-        }
+        val gridCellMinSize =
+            (uiState.gridCellMinSize.toIntOrNull()?.takeIf { i -> i > 0 } ?: 340).dp
 
 
         // 监听当前导航栈顶的路由，用于高亮显示 Drawer 中选中的 Item

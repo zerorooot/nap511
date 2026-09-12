@@ -20,8 +20,10 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -32,8 +34,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -45,6 +45,9 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -101,9 +104,9 @@ import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.dialog.ForceOpenDialog
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.screenitem.FileCellItem
 import github.zerorooot.nap511.screenitem.ImageCellItem
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.AudioViewModel
@@ -132,6 +135,7 @@ import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.LazyVerticalGridScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
+import androidx.compose.foundation.lazy.staggeredgrid.itemsIndexed as staggeredItemsIndexed
 
 @OptIn(
     ExperimentalFoundationApi::class,
@@ -445,7 +449,7 @@ fun FileScreen(
                 onBack()
             }
 
-            "图片预览" -> {
+            "大图模式" -> {
                 isImagePreviewMode = !isImagePreviewMode
             }
 
@@ -883,7 +887,32 @@ private fun FileListContent(
             }
         } else {
             key(path, isImagePreviewMode) {
-                if (isExpandedScreen || isImagePreviewMode) {
+                if (isImagePreviewMode) {
+                    val staggeredGridState = rememberLazyStaggeredGridState()
+                    LazyVerticalStaggeredGrid(
+                        state = staggeredGridState,
+                        columns = StaggeredGridCells.Adaptive(minSize = gridCellMinSize),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalItemSpacing = 8.dp,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        staggeredItemsIndexed(
+                            items = fileBeanList,
+                            key = { _, item ->
+                                item.fileId.ifEmpty { item.pickCode.ifEmpty { item.photoThumb } }
+                            },
+                        ) { index, item ->
+                            ImageCellItem(
+                                fileBean = item,
+                                index = index,
+                                clickIndex = clickIndex,
+                                modifier = Modifier, // 瀑布流快速滑动时不施加 animateItem 动画，防止布局重新计算时元素跳动
+                                itemOnClick = onItemClick,
+                                itemOnLongClick = onItemLongClick
+                            )
+                        }
+                    }
+                } else if (isExpandedScreen) {
                     LazyVerticalGridScrollbar(
                         state = gridState,
                         settings = ScrollbarSettings.Default.copy(
@@ -902,38 +931,23 @@ private fun FileListContent(
                                     item.fileId.ifEmpty { item.categoryId.ifEmpty { item.pickCode } }
                                 },
                             ) { index, item ->
-                                if (isImagePreviewMode) {
-                                    ImageCellItem(
-                                        fileBean = item,
-                                        index = index,
-                                        gridCellMinSize = gridCellMinSize,
-                                        clickIndex = clickIndex,
-                                        modifier = Modifier.animateItem(
-                                            fadeInSpec = null,
-                                            fadeOutSpec = null
-                                        ),
-                                        itemOnClick = onItemClick,
-                                        itemOnLongClick = onItemLongClick
-                                    )
-                                } else {
-                                    FileCellItem(
-                                        fileBean = item,
-                                        index = index,
-                                        clickIndex = clickIndex,
-                                        modifier = Modifier.animateItem(
-                                            fadeInSpec = null,
-                                            fadeOutSpec = null
-                                        ),
-                                        itemOnClick = onItemClick,
-                                        itemOnLongClick = onItemLongClick,
-                                        onCut = onCut,
-                                        onDelete = onDelete,
-                                        onRename = onRename,
-                                        onFileInfo = onFileInfo,
-                                        onForceOpen = onForceOpen,
-                                        onAria2Download = onAria2Download
-                                    )
-                                }
+                                FileCellItem(
+                                    fileBean = item,
+                                    index = index,
+                                    clickIndex = clickIndex,
+                                    modifier = Modifier.animateItem(
+                                        fadeInSpec = null,
+                                        fadeOutSpec = null
+                                    ),
+                                    itemOnClick = onItemClick,
+                                    itemOnLongClick = onItemLongClick,
+                                    onCut = onCut,
+                                    onDelete = onDelete,
+                                    onRename = onRename,
+                                    onFileInfo = onFileInfo,
+                                    onForceOpen = onForceOpen,
+                                    onAria2Download = onAria2Download
+                                )
                             }
                         }
                     }

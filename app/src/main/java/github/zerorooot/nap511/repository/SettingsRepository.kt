@@ -78,7 +78,7 @@ class SettingsRepository {
 
     // 1. 账号与安全分组 Flow
     private val accountFlow = combine(
-        getDataFlow(ConfigKeyUtil.UID, "0"),
+        getDataFlow(ConfigKeyUtil.UID, ""),
         getDataFlow(ConfigKeyUtil.COOKIE, ""),
         getDataFlow(ConfigKeyUtil.PASSWORD, "")
     ) { uid, cookie, password ->

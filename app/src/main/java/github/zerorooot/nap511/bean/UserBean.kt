@@ -10,7 +10,7 @@ data class AvatarBean(
     var userName: String = "Test",
     var face: String = "https://my.115.com/static/2014v1.0/personal/head/80/male/male034.png",
     @SerializedName("user_id")
-    var userId: String = "0"
+    var userId: String = ""
 )
 
 data class RemainingSpaceBean(
