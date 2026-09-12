@@ -40,11 +40,13 @@ fun Avatar(remainingSpaceBean: RemainingSpaceBean, avatarBean: AvatarBean) {
         ) {
             //头像
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current).data(avatarBean.face)
-                    .memoryCachePolicy(CachePolicy.ENABLED).diskCachePolicy(CachePolicy.ENABLED)
-                    .networkCachePolicy(CachePolicy.ENABLED).scale(coil.size.Scale.FILL)
-                    .memoryCacheKey(avatarBean.userId).diskCacheKey(avatarBean.userId)
-                    .placeholder(R.drawable.avatar).build(),
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(avatarBean.face)
+                    .scale(coil.size.Scale.FILL)
+                    .memoryCacheKey(avatarBean.userId)
+                    .diskCacheKey(avatarBean.userId)
+                    .placeholder(R.drawable.avatar)
+                    .build(),
                 modifier = Modifier
                     .size(100.dp)
                     //圆形裁剪

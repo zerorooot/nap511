@@ -5,7 +5,10 @@ import android.content.res.Configuration
 import androidx.lifecycle.viewModelScope
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
+import coil.annotation.ExperimentalCoilApi
+import coil.imageLoader
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.ImageBean
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.repository.SettingsRepository
@@ -22,26 +25,60 @@ import kotlin.math.roundToInt
 /**
  * FileViewModel 的扩展函数：媒体与文件查看相关
  */
+@OptIn(ExperimentalCoilApi::class)
 internal fun FileViewModel.getImage(fileBeanList: List<FileBean>, indexOf: Int) {
-    if (imageBeanCache.containsKey(currentCid) && imageBeanCache[currentCid]!!.containsKey(
-            indexOf
-        )
-    ) {
+    if (indexOf !in fileBeanList.indices) return
+    val fileBean = fileBeanList[indexOf]
+    val pickCode = fileBean.pickCode
+    if (pickCode.isEmpty()) return
+
+    val cid = currentCid
+    if (imageBeanCache[cid]?.containsKey(indexOf) == true) {
         return
     }
 
-    viewModelScope.launch {
-        runCatching {
-            val imageBean = fileRepository.image(
-                fileBeanList[indexOf].pickCode, System.currentTimeMillis() / 1000
-            ).imageBean
-
-            val oldMap = imageBeanCache[currentCid] ?: hashMapOf()
+    // 优先检查 Coil 磁盘缓存：如果本地已经存在图片缓存，直接使用本地文件路径，避免发起 API 请求
+    val diskCache = context.imageLoader.diskCache
+    if (diskCache != null) {
+        val localFile = diskCache.openSnapshot(pickCode)?.use { it.data.toFile() }
+        if (localFile != null && localFile.exists()) {
+            val localImageBean = ImageBean(
+                url = localFile.absolutePath,
+                fileName = fileBean.name,
+                pickCode = pickCode
+            )
+            val oldMap = imageBeanCache[cid] ?: hashMapOf()
             val newMap = HashMap(oldMap)
-            newMap[indexOf] = imageBean
+            newMap[indexOf] = localImageBean
+            imageBeanCache[cid] = newMap
+            return
+        }
+    }
 
-            imageBeanCache[currentCid] = newMap
-        }.onFailureToastAndLog()
+    val loadingKey = "$cid-$indexOf"
+    synchronized(imageLoadingSet) {
+        if (imageLoadingSet.contains(loadingKey)) return
+        imageLoadingSet.add(loadingKey)
+    }
+
+    viewModelScope.launch {
+        try {
+            runCatching {
+                val imageBean = fileRepository.image(
+                    pickCode, System.currentTimeMillis() / 1000
+                ).imageBean
+
+                val oldMap = imageBeanCache[cid] ?: hashMapOf()
+                val newMap = HashMap(oldMap)
+                newMap[indexOf] = imageBean
+
+                imageBeanCache[cid] = newMap
+            }.onFailureToastAndLog()
+        } finally {
+            synchronized(imageLoadingSet) {
+                imageLoadingSet.remove(loadingKey)
+            }
+        }
     }
 }
 

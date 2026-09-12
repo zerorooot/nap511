@@ -63,9 +63,6 @@ fun RecycleCellItem(
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(imageData)
-                            .memoryCachePolicy(CachePolicy.ENABLED)
-                            .diskCachePolicy(CachePolicy.ENABLED)
-                            .networkCachePolicy(CachePolicy.ENABLED)
                             .memoryCacheKey(recycleBean.id)
                             .diskCacheKey(recycleBean.id)
                             .scale(Scale.FILL)

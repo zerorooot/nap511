@@ -139,7 +139,8 @@ class SettingsRepository {
         getDataFlow(ConfigKeyUtil.HIDE_LOADING_VIEW, false),
         getDataFlow(ConfigKeyUtil.EARLY_LOADING, false),
         getDataFlow(ConfigKeyUtil.SAVE_REQUEST_CACHE, true),
-        getDataFlow(ConfigKeyUtil.POSITION_AFTER_AT, false)
+        getDataFlow(ConfigKeyUtil.POSITION_AFTER_AT, false),
+        getDataFlow(ConfigKeyUtil.IMAGE_HD_PREVIEW, false)
     ) { values: Array<Boolean> ->
         SwitchGroup(
             torrentSort = values[0],
@@ -153,7 +154,8 @@ class SettingsRepository {
             hideLoading = values[8],
             earlyLoading = values[9],
             saveCache = values[10],
-            positionAfterAt = values[11]
+            positionAfterAt = values[11],
+            imageHdPreview = values[12]
         )
     }
 
@@ -196,7 +198,8 @@ class SettingsRepository {
             videoLinkMode = s2.videoLinkMode,
             dynamicColorEnabled = s2.dynamicColor,
             autoJumpRetry = s2.autoJumpRetry,
-            expandedScreenEnabled = s2.expandedScreen
+            expandedScreenEnabled = s2.expandedScreen,
+            imageHdPreview = s2.imageHdPreview
         )
     }.stateIn(
         scope = repositoryScope,
@@ -340,6 +343,7 @@ class SettingsRepository {
         val hideLoading: Boolean,
         val earlyLoading: Boolean,
         val saveCache: Boolean,
-        val positionAfterAt: Boolean
+        val positionAfterAt: Boolean,
+        val imageHdPreview: Boolean
     )
 }

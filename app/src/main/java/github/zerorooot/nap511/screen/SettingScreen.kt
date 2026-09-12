@@ -391,6 +391,14 @@ fun SettingContent(
                 }
                 item {
                     SwitchPreferenceItem(
+                        title = "大图预览高清模式",
+                        summary = "开启后，大图模式下将自动请求高清原图",
+                        checked = uiState.imageHdPreview,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.IMAGE_HD_PREVIEW, it) }
+                    )
+                }
+                item {
+                    SwitchPreferenceItem(
                         title = "种子文件大小排序",
                         summary = "解析种子文件列表时按文件体积从大到小排列",
                         checked = uiState.torrentSort,

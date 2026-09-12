@@ -13,6 +13,7 @@ data class SettingUiState(
     @SerializedName(ConfigKeyUtil.HIDE_LOADING_VIEW) val hideLoadingView: Boolean = false,
     @SerializedName(ConfigKeyUtil.EARLY_LOADING) val earlyLoading: Boolean = false,
     @SerializedName(ConfigKeyUtil.SAVE_REQUEST_CACHE) val saveRequestCache: Boolean = true,
+    @SerializedName(ConfigKeyUtil.IMAGE_HD_PREVIEW) val imageHdPreview: Boolean = false,
     @SerializedName(ConfigKeyUtil.POSITION_AFTER_AT) val positionAfterAt: Boolean = false,
     @SerializedName(ConfigKeyUtil.FORCE_LOAD_CACHE) val forceLoadCache: Boolean = false,
     @SerializedName(ConfigKeyUtil.VIDEO_LINK_MODE) val videoLinkMode: Boolean = false,

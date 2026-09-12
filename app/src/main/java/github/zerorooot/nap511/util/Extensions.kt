@@ -43,7 +43,7 @@ fun resolveCallerTag(
     val fullClassName = caller.className.substringAfterLast('.')
     // 处理协程/扩展函数/匿名内部类（如 OfflineFileViewModel$refresh$1 -> OfflineFileViewModel）
     val simpleClassName = fullClassName.substringBefore('$').removeSuffix("Kt")
-    val methodName = caller.methodName
+    val methodName = caller.methodName.substringBefore('$')
 
     return "$simpleClassName.$methodName-$defaultTag"
     // 在协程 lambda (invokeSuspend) 中，真正的挂起函数名保存在内部类名中，如 $refresh$1

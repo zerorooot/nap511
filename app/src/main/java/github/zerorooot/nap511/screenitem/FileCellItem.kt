@@ -111,9 +111,6 @@ fun FileCellItem(
                         AsyncImage(
                             model = ImageRequest.Builder(LocalContext.current)
                                 .data(imageData)
-                                .memoryCachePolicy(CachePolicy.ENABLED)
-                                .diskCachePolicy(CachePolicy.ENABLED)
-                                .networkCachePolicy(CachePolicy.ENABLED)
                                 .memoryCacheKey(fileBean.fileId)
                                 .diskCacheKey(fileBean.fileId)
                                 .scale(coil.size.Scale.FILL)

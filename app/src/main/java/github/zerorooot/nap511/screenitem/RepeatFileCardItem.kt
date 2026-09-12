@@ -63,9 +63,6 @@ fun RepeatFileCardItem(
                     AsyncImage(
                         model = ImageRequest.Builder(context)
                             .data(image)
-                            .memoryCachePolicy(CachePolicy.ENABLED)
-                            .diskCachePolicy(CachePolicy.ENABLED)
-                            .networkCachePolicy(CachePolicy.ENABLED)
                             .memoryCacheKey(item.fileId)
                             .diskCacheKey(item.fileId)
                             .scale(Scale.FILL)

@@ -99,6 +99,7 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ForceOpenType
+import github.zerorooot.nap511.bean.ImageBean
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
@@ -118,6 +119,7 @@ import github.zerorooot.nap511.viewmodel.deleteMultiple
 import github.zerorooot.nap511.viewmodel.downloadText
 import github.zerorooot.nap511.viewmodel.downloadWeb
 import github.zerorooot.nap511.viewmodel.getFileInfo
+import github.zerorooot.nap511.viewmodel.getImage
 import github.zerorooot.nap511.viewmodel.getTorrentTask
 import github.zerorooot.nap511.viewmodel.getVideoInfo
 import github.zerorooot.nap511.viewmodel.getZipListFile
@@ -192,6 +194,11 @@ fun FileScreen(
             listLocation.firstVisibleItemScrollOffset
         )
     }
+
+    val scope = rememberCoroutineScope()
+    val clipboardManager = LocalClipboard.current
+    val imageLoader = context.imageLoader
+
     val density = LocalDensity.current
     // 1. 设置 35dp 的防抖阈值
     val thresholdPx = rememberSaveable(density) { with(density) { 35.dp.toPx() } }
@@ -443,6 +450,20 @@ fun FileScreen(
         ::onBack
     )
 
+    fun refresh(forceCache: Boolean = false) {
+        if (forceCache) {
+            fileBeanList.forEach { fileBean ->
+                //文件列表的里图片，ico、thumb图片
+                imageLoader.memoryCache?.remove(MemoryCache.Key(fileBean.fileId))
+                imageLoader.diskCache?.remove(fileBean.fileId)
+                //MyPhotoScreen、大图模式高清模式的图片
+                imageLoader.memoryCache?.remove(MemoryCache.Key(fileBean.pickCode))
+                imageLoader.diskCache?.remove(fileBean.pickCode)
+            }
+        }
+        fileViewModel.refresh(forceCache)
+    }
+
     fun myAppBarOnClick(name: String) {
         when (name) {
             "back" -> {
@@ -463,7 +484,7 @@ fun FileScreen(
             }
 
             "缓存清空" -> {
-                fileViewModel.refresh(true)
+                refresh(true)
             }
 
             "unzipAllFile" -> {
@@ -480,7 +501,9 @@ fun FileScreen(
             "selectReverse" -> fileViewModel.selectReverse()
             //具体实现在FileScreen#CreateDialogs()里
             "文件排序" -> fileViewModel.openFileOrderDialog()
-            "刷新文件" -> fileViewModel.refresh()
+            "刷新文件" -> {
+                refresh()
+            }
 
         }
     }
@@ -497,9 +520,6 @@ fun FileScreen(
         }
     }
 
-    val scope = rememberCoroutineScope()
-    val clipboardManager = LocalClipboard.current
-    val imageLoader = context.imageLoader
 
     val contentActions = remember(
         path,
@@ -547,11 +567,7 @@ fun FileScreen(
             },
             onPathItemClick = { fileViewModel.getFiles(it) },
             onRefresh = {
-                fileBeanList.forEach { fileBean ->
-                    imageLoader.memoryCache?.remove(MemoryCache.Key(fileBean.fileId))
-                    imageLoader.diskCache?.remove(fileBean.fileId)
-                }
-                fileViewModel.refresh()
+                refresh()
             },
             onItemClick = ::myItemOnClick,
             onItemLongClick = ::itemOnLongClick,
@@ -597,6 +613,14 @@ fun FileScreen(
             isNotificationBannerDismissed = isNotificationBannerDismissed,
             isExpandedScreen = isExpandedScreen,
             isImagePreviewMode = isImagePreviewMode,
+            imageCache = fileViewModel.imageBeanCache[fileViewModel.currentCid],
+            isImageHdPreview = settingUiState.imageHdPreview,
+            onLoadImage = { idx ->
+                fileViewModel.getImage(
+                    fileBeanList.filter { it.photoThumb != "" },
+                    idx
+                )
+            },
             gridState = gridState,
             listState = listState,
             gridCellMinSize = gridCellMinSize,
@@ -681,11 +705,14 @@ private fun FileScreenContent(
     isNotificationBannerDismissed: Boolean,
     isExpandedScreen: Boolean,
     isImagePreviewMode: Boolean,
+    modifier: Modifier = Modifier,
+    imageCache: Map<Int, ImageBean>? = null,
+    isImageHdPreview: Boolean = false,
+    onLoadImage: ((Int) -> Unit)? = null,
     gridState: LazyGridState,
     listState: LazyListState,
     gridCellMinSize: Dp,
     actions: FileContentActions,
-    modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
@@ -723,6 +750,9 @@ private fun FileScreenContent(
             gridCellMinSize = gridCellMinSize,
             isExpandedScreen = isExpandedScreen,
             isImagePreviewMode = isImagePreviewMode,
+            imageCache = imageCache,
+            isImageHdPreview = isImageHdPreview,
+            onLoadImage = onLoadImage,
             clickIndex = clickIndex,
             onRefresh = actions.onRefresh,
             onItemClick = actions.onItemClick,
@@ -869,7 +899,10 @@ private fun FileListContent(
     onAria2Download: (Int) -> Unit,
     onForceOpen: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    isImagePreviewMode: Boolean = false
+    isImagePreviewMode: Boolean = false,
+    imageCache: Map<Int, ImageBean>? = null,
+    isImageHdPreview: Boolean = false,
+    onLoadImage: ((Int) -> Unit)? = null
 ) {
     PullToRefreshBox(
         isRefreshing = refreshing,
@@ -902,10 +935,14 @@ private fun FileListContent(
                                 item.fileId.ifEmpty { item.pickCode.ifEmpty { item.photoThumb } }
                             },
                         ) { index, item ->
+                            val imageBean = imageCache?.get(index)
                             ImageCellItem(
                                 fileBean = item,
                                 index = index,
                                 clickIndex = clickIndex,
+                                imageBean = imageBean,
+                                isImageHdPreview = isImageHdPreview,
+                                onLoadImage = onLoadImage,
                                 modifier = Modifier, // 瀑布流快速滑动时不施加 animateItem 动画，防止布局重新计算时元素跳动
                                 itemOnClick = onItemClick,
                                 itemOnLongClick = onItemLongClick

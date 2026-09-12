@@ -15,6 +15,7 @@ import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import coil.request.CachePolicy
 import com.elvishew.xlog.LogConfiguration
 import com.elvishew.xlog.LogItem
 import com.elvishew.xlog.XLog
@@ -197,19 +198,6 @@ class App : Application(), ImageLoaderFactory {
         return NotificationManagerCompat.from(context).areNotificationsEnabled()
     }
 
-    /**
-     * 跳转到app的设置界面--开启通知
-     * @param context
-     */
-    fun goToNotificationSetting(context: Context) {
-        val intent = Intent()
-        // android 8.0引导
-        intent.action = "android.settings.APP_NOTIFICATION_SETTINGS"
-        intent.putExtra("android.provider.extra.APP_PACKAGE", context.packageName)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        context.startActivity(intent)
-    }
-
 
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
@@ -232,6 +220,9 @@ class App : Application(), ImageLoaderFactory {
                     .maxSizePercent(0.25)
                     .build()
             }
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .diskCachePolicy(CachePolicy.ENABLED)
+            .networkCachePolicy(CachePolicy.ENABLED)
             // 忽略服务器的 Cache-Control 限制，强制使用本地磁盘缓存
             .respectCacheHeaders(false)
             // 你也可以在这里配置全局的淡入淡出效果、默认占位图等

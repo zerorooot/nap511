@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.screenitem
 
+import android.util.LruCache
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
@@ -14,6 +15,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -28,14 +30,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import coil.request.CachePolicy
 import coil.request.ImageRequest
+import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.ImageBean
 
 
 // 全局内存缓存图片宽高比，避免快速滑动和 Item 离屏复用时高度重置引发瀑布流跳动闪烁
-private val aspectRatioCache = mutableMapOf<String, Float>()
+// 限定最多保存 1150 张图片的宽高比，超过后自动淘汰最久未使用的条目
+private val aspectRatioCache = object : LruCache<String, Float>(1150) {}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -45,13 +49,27 @@ fun ImageCellItem(
     //删除会有动画
     modifier: Modifier = Modifier,
     clickIndex: Int = -1,
+    imageBean: ImageBean? = null,
+    isImageHdPreview: Boolean = false,
+    onLoadImage: ((Int) -> Unit)? = null,
     itemOnClick: (Int) -> Unit,
     itemOnLongClick: (Int) -> Unit,
 ) {
     val image = fileBean.fileIco
     val name = fileBean.name
-    val imageData = fileBean.photoThumb.ifEmpty { image }
-    val cacheKey = fileBean.fileId.ifEmpty { fileBean.photoThumb.ifEmpty { name } }
+    val hdUrl = imageBean?.url
+    val isHdLoaded = isImageHdPreview && !hdUrl.isNullOrEmpty()
+    val imageData = if (isHdLoaded) hdUrl else fileBean.photoThumb.ifEmpty { image }
+    val cacheKey = fileBean.fileId.ifEmpty { fileBean.pickCode.ifEmpty { name } }
+    val coilCacheKey = if (isHdLoaded) fileBean.pickCode else fileBean.fileId
+
+    // 开启高清模式且 photoThumb 非空且未缓存过 ImageBean 时发起请求
+    if (isImageHdPreview && fileBean.photoThumb.isNotEmpty() && imageBean == null) {
+        LaunchedEffect(fileBean.pickCode, index) {
+            XLog.d("ImageCellItem [触发高清图请求] index=$index, name=${fileBean.name}, pickCode=${fileBean.pickCode}")
+            onLoadImage?.invoke(index)
+        }
+    }
 
     // 优先读取缓存的宽高比，未缓存时默认 1.0f (正方形)
     var aspectRatio by remember(cacheKey) {
@@ -74,8 +92,14 @@ fun ImageCellItem(
             .fillMaxWidth()
             .padding(4.dp)
             .combinedClickable(
-                onClick = { itemOnClick.invoke(index) },
-                onLongClick = { itemOnLongClick.invoke(index) }
+                onClick = {
+                    XLog.d("ImageCellItem [点击] index=$index, name=${fileBean.name}")
+                    itemOnClick.invoke(index)
+                },
+                onLongClick = {
+                    XLog.d("ImageCellItem [长按] index=$index, name=${fileBean.name}")
+                    itemOnLongClick.invoke(index)
+                }
             )
     ) {
         Column(
@@ -101,28 +125,40 @@ fun ImageCellItem(
                     )
                 } else {
                     // 有缩略图：按比例裁切填充显示照片
+                    val imageRequestBuilder = ImageRequest.Builder(LocalContext.current)
+                        .data(imageData)
+                        .memoryCacheKey(coilCacheKey)
+                        .diskCacheKey(coilCacheKey)
+                        .error(image)
+                        .crossfade(false) // 关闭淡入淡出动画，避免快速滑动时图片闪烁
+
+                    // 当 isHdLoaded 为 true 时，优先使用内存缓存中 key 为 fileBean.fileId 的缩略图作为占位符
+                    if (isHdLoaded && fileBean.photoThumb.isNotEmpty()) {
+                        imageRequestBuilder.placeholderMemoryCacheKey(fileBean.fileId)
+                    }
+                    // 兜底占位图标
+                    imageRequestBuilder.placeholder(image)
+
                     AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(imageData)
-                            .memoryCachePolicy(CachePolicy.ENABLED)
-                            .diskCachePolicy(CachePolicy.ENABLED)
-                            .networkCachePolicy(CachePolicy.ENABLED)
-                            .memoryCacheKey(fileBean.fileId)
-                            .diskCacheKey(fileBean.fileId)
-                            .placeholder(image)
-                            .error(image)
-                            .crossfade(false) // 关闭淡入淡出动画，避免快速滑动时图片闪烁
-                            .build(),
+                        model = imageRequestBuilder.build(),
                         contentDescription = "File Thumbnail",
                         onSuccess = { successState ->
+                            XLog.d("ImageCellItem [图片加载成功] index=$index, name=${fileBean.name}, isLoaded=$isHdLoaded, source=${successState.result.dataSource}")
                             val drawable = successState.result.drawable
                             if (drawable.intrinsicWidth > 0 && drawable.intrinsicHeight > 0) {
-                                val newRatio = drawable.intrinsicWidth.toFloat() / drawable.intrinsicHeight.toFloat()
-                                if (aspectRatio != newRatio) {
-                                    aspectRatioCache[cacheKey] = newRatio
+                                val newRatio =
+                                    drawable.intrinsicWidth.toFloat() / drawable.intrinsicHeight.toFloat()
+                                if (!aspectRatioCache.snapshot().containsKey(cacheKey)) {
+                                    aspectRatioCache.put(cacheKey, newRatio)
                                     aspectRatio = newRatio
                                 }
                             }
+                        },
+                        onError = { errorState ->
+                            XLog.e(
+                                "ImageCellItem [图片加载失败] index=$index, name=${fileBean.name}, isLoaded=$isHdLoaded, url=$imageData",
+                                errorState.result.throwable
+                            )
                         },
                         modifier = Modifier
                             .fillMaxSize()

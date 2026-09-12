@@ -11,8 +11,9 @@ import org.junit.Test
 class ExampleUnitTest {
     @Test
     fun addition_isCorrect() {
-        var mType = 5
-        mType = (mType + 1) % 5;
-        println(mType)
+        val simpleClassName = "ImageCellItem.ImageCellItem\$lambda\$8\$0\$0\$0\$0"
+        val removeSuffix = simpleClassName.substringBefore('$').removeSuffix("Kt")
+
+        println(removeSuffix)
     }
 }

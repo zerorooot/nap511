@@ -345,7 +345,7 @@ fun LogScreen(onClick: () -> Unit) {
                             clipboardManager.nativeClipboardManager.setPrimaryClip(
                                 ClipData.newPlainText(
                                     "logs",
-                                    it.message
+                                    "${it.tag}\n${it.timestamp}\n${it.message}"
                                 )
                             )
                             App.instance.toast("日志已复制到剪切板")

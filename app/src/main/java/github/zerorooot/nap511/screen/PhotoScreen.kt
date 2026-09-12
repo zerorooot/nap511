@@ -51,9 +51,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
-import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Scale
+import com.elvishew.xlog.XLog
 import com.smarttoolfactory.zoom.enhancedZoom
 import com.smarttoolfactory.zoom.rememberEnhancedZoomState
 import github.zerorooot.nap511.bean.FileBean
@@ -276,9 +276,6 @@ private fun FullScreenImage(image: ImageBean, onClick: () -> Unit) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(image.url)
-                .memoryCachePolicy(CachePolicy.ENABLED)
-                .diskCachePolicy(CachePolicy.ENABLED)
-                .networkCachePolicy(CachePolicy.ENABLED)
                 .memoryCacheKey(image.pickCode)
                 .diskCacheKey(image.pickCode)
                 .crossfade(true)
@@ -288,6 +285,15 @@ private fun FullScreenImage(image: ImageBean, onClick: () -> Unit) {
             contentScale = ContentScale.Fit,
             onState = { state ->
                 isLoading = state is AsyncImagePainter.State.Loading
+                if (state is AsyncImagePainter.State.Success) {
+                    XLog.d("MyPhotoScreen [图片加载成功] ImageBean=$image, source=${state.result.dataSource}")
+                }
+                if (state is AsyncImagePainter.State.Error) {
+                    XLog.e(
+                        "MyPhotoScreen [图片加载失败] ImageBean=$image",
+                        state.result.throwable
+                    )
+                }
             },
             modifier = Modifier
                 .fillMaxSize()

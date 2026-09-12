@@ -25,6 +25,7 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkQuery
+import coil.imageLoader
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -159,6 +160,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
     var photoIndexOf by mutableIntStateOf(-1)
 
     val imageBeanCache = mutableStateMapOf<String, HashMap<Int, ImageBean>>()
+    internal val imageLoadingSet = hashSetOf<String>()
 
     //位置与点击记录相关
     val clickMap = mutableStateMapOf<String, Int>()

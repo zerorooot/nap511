@@ -119,6 +119,11 @@ class ConfigKeyUtil {
         const val SAVE_REQUEST_CACHE = "SaveRequestCache"
 
         /**
+         * 图片预览高清模式
+         */
+        const val IMAGE_HD_PREVIEW = "imageHdPreview"
+
+        /**
          * 支持打开xx kb以下的文件
          */
         const val MAX_TXT_SIZE = "MaxTxtSize"
