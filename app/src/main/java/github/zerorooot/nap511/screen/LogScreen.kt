@@ -226,31 +226,31 @@ fun LogScreen(onClick: () -> Unit) {
         }
     }
 
-    val appBarOnClick: (String) -> Unit = { name ->
+    val appBarOnClick: (Any) -> Unit = { name ->
         when (name) {
             "搜索" -> {
                 isSearchOpen = true
             }
 
-            "滚动顶部" -> {
+            MenuItemAction.SCROLL_TOP -> {
                 coroutine.launch {
                     if (parsedLogs.isNotEmpty()) lazyListState.animateScrollToItem(0)
                 }
             }
 
-            "滚动底部" -> {
+            MenuItemAction.SCROLL_BOTTOM -> {
                 isAutoScrollEnabled = true // 点击后重新开启自动追日志
                 coroutine.launch {
                     if (parsedLogs.isNotEmpty()) lazyListState.animateScrollToItem(parsedLogs.lastIndex)
                 }
             }
 
-            "清空日志" -> {
+            MenuItemAction.CLEAR_LOG -> {
                 File(App.instance.cacheDir, "log").delete()
                 rawLogText = ""
             }
 
-            "导出日志" -> {
+            MenuItemAction.EXPORT_LOG -> {
                 writeToPublicExternalStorage(
                     App.instance,
                     "${App.instance.getStringRes(R.string.app_name)}_${
@@ -261,7 +261,7 @@ fun LogScreen(onClick: () -> Unit) {
                 )
             }
 
-            "刷新日志" -> {
+            MenuItemAction.REFRESH_LOG -> {
                 rawLogText = readLog()
                 isAutoScrollEnabled = true // 刷新日志时也重置为开启
                 coroutine.launch {

@@ -123,20 +123,21 @@ fun OfflineFileContent(
     }
 
     // 菜单操作逻辑：直接接收选中的 OfflineTask 对象
-    val menuOnClick = { name: String, item: OfflineTask ->
-        when (name) {
-            "复制链接" -> copyDownloadUrl(context, item.url, 1)
-            "删除文件" -> onDeleteTask(item)
-            "文件信息" -> onOpenTaskDialog(item)
+    val menuOnClick = { action: MenuItemAction, item: OfflineTask ->
+        when (action) {
+            MenuItemAction.COPY_LINK -> copyDownloadUrl(context, item.url, 1)
+            MenuItemAction.DELETE_FILE -> onDeleteTask(item)
+            MenuItemAction.FILE_INFO -> onOpenTaskDialog(item)
+            else -> {}
         }
     }
 
-    val appBarOnClick = { name: String ->
-        when (name) {
-            "刷新文件" -> onRefresh()
-            "清空已完成" -> onClearFinish()
-            "清空已失败" -> onClearError()
-            "复制本页链接" -> {
+    val appBarOnClick = { action: Any ->
+        when (action) {
+            MenuItemAction.REFRESH_FILES -> onRefresh()
+            MenuItemAction.CLEAR_COMPLETED -> onClearFinish()
+            MenuItemAction.CLEAR_FAILED -> onClearError()
+            MenuItemAction.COPY_PAGE_LINK -> {
                 val stringJoiner = StringJoiner("\n")
                 val allTasks = when (pagerState.currentPage) {
                     0 -> uiState.completedList

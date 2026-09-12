@@ -114,17 +114,17 @@ fun RepeatFileScreen(
             viewModel.loadNextPage()
         }
     }
-    val appBarOnClick = { name: String ->
+    val appBarOnClick = { name: Any ->
         when (name) {
-            "一键去重" -> {
+            MenuItemAction.ONE_KEY_DEDUP -> {
                 showDeleteDialog = true
             }
 
-            "开始查重" -> {
+            MenuItemAction.START_DEDUP -> {
                 viewModel.triggerForceRefresh()
             }
 
-            "删空文件" -> {
+            MenuItemAction.DELETE_EMPTY_FILES -> {
                 viewModel.clearEmptyFile()
             }
 

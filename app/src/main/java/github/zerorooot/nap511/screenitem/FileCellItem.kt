@@ -45,6 +45,7 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.screen.FileMoreMenu
+import github.zerorooot.nap511.screen.MenuItemAction
 import github.zerorooot.nap511.util.getCoilCacheUrl
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -192,14 +193,15 @@ fun FileCellItem(
                     }
                 }
 
-                val dispatchMenuClick: (String, Int) -> Unit = { name, _ ->
-                    when (name) {
-                        "剪切文件" -> onCut?.invoke(index)
-                        "删除文件" -> onDelete?.invoke(index)
-                        "重新命名" -> onRename?.invoke(index)
-                        "文件信息" -> onFileInfo?.invoke(index)
-                        "Aria2下载" -> onAria2Download?.invoke(index)
-                        "强行打开" -> onForceOpen?.invoke(index)
+                val dispatchMenuClick: (MenuItemAction, Int) -> Unit = { action, _ ->
+                    when (action) {
+                        MenuItemAction.CUT_FILE -> onCut?.invoke(index)
+                        MenuItemAction.DELETE_FILE -> onDelete?.invoke(index)
+                        MenuItemAction.RENAME_FILE -> onRename?.invoke(index)
+                        MenuItemAction.FILE_INFO -> onFileInfo?.invoke(index)
+                        MenuItemAction.ARIA2_DOWNLOAD -> onAria2Download?.invoke(index)
+                        MenuItemAction.FORCE_OPEN -> onForceOpen?.invoke(index)
+                        else -> {}
                     }
                 }
                 FileMoreMenu(onClick = dispatchMenuClick)

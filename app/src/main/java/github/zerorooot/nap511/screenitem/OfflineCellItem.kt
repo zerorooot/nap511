@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.OfflineTask
+import github.zerorooot.nap511.screen.MenuItemAction
 import github.zerorooot.nap511.screen.OfflineFileMoreMenu
 
 
@@ -39,7 +40,7 @@ fun OfflineCellItem(
     offlineTask: OfflineTask,
     index: Int,
     itemOnClick: (Int) -> Unit,
-    menuOnClick: (String, Int) -> Unit
+    menuOnClick: (MenuItemAction, Int) -> Unit
 ) {
     val image = if (offlineTask.fileId == "") R.drawable.other else R.drawable.folder
     val name = offlineTask.name
@@ -132,8 +133,8 @@ fun OfflineCellItem(
                     }
                 }
 
-                OfflineFileMoreMenu { itemName, _ ->
-                    menuOnClick.invoke(itemName, index)
+                OfflineFileMoreMenu { itemAction, _ ->
+                    menuOnClick.invoke(itemAction, index)
                 }
             }
 

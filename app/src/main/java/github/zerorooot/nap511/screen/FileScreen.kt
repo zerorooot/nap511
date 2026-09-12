@@ -489,17 +489,17 @@ fun FileScreen(
         fileViewModel.refresh(forceCache)
     }
 
-    fun myAppBarOnClick(name: String) {
+    fun myAppBarOnClick(name: Any) {
         when (name) {
             "back" -> {
                 onBack()
             }
 
-            "大图模式" -> {
+            MenuItemAction.GALLERY_MODE -> {
                 isImagePreviewMode = !isImagePreviewMode
             }
 
-            "视频时间" -> {
+            MenuItemAction.VIDEO_SCHEDULE -> {
                 fileViewModel.sortByVideoTime()
                 if (isExpandedScreen || isImagePreviewMode) {
                     gridState.requestScrollToItem(0, 0)
@@ -525,8 +525,8 @@ fun FileScreen(
 //            "selectAll" -> fileViewModel.selectAll()
             "selectReverse" -> fileViewModel.selectReverse()
             //具体实现在FileScreen#CreateDialogs()里
-            "文件排序" -> fileViewModel.openFileOrderDialog()
-            "刷新文件" -> {
+            MenuItemAction.FILE_SORT -> fileViewModel.openFileOrderDialog()
+            MenuItemAction.REFRESH_FILES -> {
                 refresh(true)
             }
 
@@ -546,18 +546,8 @@ fun FileScreen(
     }
 
 
-    val contentActions = remember(
-        path,
-        isExpandedScreen,
-        isImagePreviewMode,
-        gridState,
-        listState,
-        imageLoader,
-        clipboardManager,
-        scope,
-        context
-    ) {
-        FileContentActions(
+    fun fileContentActions(): FileContentActions {
+        return FileContentActions(
             onOpenNotificationSettings = {
                 val intent = Intent("android.settings.APP_NOTIFICATION_SETTINGS").apply {
                     putExtra("android.provider.extra.APP_PACKAGE", context.packageName)
@@ -622,6 +612,20 @@ fun FileScreen(
         )
     }
 
+    val contentActions = remember(
+        path,
+        isExpandedScreen,
+        isImagePreviewMode,
+        gridState,
+        listState,
+        imageLoader,
+        clipboardManager,
+        scope,
+        context
+    ) {
+        fileContentActions()
+    }
+
     FileScaffold(
         isLongClickState = fileViewModel.isLongClickState,
         appBarTitle = fileViewModel.appBarTitle,
@@ -679,7 +683,7 @@ private fun FileScaffold(
     fabPosition: FabPosition,
     nestedScrollConnection: NestedScrollConnection,
     audioViewModel: AudioViewModel,
-    onAppBarClick: (String) -> Unit,
+    onAppBarClick: (Any) -> Unit,
     onMusicDetailNav: () -> Unit,
     onCancelCut: () -> Unit,
     onCutPaste: () -> Unit,
@@ -780,7 +784,7 @@ private fun FileScreenContent(
                 )
             } else if (showBatteryBanner) {
                 NotificationPermissionBanner(
-                    text = "未开启电池优化，后台解压可能会暂停",
+                    text = "未允许无限制后台运行，后台解压可能会暂停",
                     icon = Icons.Default.BatteryAlert,
                     onOpenSettings = actions.onOpenBatterySettings,
                     onDismiss = actions.onDismissBatteryBanner

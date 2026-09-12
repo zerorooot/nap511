@@ -121,10 +121,11 @@ fun RecycleContent(
     onPasswordEntered: (String?) -> Unit,
     onClick: () -> Unit
 ) {
-    val menuOnClick = { name: String, index: Int ->
-        when (name) {
-            "还原文件" -> onRevert(index)
-            "删除文件" -> onDelete(index)
+    val menuOnClick = { action: MenuItemAction, index: Int ->
+        when (action) {
+            MenuItemAction.RESTORE_FILE -> onRevert(index)
+            MenuItemAction.DELETE_FILE -> onDelete(index)
+            else -> {}
         }
     }
 

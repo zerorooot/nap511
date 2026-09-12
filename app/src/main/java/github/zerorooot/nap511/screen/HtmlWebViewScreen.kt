@@ -141,16 +141,17 @@ fun HtmlWebViewScreen(
                             }
                         },
                         actions = {
-                            HtmlWebViewTopBarDropdownMenu(onClick = { itemValue, _ ->
-                                when (itemValue) {
-                                    "页面刷新" -> webViewInstance?.reload()
-                                    "页内查找" -> isSearchOpen = true
-                                    "分享链接" -> shareLink(
+                            HtmlWebViewTopBarDropdownMenu(onClick = { action, _ ->
+                                when (action) {
+                                    MenuItemAction.REFRESH_PAGE -> webViewInstance?.reload()
+                                    MenuItemAction.SEARCH_IN_PAGE -> isSearchOpen = true
+                                    MenuItemAction.SHARE_LINK -> shareLink(
                                         context,
                                         webViewInstance?.url ?: htmlContent,
                                         title
                                     )
-                                    "修改编码" -> showEncodingDialog = true
+                                    MenuItemAction.CHANGE_ENCODING -> showEncodingDialog = true
+                                    else -> {}
                                 }
                             })
                         }

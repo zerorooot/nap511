@@ -12,7 +12,6 @@ import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Cancel
-import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.ContentCut
 import androidx.compose.material.icons.outlined.Delete
@@ -47,18 +46,61 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 
-data class DropdownMenuItemSpec(
-    val text: String,
-    val icon: ImageVector? = null,
+enum class MenuItemAction(
+    val label: String,
+    val icon: ImageVector,
     val isDestructive: Boolean = false
-)
+) {
+    // 文件列表菜单项
+    CUT_FILE("剪切文件", Icons.Outlined.ContentCut),
+    RENAME_FILE("重新命名", Icons.Outlined.Edit),
+    FILE_INFO("文件信息", Icons.Outlined.Info),
+    FORCE_OPEN("强行打开", Icons.AutoMirrored.Outlined.OpenInNew),
+    ARIA2_DOWNLOAD("Aria2下载", Icons.Outlined.Download),
+    DELETE_FILE("删除文件", Icons.Outlined.Delete, isDestructive = true),
+
+    // 回收站菜单项
+    RESTORE_FILE("还原文件", Icons.Outlined.Restore),
+
+    // 离线任务菜单项
+    COPY_LINK("复制链接", Icons.Outlined.ContentCopy),
+
+    // 文件页顶栏菜单项
+    GALLERY_MODE("大图模式", Icons.Outlined.Image),
+    FILE_SORT("文件排序", Icons.AutoMirrored.Outlined.Sort),
+    REFRESH_FILES("刷新文件", Icons.Outlined.Refresh),
+    VIDEO_SCHEDULE("视频时间", Icons.Outlined.Schedule),
+
+    // 离线页顶栏菜单项
+    COPY_PAGE_LINK("复制本页链接", Icons.Outlined.ContentCopy),
+    CLEAR_COMPLETED("清空已完成", Icons.Outlined.DoneAll),
+    CLEAR_FAILED("清空已失败", Icons.Outlined.Cancel, isDestructive = true),
+
+    // 日志页顶栏菜单项
+    SCROLL_TOP("滚动顶部", Icons.Outlined.VerticalAlignTop),
+    SCROLL_BOTTOM("滚动底部", Icons.Outlined.VerticalAlignBottom),
+    EXPORT_LOG("导出日志", Icons.Outlined.Share),
+    REFRESH_LOG("刷新日志", Icons.Outlined.Refresh),
+    CLEAR_LOG("清空日志", Icons.Outlined.DeleteSweep, isDestructive = true),
+
+    // 查重页顶栏菜单项
+    START_DEDUP("开始查重", Icons.Outlined.FindInPage),
+    ONE_KEY_DEDUP("一键去重", Icons.Outlined.AutoFixHigh),
+    DELETE_EMPTY_FILES("删空文件", Icons.Outlined.Delete, isDestructive = true),
+
+    // WebView 顶栏菜单项
+    REFRESH_PAGE("页面刷新", Icons.Outlined.Refresh),
+    SEARCH_IN_PAGE("页内查找", Icons.Outlined.FindInPage),
+    SHARE_LINK("分享链接", Icons.Outlined.Share),
+    CHANGE_ENCODING("修改编码", Icons.Outlined.Translate)
+}
 
 @Composable
 private fun MyDropdownMenu(
-    listItems: List<DropdownMenuItemSpec>,
+    listItems: List<MenuItemAction>,
     modifier: Modifier,
     icon: @Composable () -> Unit,
-    onClick: (String, Int) -> Unit
+    onClick: (MenuItemAction, Int) -> Unit
 ) {
     var expanded by remember {
         mutableStateOf(false)
@@ -81,29 +123,27 @@ private fun MyDropdownMenu(
             shape = RoundedCornerShape(16.dp)
         ) {
             listItems.forEachIndexed { itemIndex, item ->
-                val isDelete = item.isDestructive || item.text.contains("删除")
+                val isDelete = item.isDestructive || item.label.contains("删除")
                 if (isDelete && itemIndex > 0) {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                 }
                 DropdownMenuItem(
                     onClick = {
-                        onClick.invoke(item.text, itemIndex)
+                        onClick.invoke(item, itemIndex)
                         expanded = false
                     },
                     text = {
                         Text(
-                            text = item.text,
+                            text = item.label,
                             color = if (isDelete) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                         )
                     },
-                    leadingIcon = item.icon?.let { imageVector ->
-                        {
-                            Icon(
-                                imageVector = imageVector,
-                                contentDescription = item.text,
-                                tint = if (isDelete) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                    leadingIcon = {
+                        Icon(
+                            imageVector = item.icon,
+                            contentDescription = item.label,
+                            tint = if (isDelete) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 )
             }
@@ -112,39 +152,39 @@ private fun MyDropdownMenu(
 }
 
 @Composable
-fun FileMoreMenu(onClick: (String, Int) -> Unit) {
+fun FileMoreMenu(onClick: (MenuItemAction, Int) -> Unit) {
     val listOf = listOf(
-        DropdownMenuItemSpec("剪切文件", Icons.Outlined.ContentCut),
-        DropdownMenuItemSpec("重新命名", Icons.Outlined.Edit),
-        DropdownMenuItemSpec("文件信息", Icons.Outlined.Info),
-        DropdownMenuItemSpec("强行打开", Icons.AutoMirrored.Outlined.OpenInNew),
-        DropdownMenuItemSpec("Aria2下载", Icons.Outlined.Download),
-        DropdownMenuItemSpec("删除文件", Icons.Outlined.Delete, isDestructive = true)
+        MenuItemAction.CUT_FILE,
+        MenuItemAction.RENAME_FILE,
+        MenuItemAction.FILE_INFO,
+        MenuItemAction.FORCE_OPEN,
+        MenuItemAction.ARIA2_DOWNLOAD,
+        MenuItemAction.DELETE_FILE
     )
     BaseMoreMenu(listOf, onClick)
 }
 
 @Composable
-fun RecycleMoreMenu(onClick: (String, Int) -> Unit) {
+fun RecycleMoreMenu(onClick: (MenuItemAction, Int) -> Unit) {
     val listOf = listOf(
-        DropdownMenuItemSpec("还原文件", Icons.Outlined.Restore),
-        DropdownMenuItemSpec("删除文件", Icons.Outlined.Delete, isDestructive = true)
+        MenuItemAction.RESTORE_FILE,
+        MenuItemAction.DELETE_FILE
     )
     BaseMoreMenu(listOf, onClick)
 }
 
 @Composable
-fun OfflineFileMoreMenu(onClick: (String, Int) -> Unit) {
+fun OfflineFileMoreMenu(onClick: (MenuItemAction, Int) -> Unit) {
     val listOf = listOf(
-        DropdownMenuItemSpec("复制链接", Icons.Outlined.ContentCopy),
-        DropdownMenuItemSpec("文件信息", Icons.Outlined.Info),
-        DropdownMenuItemSpec("删除文件", Icons.Outlined.Delete, isDestructive = true)
+        MenuItemAction.COPY_LINK,
+        MenuItemAction.FILE_INFO,
+        MenuItemAction.DELETE_FILE
     )
     BaseMoreMenu(listOf, onClick)
 }
 
 @Composable
-fun BaseMoreMenu(listOf: List<DropdownMenuItemSpec>, onClick: (String, Int) -> Unit) {
+fun BaseMoreMenu(listOf: List<MenuItemAction>, onClick: (MenuItemAction, Int) -> Unit) {
     MyDropdownMenu(
         listOf,
         Modifier
@@ -162,63 +202,62 @@ fun BaseMoreMenu(listOf: List<DropdownMenuItemSpec>, onClick: (String, Int) -> U
 }
 
 @Composable
-fun FileAppTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
+fun FileAppTopBarDropdownMenu(onClick: (MenuItemAction, Int) -> Unit) {
     val listOf = listOf(
-        DropdownMenuItemSpec("大图模式", Icons.Outlined.Image),
-//        DropdownMenuItemSpec("缓存清空", Icons.Outlined.CleaningServices),
-        DropdownMenuItemSpec("文件排序", Icons.AutoMirrored.Outlined.Sort),
-        DropdownMenuItemSpec("刷新文件", Icons.Outlined.Refresh),
-        DropdownMenuItemSpec("视频时间", Icons.Outlined.Schedule)
+        MenuItemAction.GALLERY_MODE,
+        MenuItemAction.FILE_SORT,
+        MenuItemAction.REFRESH_FILES,
+        MenuItemAction.VIDEO_SCHEDULE
     )
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }
 
 @Composable
-fun OfflineFileAppTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
+fun OfflineFileAppTopBarDropdownMenu(onClick: (MenuItemAction, Int) -> Unit) {
     val listOf = listOf(
-        DropdownMenuItemSpec("刷新文件", Icons.Outlined.Refresh),
-        DropdownMenuItemSpec("复制本页链接", Icons.Outlined.ContentCopy),
-        DropdownMenuItemSpec("清空已完成", Icons.Outlined.DoneAll),
-        DropdownMenuItemSpec("清空已失败", Icons.Outlined.Cancel, isDestructive = true)
+        MenuItemAction.REFRESH_FILES,
+        MenuItemAction.COPY_PAGE_LINK,
+        MenuItemAction.CLEAR_COMPLETED,
+        MenuItemAction.CLEAR_FAILED
     )
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }
 
 @Composable
-fun LogScreenTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
+fun LogScreenTopBarDropdownMenu(onClick: (MenuItemAction, Int) -> Unit) {
     val listOf = listOf(
-        DropdownMenuItemSpec("滚动顶部", Icons.Outlined.VerticalAlignTop),
-        DropdownMenuItemSpec("滚动底部", Icons.Outlined.VerticalAlignBottom),
-        DropdownMenuItemSpec("导出日志", Icons.Outlined.Share),
-        DropdownMenuItemSpec("刷新日志", Icons.Outlined.Refresh),
-        DropdownMenuItemSpec("清空日志", Icons.Outlined.DeleteSweep, isDestructive = true),
+        MenuItemAction.SCROLL_TOP,
+        MenuItemAction.SCROLL_BOTTOM,
+        MenuItemAction.EXPORT_LOG,
+        MenuItemAction.REFRESH_LOG,
+        MenuItemAction.CLEAR_LOG
     )
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }
 
 @Composable
-fun RepeatFileTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
+fun RepeatFileTopBarDropdownMenu(onClick: (MenuItemAction, Int) -> Unit) {
     val listOf = listOf(
-        DropdownMenuItemSpec("开始查重", Icons.Outlined.FindInPage),
-        DropdownMenuItemSpec("一键去重", Icons.Outlined.AutoFixHigh),
-        DropdownMenuItemSpec("删空文件", Icons.Outlined.Delete, isDestructive = true)
+        MenuItemAction.START_DEDUP,
+        MenuItemAction.ONE_KEY_DEDUP,
+        MenuItemAction.DELETE_EMPTY_FILES
     )
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }
 
 @Composable
-fun HtmlWebViewTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
+fun HtmlWebViewTopBarDropdownMenu(onClick: (MenuItemAction, Int) -> Unit) {
     val listOf = listOf(
-        DropdownMenuItemSpec("页面刷新", Icons.Outlined.Refresh),
-        DropdownMenuItemSpec("页内查找", Icons.Outlined.FindInPage),
-        DropdownMenuItemSpec("分享链接", Icons.Outlined.Share),
-        DropdownMenuItemSpec("修改编码", Icons.Outlined.Translate)
+        MenuItemAction.REFRESH_PAGE,
+        MenuItemAction.SEARCH_IN_PAGE,
+        MenuItemAction.SHARE_LINK,
+        MenuItemAction.CHANGE_ENCODING
     )
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }
 
 @Composable
-private fun BaseAppTorBarMenu(listOf: List<DropdownMenuItemSpec>, onClick: (String, Int) -> Unit) {
+private fun BaseAppTorBarMenu(listOf: List<MenuItemAction>, onClick: (MenuItemAction, Int) -> Unit) {
     MyDropdownMenu(
         listOf,
         Modifier.wrapContentSize(Alignment.TopEnd),

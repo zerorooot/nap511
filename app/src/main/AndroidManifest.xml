@@ -18,8 +18,6 @@
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
-    <uses-permission android:name="miui.permission.powerkeeper.HIDDEN_MODE_PROVIDER" />
-
     <application
         android:name=".util.App"
         android:allowBackup="true"

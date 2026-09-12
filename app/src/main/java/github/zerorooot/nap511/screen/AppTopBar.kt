@@ -75,7 +75,7 @@ fun BaseTopAppBar(
 }
 
 @Composable
-fun AppTopBarNormal(title: String, onClick: (name: String) -> Unit) {
+fun AppTopBarNormal(title: String, onClick: (Any) -> Unit) {
     BaseTopAppBar(
         title = { Text(text = title) },
         navigationIcon = {
@@ -220,7 +220,7 @@ private fun TopAppBarActionTextButton(
 }
 
 @Composable
-fun AppTopBarOfflineFile(title: String, onClick: (name: String) -> Unit) {
+fun AppTopBarOfflineFile(title: String, onClick: (Any) -> Unit) {
     BaseTopAppBar(
         title = { Text(text = title) },
         navigationIcon = {
@@ -240,7 +240,7 @@ fun AppTopBarOfflineFile(title: String, onClick: (name: String) -> Unit) {
 }
 
 @Composable
-fun AppTopBarLogScreen(title: String, onClick: (name: String) -> Unit) {
+fun AppTopBarLogScreen(title: String, onClick: (Any) -> Unit) {
     BaseTopAppBar(
         title = { Text(text = title) },
         navigationIcon = {
@@ -266,7 +266,7 @@ fun AppTopBarLogScreen(title: String, onClick: (name: String) -> Unit) {
 }
 
 @Composable
-fun AppTopBarRepeatFile(title: String, onClick: (name: String) -> Unit) {
+fun AppTopBarRepeatFile(title: String, onClick: (Any) -> Unit) {
     BaseTopAppBar(
         title = { Text(text = title) },
         navigationIcon = {
