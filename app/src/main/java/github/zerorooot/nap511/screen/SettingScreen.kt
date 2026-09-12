@@ -337,6 +337,14 @@ fun SettingContent(
                         onCheckedChange = { onSaveConfig(ConfigKeyUtil.HIDE_LOADING_VIEW, it) }
                     )
                 }
+                item {
+                    SwitchPreferenceItem(
+                        title = "隐藏电池提醒",
+                        summary = "关闭首页弹出的后台电池优化提醒 Banner",
+                        checked = uiState.hideBatteryBanner,
+                        onCheckedChange = { onSaveConfig(ConfigKeyUtil.HIDE_BATTERY_BANNER, it) }
+                    )
+                }
 
                 // --- 4. 文件与缓存 ---
                 item { PreferenceCategoryHeader("文件与缓存") }

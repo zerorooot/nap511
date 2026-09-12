@@ -24,9 +24,9 @@ import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.repository.FileRepository
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.repository.SettingsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -83,6 +83,11 @@ class UnzipAllFileWorker(
         notificationManager.createNotificationChannel(channel)
     }
 
+    override suspend fun getForegroundInfo(): ForegroundInfo {
+        createNotificationChannel()
+        return createForegroundInfo("解压中", "正在初始化解压任务...", 0, 1)
+    }
+
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         createNotificationChannel()
         // 1. 获取并校验文件列表
@@ -100,7 +105,7 @@ class UnzipAllFileWorker(
         val name = fileBeanList[0].name
 
         try {
-            setForegroundAsync(createForegroundInfo("解压中", "正在解压中", 0, size))
+            setForeground(getForegroundInfo())
         } catch (e: Exception) {
             // Android 12+ 在后台无法启动前台服务，忽略异常继续在后台执行短任务
             XLog.w("UnzipAllFileWorker setForeground 失败，将作为普通后台任务继续运行: ${e.message}")
@@ -293,7 +298,17 @@ class UnzipAllFileWorker(
                             cancelPendingIntent
                         )
                         .build()
-                notificationManager.notify(NOTIFICATION_ID, build)
+
+                val foregroundInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    ForegroundInfo(
+                        NOTIFICATION_ID, build, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                    )
+                } else {
+                    ForegroundInfo(NOTIFICATION_ID, build)
+                }
+
+                setForegroundAsync(foregroundInfo)
+                notificationManager.notify(NOTIFICATION_ID, foregroundInfo.notification)
             } catch (e: Exception) {
                 e.printStackTrace()
             }

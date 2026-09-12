@@ -7,6 +7,7 @@ import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.elvishew.xlog.XLog
@@ -117,6 +118,7 @@ internal fun FileViewModel.unzipFile(fileBeansList: List<FileBean>, cid: String,
         val request: OneTimeWorkRequest = OneTimeWorkRequest
             .Builder(UnzipAllFileWorker::class.java)
             .setConstraints(constraints)
+            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
             .addTag("UnzipAllFileWorkerOneTimeWorkRequest")
             .setInputData(dataBuilder.build())
             .build()

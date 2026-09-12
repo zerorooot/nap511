@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.ClipData
 import android.content.Intent
 import android.os.SystemClock
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -53,6 +54,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Notifications
@@ -81,6 +83,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -90,6 +93,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.nativeClipboardManager
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.annotation.ExperimentalCoilApi
 import coil.imageLoader
@@ -110,6 +114,8 @@ import github.zerorooot.nap511.screenitem.FileCellItem
 import github.zerorooot.nap511.screenitem.ImageCellItem
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.isIgnoringBatteryOptimizations
+import github.zerorooot.nap511.util.isNotificationEnabled
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.cancelCut
@@ -179,14 +185,25 @@ fun FileScreen(
     }
 
     var isNotificationEnabled by remember {
-        mutableStateOf(App.instance.isNotificationEnabled(context))
+        mutableStateOf(context.isNotificationEnabled())
     }
     var isNotificationBannerDismissed by rememberSaveable { mutableStateOf(false) }
 
     val notificationSettingLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) {
-        isNotificationEnabled = App.instance.isNotificationEnabled(context)
+        isNotificationEnabled = context.isNotificationEnabled()
+    }
+
+    var isIgnoringBatteryOptimizations by remember {
+        mutableStateOf(context.isIgnoringBatteryOptimizations())
+    }
+    val isBatteryBannerDismissed = settingUiState.hideBatteryBanner
+
+    val batterySettingLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        isIgnoringBatteryOptimizations = context.isIgnoringBatteryOptimizations()
     }
 
     val listLocation = fileViewModel.getListLocation(path)
@@ -548,6 +565,17 @@ fun FileScreen(
                 notificationSettingLauncher.launch(intent)
             },
             onDismissNotificationBanner = { isNotificationBannerDismissed = true },
+            onOpenBatterySettings = {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = "package:${context.packageName}".toUri()
+                }
+                batterySettingLauncher.launch(intent)
+            },
+            onDismissBatteryBanner = {
+                scope.launch {
+                    SettingsRepository.saveData(ConfigKeyUtil.HIDE_BATTERY_BANNER, true)
+                }
+            },
             onPathClick = {
                 clipboardManager.nativeClipboardManager.setPrimaryClip(
                     ClipData.newPlainText("path", path)
@@ -619,6 +647,8 @@ fun FileScreen(
             clickIndex = fileViewModel.clickMap.getOrDefault(path, -1),
             isNotificationEnabled = isNotificationEnabled,
             isNotificationBannerDismissed = isNotificationBannerDismissed,
+            isIgnoringBatteryOptimizations = isIgnoringBatteryOptimizations,
+            isBatteryBannerDismissed = isBatteryBannerDismissed,
             isExpandedScreen = isExpandedScreen,
             isImagePreviewMode = isImagePreviewMode,
             imageCache = fileViewModel.imageBeanCache[fileViewModel.currentCid],
@@ -711,6 +741,8 @@ private fun FileScreenContent(
     clickIndex: Int,
     isNotificationEnabled: Boolean,
     isNotificationBannerDismissed: Boolean,
+    isIgnoringBatteryOptimizations: Boolean,
+    isBatteryBannerDismissed: Boolean,
     isExpandedScreen: Boolean,
     isImagePreviewMode: Boolean,
     modifier: Modifier = Modifier,
@@ -722,6 +754,10 @@ private fun FileScreenContent(
     gridCellMinSize: Dp,
     actions: FileContentActions,
 ) {
+    val showNotificationBanner = !isNotificationEnabled && !isNotificationBannerDismissed
+    val showBatteryBanner =
+        !showNotificationBanner && !isIgnoringBatteryOptimizations && !isBatteryBannerDismissed
+
     Column(
         modifier = modifier
             .padding(
@@ -731,14 +767,25 @@ private fun FileScreenContent(
             .consumeWindowInsets(innerPadding)
     ) {
         AnimatedVisibility(
-            visible = !isNotificationEnabled && !isNotificationBannerDismissed,
+            visible = showNotificationBanner || showBatteryBanner,
             enter = fadeIn() + slideInVertically(),
             exit = fadeOut() + slideOutVertically()
         ) {
-            NotificationPermissionBanner(
-                onOpenSettings = actions.onOpenNotificationSettings,
-                onDismiss = actions.onDismissNotificationBanner
-            )
+            if (showNotificationBanner) {
+                NotificationPermissionBanner(
+                    text = "未开启通知权限，可能无法及时收到离线下载提醒",
+                    icon = Icons.Default.Notifications,
+                    onOpenSettings = actions.onOpenNotificationSettings,
+                    onDismiss = actions.onDismissNotificationBanner
+                )
+            } else if (showBatteryBanner) {
+                NotificationPermissionBanner(
+                    text = "未开启电池优化，后台解压可能会暂停",
+                    icon = Icons.Default.BatteryAlert,
+                    onOpenSettings = actions.onOpenBatterySettings,
+                    onDismiss = actions.onDismissBatteryBanner
+                )
+            }
         }
 
         FilePathBar(
@@ -1042,9 +1089,11 @@ private fun FileListContent(
 
 @Composable
 private fun NotificationPermissionBanner(
+    text: String,
+    modifier: Modifier = Modifier,
+    icon: ImageVector = Icons.Default.Notifications,
     onOpenSettings: () -> Unit,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
 ) {
     Surface(
         modifier = modifier
@@ -1066,13 +1115,13 @@ private fun NotificationPermissionBanner(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Default.Notifications,
+                    imageVector = icon,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(end = 8.dp)
                 )
                 Text(
-                    text = "未开启通知权限，可能无法及时收到离线下载提醒",
+                    text = text,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1108,6 +1157,8 @@ private fun NotificationPermissionBanner(
 private data class FileContentActions(
     val onOpenNotificationSettings: () -> Unit,
     val onDismissNotificationBanner: () -> Unit,
+    val onOpenBatterySettings: () -> Unit,
+    val onDismissBatteryBanner: () -> Unit,
     val onPathClick: () -> Unit,
     val onPathDoubleClick: () -> Unit,
     val onPathLongClick: (name: String, cid: String) -> Unit,

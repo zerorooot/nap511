@@ -183,6 +183,11 @@ class ConfigKeyUtil {
          */
         const val THEME_MODE = "themeMode"
 
+        /**
+         * 隐藏后台电池优化提醒 Banner
+         */
+        const val HIDE_BATTERY_BANNER = "hideBatteryBanner"
+
 
         /**
          * 登录

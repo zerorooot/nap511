@@ -1,6 +1,10 @@
 package github.zerorooot.nap511.util
 
+import android.app.ActivityManager
 import android.content.Context
+import android.os.Build
+import android.os.PowerManager
+import androidx.core.app.NotificationManagerCompat
 import coil.ImageLoader
 import coil.annotation.ExperimentalCoilApi
 import coil.imageLoader
@@ -127,3 +131,50 @@ inline fun <T> runCatchingWithToast(
 ): Result<T> {
     return runCatching(block).onFailureToastAndLog(tag, customMsg)
 }
+
+/**
+ * 判断允许通知，是否已经授权
+ * 返回值为true时，通知栏打开，false未打开。
+ */
+fun Context.isNotificationEnabled(): Boolean {
+    return NotificationManagerCompat.from(this).areNotificationsEnabled()
+}
+
+enum class BatteryRestrictionLevel {
+    UNRESTRICTED, // 无限制：已忽略电池优化
+    OPTIMIZED,    // 优化：默认状态，由系统智能调度
+    RESTRICTED    // 受限制：被系统或用户显式限制后台活动
+}
+
+/**
+ * 判断电池优化，是否已允许后台无限制行为（忽略电池优化）
+ * 返回值为true时，已忽略电池优化（允许后台无限制运行），false为未忽略。
+ */
+fun Context.isIgnoringBatteryOptimizations(): Boolean {
+    val batteryRestrictionLevel = getBatteryRestrictionLevel()
+    XLog.d("batteryRestrictionLevel $batteryRestrictionLevel")
+    return batteryRestrictionLevel == BatteryRestrictionLevel.UNRESTRICTED
+}
+
+private fun Context.getBatteryRestrictionLevel(): BatteryRestrictionLevel {
+    val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+    val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+
+    // 1. 判断是否处于“无限制”状态（在忽略电池优化白名单中）
+    val isIgnoringOptimizations = powerManager?.isIgnoringBatteryOptimizations(packageName) == true
+    if (isIgnoringOptimizations) {
+        return BatteryRestrictionLevel.UNRESTRICTED
+    }
+
+    // 2. 判断是否被显式置于“受限制”状态（Android 9 / API 28+ 支持）
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        val isRestricted = activityManager?.isBackgroundRestricted == true
+        if (isRestricted) {
+            return BatteryRestrictionLevel.RESTRICTED
+        }
+    }
+
+    // 3. 既未加入白名单，也未被显式受限，即处于默认的“优化”档位
+    return BatteryRestrictionLevel.OPTIMIZED
+}
+

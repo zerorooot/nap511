@@ -2,13 +2,10 @@ package github.zerorooot.nap511.util
 
 
 import android.app.Application
-import android.content.Context
-import android.content.Intent
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.foundation.ComposeFoundationFlags
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.core.app.NotificationManagerCompat
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.GifDecoder
@@ -25,26 +22,12 @@ import com.elvishew.xlog.interceptor.Interceptor
 import com.elvishew.xlog.printer.AndroidPrinter
 import com.elvishew.xlog.printer.file.FilePrinter
 import com.elvishew.xlog.printer.file.clean.FileLastModifiedCleanStrategy
-import com.google.gson.Gson
-import com.google.gson.JsonArray
-import com.google.gson.JsonObject
-import com.google.gson.JsonParser
-import com.google.gson.reflect.TypeToken
-import github.zerorooot.nap511.bean.AvatarBean
-import github.zerorooot.nap511.bean.Base115Response
 import github.zerorooot.nap511.repository.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 class AutoTagInterceptor(
     private val defaultTag: String = "XLOG"
@@ -56,7 +39,7 @@ class AutoTagInterceptor(
                 defaultTag = defaultTag,
                 ignoredPackages = listOf("com.elvishew.xlog.", "AutoTagInterceptor")
             )
-            log.tag = if (callerTag == defaultTag) defaultTag else "$callerTag-$defaultTag"
+            log.tag = if (callerTag == defaultTag) defaultTag else callerTag
         }
         return log
     }
@@ -99,7 +82,8 @@ class App : Application(), ImageLoaderFactory {
             val initialCookie = SettingsRepository.getDataSuspend(ConfigKeyUtil.COOKIE, "")
             val initialUid = SettingsRepository.getDataSuspend(ConfigKeyUtil.UID, "")
             val initialLimit =
-                SettingsRepository.getDataSuspend(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200").toIntOrNull()
+                SettingsRepository.getDataSuspend(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200")
+                    .toIntOrNull()
                     ?: 200
             UserSessionManager.init(initialCookie, initialUid, initialLimit)
 
@@ -136,21 +120,8 @@ class App : Application(), ImageLoaderFactory {
         }
     }
 
-
     fun getStringRes(id: Int): String {
         return getString(id)
-    }
-
-
-
-
-    /**
-     * 判断允许通知，是否已经授权
-     * 返回值为true时，通知栏打开，false未打开。
-     * @param context 上下文
-     */
-    fun isNotificationEnabled(context: Context): Boolean {
-        return NotificationManagerCompat.from(context).areNotificationsEnabled()
     }
 
 

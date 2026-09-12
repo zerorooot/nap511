@@ -18,6 +18,8 @@
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
+    <uses-permission android:name="miui.permission.powerkeeper.HIDDEN_MODE_PROVIDER" />
+
     <application
         android:name=".util.App"
         android:allowBackup="true"
@@ -44,11 +46,11 @@
 
         <activity
             android:name=".activity.OfflineTaskActivity"
+            android:excludeFromRecents="true"
             android:exported="true"
             android:launchMode="singleInstance"
-            android:taskAffinity=""
-            android:excludeFromRecents="true"
             android:noHistory="true"
+            android:taskAffinity=""
             android:theme="@style/Theme.TransparentNoAnimation"
             tools:ignore="AppLinkUrlError">
             <intent-filter>

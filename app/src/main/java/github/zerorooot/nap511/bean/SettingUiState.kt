@@ -34,4 +34,5 @@ data class SettingUiState(
     @SerializedName(ConfigKeyUtil.EXPANDED_SCREEN_THRESHOLD) val expandedScreenThreshold: String = "600",
     @SerializedName(ConfigKeyUtil.GRID_CELL_MIN_SIZE) val gridCellMinSize: String = "340",
     @SerializedName(ConfigKeyUtil.AUTO_IMAGE_PREVIEW_COUNT) val autoImagePreviewCount: String = "1150",
+    @SerializedName(ConfigKeyUtil.HIDE_BATTERY_BANNER) val hideBatteryBanner: Boolean = false,
 )
