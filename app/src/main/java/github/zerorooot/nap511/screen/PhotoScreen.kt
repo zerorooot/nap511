@@ -267,6 +267,9 @@ private fun PhotoBottomBar(currentIndex: Int, totalCount: Int) {
 private fun FullScreenImage(image: ImageBean, onClick: () -> Unit) {
     var isLoading by remember { mutableStateOf(true) }
 
+    val imageData = image.url.ifEmpty { null }
+    val cacheKey = image.pickCode.ifEmpty { null }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -275,20 +278,20 @@ private fun FullScreenImage(image: ImageBean, onClick: () -> Unit) {
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
-                .data(image.url)
-                .memoryCacheKey(image.pickCode)
-                .diskCacheKey(image.pickCode)
+                .data(imageData)
+                .memoryCacheKey(cacheKey)
+                .diskCacheKey(cacheKey)
                 .crossfade(true)
                 .scale(Scale.FIT)
                 .build(),
             contentDescription = null,
             contentScale = ContentScale.Fit,
             onState = { state ->
-                isLoading = state is AsyncImagePainter.State.Loading
+                isLoading = state is AsyncImagePainter.State.Loading || imageData == null
                 if (state is AsyncImagePainter.State.Success) {
                     XLog.d("MyPhotoScreen [图片加载成功] ImageBean=$image, source=${state.result.dataSource}")
                 }
-                if (state is AsyncImagePainter.State.Error) {
+                if (state is AsyncImagePainter.State.Error && imageData != null) {
                     XLog.e(
                         "MyPhotoScreen [图片加载失败] ImageBean=$image",
                         state.result.throwable

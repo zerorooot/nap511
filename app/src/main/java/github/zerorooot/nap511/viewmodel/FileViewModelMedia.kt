@@ -3,18 +3,17 @@ package github.zerorooot.nap511.viewmodel
 import android.content.Intent
 import android.content.res.Configuration
 import androidx.lifecycle.viewModelScope
+import coil.imageLoader
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
-import coil.annotation.ExperimentalCoilApi
-import coil.imageLoader
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ImageBean
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.VideoInfoBean
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.getCoilCacheUrl
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -25,7 +24,6 @@ import kotlin.math.roundToInt
 /**
  * FileViewModel 的扩展函数：媒体与文件查看相关
  */
-@OptIn(ExperimentalCoilApi::class)
 internal fun FileViewModel.getImage(fileBeanList: List<FileBean>, indexOf: Int) {
     if (indexOf !in fileBeanList.indices) return
     val fileBean = fileBeanList[indexOf]
@@ -37,22 +35,19 @@ internal fun FileViewModel.getImage(fileBeanList: List<FileBean>, indexOf: Int) 
         return
     }
 
-    // 优先检查 Coil 磁盘缓存：如果本地已经存在图片缓存，直接使用本地文件路径，避免发起 API 请求
-    val diskCache = context.imageLoader.diskCache
-    if (diskCache != null) {
-        val localFile = diskCache.openSnapshot(pickCode)?.use { it.data.toFile() }
-        if (localFile != null && localFile.exists()) {
-            val localImageBean = ImageBean(
-                url = localFile.absolutePath,
-                fileName = fileBean.name,
-                pickCode = pickCode
-            )
-            val oldMap = imageBeanCache[cid] ?: hashMapOf()
-            val newMap = HashMap(oldMap)
-            newMap[indexOf] = localImageBean
-            imageBeanCache[cid] = newMap
-            return
-        }
+    // 优先匹配 Coil 缓存（按 MemoryCache -> DiskCache 顺序短路判断，在内存时无需磁盘 I/O）
+    val cachedUrl = getCoilCacheUrl(context.imageLoader, pickCode)
+    if (cachedUrl != null) {
+        val cachedImageBean = ImageBean(
+            url = cachedUrl,
+            fileName = fileBean.name,
+            pickCode = pickCode
+        )
+        val oldMap = imageBeanCache[cid] ?: hashMapOf()
+        val newMap = HashMap(oldMap)
+        newMap[indexOf] = cachedImageBean
+        imageBeanCache[cid] = newMap
+        return
     }
 
     val loadingKey = "$cid-$indexOf"
@@ -132,20 +127,15 @@ internal fun FileViewModel.updateVideoFileBean(
 
 internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int, fileName: String) {
     viewModelScope.launch {
-        val isAutoRotate = SettingsRepository.getDataSuspend(ConfigKeyUtil.AUTO_ROTATE, false)
-        val videoLinkMode = SettingsRepository.getDataSuspend(ConfigKeyUtil.VIDEO_LINK_MODE, false)
-        val autoJumpRetry = SettingsRepository.getDataSuspend(ConfigKeyUtil.AUTO_JUMP_RETRY, true)
-        val hideLoading = SettingsRepository.getDataSuspend(ConfigKeyUtil.HIDE_LOADING_VIEW, false)
-
         runCatching {
-            val video = if (videoLinkMode) {
+            val video = if (settingUiState.videoLinkMode) {
                 fileRepository.video(pickCode)
                     .copy(
                         index = fileBeanIndex,
-                        isAutoRotate = isAutoRotate,
+                        isAutoRotate = settingUiState.autoRotateEnabled,
                         videoLinkMode = true,
-                        autoJumpRetry = autoJumpRetry,
-                        hideLoading = hideLoading
+                        autoJumpRetry = settingUiState.autoJumpRetry,
+                        hideLoading = settingUiState.hideLoadingView
                     )
             } else {
                 val (width, height) = if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
@@ -160,8 +150,8 @@ internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int, fi
                     fileName = fileName,
                     pickCode = pickCode,
                     videoLinkMode = false,
-                    autoJumpRetry = autoJumpRetry,
-                    hideLoading = hideLoading,
+                    autoJumpRetry = settingUiState.autoJumpRetry,
+                    hideLoading = settingUiState.hideLoadingView,
                     videoUrl = "http://115.com/api/video/m3u8/${pickCode}.m3u8"
                 )
             }

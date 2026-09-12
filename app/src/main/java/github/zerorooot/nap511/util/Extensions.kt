@@ -1,5 +1,10 @@
 package github.zerorooot.nap511.util
 
+import android.content.Context
+import coil.ImageLoader
+import coil.annotation.ExperimentalCoilApi
+import coil.imageLoader
+import coil.memory.MemoryCache
 import com.elvishew.xlog.XLog
 import retrofit2.HttpException
 import java.io.IOException
@@ -46,20 +51,31 @@ fun resolveCallerTag(
     val methodName = caller.methodName.substringBefore('$')
 
     return "$simpleClassName.$methodName-$defaultTag"
-    // 在协程 lambda (invokeSuspend) 中，真正的挂起函数名保存在内部类名中，如 $refresh$1
-//    if (methodName == "invokeSuspend" || methodName == "invoke" || methodName.contains('$')) {
-//        val parts = fullClassName.split('$')
-//        if (parts.size > 1 && parts[1].isNotBlank() && !parts[1].all { it.isDigit() }) {
-//            methodName = parts[1]
-//        }
-//    }
-//    methodName = methodName.substringBefore('$')
-//
-//    return if (methodName.isNotEmpty() && methodName != "invokeSuspend" && methodName != "invoke") {
-//        "$simpleClassName.$methodName"
-//    } else {
-//        simpleClassName
-//    }
+}
+
+/**
+ * 检查 Coil 的本地缓存状态（MemoryCache 与 DiskCache）
+ *
+ * @param imageLoader ImageLoader
+ * @param key 缓存 Key（如 pickCode）
+ * @return 若内存命中或磁盘命中，均返回本地物理缓存文件的绝对路径（如 /data/.../cache/...）；若无缓存则返回 null
+ */
+@OptIn(ExperimentalCoilApi::class)
+fun getCoilCacheUrl(imageLoader: ImageLoader, key: String): String? {
+    if (key.isEmpty()) return null
+
+    val isInMemory = imageLoader.memoryCache?.get(MemoryCache.Key(key)) != null
+    val localFile = imageLoader.diskCache?.openSnapshot(key)?.use { it.data.toFile() }
+    val isOnDisk = localFile != null && localFile.exists()
+
+    // 无论是内存命中还是磁盘命中，只要本地存在物理文件，均返回该文件的绝对路径
+    if (isInMemory || isOnDisk) {
+        if (localFile != null && localFile.exists()) {
+            return localFile.absolutePath
+        }
+    }
+
+    return null
 }
 
 /**

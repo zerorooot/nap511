@@ -66,7 +66,7 @@ fun ImageCellItem(
     // 开启高清模式且 photoThumb 非空且未缓存过 ImageBean 时发起请求
     if (isImageHdPreview && fileBean.photoThumb.isNotEmpty() && imageBean == null) {
         LaunchedEffect(fileBean.pickCode, index) {
-            XLog.d("ImageCellItem [触发高清图请求] index=$index, name=${fileBean.name}, pickCode=${fileBean.pickCode}")
+          //  XLog.d("ImageCellItem [触发高清图请求] index=$index, name=${fileBean.name}, pickCode=${fileBean.pickCode}")
             onLoadImage?.invoke(index)
         }
     }

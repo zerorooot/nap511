@@ -12,7 +12,6 @@ import com.google.common.reflect.TypeToken
 import com.google.gson.Gson
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ZipStatus
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.onFailureToastAndLog
@@ -100,7 +99,7 @@ internal fun FileViewModel.unzipFile(fileBeansList: List<FileBean>, cid: String,
         }
 
         //获取离线失败移动目录cid
-        val errorCid = SettingsRepository.getDataSuspend(ConfigKeyUtil.MOVE_FAIL_FILE, "")
+        val errorCid = settingUiState.moveFailFile
             .takeIf { it.isNotEmpty() }
             ?.let { data ->
                 fileBeanList.firstOrNull { it.isFolder && it.name == data }?.categoryId

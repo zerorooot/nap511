@@ -7,7 +7,6 @@ import android.content.ClipboardManager
 import android.content.Intent
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.material3.FabPosition
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -25,7 +24,6 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkQuery
-import coil.imageLoader
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -42,6 +40,7 @@ import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.RemainingSpaceBean
 import github.zerorooot.nap511.bean.Route
+import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.bean.ZipBeanList
@@ -76,8 +75,16 @@ data class FileUiState(
 
 
 @SuppressLint("MutableCollectionMutableState")
-class FileViewModel(application: Application) : AndroidViewModel(application) {
+class FileViewModel(
+    application: Application,
+) : AndroidViewModel(application) {
     internal val context = getApplication<Application>()
+
+    val settingUiStateFlow: StateFlow<SettingUiState> =
+        SettingsRepository.getInstance().settingUiStateFlow
+    val settingUiState: SettingUiState
+        get() = settingUiStateFlow.value
+
     var fileBeanList = mutableStateListOf<FileBean>()
     var unzipBeanList = mutableStateOf(ZipBeanList())
     var remainingSpace by mutableStateOf(RemainingSpaceBean())
@@ -140,7 +147,11 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            saveRequestCache = SettingsRepository.getDataSuspend(ConfigKeyUtil.SAVE_REQUEST_CACHE, true)
+            settingUiStateFlow.collect { settings ->
+                saveRequestCache = settings.saveRequestCache
+            }
+        }
+        viewModelScope.launch {
             dialogEventBus.events.collect { event ->
                 when (event) {
                     is DialogEvent.RefreshFileList -> refresh(event.cid)
@@ -466,7 +477,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
         recoverFromLongPress()
         val refreshCurrent = (cid == currentCid)
         viewModelScope.launch {
-            if (SettingsRepository.getDataSuspend(ConfigKeyUtil.FORCE_LOAD_CACHE, false) || forceCache) {
+            if (settingUiState.forceLoadCache || forceCache) {
                 removeFolderCacheRecursively(cid)
             }
             fileListCache.remove(cid)
@@ -617,12 +628,11 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             // 获取并过滤本地缓存任务
-            val currentOfflineTask =
-                SettingsRepository.getDataSuspend(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
-                    .split("\n")
-                    .filter { i -> i.isNotBlank() } // 简化过滤逻辑
-                    .toSet()
-                    .toMutableList()
+            val currentOfflineTask = settingUiState.currentOfflineTask
+                .split("\n")
+                .filter { i -> i.isNotBlank() } // 简化过滤逻辑
+                .toSet()
+                .toMutableList()
 
             if (currentOfflineTask.isEmpty()) {
                 // 如果是主动添加模式且列表为空，弹 Toast 提示
