@@ -165,7 +165,7 @@ fun BaseMoreMenu(listOf: List<DropdownMenuItemSpec>, onClick: (String, Int) -> U
 fun FileAppTopBarDropdownMenu(onClick: (String, Int) -> Unit) {
     val listOf = listOf(
         DropdownMenuItemSpec("大图模式", Icons.Outlined.Image),
-        DropdownMenuItemSpec("缓存清空", Icons.Outlined.CleaningServices),
+//        DropdownMenuItemSpec("缓存清空", Icons.Outlined.CleaningServices),
         DropdownMenuItemSpec("文件排序", Icons.AutoMirrored.Outlined.Sort),
         DropdownMenuItemSpec("刷新文件", Icons.Outlined.Refresh),
         DropdownMenuItemSpec("视频时间", Icons.Outlined.Schedule)

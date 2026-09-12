@@ -39,11 +39,13 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import coil.request.CachePolicy
+import coil.imageLoader
 import coil.request.ImageRequest
+import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.screen.FileMoreMenu
+import github.zerorooot.nap511.util.getCoilCacheUrl
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -66,8 +68,6 @@ fun FileCellItem(
     val name = fileBean.name
     val size = fileBean.sizeString
     val time = fileBean.createTimeString
-    val playLong = fileBean.playLongString
-    val imageData = fileBean.photoThumb.ifEmpty { image }
     Surface(
         shape = MaterialTheme.shapes.medium,
         tonalElevation = 10.dp,
@@ -108,8 +108,14 @@ fun FileCellItem(
                             contentDescription = "File Photo",
                         )
                     } else {
+                        val context = LocalContext.current
+                        val imageLoader = context.imageLoader
+
+                        val imageData = getCoilCacheUrl(imageLoader, fileBean.fileId)
+                            ?: fileBean.photoThumb.ifEmpty { image }
+
                         AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
+                            model = ImageRequest.Builder(context)
                                 .data(imageData)
                                 .memoryCacheKey(fileBean.fileId)
                                 .diskCacheKey(fileBean.fileId)
@@ -118,6 +124,9 @@ fun FileCellItem(
                                 .error(image) // 加载失败时也显示占位图
                                 .crossfade(true)
                                 .build(),
+                            onSuccess = { successState ->
+                                XLog.d("FileCellItem [图片加载成功] index=$index, name=${fileBean.name}, imageData=$imageData, source=${successState.result.dataSource}")
+                            },
                             contentDescription = "File Thumbnail",
                             modifier = Modifier.size(60.dp), // 用 size 替代 height + width
                             contentScale = ContentScale.Fit
@@ -155,6 +164,7 @@ fun FileCellItem(
                         )
                         // 时长（作为独立 Badge 标签凸显）
                         if (fileBean.isVideo == 1 || fileBean.fileIco == R.drawable.mp3) {
+                            val playLong = fileBean.playLongString
                             Box(
                                 modifier = Modifier
                                     .background(

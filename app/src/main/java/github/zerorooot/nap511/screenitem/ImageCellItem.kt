@@ -30,11 +30,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.imageLoader
 import coil.request.ImageRequest
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ImageBean
+import github.zerorooot.nap511.util.getCoilCacheUrl
 
 
 // 全局内存缓存图片宽高比，避免快速滑动和 Item 离屏复用时高度重置引发瀑布流跳动闪烁
@@ -59,14 +61,12 @@ fun ImageCellItem(
     val name = fileBean.name
     val hdUrl = imageBean?.url
     val isHdLoaded = isImageHdPreview && !hdUrl.isNullOrEmpty()
-    val imageData = if (isHdLoaded) hdUrl else fileBean.photoThumb.ifEmpty { image }
     val cacheKey = fileBean.fileId.ifEmpty { fileBean.pickCode.ifEmpty { name } }
-    val coilCacheKey = if (isHdLoaded) fileBean.pickCode else fileBean.fileId
 
     // 开启高清模式且 photoThumb 非空且未缓存过 ImageBean 时发起请求
     if (isImageHdPreview && fileBean.photoThumb.isNotEmpty() && imageBean == null) {
         LaunchedEffect(fileBean.pickCode, index) {
-          //  XLog.d("ImageCellItem [触发高清图请求] index=$index, name=${fileBean.name}, pickCode=${fileBean.pickCode}")
+            //  XLog.d("ImageCellItem [触发高清图请求] index=$index, name=${fileBean.name}, pickCode=${fileBean.pickCode}")
             onLoadImage?.invoke(index)
         }
     }
@@ -124,8 +124,12 @@ fun ImageCellItem(
                         contentScale = ContentScale.Fit
                     )
                 } else {
+                    val context = LocalContext.current
+                    val coilCacheKey = if (isHdLoaded) fileBean.pickCode else fileBean.fileId
+                    val imageData = getCoilCacheUrl(context.imageLoader, coilCacheKey)
+                        ?: if (isHdLoaded) hdUrl else fileBean.photoThumb.ifEmpty { image }
                     // 有缩略图：按比例裁切填充显示照片
-                    val imageRequestBuilder = ImageRequest.Builder(LocalContext.current)
+                    val imageRequestBuilder = ImageRequest.Builder(context)
                         .data(imageData)
                         .memoryCacheKey(coilCacheKey)
                         .diskCacheKey(coilCacheKey)
@@ -143,7 +147,7 @@ fun ImageCellItem(
                         model = imageRequestBuilder.build(),
                         contentDescription = "File Thumbnail",
                         onSuccess = { successState ->
-                            XLog.d("ImageCellItem [图片加载成功] index=$index, name=${fileBean.name}, isLoaded=$isHdLoaded, source=${successState.result.dataSource}")
+                            XLog.d("ImageCellItem [图片加载成功] index=$index, name=${fileBean.name}, isLoaded=$isHdLoaded, imageData=$imageData, source=${successState.result.dataSource}")
                             val drawable = successState.result.drawable
                             if (drawable.intrinsicWidth > 0 && drawable.intrinsicHeight > 0) {
                                 val newRatio =
@@ -156,8 +160,7 @@ fun ImageCellItem(
                         },
                         onError = { errorState ->
                             XLog.e(
-                                "ImageCellItem [图片加载失败] index=$index, name=${fileBean.name}, isLoaded=$isHdLoaded, url=$imageData",
-                                errorState.result.throwable
+                                "ImageCellItem [图片加载失败] index=$index, name=${fileBean.name}, isLoaded=$isHdLoaded, url=$imageData, error=${errorState.result.throwable.message}"
                             )
                         },
                         modifier = Modifier

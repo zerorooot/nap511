@@ -483,9 +483,9 @@ fun FileScreen(
                 }
             }
 
-            "缓存清空" -> {
-                refresh(true)
-            }
+//            "强制刷新" -> {
+//                refresh(true)
+//            }
 
             "unzipAllFile" -> {
                 fileViewModel.openUnzipAllFileDialog()
@@ -502,7 +502,7 @@ fun FileScreen(
             //具体实现在FileScreen#CreateDialogs()里
             "文件排序" -> fileViewModel.openFileOrderDialog()
             "刷新文件" -> {
-                refresh()
+                refresh(true)
             }
 
         }

@@ -69,6 +69,7 @@ import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.dialog.ExitApp
+import github.zerorooot.nap511.repository.AuthRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.screen.CaptchaVideoWebViewScreen
 import github.zerorooot.nap511.screen.CaptchaWebViewScreen
@@ -666,7 +667,10 @@ class MainActivity : AppCompatActivity() {
                     is LoginCredential.Cookie -> {
                         val replace = credential.cookieString.replace(" ", "")
                             .replace("[\r\n]".toRegex(), "")
-                        App.instance.checkLogin(replace)
+                        AuthRepository.checkLogin(replace)
+                            .onSuccess { App.instance.toast("登录成功～") }
+                            .onFailure { App.instance.toast("验证失败: ${it.localizedMessage}") }
+                            .isSuccess
                     }
 
                     is LoginCredential.ConfigFile -> {
@@ -699,7 +703,10 @@ class MainActivity : AppCompatActivity() {
                                 }
                             }
                             val cookie = jsonObject.get(ConfigKeyUtil.COOKIE).asString
-                            App.instance.checkLogin(cookie)
+                            AuthRepository.checkLogin(cookie)
+                                .onSuccess { App.instance.toast("登录成功～") }
+                                .onFailure { App.instance.toast("验证失败: ${it.localizedMessage}") }
+                                .isSuccess
                         } catch (e: Exception) {
                             App.instance.toast("解析配置失败")
                             XLog.e(

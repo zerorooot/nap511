@@ -64,8 +64,7 @@ class AutoTagInterceptor(
 
 @OptIn(ExperimentalFoundationApi::class)
 class App : Application(), ImageLoaderFactory {
-    private val okHttpClient by lazy { NetworkClient.sharedOkHttpClient }
-    private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+
     private var currentToast: Toast? = null
 
     companion object {
@@ -92,6 +91,10 @@ class App : Application(), ImageLoaderFactory {
         // 预热 SettingsRepository，在应用进程启动时即触发后台异步预读 DataStore
         SettingsRepository.getInstance()
 
+        // 启动时在后台线程清理过期 7 天的 Coil 图片缓存
+        appScope.launch {
+            cleanExpiredCoilDiskCache(this@App)
+        }
         appScope.launch {
             val initialCookie = SettingsRepository.getDataSuspend(ConfigKeyUtil.COOKIE, "")
             val initialUid = SettingsRepository.getDataSuspend(ConfigKeyUtil.UID, "")
@@ -138,55 +141,7 @@ class App : Application(), ImageLoaderFactory {
         return getString(id)
     }
 
-    suspend fun checkLogin(cookie: String) = withContext(Dispatchers.IO) {
-        val timestamp = System.currentTimeMillis() / 1000
-        val avatarUrl = "https://my.115.com/?ct=ajax&ac=nav&_$timestamp"
-        val ua = ConfigKeyUtil.USER_AGENT
-        val gson = Gson()
 
-        val request = Request.Builder()
-            .url(avatarUrl)
-            .addHeader("Cookie", cookie)
-            .addHeader("User-Agent", ua)
-            .get()
-            .build()
-
-        // 使用 runCatching 捕获网络/解析异常，避免 try-catch 嵌套
-        val pair = try {
-            // 使用 .use 自动关闭 Response 资源
-            okHttpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    return@use Pair(false, "网络请求失败: HTTP ${response.code}")
-                }
-
-                val bodyStr = response.body.string()
-                XLog.v("checkLogin avatarResp: $bodyStr")
-
-                // 4. 一次性反序列化，避免 Gson 嵌套双重解析
-                val type = object : TypeToken<Base115Response<AvatarBean>>() {}.type
-                val result = gson.fromJson<Base115Response<AvatarBean>>(bodyStr, type)
-
-                val avatarBean = result?.data ?: return@use Pair(false, "验证失败，请重试")
-
-                // 5. 格式化过期时间
-                avatarBean.expireString = Instant.ofEpochSecond(avatarBean.expire)
-                    .atZone(ZoneId.systemDefault())
-                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-
-                // 6. 持久化数据并同步更新会话
-                UserSessionManager.updateSession(cookie, avatarBean.userId)
-                SettingsRepository.saveData(ConfigKeyUtil.AVATAR_BEAN, gson.toJson(avatarBean))
-
-                Pair(true, "登录成功～")
-            }
-        } catch (e: Exception) {
-            XLog.e("checkLogin Check login failed", e)
-            Pair(false, "验证失败: ${e.localizedMessage ?: "未知错误"}")
-        }
-
-        toast(pair.second)
-        return@withContext pair.first
-    }
 
 
     /**
@@ -230,47 +185,5 @@ class App : Application(), ImageLoaderFactory {
             .build()
     }
 
-    /**
-     * {"jsonrpc":"2.0","id":"nap511","method":"aria2.getVersion","params":["token:11"]}
-     */
-    fun checkAria2(aria2Url: String, aria2Token: String) {
-        CoroutineScope(Dispatchers.IO).launch {
-            val requestJson = JsonObject().apply {
-                addProperty("jsonrpc", "2.0")
-                addProperty("id", "nap511")
-                addProperty("method", "aria2.getVersion")
-                add("params", JsonArray().apply {
-                    if (aria2Token.isNotEmpty()) add("token:$aria2Token")
-                })
-            }
 
-            val request = Request.Builder()
-                .url(aria2Url)
-                .post(requestJson.toString().toRequestBody(jsonMediaType))
-                .build()
-
-            val message = runCatching {
-                okHttpClient.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) return@use "aria2配置失败, HTTP ${response.code}"
-
-                    val bodyStr = response.body.string()
-                    val bodyJson = JsonParser.parseString(bodyStr).asJsonObject
-
-                    if (bodyJson.has("error")) {
-                        val errorMsg = bodyJson.getAsJsonObject("error")?.get("message")?.asString
-                        "aria2配置失败, $errorMsg"
-                    } else {
-                        SettingsRepository.saveData(ConfigKeyUtil.ARIA2_URL, aria2Url)
-                        SettingsRepository.saveData(ConfigKeyUtil.ARIA2_TOKEN, aria2Token)
-                        "aria2配置成功，请重新下载文件"
-                    }
-                }
-            }.getOrElse { e ->
-                "aria2配置失败, ${e.localizedMessage ?: "未知错误"}"
-            }
-
-            toast(message)
-        }
-
-    }
 }

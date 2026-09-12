@@ -10,7 +10,8 @@ import retrofit2.HttpException
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
-
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 /**
  * 将 Throwable 转换为对用户友好的提示文案
  */
@@ -54,6 +55,23 @@ fun resolveCallerTag(
 }
 
 /**
+ * 清理 Coil 磁盘缓存中超过 7 天未更新的文件
+ */
+suspend fun cleanExpiredCoilDiskCache(
+    context: Context,
+    maxAgeMillis: Long = 7 * 24 * 60 * 60 * 1000L
+) = withContext(Dispatchers.IO) {
+    val cacheDir = context.cacheDir.resolve("thumbnail_cache")
+    if (!cacheDir.exists() || !cacheDir.isDirectory) return@withContext
+
+    val now = System.currentTimeMillis()
+    cacheDir.listFiles()?.forEach { file ->
+        if (file.isFile && (now - file.lastModified() > maxAgeMillis)) {
+            file.delete()
+        }
+    }
+}
+/**
  * 检查 Coil 的本地缓存状态（MemoryCache 与 DiskCache）
  *
  * @param imageLoader ImageLoader
@@ -71,6 +89,11 @@ fun getCoilCacheUrl(imageLoader: ImageLoader, key: String): String? {
     // 无论是内存命中还是磁盘命中，只要本地存在物理文件，均返回该文件的绝对路径
     if (isInMemory || isOnDisk) {
         if (localFile != null && localFile.exists()) {
+            /**每次访问磁盘缓存时，更新文件的 lastModified 为当前时间，防止被
+             *  @see cleanExpiredCoilDiskCache
+             *  删除
+             */
+            localFile.setLastModified(System.currentTimeMillis())
             return localFile.absolutePath
         }
     }

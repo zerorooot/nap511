@@ -32,8 +32,11 @@ import github.zerorooot.nap511.viewmodel.closeRenameFileDialog
 import github.zerorooot.nap511.viewmodel.closeSearchDialog
 import github.zerorooot.nap511.viewmodel.closeUnzipPasswordDialog
 import github.zerorooot.nap511.viewmodel.createFolder
+import androidx.compose.runtime.rememberCoroutineScope
+import github.zerorooot.nap511.repository.AuthRepository
 import github.zerorooot.nap511.viewmodel.decryptZip
 import github.zerorooot.nap511.viewmodel.rename
+import kotlinx.coroutines.launch
 
 @ExperimentalMaterial3Api
 @Composable
@@ -42,6 +45,7 @@ fun CreateDialogs(
     settingUiState: SettingUiState,
     onNav: (Route) -> Unit
 ) {
+    val scope = rememberCoroutineScope()
     when (fileViewModel.activeDialog) {
         //重命名
         is FileDialogState.RenameFile -> {
@@ -109,9 +113,13 @@ fun CreateDialogs(
                 fileViewModel.closeAria2Dialog()
                 if (it != "") {
                     val jsonObject = JsonParser.parseString(it).asJsonObject
-                    val aria2Url = jsonObject.get(ConfigKeyUtil.ARIA2_URL).asString
-                    val aria2Token = jsonObject.get(ConfigKeyUtil.ARIA2_TOKEN).asString
-                    App.instance.checkAria2(aria2Url, aria2Token)
+                    val url = jsonObject.get(ConfigKeyUtil.ARIA2_URL).asString
+                    val token = jsonObject.get(ConfigKeyUtil.ARIA2_TOKEN).asString
+                    scope.launch {
+                        AuthRepository.checkAndSaveAria2(url, token)
+                            .onSuccess { msg -> App.instance.toast(msg) }
+                            .onFailure { err -> App.instance.toast("aria2配置失败: ${err.localizedMessage}") }
+                    }
                 }
             }
         }
