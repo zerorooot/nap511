@@ -113,7 +113,7 @@ fun MyPhotoScreen(
 @Composable
 private fun ImageBrowserScreen(
     photoList: List<FileBean>,
-    imageCache: Map<Int, ImageBean>,
+    imageCache: Map<String, ImageBean>,
     currentIndex: Int = 0,
     onLoadImage: (pageIndex: Int) -> Unit,
     onBack: () -> Unit = {}
@@ -143,7 +143,9 @@ private fun ImageBrowserScreen(
                 onLoadImage(page)
             }
 
-            val pageImage = imageCache[page] ?: ImageBean()
+
+            val currentFileBean = photoList.getOrNull(page)
+            val pageImage = currentFileBean?.pickCode?.let { imageCache[it] } ?: ImageBean()
 
             Box(
                 modifier = Modifier
@@ -178,9 +180,10 @@ private fun ImageBrowserScreen(
             exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(),
             modifier = Modifier.align(Alignment.TopCenter)
         ) {
+            val currentFileBean = photoList.getOrNull(rememberPagerState.currentPage)
             PhotoTopBar(
                 title = imageCache.getOrDefault(
-                    rememberPagerState.currentPage,
+                    currentFileBean?.pickCode,
                     ImageBean()
                 ).fileName.ifEmpty { "" },
                 onBack = onBack

@@ -128,7 +128,7 @@ internal fun FileViewModel.delete(index: Int) {
         }
 
         //delete image bean
-        imageBeanCache[currentCid]?.remove(index)
+        imageBeanCache[currentCid]?.remove(fileBean.pickCode)
 
         val fid = fileBean.fileId
         val pid = currentCid
@@ -190,7 +190,7 @@ internal fun FileViewModel.deleteMultiple() {
         filter.forEachIndexed { index: Int, fileBean: FileBean ->
             mapOf["fid[$index]"] = fileBean.fileId
             //update image cache
-            imageBeanCache[cid]?.remove(index)
+            imageBeanCache[cid]?.remove(fileBean.pickCode)
             if (fileBean.isFolder) {
                 removeFolderCacheRecursively(fileBean.categoryId)
             }

@@ -170,7 +170,7 @@ class FileViewModel(
     var photoFileBeanList = mutableListOf<FileBean>()
     var photoIndexOf by mutableIntStateOf(-1)
 
-    val imageBeanCache = mutableStateMapOf<String, HashMap<Int, ImageBean>>()
+    val imageBeanCache = mutableStateMapOf<String, HashMap<String, ImageBean>>()
     internal val imageLoadingSet = hashSetOf<String>()
 
     //位置与点击记录相关

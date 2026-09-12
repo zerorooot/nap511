@@ -71,6 +71,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -90,10 +91,14 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.nativeClipboardManager
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.annotation.ExperimentalCoilApi
 import coil.imageLoader
@@ -229,6 +234,24 @@ fun FileScreen(
     val thresholdPx = rememberSaveable(density) { with(density) { 35.dp.toPx() } }
     var isBottomBarShow by rememberSaveable { mutableStateOf(true) }
     var isTopBarShow by rememberSaveable { mutableStateOf(true) }
+
+    val view = LocalView.current
+    DisposableEffect(isTopBarShow) {
+        val window = (view.context as? Activity)?.window
+        val insetsController = window?.let { WindowCompat.getInsetsController(it, view) }
+
+        if (!isTopBarShow) {
+            insetsController?.hide(WindowInsetsCompat.Type.systemBars())
+            insetsController?.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            insetsController?.show(WindowInsetsCompat.Type.systemBars())
+        }
+
+        onDispose {
+            insetsController?.show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
 
     // 2. 嵌套滚动监听
     val nestedScrollConnection = remember {
@@ -668,11 +691,8 @@ fun FileScreen(
             isImagePreviewMode = isImagePreviewMode,
             imageCache = fileViewModel.imageBeanCache[fileViewModel.currentCid],
             isImageHdPreview = settingUiState.imageHdPreview,
-            onLoadImage = { idx ->
-                fileViewModel.getImage(
-                    fileBeanList.filter { it.photoThumb != "" },
-                    idx
-                )
+            onLoadImage = { fileBean ->
+                fileViewModel.getImage(fileBean)
             },
             gridState = gridState,
             listState = listState,
@@ -769,9 +789,9 @@ private fun FileScreenContent(
     isExpandedScreen: Boolean,
     isImagePreviewMode: Boolean,
     modifier: Modifier = Modifier,
-    imageCache: Map<Int, ImageBean>? = null,
+    imageCache: Map<String, ImageBean>? = null,
     isImageHdPreview: Boolean = false,
-    onLoadImage: ((Int) -> Unit)? = null,
+    onLoadImage: ((FileBean) -> Unit)? = null,
     gridState: LazyGridState,
     listState: LazyListState,
     gridCellMinSize: Dp,
@@ -984,9 +1004,9 @@ private fun FileListContent(
     onForceOpen: (Int) -> Unit,
     modifier: Modifier = Modifier,
     isImagePreviewMode: Boolean = false,
-    imageCache: Map<Int, ImageBean>? = null,
+    imageCache: Map<String, ImageBean>? = null,
     isImageHdPreview: Boolean = false,
-    onLoadImage: ((Int) -> Unit)? = null
+    onLoadImage: ((FileBean) -> Unit)? = null
 ) {
     PullToRefreshBox(
         isRefreshing = refreshing,
@@ -1019,7 +1039,7 @@ private fun FileListContent(
                                 item.fileId.ifEmpty { item.pickCode.ifEmpty { item.photoThumb } }
                             },
                         ) { index, item ->
-                            val imageBean = imageCache?.get(index)
+                            val imageBean = imageCache?.get(item.pickCode)
                             ImageCellItem(
                                 fileBean = item,
                                 index = index,

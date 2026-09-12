@@ -25,13 +25,23 @@ import kotlin.math.roundToInt
  * FileViewModel 的扩展函数：媒体与文件查看相关
  */
 internal fun FileViewModel.getImage(fileBeanList: List<FileBean>, indexOf: Int) {
-    if (indexOf !in fileBeanList.indices) return
+    if (indexOf !in fileBeanList.indices) {
+        XLog.e("FileViewModel.getImage indexOf=$indexOf ,不在fileBeanList=$fileBeanList 范围中")
+        return
+    }
     val fileBean = fileBeanList[indexOf]
+    getImage(fileBean)
+}
+
+/**
+ * FileViewModel 的扩展函数：媒体与文件查看相关
+ */
+internal fun FileViewModel.getImage(fileBean: FileBean) {
     val pickCode = fileBean.pickCode
     if (pickCode.isEmpty()) return
 
     val cid = currentCid
-    if (imageBeanCache[cid]?.containsKey(indexOf) == true) {
+    if (imageBeanCache[cid]?.containsKey(pickCode) == true) {
         return
     }
 
@@ -45,12 +55,12 @@ internal fun FileViewModel.getImage(fileBeanList: List<FileBean>, indexOf: Int) 
         )
         val oldMap = imageBeanCache[cid] ?: hashMapOf()
         val newMap = HashMap(oldMap)
-        newMap[indexOf] = cachedImageBean
+        newMap[pickCode] = cachedImageBean
         imageBeanCache[cid] = newMap
         return
     }
 
-    val loadingKey = "$cid-$indexOf"
+    val loadingKey = "$cid-$pickCode"
     synchronized(imageLoadingSet) {
         if (imageLoadingSet.contains(loadingKey)) return
         imageLoadingSet.add(loadingKey)
@@ -65,7 +75,7 @@ internal fun FileViewModel.getImage(fileBeanList: List<FileBean>, indexOf: Int) 
 
                 val oldMap = imageBeanCache[cid] ?: hashMapOf()
                 val newMap = HashMap(oldMap)
-                newMap[indexOf] = imageBean
+                newMap[pickCode] = imageBean
 
                 imageBeanCache[cid] = newMap
             }.onFailureToastAndLog()
@@ -76,6 +86,7 @@ internal fun FileViewModel.getImage(fileBeanList: List<FileBean>, indexOf: Int) 
         }
     }
 }
+
 
 internal fun FileViewModel.updateVideoFileBean(
     cid: String,

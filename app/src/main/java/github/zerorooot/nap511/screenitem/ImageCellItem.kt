@@ -53,7 +53,7 @@ fun ImageCellItem(
     clickIndex: Int = -1,
     imageBean: ImageBean? = null,
     isImageHdPreview: Boolean = false,
-    onLoadImage: ((Int) -> Unit)? = null,
+    onLoadImage: ((FileBean) -> Unit)? = null,
     itemOnClick: (Int) -> Unit,
     itemOnLongClick: (Int) -> Unit,
 ) {
@@ -67,7 +67,7 @@ fun ImageCellItem(
     if (isImageHdPreview && fileBean.photoThumb.isNotEmpty() && imageBean == null) {
         LaunchedEffect(fileBean.pickCode, index) {
             //  XLog.d("ImageCellItem [触发高清图请求] index=$index, name=${fileBean.name}, pickCode=${fileBean.pickCode}")
-            onLoadImage?.invoke(index)
+            onLoadImage?.invoke(fileBean)
         }
     }
 
