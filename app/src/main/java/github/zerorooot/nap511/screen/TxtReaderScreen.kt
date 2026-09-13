@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -424,17 +425,20 @@ fun TxtReaderScreen(
                                 ) {
                                     // 行号显示（Monospace 等宽字体排版）
                                     if (showLineNumbers) {
-                                        Text(
-                                            text = "${index + 1}",
-                                            fontSize = (fontSizeSp * 0.7f).sp,
-                                            lineHeight = (fontSizeSp * lineHeightMultiplier).sp,
-                                            color = contentTextColor.copy(alpha = 0.35f),
-                                            fontFamily = FontFamily.Monospace,
-                                            textAlign = TextAlign.End,
-                                            modifier = Modifier
-                                                .width(44.dp)
-                                                .padding(end = 12.dp)
-                                        )
+                                        //保持外层 SelectionContainer 跨段落选择功能的同时，将行号从选择范围中排除，使其不可被选中或复制。
+                                        DisableSelection {
+                                            Text(
+                                                text = "${index + 1}",
+                                                fontSize = (fontSizeSp * 0.7f).sp,
+                                                lineHeight = (fontSizeSp * lineHeightMultiplier).sp,
+                                                color = contentTextColor.copy(alpha = 0.35f),
+                                                fontFamily = FontFamily.Monospace,
+                                                textAlign = TextAlign.End,
+                                                modifier = Modifier
+                                                    .width(44.dp)
+                                                    .padding(end = 12.dp)
+                                            )
+                                        }
                                     }
                                     // 文本主体
                                     Text(

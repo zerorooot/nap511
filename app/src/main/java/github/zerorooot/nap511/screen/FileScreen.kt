@@ -30,7 +30,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
@@ -124,8 +123,10 @@ import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.dialog.ForceOpenDialog
 import github.zerorooot.nap511.repository.SettingsRepository
-import github.zerorooot.nap511.screenitem.FileCellItem
-import github.zerorooot.nap511.screenitem.ImageCellItem
+import github.zerorooot.nap511.screenitem.FileColumnList
+import github.zerorooot.nap511.screenitem.FileEmptyContent
+import github.zerorooot.nap511.screenitem.FileGridList
+import github.zerorooot.nap511.screenitem.FileStaggeredGridList
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.isIgnoringBatteryOptimizations
@@ -154,12 +155,6 @@ import github.zerorooot.nap511.viewmodel.startSendAria2Service
 import github.zerorooot.nap511.viewmodel.unzipFile
 import github.zerorooot.nap511.viewmodel.updateVideoFileBean
 import kotlinx.coroutines.launch
-import my.nanihadesuka.compose.LazyColumnScrollbar
-import my.nanihadesuka.compose.LazyVerticalGridScrollbar
-import my.nanihadesuka.compose.LazyVerticalStaggeredGridScrollbar
-import my.nanihadesuka.compose.ScrollbarSettings
-import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
-import androidx.compose.foundation.lazy.staggeredgrid.itemsIndexed as staggeredItemsIndexed
 
 @OptIn(
     ExperimentalFoundationApi::class,
@@ -1049,112 +1044,29 @@ private fun FileListContent(
         modifier = modifier
     ) {
         if (dataState.fileBeanList.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState()),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("暂无文件")
-            }
+            FileEmptyContent()
         } else {
             key(dataState.path, displayConfig.isPreviewActive) {
                 if (displayConfig.isPreviewActive) {
-                    LazyVerticalStaggeredGridScrollbar(
-                        state = scrollState.staggeredGridState,
-                        settings = ScrollbarSettings.Default.copy(
-                            thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
-                        )
-                    ) {
-                        LazyVerticalStaggeredGrid(
-                            state = scrollState.staggeredGridState,
-                            columns = StaggeredGridCells.Adaptive(minSize = displayConfig.gridCellMinSize),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalItemSpacing = 8.dp,
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            staggeredItemsIndexed(
-                                items = dataState.fileBeanList,
-                                key = { _, item ->
-                                    item.fileId.ifEmpty { item.categoryId.ifEmpty { item.pickCode } }
-                                },
-                            ) { index, item ->
-                                val imageBean = dataState.imageCache?.get(item.pickCode)
-                                ImageCellItem(
-                                    fileBean = item,
-                                    index = index,
-                                    clickIndex = dataState.clickIndex,
-                                    imageBean = imageBean,
-                                    isImageHdPreview = displayConfig.isImageHdPreview,
-                                    modifier = Modifier, // 瀑布流快速滑动时不施加 animateItem 动画，防止布局重新计算时元素跳动
-                                    itemActions = itemActions,
-                                )
-                            }
-                        }
-                    }
+                    FileStaggeredGridList(
+                        dataState = dataState,
+                        displayConfig = displayConfig,
+                        staggeredGridState = scrollState.staggeredGridState,
+                        itemActions = itemActions
+                    )
                 } else if (displayConfig.isExpandedScreen) {
-                    LazyVerticalGridScrollbar(
-                        state = scrollState.gridState,
-                        settings = ScrollbarSettings.Default.copy(
-                            thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
-                        )
-                    ) {
-                        LazyVerticalGrid(
-                            state = scrollState.gridState,
-                            columns = GridCells.Adaptive(minSize = displayConfig.gridCellMinSize),
-//                            contentPadding = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal).asPaddingValues(),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            gridItemsIndexed(
-                                items = dataState.fileBeanList,
-                                key = { _, item ->
-                                    item.fileId.ifEmpty { item.categoryId.ifEmpty { item.pickCode } }
-                                },
-                            ) { index, item ->
-                                FileCellItem(
-                                    fileBean = item,
-                                    index = index,
-                                    clickIndex = dataState.clickIndex,
-                                    modifier = Modifier.animateItem(
-                                        fadeInSpec = null,
-                                        fadeOutSpec = null
-                                    ),
-                                    itemActions = itemActions,
-                                )
-                            }
-                        }
-                    }
+                    FileGridList(
+                        dataState = dataState,
+                        displayConfig = displayConfig,
+                        gridState = scrollState.gridState,
+                        itemActions = itemActions
+                    )
                 } else {
-                    LazyColumnScrollbar(
-                        state = scrollState.listState,
-                        settings = ScrollbarSettings.Default.copy(
-                            thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
-                        )
-                    ) {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            state = scrollState.listState,
-//                            contentPadding = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal).asPaddingValues()
-                        ) {
-                            itemsIndexed(
-                                items = dataState.fileBeanList,
-                                key = { _, item ->
-                                    item.fileId.ifEmpty { item.categoryId.ifEmpty { item.pickCode } }
-                                },
-                            ) { index, item ->
-                                FileCellItem(
-                                    fileBean = item,
-                                    index = index,
-                                    clickIndex = dataState.clickIndex,
-                                    modifier = Modifier.animateItem(
-                                        fadeInSpec = null,
-                                        fadeOutSpec = null
-                                    ),
-                                    itemActions = itemActions,
-                                )
-                            }
-                        }
-                    }
+                    FileColumnList(
+                        dataState = dataState,
+                        listState = scrollState.listState,
+                        itemActions = itemActions
+                    )
                 }
             }
         }
