@@ -7,15 +7,16 @@ import android.os.PowerManager
 import androidx.core.app.NotificationManagerCompat
 import coil.ImageLoader
 import coil.annotation.ExperimentalCoilApi
-import coil.imageLoader
 import coil.memory.MemoryCache
 import com.elvishew.xlog.XLog
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import retrofit2.HttpException
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import java.util.regex.Pattern
+
 /**
  * 将 Throwable 转换为对用户友好的提示文案
  */
@@ -75,6 +76,7 @@ suspend fun cleanExpiredCoilDiskCache(
         }
     }
 }
+
 /**
  * 检查 Coil 的本地缓存状态（MemoryCache 与 DiskCache）
  *
@@ -130,6 +132,31 @@ inline fun <T> runCatchingWithToast(
     block: () -> T
 ): Result<T> {
     return runCatching(block).onFailureToastAndLog(tag, customMsg)
+}
+
+// 40位十六进制哈希正则 (BTih v1 标准)
+private val HEX_40_PATTERN = Pattern.compile("^[0-9a-fA-F]{40}$")
+
+// 32位Base32哈希正则 (早期或简短版磁力链标准)
+private val BASE32_32_PATTERN = Pattern.compile("^[a-zA-Z2-7]{32}$")
+
+fun String.handleText(): Set<String> {
+    return this.split("\n").map { i ->
+        //支持复制无头磁力链接
+        val a =
+            i.replace(Regex("&dn=.*"), "")
+                .replace(";", "")
+                .replace("；", "").trim()
+        if (HEX_40_PATTERN.matcher(a).matches() || BASE32_32_PATTERN.matcher(a).matches()) {
+            "magnet:?xt=urn:btih:$a"
+        } else {
+            a
+        }
+    }.filter { i ->
+        i.startsWith("http", true) || i.startsWith(
+            "ftp", true
+        ) || i.startsWith("magnet", true) || i.startsWith("ed2k", true)
+    }.toSet()
 }
 
 /**

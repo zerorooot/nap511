@@ -42,13 +42,8 @@ import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import java.util.regex.Pattern
+import github.zerorooot.nap511.util.handleText
 
-// 40位十六进制哈希正则 (BTih v1 标准)
-private val HEX_40_PATTERN = Pattern.compile("^[0-9a-fA-F]{40}$")
-
-// 32位Base32哈希正则 (早期或简短版磁力链标准)
-private val BASE32_32_PATTERN = Pattern.compile("^[a-zA-Z2-7]{32}$")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,21 +76,7 @@ fun OfflineDownloadScreen(
     }
 
     fun handleUrl(url: String): List<String> {
-        val urlList = url.split("\n").map { i ->
-            //支持复制无头磁力链接
-            val a = i.replace(Regex("&dn=.*"), "").trim()
-            if (HEX_40_PATTERN.matcher(a).matches() || BASE32_32_PATTERN.matcher(a)
-                    .matches()
-            ) {
-                "magnet:?xt=urn:btih:$a"
-            } else {
-                a
-            }
-        }.filter { i ->
-            i.startsWith("http", true) || i.startsWith(
-                "ftp", true
-            ) || i.startsWith("magnet", true) || i.startsWith("ed2k", true)
-        }.toSet().toList()
+        val urlList = url.handleText().toList()
         return urlList
     }
 

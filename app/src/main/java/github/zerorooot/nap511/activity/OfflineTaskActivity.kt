@@ -26,12 +26,12 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.handleText
 import github.zerorooot.nap511.worker.OfflineTaskWorker
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
-import java.util.regex.Pattern
 
 class OfflineTaskActivity : ComponentActivity() {
 
@@ -41,11 +41,6 @@ class OfflineTaskActivity : ComponentActivity() {
         const val PENDING_NOTIFICATION_ID = 1000
     }
 
-    // 40位十六进制哈希正则 (BTih v1 标准)
-    private val HEX_40_PATTERN = Pattern.compile("^[0-9a-fA-F]{40}$")
-
-    // 32位Base32哈希正则 (早期或简短版磁力链标准)
-    private val BASE32_32_PATTERN = Pattern.compile("^[a-zA-Z2-7]{32}$")
 
     @SuppressLint("EnqueueWork")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -163,28 +158,17 @@ class OfflineTaskActivity : ComponentActivity() {
         lifecycleScope.launch {
             try {
                 withContext(NonCancellable) {
-                    val urlList = text.split("\n").map { i ->
-                        //支持复制无头磁力链接
-                        val a = i.replace(Regex("&dn=.*"), "").trim()
-                        if (HEX_40_PATTERN.matcher(a).matches() || BASE32_32_PATTERN.matcher(a)
-                                .matches()
-                        ) {
-                            "magnet:?xt=urn:btih:$a"
-                        } else {
-                            a
-                        }
-                    }.filter { i ->
-                        i.startsWith("http", true) || i.startsWith(
-                            "ftp", true
-                        ) || i.startsWith("magnet", true) || i.startsWith("ed2k", true)
-                    }.toSet()
+                    val urlList = text.handleText()
 
                     XLog.i("OfflineTaskActivity $tag urlList: $urlList")
 
                     //非空列表
                     if (urlList.isNotEmpty()) {
                         val currentOfflineTaskList =
-                            SettingsRepository.getDataSuspend(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
+                            SettingsRepository.getDataSuspend(
+                                ConfigKeyUtil.CURRENT_OFFLINE_TASK,
+                                ""
+                            )
                                 .split("\n")
                                 .filter { i -> i != "" && i != " " }
                                 .toSet()
@@ -193,7 +177,10 @@ class OfflineTaskActivity : ComponentActivity() {
                         currentOfflineTaskList.addAll(urlList)
                         //检查离线任务时间
                         val offlineTime = try {
-                            SettingsRepository.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_TIME, "5")
+                            SettingsRepository.getDataSuspend(
+                                ConfigKeyUtil.DEFAULT_OFFLINE_TIME,
+                                "5"
+                            )
                                 .toLong()
                         } catch (e: Exception) {
                             5L
