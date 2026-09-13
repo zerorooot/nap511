@@ -26,6 +26,7 @@ import github.zerorooot.nap511.repository.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -74,6 +75,9 @@ class App : Application(), ImageLoaderFactory {
         // 预热 SettingsRepository，在应用进程启动时即触发后台异步预读 DataStore
         SettingsRepository.getInstance()
 
+        // 同步初始化 XLog 日志框架，确保在冷启动或独立 Activity 启动时 XLog 已就绪
+        initLog()
+
         // 启动时在后台线程清理过期 7 天的 Coil 图片缓存
         appScope.launch {
             cleanExpiredCoilDiskCache(this@App)
@@ -86,9 +90,15 @@ class App : Application(), ImageLoaderFactory {
                     .toIntOrNull()
                     ?: 200
             UserSessionManager.init(initialCookie, initialUid, initialLimit)
+        }
 
-            isLogEnabled = SettingsRepository.getDataSuspend(ConfigKeyUtil.LOG, false)
-            initLog()
+        // 实时监听 SettingUiState 中的 LOG 开关状态更新 isLogEnabled
+        appScope.launch {
+            SettingsRepository.getDataFlow(ConfigKeyUtil.LOG, false)
+                .distinctUntilChanged()
+                .collect { enabled ->
+                    isLogEnabled = enabled
+                }
         }
     }
 

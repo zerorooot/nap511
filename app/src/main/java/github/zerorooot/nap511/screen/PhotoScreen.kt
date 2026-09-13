@@ -67,6 +67,17 @@ fun MyPhotoScreen(
     fileViewModel: FileViewModel,
     onNav: () -> Unit
 ) {
+    // 从 ViewModel 提取当前页面的状态数据
+    val photoList = fileViewModel.photoFileBeanList
+    val currentIndex = fileViewModel.photoIndexOf
+    val cid = fileViewModel.currentCid
+    // 提取当前相册的缓存字典
+    val imageCache = fileViewModel.imageBeanCache[cid] ?: emptyMap()
+
+    LaunchedEffect(Unit) {
+        XLog.d("MyPhotoScreen enter: totalPhotos=${photoList.size}, currentIndex=$currentIndex, cid=$cid")
+    }
+
     val view = LocalView.current
     DisposableEffect(Unit) {
         // 获取 Window 实例（注意：需要确保 context 是 Activity）
@@ -89,17 +100,12 @@ fun MyPhotoScreen(
         }
     }
 
-// 从 ViewModel 提取当前页面的状态数据
-    val photoList = fileViewModel.photoFileBeanList
-    // 提取当前相册的缓存字典
-    val imageCache = fileViewModel.imageBeanCache[fileViewModel.currentCid] ?: emptyMap()
-
     ImageBrowserScreen(
         photoList = photoList,
         imageCache = imageCache,
-        currentIndex = fileViewModel.photoIndexOf,
-        onLoadImage = { pageIndex ->
-            fileViewModel.getImage(photoList, pageIndex)
+        currentIndex = currentIndex,
+        onLoadImage = { fileBean ->
+            fileViewModel.getImage(fileBean)
         },
         onBack = {
             onNav.invoke()
@@ -115,7 +121,7 @@ private fun ImageBrowserScreen(
     photoList: List<FileBean>,
     imageCache: Map<String, ImageBean>,
     currentIndex: Int = 0,
-    onLoadImage: (pageIndex: Int) -> Unit,
+    onLoadImage: (fileBean: FileBean) -> Unit,
     onBack: () -> Unit = {}
 ) {
     val rememberPagerState = rememberPagerState(
@@ -139,13 +145,13 @@ private fun ImageBrowserScreen(
             pageSpacing = 16.dp, // 图片间增加间距，避免紧贴
             modifier = Modifier.fillMaxSize()
         ) { page ->
+            val currentFileBean = photoList[page]
+            val pageImage = currentFileBean.pickCode.let { imageCache[it] } ?: ImageBean()
+
             LaunchedEffect(page) {
-                onLoadImage(page)
+                XLog.d("ImageBrowserScreen LaunchedEffect(page=$page): fileBean=${currentFileBean.name}, cachedImageBean=$pageImage")
+                onLoadImage(currentFileBean)
             }
-
-
-            val currentFileBean = photoList.getOrNull(page)
-            val pageImage = currentFileBean?.pickCode?.let { imageCache[it] } ?: ImageBean()
 
             Box(
                 modifier = Modifier
@@ -291,14 +297,19 @@ private fun FullScreenImage(image: ImageBean, onClick: () -> Unit) {
             contentScale = ContentScale.Fit,
             onState = { state ->
                 isLoading = state is AsyncImagePainter.State.Loading || imageData == null
-                if (state is AsyncImagePainter.State.Success) {
-                    XLog.d("MyPhotoScreen [图片加载成功] ImageBean=$image, source=${state.result.dataSource}")
-                }
-                if (state is AsyncImagePainter.State.Error && imageData != null) {
-                    XLog.e(
-                        "MyPhotoScreen [图片加载失败] ImageBean=$image",
-                        state.result.throwable
-                    )
+                when (state) {
+                    is AsyncImagePainter.State.Success -> {
+                        XLog.d("MyPhotoScreen [图片加载成功] name=${image.fileName}, imageData=$imageData, source=${state.result.dataSource}")
+                    }
+                    is AsyncImagePainter.State.Error -> {
+                        if (imageData != null) {
+                            XLog.e(
+                                "MyPhotoScreen [图片加载失败] name=${image.fileName}, ImageBean=$image",
+                                state.result.throwable
+                            )
+                        }
+                    }
+                    else -> {}
                 }
             },
             modifier = Modifier

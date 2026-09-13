@@ -24,30 +24,24 @@ import kotlin.math.roundToInt
 /**
  * FileViewModel 的扩展函数：媒体与文件查看相关
  */
-internal fun FileViewModel.getImage(fileBeanList: List<FileBean>, indexOf: Int) {
-    if (indexOf !in fileBeanList.indices) {
-        XLog.e("FileViewModel.getImage indexOf=$indexOf ,不在fileBeanList=$fileBeanList 范围中")
-        return
-    }
-    val fileBean = fileBeanList[indexOf]
-    getImage(fileBean)
-}
-
-/**
- * FileViewModel 的扩展函数：媒体与文件查看相关
- */
 internal fun FileViewModel.getImage(fileBean: FileBean) {
     val pickCode = fileBean.pickCode
-    if (pickCode.isEmpty()) return
-
     val cid = currentCid
+
+    if (pickCode.isEmpty()) {
+        XLog.w("FileViewModel.getImage pickCode is empty: fileBean=${fileBean.name}")
+        return
+    }
+
     if (imageBeanCache[cid]?.containsKey(pickCode) == true) {
+        XLog.d("FileViewModel.getImage hit imageBeanCache: fileBean=${fileBean.name}, cid=$cid, cache imageBean=${imageBeanCache[cid]?.get(pickCode)}")
         return
     }
 
     // 优先匹配 Coil 缓存（按 MemoryCache -> DiskCache 顺序短路判断，在内存时无需磁盘 I/O）
     val cachedUrl = getCoilCacheUrl(context.imageLoader, pickCode)
     if (cachedUrl != null) {
+        XLog.d("FileViewModel.getImage hit Coil cache: fileBean=${fileBean.name}, cachedUrl=$cachedUrl")
         val cachedImageBean = ImageBean(
             url = cachedUrl,
             fileName = fileBean.name,
@@ -62,7 +56,10 @@ internal fun FileViewModel.getImage(fileBean: FileBean) {
 
     val loadingKey = "$cid-$pickCode"
     synchronized(imageLoadingSet) {
-        if (imageLoadingSet.contains(loadingKey)) return
+        if (imageLoadingSet.contains(loadingKey)) {
+            XLog.d("FileViewModel.getImage already in imageLoadingSet: fileBean=${fileBean.name}, loadingKey=$loadingKey")
+            return
+        }
         imageLoadingSet.add(loadingKey)
     }
 
@@ -78,6 +75,7 @@ internal fun FileViewModel.getImage(fileBean: FileBean) {
                 newMap[pickCode] = imageBean
 
                 imageBeanCache[cid] = newMap
+                XLog.d("FileViewModel.getImage request success: fileBean=${fileBean.name}, imageBean=$imageBean")
             }.onFailureToastAndLog()
         } finally {
             synchronized(imageLoadingSet) {

@@ -39,9 +39,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -106,9 +104,18 @@ import coil.memory.MemoryCache
 import com.google.gson.Gson
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
+import github.zerorooot.nap511.bean.FileBannerActions
+import github.zerorooot.nap511.bean.FileBannerState
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.FileContentActions
+import github.zerorooot.nap511.bean.FileDisplayConfig
+import github.zerorooot.nap511.bean.FileItemActions
+import github.zerorooot.nap511.bean.FileListDataState
+import github.zerorooot.nap511.bean.FileListScrollState
+import github.zerorooot.nap511.bean.FilePathActions
+import github.zerorooot.nap511.bean.FileScaffoldActions
+import github.zerorooot.nap511.bean.FileScaffoldState
 import github.zerorooot.nap511.bean.ForceOpenType
-import github.zerorooot.nap511.bean.ImageBean
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
@@ -146,6 +153,7 @@ import github.zerorooot.nap511.viewmodel.updateVideoFileBean
 import kotlinx.coroutines.launch
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.LazyVerticalGridScrollbar
+import my.nanihadesuka.compose.LazyVerticalStaggeredGridScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.staggeredgrid.itemsIndexed as staggeredItemsIndexed
@@ -179,6 +187,10 @@ fun FileScreen(
     val refreshing = fileUiState.isRefreshing
     val context = LocalContext.current
     var showForceOpenDialog by rememberSaveable { mutableIntStateOf(-1) }
+
+    /**
+     * 是否开启图片瀑布流模式
+     */
     var isImagePreviewMode by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(path, refreshing, fileBeanList.toList(), settingUiState.autoImagePreviewCount) {
@@ -220,6 +232,12 @@ fun FileScreen(
     }
     val gridState = key(path) {
         rememberLazyGridState(
+            listLocation.firstVisibleItemIndex,
+            listLocation.firstVisibleItemScrollOffset
+        )
+    }
+    val staggeredGrid = key(path) {
+        rememberLazyStaggeredGridState(
             listLocation.firstVisibleItemIndex,
             listLocation.firstVisibleItemScrollOffset
         )
@@ -501,6 +519,7 @@ fun FileScreen(
             }
         }
         isBottomBarShow = true
+        isTopBarShow = true
         //触发路径和数据源的改变，重组后交由上方滚动
         fileViewModel.back()
     }
@@ -579,7 +598,7 @@ fun FileScreen(
 
 
     fun fileContentActions(): FileContentActions {
-        return FileContentActions(
+        val bannerActions = FileBannerActions(
             onOpenNotificationSettings = {
                 val intent = Intent("android.settings.APP_NOTIFICATION_SETTINGS").apply {
                     putExtra("android.provider.extra.APP_PACKAGE", context.packageName)
@@ -597,7 +616,10 @@ fun FileScreen(
                 scope.launch {
                     SettingsRepository.saveData(ConfigKeyUtil.HIDE_BATTERY_BANNER, true)
                 }
-            },
+            }
+        )
+
+        val pathActions = FilePathActions(
             onPathClick = {
                 clipboardManager.nativeClipboardManager.setPrimaryClip(
                     ClipData.newPlainText("path", path)
@@ -623,7 +645,10 @@ fun FileScreen(
                 }
                 App.instance.toast("设置默认离线位置为: $name")
             },
-            onPathItemClick = { fileViewModel.getFiles(it) },
+            onPathItemClick = { fileViewModel.getFiles(it) }
+        )
+
+        val itemActions = FileItemActions(
             onRefresh = {
                 refresh()
             },
@@ -640,7 +665,16 @@ fun FileScreen(
                 fileViewModel.getFileInfo(index)
             },
             onAria2Download = ::onMenuAria2Download,
-            onForceOpen = { showForceOpenDialog = it }
+            onForceOpen = { showForceOpenDialog = it },
+            onLoadImage = { fileBean ->
+                fileViewModel.getImage(fileBean)
+            }
+        )
+
+        return FileContentActions(
+            bannerActions = bannerActions,
+            pathActions = pathActions,
+            itemActions = itemActions
         )
     }
 
@@ -658,7 +692,7 @@ fun FileScreen(
         fileContentActions()
     }
 
-    FileScaffold(
+    val scaffoldState = FileScaffoldState(
         isLongClickState = fileViewModel.isLongClickState,
         appBarTitle = fileViewModel.appBarTitle,
         isExpandedScreen = isExpandedScreen,
@@ -668,36 +702,60 @@ fun FileScreen(
         isCutState = fileViewModel.isCutState,
         fabPosition = fabPosition,
         nestedScrollConnection = nestedScrollConnection,
-        audioViewModel = audioViewModel,
-        onAppBarClick = ::myAppBarOnClick,
-        onMusicDetailNav = { onNav(Route.MusicDetail) },
-        onCancelCut = { fileViewModel.cancelCut() },
-        onCutPaste = { fileViewModel.removeFile() },
-        onAddFolder = { fileViewModel.openCreateFolderDialog() }
+        audioViewModel = audioViewModel
+    )
+
+    val scaffoldActions = remember {
+        FileScaffoldActions(
+            onAppBarClick = ::myAppBarOnClick,
+            onMusicDetailNav = { onNav(Route.MusicDetail) },
+            onCancelCut = { fileViewModel.cancelCut() },
+            onCutPaste = { fileViewModel.removeFile() },
+            onAddFolder = { fileViewModel.openCreateFolderDialog() }
+        )
+    }
+
+    val contentDataState = FileListDataState(
+        path = path,
+        pathList = fileViewModel.pathList,
+        fileBeanList = fileBeanList,
+        refreshing = refreshing,
+        clickIndex = fileViewModel.clickMap.getOrDefault(path, -1),
+        imageCache = fileViewModel.imageBeanCache[fileViewModel.currentCid]
+    )
+
+    val bannerState = FileBannerState(
+        isNotificationEnabled = isNotificationEnabled,
+        isNotificationBannerDismissed = isNotificationBannerDismissed,
+        isIgnoringBatteryOptimizations = isIgnoringBatteryOptimizations,
+        isBatteryBannerDismissed = isBatteryBannerDismissed
+    )
+
+    val displayConfig = FileDisplayConfig(
+        isExpandedScreen = isExpandedScreen,
+        isImagePreviewMode = isImagePreviewMode,
+        isImageHdPreview = settingUiState.imageHdPreview,
+        gridCellMinSize = gridCellMinSize
+    )
+
+    val listScrollState = FileListScrollState(
+        listState = listState,
+        gridState = gridState,
+        staggeredGridState = staggeredGrid
+    )
+
+    FileScaffold(
+        state = scaffoldState,
+        actions = scaffoldActions
     ) { innerPadding ->
         FileScreenContent(
             innerPadding = innerPadding,
-            path = path,
-            pathList = fileViewModel.pathList,
-            fileBeanList = fileBeanList,
-            refreshing = refreshing,
-            clickIndex = fileViewModel.clickMap.getOrDefault(path, -1),
-            isTopBarShow = isTopBarShow,
-            isNotificationEnabled = isNotificationEnabled,
-            isNotificationBannerDismissed = isNotificationBannerDismissed,
-            isIgnoringBatteryOptimizations = isIgnoringBatteryOptimizations,
-            isBatteryBannerDismissed = isBatteryBannerDismissed,
-            isExpandedScreen = isExpandedScreen,
-            isImagePreviewMode = isImagePreviewMode,
-            imageCache = fileViewModel.imageBeanCache[fileViewModel.currentCid],
-            isImageHdPreview = settingUiState.imageHdPreview,
-            onLoadImage = { fileBean ->
-                fileViewModel.getImage(fileBean)
-            },
-            gridState = gridState,
-            listState = listState,
-            gridCellMinSize = gridCellMinSize,
-            actions = contentActions
+            dataState = contentDataState,
+            bannerState = bannerState,
+            displayConfig = displayConfig,
+            scrollState = listScrollState,
+            actions = contentActions,
+            isTopBarShow = isTopBarShow
         )
     }
 }
@@ -705,69 +763,57 @@ fun FileScreen(
 
 @Composable
 private fun FileScaffold(
-    isLongClickState: Boolean,
-    appBarTitle: String,
-    isExpandedScreen: Boolean,
-    isBottomBarShow: Boolean,
-    isTopBarShow: Boolean,
-    hasCurrentMusic: Boolean,
-    isCutState: Boolean,
-    fabPosition: FabPosition,
-    nestedScrollConnection: NestedScrollConnection,
-    audioViewModel: AudioViewModel,
-    onAppBarClick: (AppBarAction) -> Unit,
-    onMusicDetailNav: () -> Unit,
-    onCancelCut: () -> Unit,
-    onCutPaste: () -> Unit,
-    onAddFolder: () -> Unit,
+    state: FileScaffoldState,
+    actions: FileScaffoldActions,
+    modifier: Modifier = Modifier,
     content: @Composable (PaddingValues) -> Unit
 ) {
     Scaffold(
         topBar = {
             AnimatedVisibility(
-                visible = isTopBarShow,
+                visible = state.isTopBarShow,
                 enter = fadeIn() + slideInVertically(),
                 exit = fadeOut() + slideOutVertically()
             ) {
                 AnimatedContent(
-                    targetState = isLongClickState,
+                    targetState = state.isLongClickState,
                     transitionSpec = { fadeIn() togetherWith fadeOut() },
                     label = ""
-                ) {
-                    if (it) {
+                ) { isLongClick ->
+                    if (isLongClick) {
                         AppTopBarMultiple(
-                            title = appBarTitle,
-                            isExpandedScreen = isExpandedScreen,
-                            onClick = onAppBarClick
+                            title = state.appBarTitle,
+                            isExpandedScreen = state.isExpandedScreen,
+                            onClick = actions.onAppBarClick
                         )
                     } else {
-                        AppTopBarNormal(appBarTitle, onAppBarClick)
+                        AppTopBarNormal(state.appBarTitle, actions.onAppBarClick)
                     }
                 }
             }
         },
-        modifier = Modifier.nestedScroll(nestedScrollConnection),
+        modifier = modifier.nestedScroll(state.nestedScrollConnection),
         bottomBar = {
             AnimatedVisibility(
-                visible = hasCurrentMusic && isBottomBarShow,
+                visible = state.hasCurrentMusic && state.isBottomBarShow,
                 enter = slideInVertically(initialOffsetY = { it }),
                 exit = slideOutVertically(targetOffsetY = { it }),
             ) {
-                MiniPlayerBar(audioViewModel = audioViewModel) {
-                    onMusicDetailNav()
+                MiniPlayerBar(audioViewModel = state.audioViewModel) {
+                    actions.onMusicDetailNav()
                 }
             }
         },
         floatingActionButton = {
             FileScreenFab(
-                isCutState = isCutState,
-                visible = isBottomBarShow,
-                onCancelCut = onCancelCut,
-                onCutPaste = onCutPaste,
-                onAddFolder = onAddFolder
+                isCutState = state.isCutState,
+                visible = state.isBottomBarShow,
+                onCancelCut = actions.onCancelCut,
+                onCutPaste = actions.onCutPaste,
+                onAddFolder = actions.onAddFolder
             )
         },
-        floatingActionButtonPosition = fabPosition,
+        floatingActionButtonPosition = state.fabPosition,
         content = content
     )
 }
@@ -776,30 +822,18 @@ private fun FileScaffold(
 @Composable
 private fun FileScreenContent(
     innerPadding: PaddingValues,
-    path: String,
-    pathList: List<PathBean>,
-    fileBeanList: List<FileBean>,
-    refreshing: Boolean,
-    clickIndex: Int,
-    isTopBarShow: Boolean,
-    isNotificationEnabled: Boolean,
-    isNotificationBannerDismissed: Boolean,
-    isIgnoringBatteryOptimizations: Boolean,
-    isBatteryBannerDismissed: Boolean,
-    isExpandedScreen: Boolean,
-    isImagePreviewMode: Boolean,
-    modifier: Modifier = Modifier,
-    imageCache: Map<String, ImageBean>? = null,
-    isImageHdPreview: Boolean = false,
-    onLoadImage: ((FileBean) -> Unit)? = null,
-    gridState: LazyGridState,
-    listState: LazyListState,
-    gridCellMinSize: Dp,
+    dataState: FileListDataState,
+    bannerState: FileBannerState,
+    displayConfig: FileDisplayConfig,
+    scrollState: FileListScrollState,
     actions: FileContentActions,
+    modifier: Modifier = Modifier,
+    isTopBarShow: Boolean = true
 ) {
-    val showNotificationBanner = !isNotificationEnabled && !isNotificationBannerDismissed
+    val showNotificationBanner =
+        !bannerState.isNotificationEnabled && !bannerState.isNotificationBannerDismissed
     val showBatteryBanner =
-        !showNotificationBanner && !isIgnoringBatteryOptimizations && !isBatteryBannerDismissed
+        !showNotificationBanner && !bannerState.isIgnoringBatteryOptimizations && !bannerState.isBatteryBannerDismissed
 
     Column(
         modifier = modifier
@@ -818,15 +852,15 @@ private fun FileScreenContent(
                 NotificationPermissionBanner(
                     text = "未开启通知权限，可能无法及时收到离线下载提醒",
                     icon = Icons.Default.Notifications,
-                    onOpenSettings = actions.onOpenNotificationSettings,
-                    onDismiss = actions.onDismissNotificationBanner
+                    onOpenSettings = actions.bannerActions.onOpenNotificationSettings,
+                    onDismiss = actions.bannerActions.onDismissNotificationBanner
                 )
             } else if (showBatteryBanner) {
                 NotificationPermissionBanner(
                     text = "未允许无限制后台运行，后台解压可能会暂停",
                     icon = Icons.Default.BatteryAlert,
-                    onOpenSettings = actions.onOpenBatterySettings,
-                    onDismiss = actions.onDismissBatteryBanner
+                    onOpenSettings = actions.bannerActions.onOpenBatterySettings,
+                    onDismiss = actions.bannerActions.onDismissBatteryBanner
                 )
             }
         }
@@ -837,36 +871,16 @@ private fun FileScreenContent(
             exit = fadeOut() + slideOutVertically()
         ) {
             FilePathBar(
-                pathList = pathList,
-                onPathClick = actions.onPathClick,
-                onPathDoubleClick = actions.onPathDoubleClick,
-                onPathLongClick = actions.onPathLongClick,
-                onItemClick = actions.onPathItemClick
+                pathList = dataState.pathList,
+                actions = actions.pathActions
             )
         }
 
         FileListContent(
-            refreshing = refreshing,
-            fileBeanList = fileBeanList,
-            path = path,
-            listState = listState,
-            gridState = gridState,
-            gridCellMinSize = gridCellMinSize,
-            isExpandedScreen = isExpandedScreen,
-            isImagePreviewMode = isImagePreviewMode,
-            imageCache = imageCache,
-            isImageHdPreview = isImageHdPreview,
-            onLoadImage = onLoadImage,
-            clickIndex = clickIndex,
-            onRefresh = actions.onRefresh,
-            onItemClick = actions.onItemClick,
-            onItemLongClick = actions.onItemLongClick,
-            onCut = actions.onCut,
-            onDelete = actions.onDelete,
-            onRename = actions.onRename,
-            onFileInfo = actions.onFileInfo,
-            onAria2Download = actions.onAria2Download,
-            onForceOpen = actions.onForceOpen
+            dataState = dataState,
+            displayConfig = displayConfig,
+            scrollState = scrollState,
+            itemActions = actions.itemActions
         )
     }
 }
@@ -875,10 +889,8 @@ private fun FileScreenContent(
 @Composable
 private fun FilePathBar(
     pathList: List<PathBean>,
-    onPathClick: () -> Unit,
-    onPathDoubleClick: () -> Unit,
-    onPathLongClick: (String, String) -> Unit,
-    onItemClick: (String) -> Unit
+    actions: FilePathActions,
+    modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
 
@@ -887,14 +899,14 @@ private fun FilePathBar(
         scrollState.animateScrollTo(scrollState.maxValue)
     }
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = onPathClick,
-                onDoubleClick = onPathDoubleClick,
+                onClick = actions.onPathClick,
+                onDoubleClick = actions.onPathDoubleClick,
                 onLongClick = {
                     val path = pathList.last()
-                    onPathLongClick.invoke(path.name, path.cid)
+                    actions.onPathLongClick.invoke(path.name, path.cid)
                 }
             )
     ) {
@@ -925,8 +937,13 @@ private fun FilePathBar(
                             .combinedClickable(
                                 interactionSource = interactionSource,
                                 indication = null, // 彻底关闭浮层的水波纹渲染，由底层 Chip 自行展示
-                                onClick = { onItemClick(path.cid) },
-                                onLongClick = { onPathLongClick.invoke(path.name, path.cid) }
+                                onClick = { actions.onPathItemClick(path.cid) },
+                                onLongClick = {
+                                    actions.onPathLongClick.invoke(
+                                        path.name,
+                                        path.cid
+                                    )
+                                }
                             )
                     )
                 }
@@ -985,35 +1002,18 @@ private fun FileScreenFab(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FileListContent(
-    refreshing: Boolean,
-    fileBeanList: List<FileBean>,
-    path: String,
-    listState: LazyListState,
-    gridState: LazyGridState,
-    gridCellMinSize: Dp,
-    isExpandedScreen: Boolean,
-    clickIndex: Int,
-    onRefresh: () -> Unit,
-    onItemClick: (Int) -> Unit,
-    onItemLongClick: (Int) -> Unit,
-    onCut: (Int) -> Unit,
-    onDelete: (Int) -> Unit,
-    onRename: (Int) -> Unit,
-    onFileInfo: (Int) -> Unit,
-    onAria2Download: (Int) -> Unit,
-    onForceOpen: (Int) -> Unit,
-    modifier: Modifier = Modifier,
-    isImagePreviewMode: Boolean = false,
-    imageCache: Map<String, ImageBean>? = null,
-    isImageHdPreview: Boolean = false,
-    onLoadImage: ((FileBean) -> Unit)? = null
+    dataState: FileListDataState,
+    displayConfig: FileDisplayConfig,
+    scrollState: FileListScrollState,
+    itemActions: FileItemActions,
+    modifier: Modifier = Modifier
 ) {
     PullToRefreshBox(
-        isRefreshing = refreshing,
-        onRefresh = onRefresh,
+        isRefreshing = dataState.refreshing,
+        onRefresh = itemActions.onRefresh,
         modifier = modifier
     ) {
-        if (fileBeanList.isEmpty()) {
+        if (dataState.fileBeanList.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1023,51 +1023,57 @@ private fun FileListContent(
                 Text("暂无文件")
             }
         } else {
-            key(path, isImagePreviewMode) {
-                if (isImagePreviewMode) {
-                    val staggeredGridState = rememberLazyStaggeredGridState()
-                    LazyVerticalStaggeredGrid(
-                        state = staggeredGridState,
-                        columns = StaggeredGridCells.Adaptive(minSize = gridCellMinSize),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalItemSpacing = 8.dp,
-                        modifier = Modifier.fillMaxSize()
+            key(dataState.path, displayConfig.isImagePreviewMode) {
+                if (displayConfig.isImagePreviewMode) {
+                    LazyVerticalStaggeredGridScrollbar(
+                        state = scrollState.staggeredGridState,
+                        settings = ScrollbarSettings.Default.copy(
+                            thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
+                        )
                     ) {
-                        staggeredItemsIndexed(
-                            items = fileBeanList,
-                            key = { _, item ->
-                                item.fileId.ifEmpty { item.pickCode.ifEmpty { item.photoThumb } }
-                            },
-                        ) { index, item ->
-                            val imageBean = imageCache?.get(item.pickCode)
-                            ImageCellItem(
-                                fileBean = item,
-                                index = index,
-                                clickIndex = clickIndex,
-                                imageBean = imageBean,
-                                isImageHdPreview = isImageHdPreview,
-                                onLoadImage = onLoadImage,
-                                modifier = Modifier, // 瀑布流快速滑动时不施加 animateItem 动画，防止布局重新计算时元素跳动
-                                itemOnClick = onItemClick,
-                                itemOnLongClick = onItemLongClick
-                            )
+                        LazyVerticalStaggeredGrid(
+                            state = scrollState.staggeredGridState,
+                            columns = StaggeredGridCells.Adaptive(minSize = displayConfig.gridCellMinSize),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalItemSpacing = 8.dp,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            staggeredItemsIndexed(
+                                items = dataState.fileBeanList,
+                                key = { _, item ->
+                                    item.fileId.ifEmpty { item.pickCode.ifEmpty { item.photoThumb } }
+                                },
+                            ) { index, item ->
+                                val imageBean = dataState.imageCache?.get(item.pickCode)
+                                ImageCellItem(
+                                    fileBean = item,
+                                    index = index,
+                                    clickIndex = dataState.clickIndex,
+                                    imageBean = imageBean,
+                                    isImageHdPreview = displayConfig.isImageHdPreview,
+                                    onLoadImage = itemActions.onLoadImage,
+                                    modifier = Modifier, // 瀑布流快速滑动时不施加 animateItem 动画，防止布局重新计算时元素跳动
+                                    itemOnClick = itemActions.onItemClick,
+                                    itemOnLongClick = itemActions.onItemLongClick
+                                )
+                            }
                         }
                     }
-                } else if (isExpandedScreen) {
+                } else if (displayConfig.isExpandedScreen) {
                     LazyVerticalGridScrollbar(
-                        state = gridState,
+                        state = scrollState.gridState,
                         settings = ScrollbarSettings.Default.copy(
                             thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
                         )
                     ) {
                         LazyVerticalGrid(
-                            state = gridState,
-                            columns = GridCells.Adaptive(minSize = gridCellMinSize),
+                            state = scrollState.gridState,
+                            columns = GridCells.Adaptive(minSize = displayConfig.gridCellMinSize),
 //                            contentPadding = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal).asPaddingValues(),
                             modifier = Modifier.fillMaxSize()
                         ) {
                             gridItemsIndexed(
-                                items = fileBeanList,
+                                items = dataState.fileBeanList,
                                 key = { _, item ->
                                     item.fileId.ifEmpty { item.categoryId.ifEmpty { item.pickCode } }
                                 },
@@ -1075,37 +1081,37 @@ private fun FileListContent(
                                 FileCellItem(
                                     fileBean = item,
                                     index = index,
-                                    clickIndex = clickIndex,
+                                    clickIndex = dataState.clickIndex,
                                     modifier = Modifier.animateItem(
                                         fadeInSpec = null,
                                         fadeOutSpec = null
                                     ),
-                                    itemOnClick = onItemClick,
-                                    itemOnLongClick = onItemLongClick,
-                                    onCut = onCut,
-                                    onDelete = onDelete,
-                                    onRename = onRename,
-                                    onFileInfo = onFileInfo,
-                                    onForceOpen = onForceOpen,
-                                    onAria2Download = onAria2Download
+                                    itemOnClick = itemActions.onItemClick,
+                                    itemOnLongClick = itemActions.onItemLongClick,
+                                    onCut = itemActions.onCut,
+                                    onDelete = itemActions.onDelete,
+                                    onRename = itemActions.onRename,
+                                    onFileInfo = itemActions.onFileInfo,
+                                    onForceOpen = itemActions.onForceOpen,
+                                    onAria2Download = itemActions.onAria2Download
                                 )
                             }
                         }
                     }
                 } else {
                     LazyColumnScrollbar(
-                        state = listState,
+                        state = scrollState.listState,
                         settings = ScrollbarSettings.Default.copy(
                             thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
                         )
                     ) {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            state = listState,
+                            state = scrollState.listState,
 //                            contentPadding = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal).asPaddingValues()
                         ) {
                             itemsIndexed(
-                                items = fileBeanList,
+                                items = dataState.fileBeanList,
                                 key = { _, item ->
                                     item.fileId.ifEmpty { item.pickCode.ifEmpty { item.uuid.toString() } }
                                 },
@@ -1113,19 +1119,19 @@ private fun FileListContent(
                                 FileCellItem(
                                     fileBean = item,
                                     index = index,
-                                    clickIndex = clickIndex,
+                                    clickIndex = dataState.clickIndex,
                                     modifier = Modifier.animateItem(
                                         fadeInSpec = null,
                                         fadeOutSpec = null
                                     ),
-                                    itemOnClick = onItemClick,
-                                    itemOnLongClick = onItemLongClick,
-                                    onCut = onCut,
-                                    onDelete = onDelete,
-                                    onRename = onRename,
-                                    onFileInfo = onFileInfo,
-                                    onForceOpen = onForceOpen,
-                                    onAria2Download = onAria2Download
+                                    itemOnClick = itemActions.onItemClick,
+                                    itemOnLongClick = itemActions.onItemLongClick,
+                                    onCut = itemActions.onCut,
+                                    onDelete = itemActions.onDelete,
+                                    onRename = itemActions.onRename,
+                                    onFileInfo = itemActions.onFileInfo,
+                                    onForceOpen = itemActions.onForceOpen,
+                                    onAria2Download = itemActions.onAria2Download
                                 )
                             }
                         }
@@ -1199,26 +1205,3 @@ private fun NotificationPermissionBanner(
         }
     }
 }
-
-/**
- * 文件内容区域 UI 交互事件封装
- */
-private data class FileContentActions(
-    val onOpenNotificationSettings: () -> Unit,
-    val onDismissNotificationBanner: () -> Unit,
-    val onOpenBatterySettings: () -> Unit,
-    val onDismissBatteryBanner: () -> Unit,
-    val onPathClick: () -> Unit,
-    val onPathDoubleClick: () -> Unit,
-    val onPathLongClick: (name: String, cid: String) -> Unit,
-    val onPathItemClick: (cid: String) -> Unit,
-    val onRefresh: () -> Unit,
-    val onItemClick: (Int) -> Unit,
-    val onItemLongClick: (Int) -> Unit,
-    val onCut: (Int) -> Unit,
-    val onDelete: (Int) -> Unit,
-    val onRename: (Int) -> Unit,
-    val onFileInfo: (Int) -> Unit,
-    val onAria2Download: (Int) -> Unit,
-    val onForceOpen: (Int) -> Unit
-)

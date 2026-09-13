@@ -73,7 +73,7 @@ enum class MenuItemAction(
     // 文件页顶栏菜单项
     GALLERY_MODE("瀑布视图", Icons.Outlined.Image),
     FILE_SORT("文件排序", Icons.AutoMirrored.Outlined.Sort),
-    REFRESH_FILES("刷新文件", Icons.Outlined.Refresh),
+    REFRESH_FILES("强制刷新", Icons.Outlined.Refresh),
     VIDEO_SCHEDULE("视频时间", Icons.Outlined.Schedule),
 
     // 离线页顶栏菜单项

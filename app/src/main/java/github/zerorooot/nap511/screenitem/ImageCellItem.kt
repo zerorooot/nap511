@@ -82,7 +82,8 @@ fun ImageCellItem(
             containerColor = if (fileBean.isSelect) {
                 MaterialTheme.colorScheme.primaryContainer
             } else if (clickIndex == index) {
-                MaterialTheme.colorScheme.surfaceContainerLow
+               // MaterialTheme.colorScheme.surfaceContainerLow
+                MaterialTheme.colorScheme.surfaceBright
             } else {
                 MaterialTheme.colorScheme.surfaceContainer
             }

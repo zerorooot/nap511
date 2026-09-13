@@ -18,3 +18,4 @@ app/src/test/
 app/release/
 .artifacts
 .proxyai
+lib/

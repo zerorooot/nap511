@@ -7,6 +7,7 @@ import android.content.ClipboardManager
 import android.content.Intent
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -323,31 +324,19 @@ class FileViewModel(
         }
     }
 
-    fun setListLocation(path: String, listState: LazyListState) {
-        val locationBean = LocationBean(
-            listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset
-        )
-        currentLocation[path] = locationBean
+    fun setListLocation(path: String, state: Any) {
+        val (index, offset) = when (state) {
+            is LazyListState -> state.firstVisibleItemIndex to state.firstVisibleItemScrollOffset
+            is LazyGridState -> state.firstVisibleItemIndex to state.firstVisibleItemScrollOffset
+            is LazyStaggeredGridState -> state.firstVisibleItemIndex to state.firstVisibleItemScrollOffset
+            else -> return
+        }
+        currentLocation[path] = LocationBean(index, offset)
     }
 
-    fun setListLocation(path: String, gridState: LazyGridState) {
-        val locationBean = LocationBean(
-            gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset
-        )
-        currentLocation[path] = locationBean
-    }
-
-    fun setListLocationAndClickCache(index: Int, listState: LazyListState) {
+    fun setListLocationAndClickCache(index: Int, state: Any) {
         val currentPath = _currentPath.value
-        //记录上级目录当前的位置
-        setListLocation(currentPath, listState)
-        //标记此点击文件，方便确认到底点了那个
-        clickMap[currentPath] = index
-    }
-
-    fun setListLocationAndClickCache(index: Int, gridState: LazyGridState) {
-        val currentPath = _currentPath.value
-        setListLocation(currentPath, gridState)
+        setListLocation(currentPath, state)
         clickMap[currentPath] = index
     }
 

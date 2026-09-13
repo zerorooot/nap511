@@ -65,7 +65,8 @@ dependencies {
 
     implementation(libs.androidx.concurrent.futures.ktx)
     implementation(libs.xlog)
-    implementation(libs.lazycolumnscrollbar)
+    implementation(files("libs/lazycolumnscrollbar-2.2.0.aar"))
+    //implementation(libs.lazycolumnscrollbar)
     implementation(libs.process.phoenix)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.android.request.inspector.webview)
