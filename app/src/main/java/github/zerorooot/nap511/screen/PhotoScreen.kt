@@ -78,28 +78,6 @@ fun MyPhotoScreen(
         XLog.d("MyPhotoScreen enter: totalPhotos=${photoList.size}, currentIndex=$currentIndex, cid=$cid")
     }
 
-    val view = LocalView.current
-    DisposableEffect(Unit) {
-        // 获取 Window 实例（注意：需要确保 context 是 Activity）
-        val window = (view.context as? Activity)?.window
-            ?: throw Exception("Not in an Activity - unable to get Window reference")
-
-        // 创建控制器
-        val insetsController = WindowCompat.getInsetsController(window, view)
-
-        // 隐藏状态栏和导航栏
-        insetsController.hide(WindowInsetsCompat.Type.systemBars())
-
-        // 设置交互模式：滑动边缘时临时显示（Immersive Sticky 模式）
-        insetsController.systemBarsBehavior =
-            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-
-        onDispose {
-            // 退出时恢复显示
-            insetsController.show(WindowInsetsCompat.Type.systemBars())
-        }
-    }
-
     ImageBrowserScreen(
         photoList = photoList,
         imageCache = imageCache,
@@ -133,6 +111,25 @@ private fun ImageBrowserScreen(
 
     fun onToggleControl() {
         controlsVisible = !controlsVisible
+    }
+
+    val view = LocalView.current
+    DisposableEffect(controlsVisible) {
+        val window = (view.context as? Activity)?.window
+        val insetsController = window?.let { WindowCompat.getInsetsController(it, view) }
+
+        // 根据 controlsVisible 动态控制系统栏显隐
+        if (!controlsVisible) {
+            insetsController?.hide(WindowInsetsCompat.Type.systemBars())
+            insetsController?.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            insetsController?.show(WindowInsetsCompat.Type.systemBars())
+        }
+
+        onDispose {
+            insetsController?.show(WindowInsetsCompat.Type.systemBars())
+        }
     }
 
     Box(

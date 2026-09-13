@@ -3,8 +3,10 @@ package github.zerorooot.nap511.screen
 import android.app.Activity
 import android.content.ClipData
 import android.content.Intent
+import android.os.Build
 import android.os.SystemClock
 import android.provider.Settings
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -64,6 +66,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -474,10 +477,10 @@ fun FileScreen(
             fileViewModel.setRefreshingStatus(true)
 
             //记录上级目录当前的位置
-            if (isExpandedScreen || isImagePreviewMode) {
-                fileViewModel.setListLocationAndClickCache(i, gridState)
-            } else {
-                fileViewModel.setListLocationAndClickCache(i, listState)
+            when {
+                isImagePreviewMode -> fileViewModel.setListLocationAndClickCache(i, staggeredGrid)
+                isExpandedScreen -> fileViewModel.setListLocationAndClickCache(i, gridState)
+                else -> fileViewModel.setListLocationAndClickCache(i, listState)
             }
             val fileBean = fileBeanList[i]
 
@@ -493,6 +496,14 @@ fun FileScreen(
                 else -> fileViewModel.setRefreshingStatus(false)
             }
 
+        }
+    }
+
+    fun scrollToTop() {
+        when {
+            isImagePreviewMode -> staggeredGrid.requestScrollToItem(0, 0)
+            isExpandedScreen -> gridState.requestScrollToItem(0, 0)
+            else -> listState.requestScrollToItem(0, 0)
         }
     }
 
@@ -512,10 +523,10 @@ fun FileScreen(
             return
         }
         if (path != "/根目录" && !fileViewModel.isLongClickState) {
-            if (isExpandedScreen || isImagePreviewMode) {
-                fileViewModel.setListLocation(path, gridState)
-            } else {
-                fileViewModel.setListLocation(path, listState)
+            when {
+                isImagePreviewMode -> fileViewModel.setListLocation(path, staggeredGrid)
+                isExpandedScreen -> fileViewModel.setListLocation(path, gridState)
+                else -> fileViewModel.setListLocation(path, listState)
             }
         }
         isBottomBarShow = true
@@ -568,11 +579,7 @@ fun FileScreen(
 
             MenuItemAction.VIDEO_SCHEDULE -> {
                 fileViewModel.sortByVideoTime()
-                if (isExpandedScreen || isImagePreviewMode) {
-                    gridState.requestScrollToItem(0, 0)
-                } else {
-                    listState.requestScrollToItem(0, 0)
-                }
+                scrollToTop()
             }
 
             MenuItemAction.FILE_SORT -> fileViewModel.openFileOrderDialog()
@@ -628,11 +635,7 @@ fun FileScreen(
             },
             onPathDoubleClick = {
                 scope.launch {
-                    if (isExpandedScreen || isImagePreviewMode) {
-                        gridState.requestScrollToItem(0, 0)
-                    } else {
-                        listState.requestScrollToItem(0, 0)
-                    }
+                    scrollToTop()
                 }
             },
             onPathLongClick = { name, cid ->
@@ -682,6 +685,7 @@ fun FileScreen(
         path,
         isExpandedScreen,
         isImagePreviewMode,
+        staggeredGrid,
         gridState,
         listState,
         imageLoader,
@@ -769,6 +773,18 @@ private fun FileScaffold(
     content: @Composable (PaddingValues) -> Unit
 ) {
     Scaffold(
+        //直接设置
+        // contentWindowInsets = WindowInsets(0, 0, 0, 0) ,
+        // 会彻底清空 所有方向（上、下、左、右） 的系统安全边距（System Insets）
+        //造成：1、底部导航栏/手势条重叠（Bottom Insets 丢失）；2、横屏及左右安全边距丢失（Horizontal Insets 丢失）；3、软键盘自动弹起避让失效（IME Insets 丢失）
+        contentWindowInsets = if (state.isTopBarShow) {
+            ScaffoldDefaults.contentWindowInsets
+        } else {
+            // 仅在隐藏控制栏时排除 Top 边距，保留 Bottom（底部导航栏/手势）和 Horizontal（左右）
+            ScaffoldDefaults.contentWindowInsets.only(
+                WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal
+            )
+        },
         topBar = {
             AnimatedVisibility(
                 visible = state.isTopBarShow,

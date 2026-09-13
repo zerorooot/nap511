@@ -8,16 +8,33 @@
 
 # 截图
 
-<table>
-  <tr style="text-align: center; vertical-align: middle;">
-    <td><a href="./assets/01.jpg"><img src="./assets/01.jpg?raw=true" width="300" alt="Screenshot 001"/></a></td>
-    <td><a href="./assets/02.jpg"><img src="./assets/02.jpg?raw=true" width="300" alt="Screenshot 002"/></a></td>
-    <td><a href="./assets/03.jpg"><img src="./assets/03.jpg?raw=true" width="300" alt="Screenshot 003"/></a></td>
+<table style="text-align: center; vertical-align: middle; width: 1200px; table-layout: fixed;">
+  <tr><td colspan="2">
+      <a href="./assets/01.jpg"><img src="./assets/01.jpg?raw=true" width="300" alt="Screenshot 001"/></a>
+    </td>
+    <td colspan="2">
+      <a href="./assets/02.jpg"><img src="./assets/02.jpg?raw=true" width="300" alt="Screenshot 002"/></a>
+    </td>
+    <td colspan="2">
+      <a href="./assets/03.jpg"><img src="./assets/03.jpg?raw=true" width="300" alt="Screenshot 003"/></a>
+    </td>
   </tr>
-  <tr style="text-align: center; vertical-align: middle;">
-    <td><a href="./assets/04.jpg"><img src="./assets/04.jpg?raw=true" width="300" alt="Screenshot 004"/></a></td>
-    <td><a href="./assets/05.jpg"><img src="./assets/05.jpg?raw=true" width="300" alt="Screenshot 005"/></a></td>
-    <td><a href="./assets/06.jpg"><img src="./assets/06.jpg?raw=true" width="300" alt="Screenshot 006"/></a></td>
+  <tr><td colspan="2">
+      <a href="./assets/04.jpg"><img src="./assets/04.jpg?raw=true" width="300" alt="Screenshot 004"/></a>
+    </td>
+    <td colspan="2">
+      <a href="./assets/05.jpg"><img src="./assets/05.jpg?raw=true" width="300" alt="Screenshot 005"/></a>
+    </td>
+    <td colspan="2">
+      <a href="./assets/06.jpg"><img src="./assets/06.jpg?raw=true" width="300" alt="Screenshot 006"/></a>
+    </td>
+  </tr>
+  <tr><td colspan="3">
+      <a href="./assets/07.jpg"><img src="./assets/07.jpg?raw=true" width="600" alt="Screenshot 007"/></a>
+    </td>
+    <td colspan="3">
+      <a href="./assets/08.jpg"><img src="./assets/08.jpg?raw=true" width="600" alt="Screenshot 008"/></a>
+    </td>
   </tr>
 </table>
 

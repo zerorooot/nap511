@@ -107,6 +107,7 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("CoroutineCreationDuringComposition")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        //不设置会报错：No NavigationEventDispatcher was provided via LocalNavigationEventDispatcherOwner
         initializeViewTreeOwners()
         enableEdgeToEdge()
         setContent {
