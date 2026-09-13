@@ -16,15 +16,19 @@ import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.itemsIndexed as staggeredItemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.bean.FileDisplayConfig
 import github.zerorooot.nap511.bean.FileItemActions
 import github.zerorooot.nap511.bean.FileListDataState
+import github.zerorooot.nap511.bean.FileListScrollState
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.LazyVerticalGridScrollbar
 import my.nanihadesuka.compose.LazyVerticalStaggeredGridScrollbar
@@ -162,6 +166,50 @@ fun FileColumnList(
                     ),
                     itemActions = itemActions,
                 )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FileListContent(
+    dataState: FileListDataState,
+    displayConfig: FileDisplayConfig,
+    scrollState: FileListScrollState,
+    itemActions: FileItemActions,
+    modifier: Modifier = Modifier
+) {
+    PullToRefreshBox(
+        isRefreshing = dataState.refreshing,
+        onRefresh = itemActions.onRefresh,
+        modifier = modifier
+    ) {
+        if (dataState.fileBeanList.isEmpty()) {
+            FileEmptyContent()
+        } else {
+            key(dataState.path, displayConfig.isPreviewActive) {
+                if (displayConfig.isPreviewActive) {
+                    FileStaggeredGridList(
+                        dataState = dataState,
+                        displayConfig = displayConfig,
+                        staggeredGridState = scrollState.staggeredGridState,
+                        itemActions = itemActions
+                    )
+                } else if (displayConfig.isExpandedScreen) {
+                    FileGridList(
+                        dataState = dataState,
+                        displayConfig = displayConfig,
+                        gridState = scrollState.gridState,
+                        itemActions = itemActions
+                    )
+                } else {
+                    FileColumnList(
+                        dataState = dataState,
+                        listState = scrollState.listState,
+                        itemActions = itemActions
+                    )
+                }
             }
         }
     }

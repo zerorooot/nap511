@@ -3,71 +3,16 @@ package github.zerorooot.nap511.screen
 import android.app.Activity
 import android.content.ClipData
 import android.content.Intent
-import android.os.SystemClock
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
-import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.BatteryAlert
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentPaste
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ScaffoldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -80,13 +25,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -107,7 +45,6 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
 import github.zerorooot.nap511.bean.FileBannerActions
 import github.zerorooot.nap511.bean.FileBannerState
-import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileContentActions
 import github.zerorooot.nap511.bean.FileDisplayConfig
 import github.zerorooot.nap511.bean.FileItemActions
@@ -117,16 +54,11 @@ import github.zerorooot.nap511.bean.FilePathActions
 import github.zerorooot.nap511.bean.FileScaffoldActions
 import github.zerorooot.nap511.bean.FileScaffoldState
 import github.zerorooot.nap511.bean.ForceOpenType
-import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.dialog.ForceOpenDialog
 import github.zerorooot.nap511.repository.SettingsRepository
-import github.zerorooot.nap511.screenitem.FileColumnList
-import github.zerorooot.nap511.screenitem.FileEmptyContent
-import github.zerorooot.nap511.screenitem.FileGridList
-import github.zerorooot.nap511.screenitem.FileStaggeredGridList
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.isIgnoringBatteryOptimizations
@@ -137,13 +69,8 @@ import github.zerorooot.nap511.viewmodel.cancelCut
 import github.zerorooot.nap511.viewmodel.cut
 import github.zerorooot.nap511.viewmodel.delete
 import github.zerorooot.nap511.viewmodel.deleteMultiple
-import github.zerorooot.nap511.viewmodel.downloadText
-import github.zerorooot.nap511.viewmodel.downloadWeb
 import github.zerorooot.nap511.viewmodel.getFileInfo
 import github.zerorooot.nap511.viewmodel.getImage
-import github.zerorooot.nap511.viewmodel.getTorrentTask
-import github.zerorooot.nap511.viewmodel.getVideoInfo
-import github.zerorooot.nap511.viewmodel.getZipListFile
 import github.zerorooot.nap511.viewmodel.openAria2Dialog
 import github.zerorooot.nap511.viewmodel.openCreateFolderDialog
 import github.zerorooot.nap511.viewmodel.openFileOrderDialog
@@ -278,43 +205,14 @@ fun FileScreen(
         }
     }
 
-    // 2. 嵌套滚动监听
-    val nestedScrollConnection = remember {
-        var accumulatedDelta = 0f
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                val delta = available.y
-
-                // 方向改变，重置滑动累加值
-                if ((delta > 0 && accumulatedDelta < 0) || (delta < 0 && accumulatedDelta > 0)) {
-                    accumulatedDelta = 0f
-                }
-
-                accumulatedDelta += delta
-
-                // 【关键点】增加状态判断 (`&& isBottomBarShow` / `&& !isBottomBarShow`)，防止重复更新状态引发卡顿
-                if (accumulatedDelta < -thresholdPx) {
-                    if (isPreviewActive) {
-                        isTopBarShow = false
-                    }
-                    if (isBottomBarShow) {
-                        isBottomBarShow = false
-                    }
-                }
-                if (accumulatedDelta > thresholdPx) {
-                    if (isPreviewActive) {
-                        isTopBarShow = true
-                    }
-                    if (!isBottomBarShow) {
-                        isBottomBarShow = true
-                    }
-                }
-
-                return Offset.Zero
-            }
-        }
-    }
-
+    // 嵌套滚动监听
+    val nestedScrollConnection = rememberFileNestedScrollConnection(
+        thresholdPx = thresholdPx,
+        isPreviewActive = isPreviewActive,
+        isBottomBarShow = isBottomBarShow,
+        onTopBarShowChange = { isTopBarShow = it },
+        onBottomBarShowChange = { isBottomBarShow = it }
+    )
 
     val videoActivityLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -349,75 +247,32 @@ fun FileScreen(
         }
     }
 
-    fun handleFolderClick(i: Int, fileBean: FileBean) {
-        isBottomBarShow = true
-        if (settingUiState.earlyLoading) {
-            listOf(i - 1, i + 1)
-                .mapNotNull { fileBeanList.getOrNull(it) }
-                .filter { it.isFolder }
-                .forEach { fileViewModel.updateFileCache(it.categoryId) }
-        }
-        fileViewModel.getFiles(fileBean.categoryId)
+    // 记录上次点击时间，使用 longArrayOf 避免无意义的重组
+    val lastClickTime = remember { longArrayOf(0L) }
+    val clickHandler = remember(
+        fileViewModel,
+        audioViewModel,
+        settingUiState,
+        isPreviewActive,
+        isExpandedScreen,
+        staggeredGrid,
+        gridState,
+        listState
+    ) {
+        FileClickHandler(
+            fileViewModel = fileViewModel,
+            audioViewModel = audioViewModel,
+            settingUiState = settingUiState,
+            onNav = onNav,
+            isPreviewActive = isPreviewActive,
+            isExpandedScreen = isExpandedScreen,
+            staggeredGrid = staggeredGrid,
+            gridState = gridState,
+            listState = listState,
+            onBottomBarShowChange = { isBottomBarShow = it },
+            lastClickTime = lastClickTime
+        )
     }
-
-    fun handleVideoClick(i: Int, fileBean: FileBean) {
-        audioViewModel.pause()
-        fileViewModel.getVideoInfo(fileBean.pickCode, i, fileBean.name)
-    }
-
-    fun handleAudioClick(fileBean: FileBean) {
-        isBottomBarShow = true
-        fileViewModel.setRefreshingStatus(false)
-        audioViewModel.playAudio(fileBean)
-    }
-
-    fun handlePhotoClick(fileBean: FileBean) {
-        audioViewModel.pause()
-        val photoList = fileBeanList.filter { it.photoThumb != "" }
-        if (photoList.isEmpty()) {
-            App.instance.toast("图片打开失败，找不到图片url！")
-        } else {
-            fileViewModel.photoFileBeanList.clear()
-            fileViewModel.photoFileBeanList.addAll(photoList)
-            fileViewModel.photoIndexOf = photoList.indexOf(fileBean)
-            onNav.invoke(Route.Photo)
-        }
-        fileViewModel.setRefreshingStatus(false)
-    }
-
-
-    fun handleTorrentClick(fileBean: FileBean) {
-        fileViewModel.getTorrentTask(fileBean.sha1)
-    }
-
-    fun handleZipClick(i: Int) {
-        fileViewModel.selectIndex = i
-        fileViewModel.getZipListFile()
-    }
-
-    fun checkAndDownloadFile(i: Int, fileBean: FileBean, action: () -> Unit) {
-        val txtSize = settingUiState.txtSize.toIntOrNull() ?: 200
-        if (fileBean.size.toLong() < txtSize * 1024) {
-            fileViewModel.selectIndex = i
-            action()
-        } else {
-            fileViewModel.setRefreshingStatus(false)
-            App.instance.toast("仅支持打开${txtSize}kb以下的文件")
-        }
-    }
-
-    fun handleTextClick(i: Int, fileBean: FileBean) {
-        checkAndDownloadFile(i, fileBean) {
-            fileViewModel.downloadText(fileBean, onNav)
-        }
-    }
-
-    fun handleWebClick(i: Int, fileBean: FileBean) {
-        checkAndDownloadFile(i, fileBean) {
-            fileViewModel.downloadWeb(fileBean, onNav)
-        }
-    }
-
 
     if (showForceOpenDialog != -1) {
         val bean = fileViewModel.fileBeanList[showForceOpenDialog]
@@ -431,77 +286,19 @@ fun FileScreen(
             ) {
                 fileViewModel.setRefreshingStatus(true)
                 when (it) {
-                    ForceOpenType.VIDEO -> {
-                        handleVideoClick(showForceOpenDialog, bean)
-                    }
-
-                    ForceOpenType.AUDIO -> {
-                        handleAudioClick(bean)
-                    }
-
-                    ForceOpenType.IMAGE -> {
-                        handlePhotoClick(bean)
-                    }
-
-                    ForceOpenType.TEXT -> {
-                        handleTextClick(showForceOpenDialog, bean)
-                    }
-
-                    ForceOpenType.WEB -> {
-                        handleWebClick(showForceOpenDialog, bean)
-                    }
-
-                    ForceOpenType.ARCHIVE -> {
-                        handleZipClick(showForceOpenDialog)
-                    }
-
-                    ForceOpenType.TORRENT -> {
-                        handleTorrentClick(bean)
-                    }
+                    ForceOpenType.VIDEO -> clickHandler.handleVideoClick(showForceOpenDialog, bean)
+                    ForceOpenType.AUDIO -> clickHandler.handleAudioClick(bean)
+                    ForceOpenType.IMAGE -> clickHandler.handlePhotoClick(bean)
+                    ForceOpenType.TEXT -> clickHandler.handleTextClick(showForceOpenDialog, bean)
+                    ForceOpenType.WEB -> clickHandler.handleWebClick(showForceOpenDialog, bean)
+                    ForceOpenType.ARCHIVE -> clickHandler.handleZipClick(showForceOpenDialog)
+                    ForceOpenType.TORRENT -> clickHandler.handleTorrentClick(bean)
                 }
             }
         }
     }
 
-// 记录上次点击时间，使用 longArrayOf 避免无意义的重组
-    val lastClickTime = remember { longArrayOf(0L) }
-
-    // Assembled myItemOnClick — routes to focused handlers
-    fun myItemOnClick(i: Int) {
-        if (fileViewModel.isLongClickState) {
-            fileViewModel.select(i)
-        } else {
-            val currentTime = SystemClock.elapsedRealtime()
-            if (currentTime - lastClickTime[0] < 200L) { // 200ms 内的连点会被忽略
-                return
-            }
-            lastClickTime[0] = currentTime
-
-
-            fileViewModel.setRefreshingStatus(true)
-
-            //记录上级目录当前的位置
-            when {
-                isPreviewActive -> fileViewModel.setListLocationAndClickCache(i, staggeredGrid)
-                isExpandedScreen -> fileViewModel.setListLocationAndClickCache(i, gridState)
-                else -> fileViewModel.setListLocationAndClickCache(i, listState)
-            }
-            val fileBean = fileBeanList[i]
-
-            when {
-                fileBean.isFolder -> handleFolderClick(i, fileBean)
-                fileBean.isVideo == 1 -> handleVideoClick(i, fileBean)
-                fileBean.fileIco == R.drawable.torrent -> handleTorrentClick(fileBean)
-                fileBean.fileIco == R.drawable.zip -> handleZipClick(i)
-                fileBean.fileIco == R.drawable.txt -> handleTextClick(i, fileBean)
-                fileBean.fileIco == R.drawable.web -> handleWebClick(i, fileBean)
-                fileBean.fileIco == R.drawable.mp3 -> handleAudioClick(fileBean)
-                fileBean.photoThumb.isNotEmpty() -> handlePhotoClick(fileBean)
-                else -> fileViewModel.setRefreshingStatus(false)
-            }
-
-        }
-    }
+    fun myItemOnClick(i: Int) = clickHandler.myItemOnClick(i)
 
     fun scrollToTop() {
         when {
@@ -595,9 +392,6 @@ fun FileScreen(
         }
     }
 
-    // ============================================================
-    // Phase 4: inline itemOnLongClick (no remember needed)
-    // ============================================================
     fun itemOnLongClick(i: Int) {
         fileViewModel.isLongClickState = !fileViewModel.isLongClickState
         if (fileViewModel.isLongClickState) {
@@ -775,364 +569,5 @@ fun FileScreen(
             actions = contentActions,
             isTopBarShow = isTopBarShow
         )
-    }
-}
-
-
-@Composable
-private fun FileScaffold(
-    state: FileScaffoldState,
-    actions: FileScaffoldActions,
-    modifier: Modifier = Modifier,
-    content: @Composable (PaddingValues) -> Unit
-) {
-    Scaffold(
-        //直接设置
-        // contentWindowInsets = WindowInsets(0, 0, 0, 0) ,
-        // 会彻底清空 所有方向（上、下、左、右） 的系统安全边距（System Insets）
-        //造成：1、底部导航栏/手势条重叠（Bottom Insets 丢失）；2、横屏及左右安全边距丢失（Horizontal Insets 丢失）；3、软键盘自动弹起避让失效（IME Insets 丢失）
-        contentWindowInsets = if (state.isTopBarShow) {
-            ScaffoldDefaults.contentWindowInsets
-        } else {
-            // 仅在隐藏控制栏时排除 Top 边距，保留 Bottom（底部导航栏/手势）和 Horizontal（左右）
-            ScaffoldDefaults.contentWindowInsets.only(
-                WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal
-            )
-        },
-        topBar = {
-            AnimatedVisibility(
-                visible = state.isTopBarShow,
-                enter = fadeIn() + slideInVertically(),
-                exit = fadeOut() + slideOutVertically()
-            ) {
-                AnimatedContent(
-                    targetState = state.isLongClickState,
-                    transitionSpec = { fadeIn() togetherWith fadeOut() },
-                    label = ""
-                ) { isLongClick ->
-                    if (isLongClick) {
-                        AppTopBarMultiple(
-                            title = state.appBarTitle,
-                            isExpandedScreen = state.isExpandedScreen,
-                            onClick = actions.onAppBarClick
-                        )
-                    } else {
-                        AppTopBarNormal(state.appBarTitle, actions.onAppBarClick)
-                    }
-                }
-            }
-        },
-        modifier = modifier.nestedScroll(state.nestedScrollConnection),
-        bottomBar = {
-            AnimatedVisibility(
-                visible = state.hasCurrentMusic && state.isBottomBarShow,
-                enter = slideInVertically(initialOffsetY = { it }),
-                exit = slideOutVertically(targetOffsetY = { it }),
-            ) {
-                MiniPlayerBar(audioViewModel = state.audioViewModel) {
-                    actions.onMusicDetailNav()
-                }
-            }
-        },
-        floatingActionButton = {
-            FileScreenFab(
-                isCutState = state.isCutState,
-                visible = state.isBottomBarShow,
-                onCancelCut = actions.onCancelCut,
-                onCutPaste = actions.onCutPaste,
-                onAddFolder = actions.onAddFolder
-            )
-        },
-        floatingActionButtonPosition = state.fabPosition,
-        content = content
-    )
-}
-
-@OptIn(ExperimentalCoilApi::class)
-@Composable
-private fun FileScreenContent(
-    innerPadding: PaddingValues,
-    dataState: FileListDataState,
-    bannerState: FileBannerState,
-    displayConfig: FileDisplayConfig,
-    scrollState: FileListScrollState,
-    actions: FileContentActions,
-    modifier: Modifier = Modifier,
-    isTopBarShow: Boolean = true
-) {
-    val showNotificationBanner =
-        !bannerState.isNotificationEnabled && !bannerState.isNotificationBannerDismissed
-    val showBatteryBanner =
-        !showNotificationBanner && !bannerState.isIgnoringBatteryOptimizations && !bannerState.isBatteryBannerDismissed
-
-    Column(
-        modifier = modifier
-            .padding(
-                top = innerPadding.calculateTopPadding(),
-                bottom = innerPadding.calculateBottomPadding()
-            )
-            .consumeWindowInsets(innerPadding)
-    ) {
-        AnimatedVisibility(
-            visible = showNotificationBanner || showBatteryBanner,
-            enter = fadeIn() + slideInVertically(),
-            exit = fadeOut() + slideOutVertically()
-        ) {
-            if (showNotificationBanner) {
-                NotificationPermissionBanner(
-                    text = "未开启通知权限，可能无法及时收到离线下载提醒",
-                    icon = Icons.Default.Notifications,
-                    onOpenSettings = actions.bannerActions.onOpenNotificationSettings,
-                    onDismiss = actions.bannerActions.onDismissNotificationBanner
-                )
-            } else if (showBatteryBanner) {
-                NotificationPermissionBanner(
-                    text = "未允许无限制后台运行，后台解压可能会暂停",
-                    icon = Icons.Default.BatteryAlert,
-                    onOpenSettings = actions.bannerActions.onOpenBatterySettings,
-                    onDismiss = actions.bannerActions.onDismissBatteryBanner
-                )
-            }
-        }
-
-        AnimatedVisibility(
-            visible = isTopBarShow,
-            enter = fadeIn() + slideInVertically(),
-            exit = fadeOut() + slideOutVertically()
-        ) {
-            FilePathBar(
-                pathList = dataState.pathList,
-                actions = actions.pathActions
-            )
-        }
-
-        FileListContent(
-            dataState = dataState,
-            displayConfig = displayConfig,
-            scrollState = scrollState,
-            itemActions = actions.itemActions
-        )
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun FilePathBar(
-    pathList: List<PathBean>,
-    actions: FilePathActions,
-    modifier: Modifier = Modifier
-) {
-    val scrollState = rememberScrollState()
-
-    // 路径变化时自动滚动到最右侧末尾
-    LaunchedEffect(pathList.size) {
-        scrollState.animateScrollTo(scrollState.maxValue)
-    }
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .combinedClickable(
-                onClick = actions.onPathClick,
-                onDoubleClick = actions.onPathDoubleClick,
-                onLongClick = {
-                    val path = pathList.last()
-                    actions.onPathLongClick.invoke(path.name, path.cid)
-                }
-            )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
-                .horizontalScroll(scrollState),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            pathList.forEachIndexed { index, path ->
-                // interactionSource 以便组件和点击修饰符同步水波纹与焦点状态
-                val interactionSource = remember { MutableInteractionSource() }
-                Box {
-                    FilterChip(
-                        selected = (index != pathList.size - 1),
-                        onClick = {},
-                        label = {
-                            Text(text = path.name.ifEmpty { "根目录" })
-                        },
-                        modifier = Modifier.padding(start = 6.dp, end = 6.dp),
-                        interactionSource = interactionSource
-                    )
-                    // 添加一个完全匹配尺寸的透明层，统一处理单击和长按
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .combinedClickable(
-                                interactionSource = interactionSource,
-                                indication = null, // 彻底关闭浮层的水波纹渲染，由底层 Chip 自行展示
-                                onClick = { actions.onPathItemClick(path.cid) },
-                                onLongClick = {
-                                    actions.onPathLongClick.invoke(
-                                        path.name,
-                                        path.cid
-                                    )
-                                }
-                            )
-                    )
-                }
-
-                // 间隔符
-                if (index < pathList.size - 1) {
-                    MiddleEllipsisText(
-                        text = "/",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-//                        modifier = Modifier.padding(0.dp, 4.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FileScreenFab(
-    isCutState: Boolean,
-    visible: Boolean,
-    onCancelCut: () -> Unit,
-    onCutPaste: () -> Unit,
-    onAddFolder: () -> Unit
-) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = slideInVertically(initialOffsetY = { it }) + scaleIn() + fadeIn(),
-        exit = slideOutVertically(targetOffsetY = { it }) + scaleOut() + fadeOut()
-    ) {
-        AnimatedContent(
-            targetState = isCutState,
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
-            label = "FabAnimation"
-        ) { isCut ->
-            if (isCut) {
-                Column {
-                    FloatingActionButton(onClick = onCancelCut) {
-                        Icon(Icons.Filled.Close, "close")
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    FloatingActionButton(onClick = onCutPaste) {
-                        Icon(Icons.Default.ContentPaste, "cut")
-                    }
-                }
-            } else {
-                FloatingActionButton(onClick = onAddFolder) {
-                    Icon(Icons.Filled.Add, "add")
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun FileListContent(
-    dataState: FileListDataState,
-    displayConfig: FileDisplayConfig,
-    scrollState: FileListScrollState,
-    itemActions: FileItemActions,
-    modifier: Modifier = Modifier
-) {
-    PullToRefreshBox(
-        isRefreshing = dataState.refreshing,
-        onRefresh = itemActions.onRefresh,
-        modifier = modifier
-    ) {
-        if (dataState.fileBeanList.isEmpty()) {
-            FileEmptyContent()
-        } else {
-            key(dataState.path, displayConfig.isPreviewActive) {
-                if (displayConfig.isPreviewActive) {
-                    FileStaggeredGridList(
-                        dataState = dataState,
-                        displayConfig = displayConfig,
-                        staggeredGridState = scrollState.staggeredGridState,
-                        itemActions = itemActions
-                    )
-                } else if (displayConfig.isExpandedScreen) {
-                    FileGridList(
-                        dataState = dataState,
-                        displayConfig = displayConfig,
-                        gridState = scrollState.gridState,
-                        itemActions = itemActions
-                    )
-                } else {
-                    FileColumnList(
-                        dataState = dataState,
-                        listState = scrollState.listState,
-                        itemActions = itemActions
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun NotificationPermissionBanner(
-    text: String,
-    modifier: Modifier = Modifier,
-    icon: ImageVector = Icons.Default.Notifications,
-    onOpenSettings: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 2.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(end = 8.dp)
-                )
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(
-                    onClick = onOpenSettings,
-                    contentPadding = PaddingValues(horizontal = 8.dp)
-                ) {
-                    Text("去开启", style = MaterialTheme.typography.labelMedium)
-                }
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "关闭",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-        }
     }
 }

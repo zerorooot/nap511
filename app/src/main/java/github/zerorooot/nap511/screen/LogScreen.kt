@@ -341,11 +341,14 @@ fun LogScreen(onClick: () -> Unit) {
                             searchQuery = searchQuery,
                             searchMatches = searchMatches,
                             currentMatchIndex = currentMatchIndex
-                        ) {
+                        ) { logEntry ->
+                            val text = listOf(logEntry.tag, logEntry.timestamp, logEntry.message)
+                                .filter { it.isNotBlank() }  // 过滤掉空字符串 "" 以及只包含空白字符的字符串（如 " "、" "、"\t"、"\n"）
+                                .joinToString("\n")
                             clipboardManager.nativeClipboardManager.setPrimaryClip(
                                 ClipData.newPlainText(
                                     "logs",
-                                    "${it.tag}\n${it.timestamp}\n${it.message}"
+                                    text
                                 )
                             )
                             App.instance.toast("日志已复制到剪切板")
