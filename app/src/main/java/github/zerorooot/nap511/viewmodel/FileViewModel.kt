@@ -25,6 +25,9 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkQuery
+import coil.annotation.ExperimentalCoilApi
+import coil.imageLoader
+import coil.memory.MemoryCache
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -482,12 +485,20 @@ class FileViewModel(
 
     }
 
+    @OptIn(ExperimentalCoilApi::class)
     suspend fun removeFolderCacheRecursively(categoryId: String) {
         suspend fun walk(cid: String) {
 //            XLog.d("DebugWalk delete 真实 cid 值: $cid")
             // 1. 先取出当前层级的子文件夹列表
             val folderList =
                 fileListCache[cid]?.fileBeanList?.filter { it.isFolder } ?: emptyList()
+            folderList.forEach {
+                //清空coli图片缓存
+                if (it.photoThumb != "") {
+                    context.imageLoader.memoryCache?.remove(MemoryCache.Key(it.pickCode))
+                    context.imageLoader.diskCache?.remove(it.pickCode)
+                }
+            }
             // 2. 优先向下递归，清理所有子文件夹
             for (item in folderList) {
                 walk(item.categoryId)

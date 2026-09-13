@@ -3,10 +3,8 @@ package github.zerorooot.nap511.screen
 import android.app.Activity
 import android.content.ClipData
 import android.content.Intent
-import android.os.Build
 import android.os.SystemClock
 import android.provider.Settings
-import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -80,6 +78,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -193,16 +192,25 @@ fun FileScreen(
 
     /**
      * 是否开启图片瀑布流模式
+     * null: 使用自动判断逻辑(isAutoImagePreview)
+     * true: 手动强制开启
+     * false: 手动强制关闭
      */
-    var isImagePreviewMode by rememberSaveable { mutableStateOf(false) }
-
+    var isImagePreviewMode by rememberSaveable { mutableStateOf<Boolean?>(null) }
+    var isAutoImagePreview by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(path, refreshing, fileBeanList.toList(), settingUiState.autoImagePreviewCount) {
         val threshold = settingUiState.autoImagePreviewCount.toIntOrNull() ?: 0
         if (threshold > 0 && !refreshing) {
             val imageCount = fileBeanList.count { it.photoThumb.isNotEmpty() }
-            isImagePreviewMode = isImagePreviewMode || (imageCount > threshold)
+            isAutoImagePreview = (imageCount > threshold)
         }
     }
+
+    LaunchedEffect(path) {
+        isImagePreviewMode = null
+    }
+
+    val isPreviewActive by rememberUpdatedState(isImagePreviewMode ?: isAutoImagePreview)
 
     var isNotificationEnabled by remember {
         mutableStateOf(context.isNotificationEnabled())
@@ -290,7 +298,7 @@ fun FileScreen(
 
                 // 【关键点】增加状态判断 (`&& isBottomBarShow` / `&& !isBottomBarShow`)，防止重复更新状态引发卡顿
                 if (accumulatedDelta < -thresholdPx) {
-                    if (isImagePreviewMode) {
+                    if (isPreviewActive) {
                         isTopBarShow = false
                     }
                     if (isBottomBarShow) {
@@ -298,7 +306,7 @@ fun FileScreen(
                     }
                 }
                 if (accumulatedDelta > thresholdPx) {
-                    if (isImagePreviewMode) {
+                    if (isPreviewActive) {
                         isTopBarShow = true
                     }
                     if (!isBottomBarShow) {
@@ -478,7 +486,7 @@ fun FileScreen(
 
             //记录上级目录当前的位置
             when {
-                isImagePreviewMode -> fileViewModel.setListLocationAndClickCache(i, staggeredGrid)
+                isPreviewActive -> fileViewModel.setListLocationAndClickCache(i, staggeredGrid)
                 isExpandedScreen -> fileViewModel.setListLocationAndClickCache(i, gridState)
                 else -> fileViewModel.setListLocationAndClickCache(i, listState)
             }
@@ -501,7 +509,7 @@ fun FileScreen(
 
     fun scrollToTop() {
         when {
-            isImagePreviewMode -> staggeredGrid.requestScrollToItem(0, 0)
+            isPreviewActive -> staggeredGrid.requestScrollToItem(0, 0)
             isExpandedScreen -> gridState.requestScrollToItem(0, 0)
             else -> listState.requestScrollToItem(0, 0)
         }
@@ -524,7 +532,7 @@ fun FileScreen(
         }
         if (path != "/根目录" && !fileViewModel.isLongClickState) {
             when {
-                isImagePreviewMode -> fileViewModel.setListLocation(path, staggeredGrid)
+                isPreviewActive -> fileViewModel.setListLocation(path, staggeredGrid)
                 isExpandedScreen -> fileViewModel.setListLocation(path, gridState)
                 else -> fileViewModel.setListLocation(path, listState)
             }
@@ -574,7 +582,7 @@ fun FileScreen(
             }
 
             MenuItemAction.GALLERY_MODE -> {
-                isImagePreviewMode = !isImagePreviewMode
+                isImagePreviewMode = !isPreviewActive
             }
 
             MenuItemAction.VIDEO_SCHEDULE -> {
@@ -684,7 +692,7 @@ fun FileScreen(
     val contentActions = remember(
         path,
         isExpandedScreen,
-        isImagePreviewMode,
+        isPreviewActive,
         staggeredGrid,
         gridState,
         listState,
@@ -737,7 +745,7 @@ fun FileScreen(
 
     val displayConfig = FileDisplayConfig(
         isExpandedScreen = isExpandedScreen,
-        isImagePreviewMode = isImagePreviewMode,
+        isPreviewActive = isPreviewActive,
         isImageHdPreview = settingUiState.imageHdPreview,
         gridCellMinSize = gridCellMinSize
     )
@@ -1039,8 +1047,8 @@ private fun FileListContent(
                 Text("暂无文件")
             }
         } else {
-            key(dataState.path, displayConfig.isImagePreviewMode) {
-                if (displayConfig.isImagePreviewMode) {
+            key(dataState.path, displayConfig.isPreviewActive) {
+                if (displayConfig.isPreviewActive) {
                     LazyVerticalStaggeredGridScrollbar(
                         state = scrollState.staggeredGridState,
                         settings = ScrollbarSettings.Default.copy(

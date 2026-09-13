@@ -119,14 +119,20 @@ class FileRepository {
         val addTask = offlineService.addTask(map)
         XLog.d("add task addTask $addTask")
         val message = if (addTask.state) {
-            "任务添加成功"
+            "成功将任务添加到‘${
+                SettingsRepository.getDataSuspend(
+                    ConfigKeyUtil.DEFAULT_OFFLINE_PATH,
+                    "根目录/云下载"
+                ).substringAfterLast("/")
+            }’目录"
         } else {
             if (addTask.errorMsg.contains("请验证账号")) {
                 handle.invoke(true)
             }
             //把失败的离线链接保存起来
             val currentOfflineTaskList =
-                SettingsRepository.getDataSuspend(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "").split("\n")
+                SettingsRepository.getDataSuspend(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
+                    .split("\n")
                     .filter { i -> i != "" && i != " " }.toSet().toMutableList()
             currentOfflineTaskList.addAll(list)
             val stringJoiner = StringJoiner("\n")

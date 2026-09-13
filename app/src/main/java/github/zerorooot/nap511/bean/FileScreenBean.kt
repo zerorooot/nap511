@@ -64,7 +64,7 @@ data class FileBannerState(
  */
 data class FileDisplayConfig(
     val isExpandedScreen: Boolean,
-    val isImagePreviewMode: Boolean,
+    val isPreviewActive: Boolean,
     val isImageHdPreview: Boolean = false,
     val gridCellMinSize: Dp
 )

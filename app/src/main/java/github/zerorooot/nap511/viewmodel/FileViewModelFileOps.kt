@@ -3,6 +3,9 @@ package github.zerorooot.nap511.viewmodel
 import android.annotation.SuppressLint
 import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.viewModelScope
+import coil.annotation.ExperimentalCoilApi
+import coil.imageLoader
+import coil.memory.MemoryCache
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
@@ -109,6 +112,7 @@ internal fun FileViewModel.getFileInfo(index: Int) {
     }
 }
 
+@OptIn(ExperimentalCoilApi::class)
 internal fun FileViewModel.delete(index: Int) {
     val fileBean = fileBeanList[index]
     viewModelScope.launch {
@@ -136,6 +140,11 @@ internal fun FileViewModel.delete(index: Int) {
         runCatching {
             val delete = fileRepository.delete(pid, fid)
             if (delete.state) {
+                //删除coli图片缓存
+                if (fileBean.photoThumb != "") {
+                    context.imageLoader.memoryCache?.remove(MemoryCache.Key(fileBean.pickCode))
+                    context.imageLoader.diskCache?.remove(fileBean.pickCode)
+                }
                 "删除 ${fileBean.name} 成功"
             } else {
                 fileBeanList = beforeList
