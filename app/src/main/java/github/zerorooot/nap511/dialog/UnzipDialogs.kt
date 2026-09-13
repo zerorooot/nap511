@@ -47,12 +47,12 @@ fun UnzipPassword(fileBean: FileBean, enter: (String?) -> Unit) {
 
 @Composable
 fun UnzipDialog(fileViewModel: FileViewModel) {
-    val fileBean = fileViewModel.fileBeanList.getOrNull(fileViewModel.selectIndex)
+    val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
     val zipBeanList by fileViewModel.unzipBeanList
     LaunchedEffect(Unit) {
         fileViewModel.setRefreshingStatus(false)
     }
-    UnzipScreen(zipBeanList, fileBean?.name ?: "解压文件") {
+    UnzipScreen(zipBeanList, fileBean.name) {
         if (it.first) {
             when (it.second) {
                 "exit" -> {
@@ -72,7 +72,7 @@ fun UnzipDialog(fileViewModel: FileViewModel) {
                 }
 
                 "unzipAll" -> {
-                    fileViewModel.unzipFile()
+                    fileViewModel.unzipFile(fileBean)
                     fileViewModel.closeUnzipDialog()
                 }
             }

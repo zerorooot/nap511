@@ -98,11 +98,10 @@ internal fun FileViewModel.createFolder(folderName: String) {
     }
 }
 
-internal fun FileViewModel.getFileInfo(index: Int) {
+internal fun FileViewModel.getFileInfo(fileBean: FileBean) {
     viewModelScope.launch {
         _isRefreshing.value = true
         runCatching {
-            val fileBean = fileBeanList[index]
             fileInfo = if (fileBean.isFolder) {
                 fileRepository.getFileInfo(fileBean.categoryId)
             } else {
@@ -116,8 +115,7 @@ internal fun FileViewModel.getFileInfo(index: Int) {
 }
 
 @OptIn(ExperimentalCoilApi::class)
-internal fun FileViewModel.delete(index: Int) {
-    val fileBean = fileBeanList[index]
+internal fun FileViewModel.delete(fileBean: FileBean) {
     viewModelScope.launch {
         val beforeList = fileBeanList
         val beforeFileListCache = fileListCache[currentCid]

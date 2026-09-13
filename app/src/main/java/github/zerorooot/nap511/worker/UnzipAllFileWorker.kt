@@ -153,7 +153,7 @@ class UnzipAllFileWorker(
         val isAllSuccess = !isCancel && unzipResult.isEmpty()
         val message = when {
             isCancel -> "🔙任务被取消"
-            (size == 1) -> "$name 解压完成！"
+            (size == 1) -> if (isAllSuccess) "$name 解压完成" else "$name 解压失败"
             isAllSuccess -> "${size}个文件解压完成！"
             else -> "❎ ${unzipFailList.size}个文件解压失败！"
         }

@@ -76,14 +76,14 @@ internal fun FileViewModel.getZipListFile(
     }
 }
 
-
-internal fun FileViewModel.unzipFile() {
+internal fun FileViewModel.unzipFile(fileBean: FileBean) {
     viewModelScope.launch(Dispatchers.IO) {
         val cid = currentCid
-        val arrayListOf = arrayListOf(fileBeanList[selectIndex])
+        val arrayListOf = arrayListOf(fileBean)
         unzipFile(arrayListOf, cid)
     }
 }
+
 
 internal fun FileViewModel.unzipFile(fileBeansList: List<FileBean>, cid: String, pwd: String = "") {
     viewModelScope.launch(Dispatchers.IO) {

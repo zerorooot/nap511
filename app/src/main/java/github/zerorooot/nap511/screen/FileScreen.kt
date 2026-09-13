@@ -672,13 +672,19 @@ fun FileScreen(
                 fileViewModel.selectIndex = index
                 fileViewModel.openRenameFileDialog()
             },
-            onFileInfo = { index ->
-                fileViewModel.selectIndex = index
-                fileViewModel.getFileInfo(index)
+            onFileInfo = { fileBean ->
+                fileViewModel.getFileInfo(fileBean)
             },
-            onUnzip = { index ->
-                fileViewModel.selectIndex = index
-                fileViewModel.unzipFile()
+            onUnzip = { fileBean ->
+                if (fileBean.isFolder) {
+                    App.instance.toast("不能解压文件夹！")
+                    return@FileItemActions
+                }
+                if (fileBean.fileIco != R.drawable.zip) {
+                    App.instance.toast("非压缩文件！")
+                    return@FileItemActions
+                }
+                fileViewModel.unzipFile(fileBean)
             },
             onAria2Download = ::onMenuAria2Download,
             onForceOpen = { showForceOpenDialog = it },

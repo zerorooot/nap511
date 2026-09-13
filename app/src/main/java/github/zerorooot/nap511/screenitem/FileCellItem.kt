@@ -190,10 +190,10 @@ fun FileCellItem(
                 val dispatchMenuClick: (MenuItemAction, Int) -> Unit = { action, _ ->
                     when (action) {
                         MenuItemAction.CUT_FILE -> itemActions.onCut.invoke(index)
-                        MenuItemAction.DELETE_FILE -> itemActions.onDelete.invoke(index)
-                        MenuItemAction.UNZIP_FILE -> itemActions.onUnzip.invoke(index)
+                        MenuItemAction.DELETE_FILE -> itemActions.onDelete.invoke(fileBean)
+                        MenuItemAction.UNZIP_FILE -> itemActions.onUnzip.invoke(fileBean)
                         MenuItemAction.RENAME_FILE -> itemActions.onRename.invoke(index)
-                        MenuItemAction.FILE_INFO -> itemActions.onFileInfo.invoke(index)
+                        MenuItemAction.FILE_INFO -> itemActions.onFileInfo.invoke(fileBean)
                         MenuItemAction.ARIA2_DOWNLOAD -> itemActions.onAria2Download.invoke(index)
                         MenuItemAction.FORCE_OPEN -> itemActions.onForceOpen.invoke(index)
                         else -> {}
