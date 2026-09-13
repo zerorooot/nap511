@@ -20,6 +20,7 @@ import androidx.compose.material.icons.outlined.DoneAll
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FindInPage
+import androidx.compose.material.icons.outlined.FolderZip
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Refresh
@@ -60,6 +61,7 @@ enum class MenuItemAction(
     CUT_FILE("剪切文件", Icons.Outlined.ContentCut),
     RENAME_FILE("重新命名", Icons.Outlined.Edit),
     FILE_INFO("文件信息", Icons.Outlined.Info),
+    UNZIP_FILE("解压文件", Icons.Outlined.FolderZip),
     FORCE_OPEN("强行打开", Icons.AutoMirrored.Outlined.OpenInNew),
     ARIA2_DOWNLOAD("Aria2下载", Icons.Outlined.Download),
     DELETE_FILE("删除文件", Icons.Outlined.Delete, isDestructive = true),
@@ -161,6 +163,7 @@ fun FileMoreMenu(onClick: (MenuItemAction, Int) -> Unit) {
     val listOf = listOf(
         MenuItemAction.CUT_FILE,
         MenuItemAction.RENAME_FILE,
+        MenuItemAction.UNZIP_FILE,
         MenuItemAction.FILE_INFO,
         MenuItemAction.FORCE_OPEN,
         MenuItemAction.ARIA2_DOWNLOAD,
@@ -262,7 +265,10 @@ fun HtmlWebViewTopBarDropdownMenu(onClick: (MenuItemAction, Int) -> Unit) {
 }
 
 @Composable
-private fun BaseAppTorBarMenu(listOf: List<MenuItemAction>, onClick: (MenuItemAction, Int) -> Unit) {
+private fun BaseAppTorBarMenu(
+    listOf: List<MenuItemAction>,
+    onClick: (MenuItemAction, Int) -> Unit
+) {
     MyDropdownMenu(
         listOf,
         Modifier.wrapContentSize(Alignment.TopEnd),

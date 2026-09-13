@@ -35,6 +35,7 @@ import coil.request.ImageRequest
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.FileItemActions
 import github.zerorooot.nap511.bean.ImageBean
 import github.zerorooot.nap511.util.getCoilCacheUrl
 
@@ -53,9 +54,7 @@ fun ImageCellItem(
     clickIndex: Int = -1,
     imageBean: ImageBean? = null,
     isImageHdPreview: Boolean = false,
-    onLoadImage: ((FileBean) -> Unit)? = null,
-    itemOnClick: (Int) -> Unit,
-    itemOnLongClick: (Int) -> Unit,
+    itemActions: FileItemActions,
 ) {
     val image = fileBean.fileIco
     val name = fileBean.name
@@ -67,7 +66,7 @@ fun ImageCellItem(
     if (isImageHdPreview && fileBean.photoThumb.isNotEmpty() && imageBean == null) {
         LaunchedEffect(fileBean.pickCode, index) {
             //  XLog.d("ImageCellItem [触发高清图请求] index=$index, name=${fileBean.name}, pickCode=${fileBean.pickCode}")
-            onLoadImage?.invoke(fileBean)
+            itemActions.onLoadImage?.invoke(fileBean)
         }
     }
 
@@ -82,7 +81,7 @@ fun ImageCellItem(
             containerColor = if (fileBean.isSelect) {
                 MaterialTheme.colorScheme.primaryContainer
             } else if (clickIndex == index) {
-               // MaterialTheme.colorScheme.surfaceContainerLow
+                // MaterialTheme.colorScheme.surfaceContainerLow
                 MaterialTheme.colorScheme.surfaceBright
             } else {
                 MaterialTheme.colorScheme.surfaceContainer
@@ -95,11 +94,11 @@ fun ImageCellItem(
             .combinedClickable(
                 onClick = {
                     XLog.d("ImageCellItem [点击] index=$index, name=${fileBean.name}")
-                    itemOnClick.invoke(index)
+                    itemActions.onItemClick.invoke(index)
                 },
                 onLongClick = {
                     XLog.d("ImageCellItem [长按] index=$index, name=${fileBean.name}")
-                    itemOnLongClick.invoke(index)
+                    itemActions.onItemLongClick.invoke(index)
                 }
             )
     ) {
@@ -185,25 +184,6 @@ fun ImageCellItem(
             )
         }
     }
-}
-
-
-@Preview
-@Composable
-fun ImageCellItemPreview() {
-    val copy =
-        FileBean().copy(
-            photoThumb = "https://my.115.com/static/2014v1.0/personal/head/80/male/male034.png",
-            name = "图片文件测试123.jpg",
-            fileIco = R.drawable.png
-        )
-    ImageCellItem(
-        fileBean = copy,
-        index = 1,
-        clickIndex = -1,
-        itemOnClick = {},
-        itemOnLongClick = {}
-    )
 }
 
 

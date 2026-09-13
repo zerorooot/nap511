@@ -489,21 +489,21 @@ class FileViewModel(
     suspend fun removeFolderCacheRecursively(categoryId: String) {
         suspend fun walk(cid: String) {
 //            XLog.d("DebugWalk delete 真实 cid 值: $cid")
-            val fileList = fileListCache[cid]?.fileBeanList?.filter { !it.isFolder } ?: emptyList()
-            fileList.forEach {
-                //清空coli图片缓存
-                if (it.photoThumb != "") {
-                    context.imageLoader.deleteCoilCache(it.pickCode)
+            val fileBeanList = fileListCache[cid]?.fileBeanList ?: emptyList()
+
+            fileBeanList.forEach {
+                if (it.isFolder) {
+                    //向下递归，清理所有子文件夹
+                    walk(it.categoryId)
+                } else {
+                    //清空coli图片缓存
+                    if (it.photoThumb != "") {
+                        context.imageLoader.deleteCoilCache(it.pickCode)
+                    }
                 }
             }
-            // 1. 先取出当前层级的子文件夹列表
-            val folderList =
-                fileListCache[cid]?.fileBeanList?.filter { it.isFolder } ?: emptyList()
-            // 2. 优先向下递归，清理所有子文件夹
-            for (item in folderList) {
-                walk(item.categoryId)
-            }
-            // 3. 所有子级处理完后，再清理当前节点的缓存
+
+            // 所有子级处理完后，再清理当前节点的缓存
             fileListCache.remove(cid)
         }
         // 执行递归清理（内部已包含对根文件夹 fileBean.categoryId 的 remove）

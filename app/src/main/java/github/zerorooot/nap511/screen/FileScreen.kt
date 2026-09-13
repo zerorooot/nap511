@@ -151,6 +151,7 @@ import github.zerorooot.nap511.viewmodel.openSearchDialog
 import github.zerorooot.nap511.viewmodel.openUnzipAllFileDialog
 import github.zerorooot.nap511.viewmodel.removeFile
 import github.zerorooot.nap511.viewmodel.startSendAria2Service
+import github.zerorooot.nap511.viewmodel.unzipFile
 import github.zerorooot.nap511.viewmodel.updateVideoFileBean
 import kotlinx.coroutines.launch
 import my.nanihadesuka.compose.LazyColumnScrollbar
@@ -675,6 +676,10 @@ fun FileScreen(
                 fileViewModel.selectIndex = index
                 fileViewModel.getFileInfo(index)
             },
+            onUnzip = { index ->
+                fileViewModel.selectIndex = index
+                fileViewModel.unzipFile()
+            },
             onAria2Download = ::onMenuAria2Download,
             onForceOpen = { showForceOpenDialog = it },
             onLoadImage = { fileBean ->
@@ -1065,7 +1070,7 @@ private fun FileListContent(
                             staggeredItemsIndexed(
                                 items = dataState.fileBeanList,
                                 key = { _, item ->
-                                    item.fileId.ifEmpty { item.pickCode.ifEmpty { item.photoThumb } }
+                                    item.fileId.ifEmpty { item.categoryId.ifEmpty { item.pickCode } }
                                 },
                             ) { index, item ->
                                 val imageBean = dataState.imageCache?.get(item.pickCode)
@@ -1075,10 +1080,8 @@ private fun FileListContent(
                                     clickIndex = dataState.clickIndex,
                                     imageBean = imageBean,
                                     isImageHdPreview = displayConfig.isImageHdPreview,
-                                    onLoadImage = itemActions.onLoadImage,
                                     modifier = Modifier, // 瀑布流快速滑动时不施加 animateItem 动画，防止布局重新计算时元素跳动
-                                    itemOnClick = itemActions.onItemClick,
-                                    itemOnLongClick = itemActions.onItemLongClick
+                                    itemActions = itemActions,
                                 )
                             }
                         }
@@ -1110,14 +1113,7 @@ private fun FileListContent(
                                         fadeInSpec = null,
                                         fadeOutSpec = null
                                     ),
-                                    itemOnClick = itemActions.onItemClick,
-                                    itemOnLongClick = itemActions.onItemLongClick,
-                                    onCut = itemActions.onCut,
-                                    onDelete = itemActions.onDelete,
-                                    onRename = itemActions.onRename,
-                                    onFileInfo = itemActions.onFileInfo,
-                                    onForceOpen = itemActions.onForceOpen,
-                                    onAria2Download = itemActions.onAria2Download
+                                    itemActions = itemActions,
                                 )
                             }
                         }
@@ -1137,7 +1133,7 @@ private fun FileListContent(
                             itemsIndexed(
                                 items = dataState.fileBeanList,
                                 key = { _, item ->
-                                    item.fileId.ifEmpty { item.pickCode.ifEmpty { item.uuid.toString() } }
+                                    item.fileId.ifEmpty { item.categoryId.ifEmpty { item.pickCode } }
                                 },
                             ) { index, item ->
                                 FileCellItem(
@@ -1148,14 +1144,7 @@ private fun FileListContent(
                                         fadeInSpec = null,
                                         fadeOutSpec = null
                                     ),
-                                    itemOnClick = itemActions.onItemClick,
-                                    itemOnLongClick = itemActions.onItemLongClick,
-                                    onCut = itemActions.onCut,
-                                    onDelete = itemActions.onDelete,
-                                    onRename = itemActions.onRename,
-                                    onFileInfo = itemActions.onFileInfo,
-                                    onForceOpen = itemActions.onForceOpen,
-                                    onAria2Download = itemActions.onAria2Download
+                                    itemActions = itemActions,
                                 )
                             }
                         }

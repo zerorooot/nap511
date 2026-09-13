@@ -44,6 +44,7 @@ import coil.request.ImageRequest
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.FileItemActions
 import github.zerorooot.nap511.screen.FileMoreMenu
 import github.zerorooot.nap511.screen.MenuItemAction
 import github.zerorooot.nap511.util.getCoilCacheUrl
@@ -56,14 +57,7 @@ fun FileCellItem(
     clickIndex: Int = -1,
     //删除会有动画
     modifier: Modifier,
-    itemOnClick: (Int) -> Unit,
-    itemOnLongClick: (Int) -> Unit,
-    onCut: ((Int) -> Unit)? = null,
-    onDelete: ((Int) -> Unit)? = null,
-    onRename: ((Int) -> Unit)? = null,
-    onFileInfo: ((Int) -> Unit)? = null,
-    onAria2Download: ((Int) -> Unit)? = null,
-    onForceOpen: ((Int) -> Unit)? = null,
+    itemActions: FileItemActions,
 ) {
     val image = fileBean.fileIco
     val name = fileBean.name
@@ -76,10 +70,10 @@ fun FileCellItem(
             .padding(1.dp)
             .combinedClickable(
                 onClick = {
-                    itemOnClick.invoke(index)
+                    itemActions.onItemClick.invoke(index)
                 },
                 onLongClick = {
-                    itemOnLongClick.invoke(index)
+                    itemActions.onItemLongClick.invoke(index)
                 }
             ),
         color = if (fileBean.isSelect) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
@@ -195,12 +189,13 @@ fun FileCellItem(
 
                 val dispatchMenuClick: (MenuItemAction, Int) -> Unit = { action, _ ->
                     when (action) {
-                        MenuItemAction.CUT_FILE -> onCut?.invoke(index)
-                        MenuItemAction.DELETE_FILE -> onDelete?.invoke(index)
-                        MenuItemAction.RENAME_FILE -> onRename?.invoke(index)
-                        MenuItemAction.FILE_INFO -> onFileInfo?.invoke(index)
-                        MenuItemAction.ARIA2_DOWNLOAD -> onAria2Download?.invoke(index)
-                        MenuItemAction.FORCE_OPEN -> onForceOpen?.invoke(index)
+                        MenuItemAction.CUT_FILE -> itemActions.onCut.invoke(index)
+                        MenuItemAction.DELETE_FILE -> itemActions.onDelete.invoke(index)
+                        MenuItemAction.UNZIP_FILE -> itemActions.onUnzip.invoke(index)
+                        MenuItemAction.RENAME_FILE -> itemActions.onRename.invoke(index)
+                        MenuItemAction.FILE_INFO -> itemActions.onFileInfo.invoke(index)
+                        MenuItemAction.ARIA2_DOWNLOAD -> itemActions.onAria2Download.invoke(index)
+                        MenuItemAction.FORCE_OPEN -> itemActions.onForceOpen.invoke(index)
                         else -> {}
                     }
                 }

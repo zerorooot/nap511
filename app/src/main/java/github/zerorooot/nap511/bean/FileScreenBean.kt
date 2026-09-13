@@ -106,6 +106,7 @@ data class FileItemActions(
     val onItemClick: (Int) -> Unit,
     val onItemLongClick: (Int) -> Unit,
     val onCut: (Int) -> Unit,
+    val onUnzip: (Int) -> Unit,
     val onDelete: (Int) -> Unit,
     val onRename: (Int) -> Unit,
     val onFileInfo: (Int) -> Unit,

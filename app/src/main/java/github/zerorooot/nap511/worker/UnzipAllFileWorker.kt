@@ -160,7 +160,7 @@ class UnzipAllFileWorker(
 
         // 2. 统一处理通知、日志和 Toast
         showCompletionNotification(isAllSuccess, message, unzipResult, cid)
-        XLog.i("showCompletionNotification $message\n$unzipResult")
+        XLog.i("showCompletionNotification $message $unzipResult")
         App.instance.toast(message)
 
         // 3. 统一构建返回的 Data
