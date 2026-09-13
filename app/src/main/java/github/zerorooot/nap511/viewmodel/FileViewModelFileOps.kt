@@ -11,8 +11,11 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.RenameBean
 import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.deleteCoilCache
+import github.zerorooot.nap511.util.getCoilCacheUrl
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.launch
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -142,8 +145,7 @@ internal fun FileViewModel.delete(index: Int) {
             if (delete.state) {
                 //删除coli图片缓存
                 if (fileBean.photoThumb != "") {
-                    context.imageLoader.memoryCache?.remove(MemoryCache.Key(fileBean.pickCode))
-                    context.imageLoader.diskCache?.remove(fileBean.pickCode)
+                    context.imageLoader.deleteCoilCache(fileBean.pickCode)
                 }
                 "删除 ${fileBean.name} 成功"
             } else {

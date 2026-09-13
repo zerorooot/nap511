@@ -12,6 +12,7 @@ import com.elvishew.xlog.XLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
+import java.io.File
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -105,6 +106,19 @@ fun getCoilCacheUrl(imageLoader: ImageLoader, key: String): String? {
     }
 
     return null
+}
+
+/**
+ *
+ */
+@OptIn(ExperimentalCoilApi::class)
+fun ImageLoader.deleteCoilCache(key: String) {
+    this.memoryCache?.remove(MemoryCache.Key(key))
+    this.diskCache?.remove(key)
+    getCoilCacheUrl(
+        this,
+        key
+    )?.let { File(it).delete() }
 }
 
 /**
