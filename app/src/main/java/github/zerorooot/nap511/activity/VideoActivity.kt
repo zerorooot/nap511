@@ -10,44 +10,12 @@ import android.view.View
 import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.media3.common.PlaybackException.CUSTOM_ERROR_CODE_BASE
-import androidx.media3.common.PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED
-import androidx.media3.common.PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED
-import androidx.media3.common.PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW
-import androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED
-import androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED
-import androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FAILED
-import androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES
-import androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED
-import androidx.media3.common.PlaybackException.ERROR_CODE_DRM_CONTENT_ERROR
-import androidx.media3.common.PlaybackException.ERROR_CODE_DRM_DEVICE_REVOKED
-import androidx.media3.common.PlaybackException.ERROR_CODE_DRM_DISALLOWED_OPERATION
-import androidx.media3.common.PlaybackException.ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED
-import androidx.media3.common.PlaybackException.ERROR_CODE_DRM_LICENSE_EXPIRED
-import androidx.media3.common.PlaybackException.ERROR_CODE_DRM_PROVISIONING_FAILED
-import androidx.media3.common.PlaybackException.ERROR_CODE_DRM_SCHEME_UNSUPPORTED
-import androidx.media3.common.PlaybackException.ERROR_CODE_DRM_SYSTEM_ERROR
-import androidx.media3.common.PlaybackException.ERROR_CODE_DRM_UNSPECIFIED
-import androidx.media3.common.PlaybackException.ERROR_CODE_FAILED_RUNTIME_CHECK
-import androidx.media3.common.PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS
-import androidx.media3.common.PlaybackException.ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED
-import androidx.media3.common.PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND
-import androidx.media3.common.PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE
-import androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
-import androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
-import androidx.media3.common.PlaybackException.ERROR_CODE_IO_NO_PERMISSION
-import androidx.media3.common.PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE
-import androidx.media3.common.PlaybackException.ERROR_CODE_IO_UNSPECIFIED
-import androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED
-import androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED
-import androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED
-import androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED
-import androidx.media3.common.PlaybackException.ERROR_CODE_REMOTE_ERROR
-import androidx.media3.common.PlaybackException.ERROR_CODE_TIMEOUT
-import androidx.media3.common.PlaybackException.ERROR_CODE_UNSPECIFIED
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSink
 import androidx.media3.datasource.DataSource
@@ -57,213 +25,51 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MediaSource
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
-import com.google.gson.JsonObject
 import com.shuyu.gsyvideoplayer.GSYVideoManager
 import com.shuyu.gsyvideoplayer.listener.GSYSampleCallBack
 import com.shuyu.gsyvideoplayer.player.PlayerFactory
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.LaunchVideoParams
-import github.zerorooot.nap511.bean.VideoBean
-import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.player.MyGSYVideoPlayer
-import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.UserSessionManager
-import github.zerorooot.nap511.util.onFailureToastAndLog
+import github.zerorooot.nap511.util.VideoErrorInterceptor
+import github.zerorooot.nap511.util.VideoErrorMapper
+import github.zerorooot.nap511.util.isHandledException
+import github.zerorooot.nap511.viewmodel.VideoUiEvent
+import github.zerorooot.nap511.viewmodel.VideoViewModel
 import kotlinx.coroutines.launch
-import okhttp3.Interceptor
-import okhttp3.MediaType
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.Response
 import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
 import tv.danmaku.ijk.media.exo2.ExoMediaSourceInterceptListener
 import tv.danmaku.ijk.media.exo2.ExoSourceManager
 import java.io.File
-import java.io.IOException
-import javax.xml.parsers.DocumentBuilderFactory
-
-data class OssError(
-    val code: String = "",
-    val message: String = "",
-    val requestId: String = "",
-    val hostId: String = "",
-    val actualObjectSize: Long = 0L,
-    val rangeRequested: String = ""
-)
-
-/**
- * 标识已被拦截器接管并处理过的视频异常
- */
-class HandledVideoException(message: String) : IOException(message)
-
-/**
- * 视频请求错误拦截器
- * @param onErrorCallback 当状态码非 2xx 时触发回调：(url, httpCode, responseBody)
- */
-class VideoErrorInterceptor(
-    private val onErrorCallback: ((url: String, contentType: MediaType, errorBody: String) -> Boolean)
-) : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response {
-        val request = chain.request()
-        val url = request.url.toString()
-
-        val response = chain.proceed(request)
-        val body = response.body
-        val contentType = body.contentType() ?: "application/null".toMediaType()
-        val contentTypeString = contentType.toString().lowercase()
-
-        // 2. 判断是否属于典型的“非视频/非音视频流”响应类型
-        val isErrorContentType = isNonMediaContentType(contentTypeString)
-
-        if (isErrorContentType) {
-            // 使用 peekBody 窥探返回的错误信息（如 JSON 字符串或 HTML 网页）
-            val errorBody = try {
-                response.peekBody(1024 * 1024).string()
-            } catch (e: Exception) {
-                ""
-            }
-            // 回调业务层通知（比如提取 JSON 里的 code 和 msg）
-            if (onErrorCallback.invoke(url, contentType, errorBody)) {
-                // 这会让 ExoPlayer 在 open() 阶段直接捕获网络源头错误，阻止其继续尝试解码 JSON/HTML
-                throw HandledVideoException("Invalid video Content-Type: '$contentType', Error Body: $errorBody")
-            }
-        }
-
-        return response
-    }
-
-    /**
-     * 判断是否为非媒体类型（即业务错误类型）
-     */
-    private fun isNonMediaContentType(contentType: String): Boolean {
-        // 如果连 Content-Type 都没返回，或者返回了典型的文本/JSON 类型
-        if (contentType.isEmpty()) return false
-
-        // 1. 明确的黑名单（优先匹配典型的错误类型）
-        val isBlacklisted = contentType.contains("application/json") ||
-                contentType.contains("text/html") ||
-                contentType.contains("text/plain") ||
-                contentType.contains("application/xml") ||
-                contentType.contains("text/xml")
-
-        if (isBlacklisted) return true
-
-        // 2. 白名单校验（如果不在黑名单，确保它属于合法媒体流类型）
-        // 常见的合法视频/音频 Content-Type 包括:
-        // - video/* (video/mp4, video/x-flv 等)
-        // - audio/* (audio/mpeg 等)
-        // - application/x-mpegurl, application/vnd.apple.mpegurl (HLS .m3u8)
-        // - application/dash+xml (DASH)
-        // - application/octet-stream (通用二进制流，部分 CDN 会强制返这个)
-        val isMediaStream = contentType.contains("video/") ||
-                contentType.contains("audio/") ||
-                contentType.contains("mpegurl") ||
-                contentType.contains("dash+xml") ||
-                contentType.contains("application/octet-stream")
-
-        // 如果既不是明确的媒体流，又不是流媒体格式，则判定为错误
-        return !isMediaStream
-    }
-}
 
 class VideoActivity : AppCompatActivity() {
-    val playbackErrorMessageMap: Map<Int, String> = mapOf(
-        // 基础与通用错误
-        ERROR_CODE_UNSPECIFIED to "发生未知错误",
-        ERROR_CODE_REMOTE_ERROR to "服务器开小差了，请稍后再试",
-        ERROR_CODE_BEHIND_LIVE_WINDOW to "当前直播已过期或进度太落后",
-        ERROR_CODE_TIMEOUT to "操作超时，请检查网络",
-        ERROR_CODE_FAILED_RUNTIME_CHECK to "系统运行环境异常",
-// IO 与网络错误 (最常见的用户网络问题)
-        ERROR_CODE_IO_UNSPECIFIED to "网络或文件读取发生未知错误",
-        ERROR_CODE_IO_NETWORK_CONNECTION_FAILED to "网络连接失败，请检查网络设置",
-        ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT to "网络连接超时，请重试",
-        ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE to "播放链接无效（服务器返回数据类型错误）",
-        ERROR_CODE_IO_BAD_HTTP_STATUS to "服务器响应异常（视频可能已下架）",
-        ERROR_CODE_IO_FILE_NOT_FOUND to "找不到该视频文件",
-        ERROR_CODE_IO_NO_PERMISSION to "应用没有网络或文件读取权限",
-        ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED to "安全限制，不允许使用非加密的 HTTP 链接",
-        ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE to "视频数据读取出错",
-
-        // 解析错误 (文件格式问题)
-        ERROR_CODE_PARSING_CONTAINER_MALFORMED to "视频文件已损坏",
-        ERROR_CODE_PARSING_MANIFEST_MALFORMED to "播放列表文件已损坏，可能需要验证(高级设置->视频播放验证)",
-        ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED to "不支持该视频文件格式",
-        ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED to "不支持该播放列表格式",
-
-        // 解码与播放错误 (设备性能或兼容性问题)
-        ERROR_CODE_DECODER_INIT_FAILED to "视频解码器初始化失败",
-        ERROR_CODE_DECODER_QUERY_FAILED to "当前设备找不到合适的视频解码器",
-        ERROR_CODE_DECODING_FAILED to "视频解码失败，无法播放",
-        ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES to "视频规格太高，当前设备性能不足以播放",
-        ERROR_CODE_DECODING_FORMAT_UNSUPPORTED to "当前设备不支持这种视频编码格式",
-        ERROR_CODE_AUDIO_TRACK_INIT_FAILED to "音频播放初始化失败",
-        ERROR_CODE_AUDIO_TRACK_WRITE_FAILED to "音频数据输出失败",
-
-        // DRM (数字版权管理) 错误
-        ERROR_CODE_DRM_UNSPECIFIED to "版权保护模块发生未知错误",
-        ERROR_CODE_DRM_SCHEME_UNSUPPORTED to "当前设备不支持该视频的版权保护格式",
-        ERROR_CODE_DRM_PROVISIONING_FAILED to "获取数字版权证书失败",
-        ERROR_CODE_DRM_CONTENT_ERROR to "受版权保护的视频内容解密失败",
-        ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED to "获取视频播放许可证失败",
-        ERROR_CODE_DRM_DISALLOWED_OPERATION to "因版权限制，不允许此操作",
-        ERROR_CODE_DRM_SYSTEM_ERROR to "设备数字版权系统底层出错",
-        ERROR_CODE_DRM_DEVICE_REVOKED to "当前设备的播放权限已被吊销",
-        ERROR_CODE_DRM_LICENSE_EXPIRED to "该视频的播放许可证已过期",
-
-        // 自定义错误
-        CUSTOM_ERROR_CODE_BASE to "发生自定义系统错误"
-    )
-
-    @Volatile
-    private var isReloadingVideo = false
+    private val viewModel: VideoViewModel by viewModels()
     private lateinit var videoPlayer: MyGSYVideoPlayer
-    private val launchVideoParams: LaunchVideoParams by lazy {
-        Gson().fromJson(
-            intent.getStringExtra("bean")!!, LaunchVideoParams::class.java
-        )
-    }
-    internal val fileRepository: FileRepository by lazy {
-        FileRepository.getInstance()
-    }
-    private val videoAttribute by lazy {
-        launchVideoParams.videoAttribute
-    }
-    private lateinit var videoInfo: VideoInfoBean
-
-    private val isAutoRotate by lazy {
-        videoAttribute.isAutoRotate
-    }
-    private val videoLinkMode by lazy {
-        videoAttribute.videoLinkMode
-    }
-    private val autoJumpRetry by lazy {
-        videoAttribute.autoJumpRetry
-    }
-    private val hideLoading by lazy {
-        videoAttribute.hideLoading
-    }
-    private var fileBeanIndex = -1
-    private val videoHistoryMap = mutableMapOf<String, VideoBean>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_video)
-        videoInfo = launchVideoParams.videoInfo
-        fileBeanIndex = videoInfo.index
+
+        val paramsJson = intent.getStringExtra("bean")
+        val launchVideoParams = Gson().fromJson(paramsJson, LaunchVideoParams::class.java)
+
+        val isPortrait = resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+        viewModel.initParams(launchVideoParams, isPortrait)
+
+        val videoInfo = launchVideoParams.videoInfo
         val headerMap = hashMapOf(
             "cookie" to UserSessionManager.cookie,
             "User-Agent" to ConfigKeyUtil.USER_AGENT
         )
-        val address = videoInfo.videoUrl.ifEmpty {
-            videoInfo.downloadUrl
-        }
+        val address = videoInfo.videoUrl.ifEmpty { videoInfo.downloadUrl }
         val title = videoInfo.fileName
+
         videoPlayer = findViewById(R.id.pre_video_player)
-        videoPlayer.setHideLoadingView(hideLoading)
+        videoPlayer.setHideLoadingView(viewModel.hideLoading)
 
         initGSYExoPlayerWithOkHttp(this.applicationContext)
         PlayerFactory.setPlayManager(Exo2PlayerManager::class.java)
@@ -283,7 +89,7 @@ class VideoActivity : AppCompatActivity() {
             }
             //设置返回按键功能
             backButton.setOnClickListener {
-                back()
+                performBack()
             }
             // 上一集 / 下一集
             findViewById<View>(R.id.prev_episode)?.setOnClickListener {
@@ -294,25 +100,68 @@ class VideoActivity : AppCompatActivity() {
             }
         }
 
-        updatePrevNextButtonsState()
-
+        videoPlayer.setVideoAllCallBack(gSYErrorCallBack)
         videoPlayer.startPlayLogic()
 
-        //设置横屏
-        lifecycleScope.launch {
-            if (isAutoRotate) {
-                val videoHeight = videoInfo.height
-                val videoWidth = videoInfo.width
-                if (videoWidth < videoHeight) {
-                    rotateScreen()
-                }
-            }
+        onBackPressedDispatcher.addCallback(this) {
+            performBack()
         }
 
-        videoPlayer.setVideoAllCallBack(gSYErrorCallBack)
+        observeViewModel()
+    }
 
-        onBackPressedDispatcher.addCallback(this) {
-            back()
+    private fun observeViewModel() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    viewModel.hasPrev.collect { hasPrev ->
+                        videoPlayer.findViewById<View>(R.id.prev_episode)?.apply {
+                            isEnabled = hasPrev
+                            alpha = if (hasPrev) 1.0f else 0.3f
+                        }
+                    }
+                }
+                launch {
+                    viewModel.hasNext.collect { hasNext ->
+                        videoPlayer.findViewById<View>(R.id.next_episode)?.apply {
+                            isEnabled = hasNext
+                            alpha = if (hasNext) 1.0f else 0.3f
+                        }
+                    }
+                }
+                launch {
+                    viewModel.uiEvent.collect { event ->
+                        when (event) {
+                            is VideoUiEvent.PlayNext -> {
+                                videoPlayer.playNext(event.videoUrl, event.title)
+                            }
+
+                            is VideoUiEvent.Toast -> {
+                                Toast.makeText(
+                                    this@VideoActivity,
+                                    event.message,
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+
+                            is VideoUiEvent.RotateScreen -> {
+                                rotateScreen()
+                            }
+
+                            is VideoUiEvent.FinishWithResult -> {
+                                val returnIntent = Intent().apply {
+                                    putExtra("videoHistory", event.videoHistoryJson)
+                                    putExtra("nav", event.nav)
+                                    putExtra("toast", event.toast)
+                                }
+                                setResult(event.resultCode, returnIntent)
+                                videoPlayer.setVideoAllCallBack(null)
+                                finish()
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -329,51 +178,16 @@ class VideoActivity : AppCompatActivity() {
         }
     }
 
-    override fun onPause() {
-        videoPlayer.onVideoPause()
-        super.onPause()
+    private fun playNextVideo(isNext: Boolean) {
+        val isPortrait = resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+        viewModel.playNextVideo(isNext, isPortrait, videoPlayer.currentPositionWhenPlaying)
     }
 
-    override fun onResume() {
-        videoPlayer.onVideoResume()
-        super.onResume()
+    private fun performBack(nav: String = "", toast: String = "", resultCode: Int = RESULT_OK) {
+        viewModel.back(videoPlayer.currentPositionWhenPlaying, nav, toast, resultCode)
     }
 
-    override fun onDestroy() {
-        GSYVideoManager.releaseAllVideos()
-        super.onDestroy()
-    }
-
-
-    private fun back(nav: String = "", toast: String = "", resultCode: Int = RESULT_OK) {
-        lifecycleScope.launch {
-            //更新当前视频
-            updateVideoHistory()
-            val videoHistoryMapJson = Gson().toJson(videoHistoryMap)
-            val returnIntent = Intent().apply {
-                putExtra("videoHistory", videoHistoryMapJson)
-                putExtra("nav", nav)
-                putExtra("toast", toast)
-            }
-            // 2. 设置结果码为 RESULT_OK，并传入 Intent
-            setResult(resultCode, returnIntent)
-            //释放所有
-            videoPlayer.setVideoAllCallBack(null);
-            finish()
-        }
-    }
-
-
-    private fun isHandledException(throwable: Throwable?): Boolean {
-        var cause = throwable
-        while (cause != null) {
-            if (cause is HandledVideoException) return true
-            cause = cause.cause
-        }
-        return false
-    }
-
-    val gSYErrorCallBack = object : GSYSampleCallBack() {
+    private val gSYErrorCallBack = object : GSYSampleCallBack() {
         override fun onPlayError(url: String?, vararg objects: Any?) {
             val playerManager = videoPlayer.gsyVideoManager.player as? Exo2PlayerManager
             val exoPlayer = playerManager?.mediaPlayer as? ExoPlayer
@@ -386,68 +200,29 @@ class VideoActivity : AppCompatActivity() {
             val errorStatus =
                 if (objects[2] != null && videoPlayer.gsyVideoManager.player is Exo2PlayerManager) {
                     val code = (objects[2] as Int)
-                    playbackErrorMessageMap.getOrDefault(code, "")
-                        .ifEmpty { "发生未记录的错误 (错误码: $code)" }
+                    VideoErrorMapper.getErrorMessage(code)
                 } else {
                     "UNKNOWN_ERROR"
                 }
+            val title = viewModel.videoInfo.value?.fileName ?: ""
             XLog.e("$title 播放失败 $errorStatus")
             Toast.makeText(baseContext, errorStatus, Toast.LENGTH_SHORT).show()
             finish()
         }
     }
 
-    /**
-     * 全局配置 GSYVideoPlayer (ExoPlayer) 使用自定义的 OkHttpClient 拦截器
-     */
-    fun initGSYExoPlayerWithOkHttp(context: Context) {
-        // 1. 创建包含错误拦截器的 OkHttpClient
+    private fun initGSYExoPlayerWithOkHttp(context: Context) {
         val customOkHttpClient = OkHttpClient.Builder()
             .addInterceptor(VideoErrorInterceptor { url, contentType, errorBody ->
-                XLog.e(
-                    "GSY Player 网络请求 $url 失败: [$contentType] -> Body: ${
-                        errorBody.replace(
-                            "\n",
-                            ""
-                        )
-                    }"
+                viewModel.handleInterceptorError(
+                    currentPositionMs = videoPlayer.currentPositionWhenPlaying,
+                    url = url,
+                    contentType = contentType,
+                    errorBody = errorBody
                 )
-                if (errorBody.isEmpty()) {
-                    if (!videoLinkMode && autoJumpRetry) {
-                        rePlayNewVideo()
-                        return@VideoErrorInterceptor true
-                    }
-
-                    back(
-                        toast = "视频地址错误！请打开\"视频解析模式\"请求正确链接",
-                        resultCode = RESULT_CANCELED
-                    )
-                    return@VideoErrorInterceptor true
-                }
-
-                runCatching { Gson().fromJson(errorBody, JsonObject::class.java) }
-                    .onSuccess { fromJson ->
-                        if (fromJson.has("error")) {
-                            val message = fromJson.get("error").asString
-                            back(
-                                nav = "VerifyVideoAccount",
-                                toast = message,
-                                resultCode = RESULT_CANCELED
-                            )
-                            return@VideoErrorInterceptor true
-                        }
-                    }
-                runCatching { parseOssErrorWithDom(errorBody).message }
-                    .onSuccess { message ->
-                        back(toast = message, resultCode = RESULT_CANCELED)
-                        return@VideoErrorInterceptor true
-                    }
-
-                return@VideoErrorInterceptor false
             })
             .build()
 
-        // 3. 拦截 GSYVideoPlayer 的 MediaSource 构建流程
         ExoSourceManager.setExoMediaSourceInterceptListener(object :
             ExoMediaSourceInterceptListener {
             override fun getMediaSource(
@@ -469,9 +244,7 @@ class VideoActivity : AppCompatActivity() {
                 mapHeadData: Map<String?, String?>?,
                 allowCrossProtocolRedirects: Boolean
             ): DataSource.Factory {
-                // 2. 将 OkHttpClient 包装为 ExoPlayer 的 HttpDataSource.Factory
                 val okHttpDataSourceFactory = OkHttpDataSource.Factory(customOkHttpClient)
-                // 如果有自定义的 Request Header，同步给 Factory
                 mapHeadData?.let {
                     okHttpDataSourceFactory.setDefaultRequestProperties(it as Map<String, String>)
                 }
@@ -488,122 +261,18 @@ class VideoActivity : AppCompatActivity() {
         })
     }
 
-    fun rePlayNewVideo() {
-        // 如果已经在重新获取链接中，直接跳过
-        if (isReloadingVideo) return
-        isReloadingVideo = true
-        App.instance.toast("视频地址错误！正在重新获取新链接")
-        lifecycleScope.launch {
-            try {
-                val video = fileRepository.video(videoInfo.pickCode)
-                XLog.i("playNewVideo $video")
-                this@VideoActivity.videoPlayer.playNext(video.downloadUrl, video.fileName)
-            } catch (e: Exception) {
-                isReloadingVideo = false // 异常时重置标志位
-            }
-        }
+    override fun onPause() {
+        videoPlayer.onVideoPause()
+        super.onPause()
     }
 
-    private fun updatePrevNextButtonsState() {
-        val prevBtn = videoPlayer.findViewById<View>(R.id.prev_episode)
-        val nextBtn = videoPlayer.findViewById<View>(R.id.next_episode)
-
-        val hasPrev = fileBeanIndex - 1 >= 0 && fileBeanIndex - 1 < launchVideoParams.videoList.size
-        val hasNext = fileBeanIndex + 1 >= 0 && fileBeanIndex + 1 < launchVideoParams.videoList.size
-
-        prevBtn?.apply {
-            isEnabled = hasPrev
-            alpha = if (hasPrev) 1.0f else 0.3f
-        }
-        nextBtn?.apply {
-            isEnabled = hasNext
-            alpha = if (hasNext) 1.0f else 0.3f
-        }
+    override fun onResume() {
+        videoPlayer.onVideoResume()
+        super.onResume()
     }
 
-    fun playNextVideo(isNext: Boolean) {
-        val nextIndex = if (isNext) fileBeanIndex + 1 else fileBeanIndex - 1
-        val fileBean = launchVideoParams.videoList.getOrNull(nextIndex)
-        if (fileBean == null) {
-            App.instance.toast("找不到新视频")
-            updatePrevNextButtonsState()
-            return
-        }
-        fileBeanIndex = nextIndex
-        updatePrevNextButtonsState()
-        lifecycleScope.launch {
-            runCatching {
-                updateVideoHistory()
-
-                val pickCode = fileBean.pickCode
-                val name = fileBean.name
-                val video = if (videoLinkMode) {
-                    fileRepository.video(pickCode)
-                } else {
-                    val (width, height) = if (this@VideoActivity.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
-                        1080 to 1920
-                    } else {
-                        1920 to 1080
-                    }
-                    VideoInfoBean(
-                        width = width,
-                        height = height,
-                        index = fileBeanIndex,
-                        fileName = name,
-                        pickCode = pickCode,
-                        videoUrl = "http://115.com/api/video/m3u8/${pickCode}.m3u8"
-                    )
-                }
-                videoInfo = video
-                this@VideoActivity.videoPlayer.playNext(video.videoUrl, video.fileName)
-            }.onFailureToastAndLog()
-        }
+    override fun onDestroy() {
+        GSYVideoManager.releaseAllVideos()
+        super.onDestroy()
     }
-
-    suspend fun updateVideoHistory() {
-        val currentDuration = (videoPlayer.currentPositionWhenPlaying / 1000).toInt()
-        val pickCode = videoInfo.pickCode
-        val name = videoInfo.fileName
-        val bean = VideoBean(currentDuration, pickCode)
-        videoHistoryMap[pickCode] = bean
-
-        val map = mapOf(
-            "op" to "update",
-            "pick_code" to pickCode,
-            "time" to currentDuration.toString(),
-            "category" to "1",
-            "format" to "json"
-        )
-        runCatching {
-            val videoHistory = fileRepository.videoHistory(map)
-            if (!videoHistory.state) {
-                XLog.e("更新视频时间失败！ name: $name, pickCode: $pickCode, result: $videoHistory")
-            } else {
-                XLog.d("更新视频时间成功 name: $name, pickCode: $pickCode, result: $videoHistory")
-            }
-        }.onFailure { e ->
-            XLog.e("更新视频时间异常 name: $name, pickCode: $pickCode", e)
-        }
-    }
-
-    fun parseOssErrorWithDom(xmlString: String): OssError {
-        val factory = DocumentBuilderFactory.newInstance()
-        val builder = factory.newDocumentBuilder()
-        val doc = builder.parse(xmlString.byteInputStream())
-        doc.documentElement.normalize()
-
-        fun getValue(tag: String): String {
-            return doc.getElementsByTagName(tag).item(0)?.textContent.orEmpty()
-        }
-
-        return OssError(
-            code = getValue("Code"),
-            message = getValue("Message"),
-            requestId = getValue("RequestId"),
-            hostId = getValue("HostId"),
-            actualObjectSize = getValue("ActualObjectSize").toLongOrNull() ?: 0L,
-            rangeRequested = getValue("RangeRequested")
-        )
-    }
-
 }
