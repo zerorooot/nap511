@@ -5,17 +5,14 @@ import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.viewModelScope
 import coil.annotation.ExperimentalCoilApi
 import coil.imageLoader
-import coil.memory.MemoryCache
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.RenameBean
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.deleteCoilCache
-import github.zerorooot.nap511.util.getCoilCacheUrl
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.launch
-import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -266,13 +263,15 @@ internal fun FileViewModel.formatFileBeanList(fileBeanList: List<FileBean>): Arr
         var createTimeString = fileBean.createTime.toLongOrNull()?.let {
             dateFormat.format(it * 1000)
         } ?: ""
+        var playLongRatio = ""
+
 
         // 判断是否为文件夹
         val isFolder = fileBean.fileId.isEmpty()
         val finalFileId = if (isFolder) fileBean.categoryId else fileBean.fileId
 
         var sizeString = fileBean.sizeString
-        var modifiedTimeString = fileBean.modifiedTimeString
+        var modifiedTimeString: String
         var rawModifiedTime = fileBean.modifiedTime
 
         if (isFolder) {
@@ -295,7 +294,7 @@ internal fun FileViewModel.formatFileBeanList(fileBeanList: List<FileBean>): Arr
             if (fileBean.currentPlayTime != 0 && fileBean.playLong != 0.00) {
                 val playTime =
                     ((fileBean.currentPlayTime.toFloat() / fileBean.playLong) * 100).roundToInt()
-                createTimeString = "▶️ $playTime% $createTimeString"
+                playLongRatio = "▶️ $playTime%"
             }
         }
 
@@ -333,6 +332,7 @@ internal fun FileViewModel.formatFileBeanList(fileBeanList: List<FileBean>): Arr
             modifiedTimeString = modifiedTimeString,
             modifiedTime = rawModifiedTime,
             sizeString = sizeString,
+            playLongRatio = playLongRatio,
             playLongString = playLongString
         )
     }.toMutableList() as ArrayList<FileBean>

@@ -90,7 +90,14 @@ data class FileBean(
     val isFolder: Boolean = false,
     val updateTimeString: String = "",
     val createTimeString: String = "",
+    /**
+     * 视频时间格式化后
+     */
     val playLongString: String = "",
+    /**
+     * 播放了百分之几
+     */
+    val playLongRatio: String = "",
     val modifiedTimeString: String = "",
     val sizeString: String = "",
     val isSelect: Boolean = false,

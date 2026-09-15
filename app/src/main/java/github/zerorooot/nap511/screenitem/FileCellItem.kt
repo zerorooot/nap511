@@ -130,54 +130,73 @@ fun FileCellItem(
                     }
                 }
 
+                val playLong = fileBean.playLongString
+                val playLongRatio = fileBean.playLongRatio
+                val isMedia = fileBean.isVideo == 1 || fileBean.fileIco == R.drawable.mp3
+                val hasMediaInfo = isMedia && (playLong.isNotEmpty() || playLongRatio.isNotEmpty())
+                val hasSubInfo = size.isNotEmpty() || hasMediaInfo
+
                 Column(
                     verticalArrangement = Arrangement.SpaceEvenly,
                     modifier = Modifier
-//                        .padding(4.dp)
+                        .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
                         .fillMaxHeight()
-                        .weight(0.7f)
+                        .weight(1f)
                 ) {
+                    // 1. 文件名（无中间信息时可支持显示 2 行）
                     AutoSizableTextField(
                         value = name,
-                        modifier = Modifier
-                            .padding(start = 4.dp, top = 9.dp)
-                            .fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth(),
                         minFontSize = 10.sp,
-                        maxLines = 2
+                        maxLines = if (hasSubInfo) 1 else 2
                     )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        //  horizontalArrangement = Arrangement.spacedBy(6.dp), // 明确间距
-                        modifier = Modifier
-                            .padding(start = 5.dp, top = 9.dp)
-                            .fillMaxSize()
-                    ) {
-                        Text(
-                            text = size,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1
-                        )
-                        // 时长（作为独立 Badge 标签凸显）
-                        if (fileBean.isVideo == 1 || fileBean.fileIco == R.drawable.mp3) {
-                            val playLong = fileBean.playLongString
-                            Box(
-                                modifier = Modifier
-                                    .background(
-                                        color = MaterialTheme.colorScheme.secondaryContainer,
-                                        shape = RoundedCornerShape(4.dp)
-                                    )
-                            ) {
+                    // 2. 大小与时长信息（仅在有内容时渲染 Row）
+                    if (hasSubInfo) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (size.isNotEmpty()) {
                                 Text(
-                                    text = playLong,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                    text = size,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1
                                 )
                             }
+                            if (isMedia) {
+                                if (playLong.isNotEmpty()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(
+                                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                                shape = RoundedCornerShape(4.dp)
+                                            )
+                                    ) {
+                                        Text(
+                                            text = playLong,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                            modifier = Modifier.padding(horizontal = 2.dp, vertical = 1.dp),
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                                if (playLongRatio.isNotEmpty()) {
+                                    Text(
+                                        text = playLongRatio,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.padding(horizontal = 1.dp, vertical = 1.dp),
+                                        maxLines = 1
+                                    )
+                                }
+                            }
                         }
-                        // 4. 修改时间
+                    }
+                    // 3. 修改时间
+                    if (time.isNotEmpty()) {
                         Text(
                             text = time,
                             style = MaterialTheme.typography.labelMedium,

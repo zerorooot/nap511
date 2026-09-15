@@ -234,4 +234,49 @@ class SubtitleRepository(
 
         result
     }
+
+    /**
+     * 将自定义本地 SRT 文件上传到 115 指定目录 CID
+     * @param srtFile 本地 SRT 文件
+     * @param uploadFileName 上传至网盘的目标文件名（例如 VideoName.srt）
+     * @param targetCid 115 目标目录 CID
+     */
+    suspend fun uploadCustomSrtFileTo115(
+        srtFile: File,
+        uploadFileName: String,
+        targetCid: String
+    ): BaseReturnMessage = withContext(Dispatchers.IO) {
+        if (targetCid.isBlank() || targetCid == "0") {
+            return@withContext BaseReturnMessage(
+                state = false,
+                message = "当前视频未获取到有效父目录 CID"
+            )
+        }
+
+        if (!srtFile.exists() || srtFile.length() <= 0) {
+            return@withContext BaseReturnMessage(
+                state = false,
+                message = "字幕文件不存在或内容为空"
+            )
+        }
+
+        val cacheDir = srtFile.parentFile ?: srtFile
+        val tempUploadFile = File(cacheDir, uploadFileName)
+        if (tempUploadFile != srtFile) {
+            srtFile.copyTo(tempUploadFile, overwrite = true)
+        }
+
+        val result = fileRepository.uploadFile(
+            file = tempUploadFile,
+            targetCid = targetCid,
+            uploadFileName = uploadFileName,
+            mimeType = "application/x-subrip"
+        )
+
+        if (tempUploadFile.exists() && tempUploadFile != srtFile) {
+            tempUploadFile.delete()
+        }
+
+        result
+    }
 }

@@ -126,9 +126,8 @@ internal fun FileViewModel.updateVideoFileBeans(
                 ((duration.toFloat() / fileBean.playLong) * 100).roundToInt()
             }
 
-            val createTimeString = sdf.format(fileBean.createTime.toLong() * 1000)
-            val newTimeString = "▶️ $playTime% $createTimeString"
-            val updatedBean = fileBean.copy(createTimeString = newTimeString)
+            val playTimeRatio = "▶️ $playTime%"
+            val updatedBean = fileBean.copy(playLongRatio = playTimeRatio)
 
             fileBeanList[index] = updatedBean
             isAnyUpdated = true

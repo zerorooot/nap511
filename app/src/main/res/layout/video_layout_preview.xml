@@ -699,6 +699,17 @@
                         android:textSize="10sp" />
                 </LinearLayout>
 
+                <TextView
+                    android:id="@+id/btn_save_subtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="28dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="@drawable/bg_control_pill"
+                    android:gravity="center"
+                    android:text="保存当前字幕"
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp" />
+
                 <!-- 5. 移除当前字幕按钮 -->
                 <TextView
                     android:id="@+id/btn_remove_subtitle"

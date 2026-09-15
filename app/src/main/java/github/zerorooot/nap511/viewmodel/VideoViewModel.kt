@@ -369,4 +369,23 @@ class VideoViewModel : ViewModel() {
             }
         )
     }
+
+    /**
+     * 保存并上传当前字幕（连同本地时间偏移修正）至当前视频所在的 115 目录
+     */
+    fun saveAndUploadSubtitle(cacheDirFile: File) {
+        val parentCid = launchVideoParams.categoryId
+        val videoFileName = _uiState.value.videoInfo?.fileName ?: launchVideoParams.videoInfo.fileName
+        subtitleDelegate.saveAndUploadCurrentSubtitle(
+            scope = viewModelScope,
+            cacheDirFile = cacheDirFile,
+            videoFileName = videoFileName,
+            targetCid = parentCid,
+            onSuccess = {
+                viewModelScope.launch {
+                    DialogEventBus.getInstance().emit(DialogEvent.RefreshFileList(parentCid))
+                }
+            }
+        )
+    }
 }

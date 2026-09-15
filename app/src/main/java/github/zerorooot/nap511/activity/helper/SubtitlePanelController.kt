@@ -135,6 +135,10 @@ class SubtitlePanelController(
             viewModel.updateSubtitleStyle(viewModel.uiState.value.subtitleStyle.copy(backgroundColor = nextBg))
         }
 
+        videoPlayer.findViewById<View>(R.id.btn_save_subtitle)?.setOnClickListener {
+            viewModel.saveAndUploadSubtitle(context.cacheDir)
+        }
+
         videoPlayer.findViewById<View>(R.id.btn_remove_subtitle)?.setOnClickListener {
             videoPlayer.setSubtitleEnabled(false)
             viewModel.removeSubtitle()
