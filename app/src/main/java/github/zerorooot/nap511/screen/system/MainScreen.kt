@@ -1,4 +1,6 @@
-package github.zerorooot.nap511.screen
+package github.zerorooot.nap511.screen.system
+
+import github.zerorooot.nap511.screen.file.CreateDialogs
 
 import android.content.Intent
 import androidx.activity.ComponentActivity

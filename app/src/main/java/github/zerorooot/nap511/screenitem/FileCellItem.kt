@@ -45,9 +45,9 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileItemActions
-import github.zerorooot.nap511.screen.FileMoreMenu
-import github.zerorooot.nap511.screen.FolderMoreMenu
-import github.zerorooot.nap511.screen.MenuItemAction
+import github.zerorooot.nap511.screen.components.FileMoreMenu
+import github.zerorooot.nap511.screen.components.FolderMoreMenu
+import github.zerorooot.nap511.screen.components.MenuItemAction
 import github.zerorooot.nap511.util.getCoilCacheUrl
 
 @OptIn(ExperimentalFoundationApi::class)

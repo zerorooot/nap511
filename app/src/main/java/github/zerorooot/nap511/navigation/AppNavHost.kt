@@ -9,25 +9,24 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.dialog.ExitApp
-import github.zerorooot.nap511.screen.CaptchaVideoWebViewScreen
-import github.zerorooot.nap511.screen.CaptchaWebViewScreen
-import github.zerorooot.nap511.screen.FileScreen
-import github.zerorooot.nap511.screen.HtmlWebViewScreen
-import github.zerorooot.nap511.screen.LogScreen
-import github.zerorooot.nap511.screen.LoginScreen
-import github.zerorooot.nap511.screen.MusicDetailScreen
-import github.zerorooot.nap511.screen.MyPhotoScreen
-import github.zerorooot.nap511.screen.OfflineDownloadScreen
-import github.zerorooot.nap511.screen.OfflineFileScreen
-import github.zerorooot.nap511.screen.RecycleScreen
-import github.zerorooot.nap511.screen.RepeatFileScreen
-import github.zerorooot.nap511.screen.SettingScreen
-import github.zerorooot.nap511.screen.TxtReaderScreen
-import github.zerorooot.nap511.screen.WebViewScreen
+import github.zerorooot.nap511.screen.auth.LoginScreen
+import github.zerorooot.nap511.screen.file.FileScreen
+import github.zerorooot.nap511.screen.file.OfflineDownloadScreen
+import github.zerorooot.nap511.screen.file.OfflineFileScreen
+import github.zerorooot.nap511.screen.file.RecycleScreen
+import github.zerorooot.nap511.screen.file.RepeatFileScreen
+import github.zerorooot.nap511.screen.system.LogScreen
+import github.zerorooot.nap511.screen.system.SettingScreen
+import github.zerorooot.nap511.screen.viewer.MusicDetailScreen
+import github.zerorooot.nap511.screen.viewer.MyPhotoScreen
+import github.zerorooot.nap511.screen.viewer.TxtReaderScreen
+import github.zerorooot.nap511.screen.web.CaptchaVideoWebViewScreen
+import github.zerorooot.nap511.screen.web.CaptchaWebViewScreen
+import github.zerorooot.nap511.screen.web.HtmlWebViewScreen
+import github.zerorooot.nap511.screen.web.WebViewScreen
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.LoginViewModel
@@ -83,8 +82,7 @@ fun AppNavHost(
                 gridCellMinSize,
                 { route ->
                     navController.navigate(route)
-                }
-            ) {
+                }) {
                 val open = isDrawerOpen()
                 if (open) {
                     onCloseDrawer()
@@ -103,11 +101,7 @@ fun AppNavHost(
             val urlText by offlineFileViewModel.urlText
 
             OfflineDownloadScreen(
-                fileUiState.path,
-                quotaBean,
-                urlText,
-                { onOpenDrawer() }
-            ) { list ->
+                fileUiState.path, quotaBean, urlText, { onOpenDrawer() }) { list ->
                 offlineFileViewModel.addTask(list, fileViewModel.currentCid) { needVerify ->
                     if (needVerify) {
                         navController.navigate(Route.VerifyMagnetLinkAccount)
@@ -124,8 +118,7 @@ fun AppNavHost(
                 offlineFileViewModel,
                 isExpandedScreen,
                 gridCellMinSize,
-                { fileViewModel.getFiles(it) }
-            ) { action ->
+                { fileViewModel.getFiles(it) }) { action ->
                 when (action) {
                     "ModalNavigationDrawerMenu" -> onOpenDrawer()
                     "MyFile" -> navController.popBackStack()
@@ -231,8 +224,7 @@ fun AppNavHost(
                 repeatViewModel,
                 isExpandedScreen,
                 gridCellMinSize,
-                { onOpenDrawer() }
-            ) { targetCid ->
+                { onOpenDrawer() }) { targetCid ->
                 fileViewModel.getFiles(targetCid)
                 navController.navigate(Route.MyFile) {
                     popUpTo<Route.RepeatFile> { inclusive = true }

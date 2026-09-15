@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen
+package github.zerorooot.nap511.screen.file
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -29,6 +29,9 @@ import github.zerorooot.nap511.bean.FileListDataState
 import github.zerorooot.nap511.bean.FileListScrollState
 import github.zerorooot.nap511.bean.FileScaffoldActions
 import github.zerorooot.nap511.bean.FileScaffoldState
+import github.zerorooot.nap511.screen.components.AppTopBarMultiple
+import github.zerorooot.nap511.screen.components.AppTopBarNormal
+import github.zerorooot.nap511.screen.components.MiniPlayerBar
 import github.zerorooot.nap511.screenitem.FileListContent
 import github.zerorooot.nap511.screenitem.FilePathBar
 import github.zerorooot.nap511.screenitem.FileScreenFab

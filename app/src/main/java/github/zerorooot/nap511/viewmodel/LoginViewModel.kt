@@ -7,7 +7,7 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import github.zerorooot.nap511.repository.AuthRepository
 import github.zerorooot.nap511.repository.SettingsRepository
-import github.zerorooot.nap511.screen.LoginCredential
+import github.zerorooot.nap511.screen.auth.LoginCredential
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import kotlinx.coroutines.Dispatchers

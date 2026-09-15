@@ -1,4 +1,7 @@
-package github.zerorooot.nap511.screen
+package github.zerorooot.nap511.screen.auth
+
+import github.zerorooot.nap511.screen.web.CaptchaPromptDialog
+import github.zerorooot.nap511.screen.web.LoginWebViewScreen
 
 import android.net.Uri
 import android.view.WindowManager

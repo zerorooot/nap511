@@ -1,4 +1,7 @@
-package github.zerorooot.nap511.screen
+package github.zerorooot.nap511.screen.viewer
+
+import github.zerorooot.nap511.screen.components.TopAppBarTxtReaderNormal
+import github.zerorooot.nap511.screen.components.TopAppBarTxtReaderSearch
 
 import android.app.Activity
 import android.content.Intent

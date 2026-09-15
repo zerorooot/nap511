@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen
+package github.zerorooot.nap511.screen.components
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column

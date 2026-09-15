@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen
+package github.zerorooot.nap511.screen.file
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember

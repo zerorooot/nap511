@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen
+package github.zerorooot.nap511.screen.components
 
 //https://github.com/mataku/MiddleEllipsisText
 

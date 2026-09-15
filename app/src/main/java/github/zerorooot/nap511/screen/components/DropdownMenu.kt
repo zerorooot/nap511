@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen
+package github.zerorooot.nap511.screen.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight

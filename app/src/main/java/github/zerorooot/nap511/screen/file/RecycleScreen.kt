@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen
+package github.zerorooot.nap511.screen.file
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
@@ -29,6 +29,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.zerorooot.nap511.bean.RecycleBean
+import github.zerorooot.nap511.screen.components.AppBarAction
+import github.zerorooot.nap511.screen.components.AppTopBarRecycle
+import github.zerorooot.nap511.screen.components.MenuItemAction
+import github.zerorooot.nap511.screen.components.MiddleEllipsisText
+import github.zerorooot.nap511.screen.components.TopBarAction
 import github.zerorooot.nap511.dialog.RecyclePasswordDialog
 import github.zerorooot.nap511.screenitem.RecycleCellItem
 import github.zerorooot.nap511.repository.SettingsRepository

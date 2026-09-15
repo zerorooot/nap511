@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen
+package github.zerorooot.nap511.screen.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box

@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen
+package github.zerorooot.nap511.screen.viewer
 
 import android.app.Activity
 import androidx.compose.animation.AnimatedVisibility

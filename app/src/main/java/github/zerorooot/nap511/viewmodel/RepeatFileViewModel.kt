@@ -8,7 +8,7 @@ import github.zerorooot.nap511.bean.CategoryDetailResponse
 import github.zerorooot.nap511.bean.RepeatFileItem
 import github.zerorooot.nap511.bean.RepeatListResponse
 import github.zerorooot.nap511.bean.RepeatStatusData
-import github.zerorooot.nap511.screen.formatBytes
+import github.zerorooot.nap511.screen.file.formatBytes
 import github.zerorooot.nap511.service.RepeatService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.onFailureToastAndLog

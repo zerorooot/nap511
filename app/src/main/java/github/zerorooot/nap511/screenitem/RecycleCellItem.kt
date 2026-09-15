@@ -23,12 +23,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Scale
 import github.zerorooot.nap511.bean.RecycleBean
-import github.zerorooot.nap511.screen.MenuItemAction
-import github.zerorooot.nap511.screen.RecycleMoreMenu
+import github.zerorooot.nap511.screen.components.MenuItemAction
+import github.zerorooot.nap511.screen.components.RecycleMoreMenu
 
 @Composable
 fun RecycleCellItem(

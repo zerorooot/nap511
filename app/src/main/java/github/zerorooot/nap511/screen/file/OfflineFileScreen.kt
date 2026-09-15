@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen
+package github.zerorooot.nap511.screen.file
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -37,6 +37,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.core.content.ContextCompat.getSystemService
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.zerorooot.nap511.bean.OfflineTask
+import github.zerorooot.nap511.screen.components.AppBarAction
+import github.zerorooot.nap511.screen.components.AppTopBarOfflineFile
+import github.zerorooot.nap511.screen.components.MenuItemAction
+import github.zerorooot.nap511.screen.components.TopBarAction
 import github.zerorooot.nap511.dialog.OfflineFileInfoDialog
 import github.zerorooot.nap511.screenitem.OfflineCellItem
 import github.zerorooot.nap511.util.ConfigKeyUtil

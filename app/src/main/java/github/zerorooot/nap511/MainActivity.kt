@@ -15,7 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.zerorooot.nap511.repository.SettingsRepository
-import github.zerorooot.nap511.screen.MainScreen
+import github.zerorooot.nap511.screen.system.MainScreen
 import github.zerorooot.nap511.ui.theme.Nap511Theme
 
 class MainActivity : AppCompatActivity() {

@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen
+package github.zerorooot.nap511.screen.viewer
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement

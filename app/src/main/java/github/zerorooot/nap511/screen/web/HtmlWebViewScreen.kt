@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen
+package github.zerorooot.nap511.screen.web
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -38,10 +38,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.FileProvider
-import androidx.core.net.toUri
-import github.zerorooot.nap511.util.App
-import java.io.File
+import github.zerorooot.nap511.screen.components.BaseTopAppBar
+import github.zerorooot.nap511.screen.components.HtmlWebViewTopBarDropdownMenu
+import github.zerorooot.nap511.screen.components.MenuItemAction
+import github.zerorooot.nap511.screen.components.TopAppBarSearch
 import java.nio.charset.Charset
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -150,6 +150,7 @@ fun HtmlWebViewScreen(
                                         webViewInstance?.url ?: htmlContent,
                                         title
                                     )
+
                                     MenuItemAction.CHANGE_ENCODING -> showEncodingDialog = true
                                     else -> {}
                                 }

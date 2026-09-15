@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen
+package github.zerorooot.nap511.screen.file
 
 import android.os.SystemClock
 import androidx.compose.foundation.lazy.LazyListState
