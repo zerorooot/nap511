@@ -46,6 +46,7 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileItemActions
 import github.zerorooot.nap511.screen.FileMoreMenu
+import github.zerorooot.nap511.screen.FolderMoreMenu
 import github.zerorooot.nap511.screen.MenuItemAction
 import github.zerorooot.nap511.util.getCoilCacheUrl
 
@@ -199,7 +200,13 @@ fun FileCellItem(
                         else -> {}
                     }
                 }
-                FileMoreMenu(onClick = dispatchMenuClick)
+
+                if (fileBean.isFolder) {
+                    FolderMoreMenu(dispatchMenuClick)
+                } else {
+                    FileMoreMenu(dispatchMenuClick)
+                }
+
 
             }
 

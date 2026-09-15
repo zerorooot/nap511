@@ -8,7 +8,10 @@ import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ImageBean
+import github.zerorooot.nap511.bean.LaunchVideoParams
 import github.zerorooot.nap511.bean.Route
+import github.zerorooot.nap511.bean.VideoAttributeBean
+import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.App
@@ -16,6 +19,8 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.getCoilCacheUrl
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -34,7 +39,13 @@ internal fun FileViewModel.getImage(fileBean: FileBean) {
     }
 
     if (imageBeanCache[cid]?.containsKey(pickCode) == true) {
-        XLog.d("FileViewModel.getImage hit imageBeanCache: fileBean=${fileBean.name}, cid=$cid, cache imageBean=${imageBeanCache[cid]?.get(pickCode)}")
+        XLog.d(
+            "FileViewModel.getImage hit imageBeanCache: fileBean=${fileBean.name}, cid=$cid, cache imageBean=${
+                imageBeanCache[cid]?.get(
+                    pickCode
+                )
+            }"
+        )
         return
     }
 
@@ -85,66 +96,101 @@ internal fun FileViewModel.getImage(fileBean: FileBean) {
     }
 }
 
-
-internal fun FileViewModel.updateVideoFileBean(
+/**
+ * 批量更新视频播放进度与历史记录
+ * @param cid 当前目录 ID
+ * @param videoHistoryMap 包含 pickCode 与对应 VideoBean 的映射表
+ */
+internal fun FileViewModel.updateVideoFileBeans(
     cid: String,
-    index: Int,
-    duration: Int,
-    pickCode: String
+    videoHistoryMap: Map<String, VideoBean>
 ) {
+    if (videoHistoryMap.isEmpty()) return
+
     viewModelScope.launch {
-        val fileBean = fileBeanList[index]
+        // 构建时间格式化工具，避免在循环体内重复实例化
+        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+        var isAnyUpdated = false
 
-        if (fileBean.isVideo != 1) return@launch
+        // 批量更新本地内存中的列表数据
+        videoHistoryMap.forEach { (pickCode, bean) ->
+            val index = fileBeanList.indexOfFirst { it.pickCode == pickCode }
+            // 防御越界保护
+            if (index == -1) return@forEach
 
-        val playTime = if (fileBean.playLong == 0.0) {
-            100
-        } else {
-            ((duration.toFloat() / fileBean.playLong) * 100).roundToInt()
+            val fileBean = fileBeanList[index]
+            if (fileBean.isVideo != 1) return@forEach
+
+            val duration = bean.currentDuration
+            val playTime = if (fileBean.playLong == 0.0) {
+                100
+            } else {
+                ((duration.toFloat() / fileBean.playLong) * 100).roundToInt()
+            }
+
+            val createTimeString = sdf.format(fileBean.createTime.toLong() * 1000)
+            val newTimeString = "▶️ $playTime% $createTimeString"
+            val updatedBean = fileBean.copy(createTimeString = newTimeString)
+
+            fileBeanList[index] = updatedBean
+            isAnyUpdated = true
         }
 
-        val createTimeString =
-            SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
-                fileBean.createTime.toLong() * 1000
-            )
-        val newTimeString = "▶️ $playTime% $createTimeString"
-        val updatedBean = fileBean.copy(createTimeString = newTimeString)
-        fileBeanList[index] = updatedBean
-
-        if (!isSearchState) {
+        //本地列表全部修改完成后，仅同步一次缓存，避免频繁拷贝与多次刷新
+        if (isAnyUpdated && !isSearchState) {
             fileListCache[cid]?.fileBeanList = ArrayList(fileBeanList.toList())
         }
 
-        val map = mapOf(
-            "op" to "update",
-            "pick_code" to pickCode,
-            "time" to duration.toString(),
-            "category" to "1",
-            "format" to "json"
-        )
-        runCatching {
-            val videoHistory = fileRepository.videoHistory(map)
-            if (!videoHistory.state) {
-                App.instance.toast(videoHistory.error)
-                XLog.e("更新视频时间失败！ $videoHistory")
-            } else {
-                XLog.d("更新视频时间 $videoHistory")
-            }
-        }.onFailureToastAndLog()
+//        // 并发发起所有网络请求（async + awaitAll）
+//        val uploadJobs = videoHistoryMap.map { (pickCode, bean) ->
+//            async {
+//                val map = mapOf(
+//                    "op" to "update",
+//                    "pick_code" to pickCode,
+//                    "time" to bean.currentDuration.toString(),
+//                    "category" to "1",
+//                    "format" to "json"
+//                )
+//                runCatching {
+//                    val videoHistory = fileRepository.videoHistory(map)
+//                    if (!videoHistory.state) {
+//                        XLog.e("更新视频时间失败！ name: ${bean.name}, pickCode: $pickCode, result: $videoHistory")
+//                    } else {
+//                        XLog.d("更新视频时间成功 name: ${bean.name}, pickCode: $pickCode, result: $videoHistory")
+//                    }
+//                }.onFailure { e ->
+//                    XLog.e("更新视频时间异常 name: ${bean.name}, pickCode: $pickCode", e)
+//                }
+//            }
+//        }
+//
+//        // 等待所有请求完成
+//        uploadJobs.awaitAll()
     }
 }
 
-internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int, fileName: String) {
+internal fun FileViewModel.getVideoInfo(fileBean: FileBean) {
+    val pickCode = fileBean.pickCode
+    val fileName = fileBean.name
+    val videoList =
+        fileBeanList.filter { it.isVideo == 1 && it.playLong != 0.0 }
+            .map { VideoBean(name = it.name, pickCode = it.pickCode) }
+
+    val fileBeanIndex = videoList.indexOfFirst { it.pickCode == pickCode }
+
+
     viewModelScope.launch {
         runCatching {
+            val videoAttributeBean = VideoAttributeBean(
+                isAutoRotate = settingUiState.autoRotateEnabled,
+                videoLinkMode = settingUiState.videoLinkMode,
+                autoJumpRetry = settingUiState.autoJumpRetry,
+                hideLoading = settingUiState.hideLoadingView
+            )
             val video = if (settingUiState.videoLinkMode) {
                 fileRepository.video(pickCode)
                     .copy(
                         index = fileBeanIndex,
-                        isAutoRotate = settingUiState.autoRotateEnabled,
-                        videoLinkMode = true,
-                        autoJumpRetry = settingUiState.autoJumpRetry,
-                        hideLoading = settingUiState.hideLoadingView
                     )
             } else {
                 val (width, height) = if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
@@ -158,14 +204,12 @@ internal fun FileViewModel.getVideoInfo(pickCode: String, fileBeanIndex: Int, fi
                     index = fileBeanIndex,
                     fileName = fileName,
                     pickCode = pickCode,
-                    videoLinkMode = false,
-                    autoJumpRetry = settingUiState.autoJumpRetry,
-                    hideLoading = settingUiState.hideLoadingView,
                     videoUrl = "http://115.com/api/video/m3u8/${pickCode}.m3u8"
                 )
             }
             XLog.d("FileViewModel getVideoInfo $video")
-            _launchVideoEvent.emit(video)
+            val launchVideoParams = LaunchVideoParams(video, videoAttributeBean, videoList)
+            _launchVideoEvent.emit(launchVideoParams)
         }.onFailureToastAndLog()
         setRefreshingStatus(false)
     }

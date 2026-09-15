@@ -36,6 +36,7 @@ import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.FileInfo
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.ImageBean
+import github.zerorooot.nap511.bean.LaunchVideoParams
 import github.zerorooot.nap511.bean.LocationBean
 import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.OrderBean
@@ -198,7 +199,7 @@ class FileViewModel(
         FileRepository.getInstance()
     }
 
-    internal val _launchVideoEvent = MutableSharedFlow<VideoInfoBean>()
+    internal val _launchVideoEvent = MutableSharedFlow<LaunchVideoParams>()
     val launchVideoEvent = _launchVideoEvent.asSharedFlow()
 
     private val _navigationEvent = Channel<NavEvent>()

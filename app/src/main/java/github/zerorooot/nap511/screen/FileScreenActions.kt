@@ -41,9 +41,9 @@ class FileClickHandler(
         fileViewModel.getFiles(fileBean.categoryId)
     }
 
-    fun handleVideoClick(i: Int, fileBean: FileBean) {
+    fun handleVideoClick(fileBean: FileBean) {
         audioViewModel.pause()
-        fileViewModel.getVideoInfo(fileBean.pickCode, i, fileBean.name)
+        fileViewModel.getVideoInfo(fileBean)
     }
 
     fun handleAudioClick(fileBean: FileBean) {
@@ -119,7 +119,7 @@ class FileClickHandler(
 
             when {
                 fileBean.isFolder -> handleFolderClick(i, fileBean)
-                fileBean.isVideo == 1 -> handleVideoClick(i, fileBean)
+                fileBean.isVideo == 1 -> handleVideoClick(fileBean)
                 fileBean.fileIco == R.drawable.torrent -> handleTorrentClick(fileBean)
                 fileBean.fileIco == R.drawable.zip -> handleZipClick(i)
                 fileBean.fileIco == R.drawable.txt -> handleTextClick(i, fileBean)

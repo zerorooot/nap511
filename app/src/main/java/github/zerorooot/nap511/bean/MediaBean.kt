@@ -9,6 +9,33 @@ data class MusicBean(
     val audioUrl: String = ""
 )
 
+data class VideoBean(
+    val currentDuration: Int = -1,
+//    val fileBeanIndex: Int = -1,
+    val pickCode: String,
+    //playNextVideo中需要用到
+    val name: String = ""
+)
+
+/**
+ * 启动视频播放的事件包装类
+ * @param videoInfo 视频基础信息
+ * @param videoAttribute 视频属性配置
+ * @param videoList 视频列表
+ */
+data class LaunchVideoParams(
+    val videoInfo: VideoInfoBean,
+    val videoAttribute: VideoAttributeBean,
+    val videoList: List<VideoBean>
+)
+
+data class VideoAttributeBean(
+    val isAutoRotate: Boolean = false,
+    val videoLinkMode: Boolean = false,
+    val autoJumpRetry: Boolean = true,
+    val hideLoading: Boolean = false,
+)
+
 data class VideoInfoBean(
     @SerializedName("thumb_url") var thumbUrl: String = "",
     @SerializedName("height") var height: Int = 0,
@@ -27,10 +54,6 @@ data class VideoInfoBean(
     @SerializedName("user_turn") var userTurn: Int = 0,
     @SerializedName("origin_file_url") var originFileUrl: String = "",
     val index: Int = -1,
-    val isAutoRotate: Boolean = false,
-    val videoLinkMode: Boolean = false,
-    val autoJumpRetry: Boolean = true,
-    val hideLoading: Boolean = false,
 
     @SerializedName("download_url")
     private val rawDownloadUrl: Any? = null

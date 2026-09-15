@@ -86,7 +86,7 @@ class FileCacheManager(
         val stringJoiner = StringJoiner("；")
         fileList.forEach { i ->
             memoryCache[i]?.data?.path?.last()?.name?.let {
-                stringJoiner.add("name: $it")
+                stringJoiner.add(it)
             }
             deleteDiskFile(i)
         }

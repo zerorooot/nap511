@@ -171,6 +171,16 @@ fun FileMoreMenu(onClick: (MenuItemAction, Int) -> Unit) {
     )
     BaseMoreMenu(listOf, onClick)
 }
+@Composable
+fun FolderMoreMenu(onClick: (MenuItemAction, Int) -> Unit) {
+    val listOf = listOf(
+        MenuItemAction.CUT_FILE,
+        MenuItemAction.RENAME_FILE,
+        MenuItemAction.FILE_INFO,
+        MenuItemAction.DELETE_FILE
+    )
+    BaseMoreMenu(listOf, onClick)
+}
 
 @Composable
 fun RecycleMoreMenu(onClick: (MenuItemAction, Int) -> Unit) {

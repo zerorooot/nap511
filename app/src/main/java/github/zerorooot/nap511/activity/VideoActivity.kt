@@ -62,12 +62,15 @@ import com.shuyu.gsyvideoplayer.GSYVideoManager
 import com.shuyu.gsyvideoplayer.listener.GSYSampleCallBack
 import com.shuyu.gsyvideoplayer.player.PlayerFactory
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.bean.LaunchVideoParams
+import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.player.MyGSYVideoPlayer
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.UserSessionManager
+import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.launch
 import okhttp3.Interceptor
 import okhttp3.MediaType
@@ -217,29 +220,40 @@ class VideoActivity : AppCompatActivity() {
     @Volatile
     private var isReloadingVideo = false
     private lateinit var videoPlayer: MyGSYVideoPlayer
-    private val videoInfo: VideoInfoBean by lazy {
+    private val launchVideoParams: LaunchVideoParams by lazy {
         Gson().fromJson(
-            intent.getStringExtra("bean")!!, VideoInfoBean::class.java
+            intent.getStringExtra("bean")!!, LaunchVideoParams::class.java
         )
     }
-    private val isAutoRotate by lazy {
-        videoInfo.isAutoRotate
+    internal val fileRepository: FileRepository by lazy {
+        FileRepository.getInstance()
     }
+    private val videoAttribute by lazy {
+        launchVideoParams.videoAttribute
+    }
+    private lateinit var videoInfo: VideoInfoBean
 
+    private val isAutoRotate by lazy {
+        videoAttribute.isAutoRotate
+    }
     private val videoLinkMode by lazy {
-        videoInfo.videoLinkMode
+        videoAttribute.videoLinkMode
     }
     private val autoJumpRetry by lazy {
-        videoInfo.autoJumpRetry
+        videoAttribute.autoJumpRetry
     }
     private val hideLoading by lazy {
-        videoInfo.hideLoading
+        videoAttribute.hideLoading
     }
+    private var fileBeanIndex = -1
+    private val videoHistoryMap = mutableMapOf<String, VideoBean>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_video)
+        videoInfo = launchVideoParams.videoInfo
+        fileBeanIndex = videoInfo.index
         val headerMap = hashMapOf(
             "cookie" to UserSessionManager.cookie,
             "User-Agent" to ConfigKeyUtil.USER_AGENT
@@ -270,6 +284,13 @@ class VideoActivity : AppCompatActivity() {
             //设置返回按键功能
             backButton.setOnClickListener {
                 back()
+            }
+            // 上一集 / 下一集
+            findViewById<View>(R.id.prev_episode)?.setOnClickListener {
+                playNextVideo(false)
+            }
+            findViewById<View>(R.id.next_episode)?.setOnClickListener {
+                playNextVideo(true)
             }
         }
 
@@ -324,21 +345,23 @@ class VideoActivity : AppCompatActivity() {
 
 
     private fun back(nav: String = "", toast: String = "", resultCode: Int = RESULT_OK) {
-        val currentDuration = (videoPlayer.currentPositionWhenPlaying / 1000).toInt()
-        val fileBeanIndex = intent.getIntExtra("fileBeanIndex", -1)
-        // 1. 创建一个新的 Intent 用来装载要返回的数据
-        val returnIntent = Intent().apply {
-            putExtra("current_time", currentDuration)
-            putExtra("fileBeanIndex", fileBeanIndex)
-            putExtra("pickCode", videoInfo.pickCode)
-            putExtra("nav", nav)
-            putExtra("toast", toast)
+        lifecycleScope.launch {
+            //只看了一个视频
+            if (videoHistoryMap.isEmpty()) {
+                updateVideoHistory()
+            }
+            val videoHistoryMapJson = Gson().toJson(videoHistoryMap)
+            val returnIntent = Intent().apply {
+                putExtra("videoHistory", videoHistoryMapJson)
+                putExtra("nav", nav)
+                putExtra("toast", toast)
+            }
+            // 2. 设置结果码为 RESULT_OK，并传入 Intent
+            setResult(resultCode, returnIntent)
+            //释放所有
+            videoPlayer.setVideoAllCallBack(null);
+            finish()
         }
-        // 2. 设置结果码为 RESULT_OK，并传入 Intent
-        setResult(resultCode, returnIntent)
-        //释放所有
-        videoPlayer.setVideoAllCallBack(null);
-        finish()
     }
 
 
@@ -392,7 +415,7 @@ class VideoActivity : AppCompatActivity() {
                 )
                 if (errorBody.isEmpty()) {
                     if (!videoLinkMode && autoJumpRetry) {
-                        playNewVideo()
+                        rePlayNewVideo()
                         return@VideoErrorInterceptor true
                     }
 
@@ -466,20 +489,92 @@ class VideoActivity : AppCompatActivity() {
         })
     }
 
-    fun playNewVideo() {
+    fun rePlayNewVideo() {
         // 如果已经在重新获取链接中，直接跳过
         if (isReloadingVideo) return
         isReloadingVideo = true
         App.instance.toast("视频地址错误！正在重新获取新链接")
         lifecycleScope.launch {
             try {
-                val fileRepository = FileRepository.getInstance()
                 val video = fileRepository.video(videoInfo.pickCode)
                 XLog.i("playNewVideo $video")
                 this@VideoActivity.videoPlayer.playNext(video.downloadUrl, video.fileName)
             } catch (e: Exception) {
                 isReloadingVideo = false // 异常时重置标志位
             }
+        }
+    }
+
+    fun playNextVideo(isNext: Boolean) {
+        if (isNext) {
+            fileBeanIndex -= 1
+        } else {
+            fileBeanIndex += 1
+        }
+        val fileBean = launchVideoParams.videoList.getOrNull(fileBeanIndex)
+        if (fileBean == null) {
+            App.instance.toast("找不到新视频")
+            if (isNext) {
+                //下一个按钮disable
+                // TODO()
+            } else {
+                //上一个按钮disable
+                // TODO()
+            }
+            return
+        }
+        lifecycleScope.launch {
+            runCatching {
+                updateVideoHistory()
+
+                val pickCode = fileBean.pickCode
+                val name = fileBean.name
+                val video = if (videoLinkMode) {
+                    fileRepository.video(pickCode)
+                } else {
+                    val (width, height) = if (this@VideoActivity.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
+                        1080 to 1920
+                    } else {
+                        1920 to 1080
+                    }
+                    VideoInfoBean(
+                        width = width,
+                        height = height,
+                        index = fileBeanIndex,
+                        fileName = name,
+                        pickCode = pickCode,
+                        videoUrl = "http://115.com/api/video/m3u8/${pickCode}.m3u8"
+                    )
+                }
+                videoInfo = video
+                this@VideoActivity.videoPlayer.playNext(video.videoUrl, video.fileName)
+            }.onFailureToastAndLog()
+        }
+    }
+
+    suspend fun updateVideoHistory() {
+        val currentDuration = (videoPlayer.currentPositionWhenPlaying / 1000).toInt()
+        val pickCode = videoInfo.pickCode
+        val name = videoInfo.fileName
+        val bean = VideoBean(currentDuration, pickCode)
+        videoHistoryMap[pickCode] = bean
+
+        val map = mapOf(
+            "op" to "update",
+            "pick_code" to pickCode,
+            "time" to currentDuration.toString(),
+            "category" to "1",
+            "format" to "json"
+        )
+        runCatching {
+            val videoHistory = fileRepository.videoHistory(map)
+            if (!videoHistory.state) {
+                XLog.e("更新视频时间失败！ name: $name, pickCode: $pickCode, result: $videoHistory")
+            } else {
+                XLog.d("更新视频时间成功 name: $name, pickCode: $pickCode, result: $videoHistory")
+            }
+        }.onFailure { e ->
+            XLog.e("更新视频时间异常 name: $name, pickCode: $pickCode", e)
         }
     }
 

@@ -41,6 +41,7 @@ import coil.annotation.ExperimentalCoilApi
 import coil.imageLoader
 import coil.memory.MemoryCache
 import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
 import github.zerorooot.nap511.bean.FileBannerActions
@@ -54,9 +55,10 @@ import github.zerorooot.nap511.bean.FilePathActions
 import github.zerorooot.nap511.bean.FileScaffoldActions
 import github.zerorooot.nap511.bean.FileScaffoldState
 import github.zerorooot.nap511.bean.ForceOpenType
+import github.zerorooot.nap511.bean.LaunchVideoParams
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
-import github.zerorooot.nap511.bean.VideoInfoBean
+import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.dialog.ForceOpenDialog
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
@@ -80,8 +82,9 @@ import github.zerorooot.nap511.viewmodel.openUnzipAllFileDialog
 import github.zerorooot.nap511.viewmodel.removeFile
 import github.zerorooot.nap511.viewmodel.startSendAria2Service
 import github.zerorooot.nap511.viewmodel.unzipFile
-import github.zerorooot.nap511.viewmodel.updateVideoFileBean
+import github.zerorooot.nap511.viewmodel.updateVideoFileBeans
 import kotlinx.coroutines.launch
+import java.lang.reflect.Type
 
 @OptIn(
     ExperimentalFoundationApi::class,
@@ -219,11 +222,19 @@ fun FileScreen(
     ) { result ->
         val data = result.data
         if (result.resultCode == Activity.RESULT_OK) {
-            val index = data?.getIntExtra("fileBeanIndex", -1) ?: -1
-            val duration = data?.getIntExtra("current_time", 0) ?: 0
-            val pickCode = data?.getStringExtra("pickCode") ?: "0"
-            fileViewModel.updateVideoFileBean(fileViewModel.currentCid, index, duration, pickCode)
+            val videoHistoryJson = data?.getStringExtra("videoHistory") ?: "{}"
+            val type: Type = object : TypeToken<MutableMap<String, VideoBean>>() {}.type
+            val videoHistoryMap: MutableMap<String, VideoBean> =
+                Gson().fromJson(videoHistoryJson, type) ?: mutableMapOf()
+
+            if (videoHistoryMap.isNotEmpty()) {
+                fileViewModel.updateVideoFileBeans(
+                    fileViewModel.currentCid,
+                    videoHistoryMap
+                )
+            }
         }
+
         if (result.resultCode == Activity.RESULT_CANCELED) {
             val nav = data?.getStringExtra("nav") ?: ""
             if (nav == "VerifyVideoAccount") {
@@ -237,11 +248,11 @@ fun FileScreen(
     }
 
     LaunchedEffect(Unit) {
-        fileViewModel.launchVideoEvent.collect { videoDate ->
-            val videoInfoBeanJson = Gson().toJson(videoDate, VideoInfoBean::class.java)
+        fileViewModel.launchVideoEvent.collect { launchVideoParams ->
+            val launchVideoParamsJson =
+                Gson().toJson(launchVideoParams, LaunchVideoParams::class.java)
             val intent = Intent(context, VideoActivity::class.java).apply {
-                putExtra("fileBeanIndex", videoDate.index)
-                putExtra("bean", videoInfoBeanJson)
+                putExtra("bean", launchVideoParamsJson)
             }
             videoActivityLauncher.launch(intent)
         }
@@ -286,7 +297,7 @@ fun FileScreen(
             ) {
                 fileViewModel.setRefreshingStatus(true)
                 when (it) {
-                    ForceOpenType.VIDEO -> clickHandler.handleVideoClick(showForceOpenDialog, bean)
+                    ForceOpenType.VIDEO -> clickHandler.handleVideoClick(bean)
                     ForceOpenType.AUDIO -> clickHandler.handleAudioClick(bean)
                     ForceOpenType.IMAGE -> clickHandler.handlePhotoClick(bean)
                     ForceOpenType.TEXT -> clickHandler.handleTextClick(showForceOpenDialog, bean)
