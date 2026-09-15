@@ -104,6 +104,9 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
     private val videoManger: AudioGSYManager = AudioGSYManager.instance()
 
+    val durationMs: Long
+        get() = videoManger.duration.coerceAtLeast(0L)
+
     private val listener = object : GSYMediaPlayerListener {
         override fun onPrepared() {
             viewModelScope.launch {
