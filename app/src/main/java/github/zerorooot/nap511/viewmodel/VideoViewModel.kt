@@ -1,15 +1,19 @@
 package github.zerorooot.nap511.viewmodel
 
 import android.app.Activity
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import github.zerorooot.nap511.bean.LaunchVideoParams
+import github.zerorooot.nap511.bean.SubtitleItem
+import github.zerorooot.nap511.bean.SubtitleStyleBean
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.repository.FileRepository
+import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.network.parseOssErrorWithDom
 import github.zerorooot.nap511.util.onFailureToastAndLog
@@ -21,6 +25,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import okhttp3.MediaType
+import java.io.File
 
 sealed class VideoUiEvent {
     data class PlayNext(val videoUrl: String, val title: String) : VideoUiEvent()
@@ -37,6 +42,8 @@ sealed class VideoUiEvent {
 class VideoViewModel(
     internal val fileRepository: FileRepository = FileRepository.getInstance()
 ) : ViewModel() {
+
+    internal val subtitleRepository: SubtitleRepository = SubtitleRepository.getInstance()
 
     lateinit var launchVideoParams: LaunchVideoParams
         private set
@@ -58,6 +65,25 @@ class VideoViewModel(
 
     private val _uiEvent = MutableSharedFlow<VideoUiEvent>()
     val uiEvent: SharedFlow<VideoUiEvent> = _uiEvent.asSharedFlow()
+
+    // --- 字幕管理 StateFlow 状态 ---
+    private val _subtitles = MutableStateFlow<List<SubtitleItem>>(emptyList())
+    val subtitles: StateFlow<List<SubtitleItem>> = _subtitles.asStateFlow()
+
+    private val _selectedSubtitle = MutableStateFlow<SubtitleItem?>(null)
+    val selectedSubtitle: StateFlow<SubtitleItem?> = _selectedSubtitle.asStateFlow()
+
+    private val _subtitleOffsetMs = MutableStateFlow(0L)
+    val subtitleOffsetMs: StateFlow<Long> = _subtitleOffsetMs.asStateFlow()
+
+    private val _subtitleStyle = MutableStateFlow(SubtitleStyleBean())
+    val subtitleStyle: StateFlow<SubtitleStyleBean> = _subtitleStyle.asStateFlow()
+
+    private val _isSubtitleLoading = MutableStateFlow(false)
+    val isSubtitleLoading: StateFlow<Boolean> = _isSubtitleLoading.asStateFlow()
+
+    private val _defaultSearchKeyword = MutableStateFlow("")
+    val defaultSearchKeyword: StateFlow<String> = _defaultSearchKeyword.asStateFlow()
 
     val videoAttribute by lazy { launchVideoParams.videoAttribute }
     val isAutoRotate by lazy { videoAttribute.isAutoRotate }
@@ -253,5 +279,108 @@ class VideoViewModel(
             }
 
         return false
+    }
+
+    // --- 字幕业务函数 ---
+
+    /**
+     * 首次或默认初始化加载字幕列表（从迅雷 API 与 115 同目录获取）
+     */
+    fun loadSubtitles(videoDurationMs: Long) {
+        val currentInfo = _videoInfo.value ?: return
+        val videoName = currentInfo.fileName
+        val parentCid = currentInfo.parentId
+
+        // 默认将视频文件名去除后缀作为初始搜索关键字
+        val keyword = if (videoName.contains(".")) {
+            videoName.substringBeforeLast(".")
+        } else {
+            videoName
+        }
+        _defaultSearchKeyword.value = keyword
+
+        viewModelScope.launch {
+            _isSubtitleLoading.value = true
+            runCatching {
+                val list = subtitleRepository.getSubtitles(
+                    searchKeyword = keyword,
+                    parentCid = parentCid,
+                    videoDurationMs = videoDurationMs
+                )
+                _subtitles.value = list
+            }.onFailure { e ->
+                XLog.e("加载字幕列表失败", e)
+            }
+            _isSubtitleLoading.value = false
+        }
+    }
+
+    /**
+     * 根据自定义输入的关键字进行字幕搜索
+     */
+    fun searchSubtitlesByName(keyword: String, videoDurationMs: Long) {
+        if (keyword.isBlank()) return
+        val currentInfo = _videoInfo.value ?: return
+        val parentCid = currentInfo.parentId
+
+        viewModelScope.launch {
+            _isSubtitleLoading.value = true
+            runCatching {
+                val list = subtitleRepository.getSubtitles(
+                    searchKeyword = keyword,
+                    parentCid = parentCid,
+                    videoDurationMs = videoDurationMs
+                )
+                _subtitles.value = list
+            }.onFailure { e ->
+                XLog.e("自定义关键字搜索字幕失败: $keyword", e)
+            }
+            _isSubtitleLoading.value = false
+        }
+    }
+
+    /**
+     * 下载选中的字幕文件并回调准备好的本地 File
+     */
+    fun selectSubtitle(context: Context, item: SubtitleItem, onReady: (File) -> Unit) {
+        viewModelScope.launch {
+            //_isSubtitleLoading.value = true
+            val file = subtitleRepository.downloadAndPrepareSubtitle(context, item)
+            //_isSubtitleLoading.value = false
+            if (file != null) {
+                _selectedSubtitle.value = item
+                onReady(file)
+            } else {
+                _uiEvent.emit(VideoUiEvent.Toast("下载或格式转换字幕失败: ${item.simpleName}"))
+            }
+        }
+    }
+
+    /**
+     * 设置精确的时间偏移量 (ms)
+     */
+    fun setSubtitleOffset(offsetMs: Long) {
+        _subtitleOffsetMs.value = offsetMs
+    }
+
+    /**
+     * 微调时间偏移量 (ms)
+     */
+    fun addSubtitleOffset(deltaMs: Long) {
+        _subtitleOffsetMs.value += deltaMs
+    }
+
+    /**
+     * 更新字幕样式（字号、颜色、字体、加粗、底色）
+     */
+    fun updateSubtitleStyle(styleBean: SubtitleStyleBean) {
+        _subtitleStyle.value = styleBean
+    }
+
+    /**
+     * 清除/移除当前字幕
+     */
+    fun removeSubtitle() {
+        _selectedSubtitle.value = null
     }
 }

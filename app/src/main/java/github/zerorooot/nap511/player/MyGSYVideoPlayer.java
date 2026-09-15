@@ -3,17 +3,18 @@ package github.zerorooot.nap511.player;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Typeface;
 import android.os.BatteryManager;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
-import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.TextView;
 
 import com.elvishew.xlog.XLog;
+import com.shuyu.gsyvideoplayer.subtitle.GSYSubtitleStyle;
 import com.shuyu.gsyvideoplayer.utils.CommonUtil;
 import com.shuyu.gsyvideoplayer.utils.GSYVideoType;
 import com.shuyu.gsyvideoplayer.video.StandardGSYVideoPlayer;
@@ -24,24 +25,23 @@ import java.util.Locale;
 import java.util.Objects;
 
 import github.zerorooot.nap511.R;
+import github.zerorooot.nap511.bean.SubtitleStyleBean;
 
 public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     private TextView mMoreScale;
     private TextView switchSpeed;
-    private TextView switchEpisode;
 
     // 统一的合并抽屉面板组件
     private View layoutDrawer;
     private TextView tvDrawerTitle;
-    private View closeDrawer;
     private DrawerType mCurrentDrawerType = null;
     private OnDrawerOpenListener mOnDrawerOpenListener;
 
     /**
-     * 抽屉类型枚举：选集、倍速、画面比例
+     * 抽屉类型枚举：选集、倍速、画面比例、字幕
      */
     public enum DrawerType {
-        EPISODE, SPEED, SCALE
+        EPISODE, SPEED, SCALE, SUBTITLE
     }
 
     /**
@@ -116,12 +116,13 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
 
         mMoreScale = findViewById(R.id.moreScale);
         switchSpeed = findViewById(R.id.switchSpeed);
-        switchEpisode = findViewById(R.id.switchEpisode);
+        TextView switchEpisode = findViewById(R.id.switchEpisode);
+        TextView switchSubtitle = findViewById(R.id.switchSubtitle);
 
         // 绑定统一的右侧抽屉面板及其组件
         layoutDrawer = findViewById(R.id.layout_drawer);
         tvDrawerTitle = findViewById(R.id.tv_drawer_title);
-        closeDrawer = findViewById(R.id.close_drawer);
+        View closeDrawer = findViewById(R.id.close_drawer);
 
         // 底部各按钮绑定点击事件，打开对应类型的抽屉
         if (switchEpisode != null) {
@@ -132,6 +133,9 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         }
         if (mMoreScale != null) {
             mMoreScale.setOnClickListener(v -> openDrawer(DrawerType.SCALE, "画面比例"));
+        }
+        if (switchSubtitle != null) {
+            switchSubtitle.setOnClickListener(v -> openDrawer(DrawerType.SUBTITLE, "字幕 " + mTitleTextView.getText() + " " + CommonUtil.stringForTime(getDuration())));
         }
 
         // 抽屉关闭按钮事件
@@ -331,6 +335,24 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     public void setSpeedText(String text) {
         if (switchSpeed != null) {
             switchSpeed.setText(text);
+        }
+    }
+
+    /**
+     * 应用字幕样式设置 (字号、颜色、背景色、字体、加粗)
+     */
+    public void applySubtitleStyle(SubtitleStyleBean styleBean) {
+        if (styleBean == null) return;
+        GSYSubtitleStyle style = new GSYSubtitleStyle.Builder()
+                .setTextSizeSp(styleBean.getTextSizeSp())
+                .setTextColor(styleBean.getTextColor())
+                .setBackgroundColor(styleBean.getBackgroundColor())
+                .build();
+        setSubtitleStyle(style);
+
+        if (mSubtitleView != null) {
+            int styleFlags = styleBean.isBold() ? Typeface.BOLD : Typeface.NORMAL;
+            mSubtitleView.setTypeface(styleBean.getFontFamily().getTypeface(), styleFlags);
         }
     }
 

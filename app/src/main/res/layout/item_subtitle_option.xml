@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/card_subtitle"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="4dp"
+    android:layout_marginVertical="4dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground"
+    app:cardBackgroundColor="#1AFFFFFF"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="0dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="8dp">
+
+        <TextView
+            android:id="@+id/tv_subtitle_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textColor="#D0FFFFFF"
+            android:textSize="13sp"
+            tools:text="Game.of.Thrones.S04E10.1080p.srt" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <!-- 来源标签 (迅雷 / 115网盘) -->
+            <TextView
+                android:id="@+id/tv_subtitle_source"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="#3342A5F5"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:textColor="#42A5F5"
+                android:textSize="10sp"
+                tools:text="迅雷" />
+
+            <!-- 格式扩展名 -->
+            <TextView
+                android:id="@+id/tv_subtitle_ext"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:textColor="#80FFFFFF"
+                android:textSize="11sp"
+                tools:text="SRT" />
+
+            <!-- 时长 -->
+            <TextView
+                android:id="@+id/tv_subtitle_duration"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:gravity="end"
+                android:textColor="#80FFFFFF"
+                android:textSize="11sp"
+                tools:text="01:04:39" />
+        </LinearLayout>
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>
