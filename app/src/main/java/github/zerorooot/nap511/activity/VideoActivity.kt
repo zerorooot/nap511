@@ -242,7 +242,7 @@ class VideoActivity : AppCompatActivity() {
                     MyGSYVideoPlayer.DrawerType.SUBTITLE -> {
                         layoutSubtitlePanel?.visibility = View.VISIBLE
                         rvDrawer.adapter = subtitleAdapter
-                        if (viewModel.uiState.value.subtitles.isEmpty()) {
+                        if (!viewModel.uiState.value.searchedSubtitle) {
                             viewModel.loadSubtitles(videoPlayer.duration)
                         }
                         val etSearch = videoPlayer.findViewById<EditText>(R.id.et_subtitle_search)
@@ -303,7 +303,7 @@ class VideoActivity : AppCompatActivity() {
                         updateSubtitleStyleButtonVisuals(state.subtitleStyle)
 
                         val etSearch = videoPlayer.findViewById<EditText>(R.id.et_subtitle_search)
-                        if (etSearch != null && etSearch.text.isNullOrEmpty()) {
+                        if (etSearch != null) {
                             etSearch.setText(state.defaultSearchKeyword)
                         }
                     }

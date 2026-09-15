@@ -1,7 +1,6 @@
 package github.zerorooot.nap511.viewmodel
 
 import android.app.Activity
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elvishew.xlog.XLog
@@ -107,6 +106,7 @@ class VideoViewModel : ViewModel() {
             App.instance.toast("找不到视频")
             return
         }
+        val videoName = fileBean.name
         val listSize = launchVideoParams.videoList.size
         _uiState.update { currentState ->
             currentState.copy(
@@ -115,6 +115,13 @@ class VideoViewModel : ViewModel() {
                 hasNext = targetIndex + 1 in 0 until listSize
             )
         }
+        // 默认将视频文件名去除后缀作为初始搜索关键字
+        val keyword = if (videoName.contains(".")) {
+            videoName.substringBeforeLast(".")
+        } else {
+            videoName
+        }
+
 
         viewModelScope.launch {
             runCatching {
@@ -139,7 +146,13 @@ class VideoViewModel : ViewModel() {
                         videoUrl = "http://115.com/api/video/m3u8/${pickCode}.m3u8"
                     )
                 }
-                _uiState.update { it.copy(videoInfo = video) }
+                _uiState.update {
+                    it.copy(
+                        videoInfo = video,
+                        searchedSubtitle = false,
+                        defaultSearchKeyword = keyword,
+                    )
+                }
                 _uiEvent.emit(VideoUiEvent.PlayNext(video.videoUrl, video.fileName))
             }.onFailureToastAndLog()
         }
@@ -280,7 +293,13 @@ class VideoViewModel : ViewModel() {
                     oneOneFiveSubtitles = launchVideoParams.localSubtitleItem,
                     videoDurationMs = videoDurationMs
                 )
-                _uiState.update { it.copy(subtitles = list, isSubtitleLoading = false) }
+                _uiState.update {
+                    it.copy(
+                        subtitles = list,
+                        isSubtitleLoading = false,
+                        searchedSubtitle = true
+                    )
+                }
             }.onFailure { e ->
                 XLog.e("加载字幕列表失败", e)
                 _uiState.update { it.copy(isSubtitleLoading = false) }
