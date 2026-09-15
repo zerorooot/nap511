@@ -177,7 +177,7 @@ internal fun FileViewModel.getVideoInfo(fileBean: FileBean) {
     val fileName = fileBean.name
     val videoList = fileBeanList.filter { it.isVideo == 1 && it.playLong != 0.0 }
         .map { VideoBean(name = it.name, pickCode = it.pickCode, fileId = fileBean.fileId) }
-
+    val fileBeanIndex = videoList.indexOfFirst { it.pickCode == pickCode }
 
     val localSubtitleList = fileBeanList.filter { fileBean ->
         !fileBean.isFolder && isSubtitleFile(fileBean.name)
@@ -197,7 +197,6 @@ internal fun FileViewModel.getVideoInfo(fileBean: FileBean) {
         )
     }
 
-    val fileBeanIndex = videoList.indexOfFirst { it.pickCode == pickCode }
 
 
     viewModelScope.launch {
@@ -210,8 +209,8 @@ internal fun FileViewModel.getVideoInfo(fileBean: FileBean) {
             )
             val video = if (settingUiState.videoLinkMode) {
                 fileRepository.video(pickCode).copy(
-                        index = fileBeanIndex,
-                    )
+                    index = fileBeanIndex,
+                )
             } else {
                 val (width, height) = if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
                     1080 to 1920
