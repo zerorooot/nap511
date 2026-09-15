@@ -69,14 +69,15 @@ fun MusicDetailScreen(
     audioViewModel: AudioViewModel,
     onBack: () -> Unit
 ) {
-    val fileBean = audioViewModel.currentMusic ?: return
-    val isPlaying = audioViewModel.isPlaying
-    val isLoading = audioViewModel.isLoading
-    val progress =
-        if (audioViewModel.isUserSeeking) audioViewModel.userSeekProgress else audioViewModel.progress
-    val positionText = audioViewModel.currentPositionText
-    val speed = audioViewModel.playbackSpeed
-    val volume = audioViewModel.volume
+    val playbackState = audioViewModel.uiState.playback
+    val subtitleState = audioViewModel.uiState.subtitle
+    val fileBean = playbackState.currentMusic ?: return
+    val isPlaying = playbackState.isPlaying
+    val isLoading = playbackState.isLoading
+    val progress = playbackState.displayProgress
+    val positionText = playbackState.currentPositionText
+    val speed = playbackState.playbackSpeed
+    val volume = playbackState.volume
 
     // 控制字幕选择 BottomSheet 显隐
     var showSubtitleSheet by remember { mutableStateOf(false) }
@@ -97,7 +98,7 @@ fun MusicDetailScreen(
                         Icon(
                             Icons.Default.Subtitles,
                             contentDescription = "Subtitles",
-                            tint = if (audioViewModel.selectedSubtitle != null) {
+                            tint = if (subtitleState.selectedSubtitle != null) {
                                 MaterialTheme.colorScheme.primary
                             } else {
                                 MaterialTheme.colorScheme.onPrimaryContainer
@@ -140,8 +141,8 @@ fun MusicDetailScreen(
                         ) { isLyrics ->
                             if (isLyrics) {
                                 FullLyricsView(
-                                    entries = audioViewModel.subtitleEntries,
-                                    currentIndex = audioViewModel.currentSubtitleIndex,
+                                    entries = subtitleState.entries,
+                                    currentIndex = subtitleState.currentIndex,
                                     onEntryClick = { audioViewModel.seekToSubtitleEntry(it) },
                                     onClose = { showFullLyrics = false },
                                     modifier = Modifier.fillMaxSize()
@@ -153,7 +154,7 @@ fun MusicDetailScreen(
                                         .aspectRatio(1f)
                                         .fillMaxHeight()
                                         .clickable {
-                                            if (audioViewModel.selectedSubtitle != null) {
+                                            if (subtitleState.selectedSubtitle != null) {
                                                 showFullLyrics = true
                                             } else {
                                                 showSubtitleSheet = true
@@ -178,8 +179,8 @@ fun MusicDetailScreen(
                         Spacer(modifier = Modifier.height(12.dp))
 
                         SubtitleDisplay(
-                            subtitleText = audioViewModel.currentSubtitleText,
-                            hasSelectedSubtitle = audioViewModel.selectedSubtitle != null,
+                            subtitleText = subtitleState.currentText,
+                            hasSelectedSubtitle = subtitleState.selectedSubtitle != null,
                             onOpenSubtitleSheet = { showSubtitleSheet = true },
                             onToggleFullLyrics = { showFullLyrics = !showFullLyrics }
                         )
@@ -195,7 +196,7 @@ fun MusicDetailScreen(
                         PlaybackProgress(
                             progress = progress,
                             positionText = positionText,
-                            isUserSeeking = audioViewModel.isUserSeeking,
+                            isUserSeeking = playbackState.isUserSeeking,
                             onSeekStart = { audioViewModel.onSeekStart() },
                             onSeekChange = { audioViewModel.onSeekChange(it) },
                             onSeekEnd = { audioViewModel.onSeekEnd() }
@@ -233,8 +234,8 @@ fun MusicDetailScreen(
                         ) { isLyrics ->
                             if (isLyrics) {
                                 FullLyricsView(
-                                    entries = audioViewModel.subtitleEntries,
-                                    currentIndex = audioViewModel.currentSubtitleIndex,
+                                    entries = subtitleState.entries,
+                                    currentIndex = subtitleState.currentIndex,
                                     onEntryClick = { audioViewModel.seekToSubtitleEntry(it) },
                                     onClose = { showFullLyrics = false },
                                     modifier = Modifier.fillMaxSize()
@@ -245,7 +246,7 @@ fun MusicDetailScreen(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .clickable {
-                                            if (audioViewModel.selectedSubtitle != null) {
+                                            if (subtitleState.selectedSubtitle != null) {
                                                 showFullLyrics = true
                                             } else {
                                                 showSubtitleSheet = true
@@ -259,8 +260,8 @@ fun MusicDetailScreen(
                     MusicInfo(fileBean = fileBean)
 
                     SubtitleDisplay(
-                        subtitleText = audioViewModel.currentSubtitleText,
-                        hasSelectedSubtitle = audioViewModel.selectedSubtitle != null,
+                        subtitleText = subtitleState.currentText,
+                        hasSelectedSubtitle = subtitleState.selectedSubtitle != null,
                         onOpenSubtitleSheet = { showSubtitleSheet = true },
                         onToggleFullLyrics = { showFullLyrics = !showFullLyrics },
                         modifier = Modifier.padding(vertical = 8.dp)
@@ -276,7 +277,7 @@ fun MusicDetailScreen(
                     PlaybackProgress(
                         progress = progress,
                         positionText = positionText,
-                        isUserSeeking = audioViewModel.isUserSeeking,
+                        isUserSeeking = playbackState.isUserSeeking,
                         onSeekStart = { audioViewModel.onSeekStart() },
                         onSeekChange = { audioViewModel.onSeekChange(it) },
                         onSeekEnd = { audioViewModel.onSeekEnd() }

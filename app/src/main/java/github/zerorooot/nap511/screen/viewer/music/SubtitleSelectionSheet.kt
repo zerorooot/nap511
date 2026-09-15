@@ -63,16 +63,17 @@ fun SubtitleSelectionSheet(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val musicName = audioViewModel.currentMusic?.name ?: ""
+    val subtitleState = audioViewModel.uiState.subtitle
+    val musicName = audioViewModel.uiState.playback.currentMusic?.name ?: ""
 
     SubtitleSelectionSheet(
         musicName = musicName,
-        subtitles = audioViewModel.subtitles,
+        subtitles = subtitleState.subtitles,
         musicDurationMs = audioViewModel.durationMs,
-        selectedSubtitle = audioViewModel.selectedSubtitle,
-        subtitleOffsetMs = audioViewModel.subtitleOffsetMs,
-        isSubtitleSearchLoading = audioViewModel.isSubtitleSearchLoading,
-        isSubtitleLoading = audioViewModel.isSubtitleLoading,
+        selectedSubtitle = subtitleState.selectedSubtitle,
+        subtitleOffsetMs = subtitleState.offsetMs,
+        isSubtitleSearchLoading = subtitleState.isSearchLoading,
+        isSubtitleLoading = subtitleState.isLoading,
         onSearch = { keyword -> audioViewModel.loadSubtitles(searchKeyword = keyword) },
         onAddSubtitleOffset = { offset -> audioViewModel.addSubtitleOffset(offset) },
         onSetSubtitleOffset = { offset -> audioViewModel.setSubtitleOffset(offset) },

@@ -524,7 +524,7 @@ fun FileScreen(
         isExpandedScreen = isExpandedScreen,
         isBottomBarShow = isBottomBarShow,
         isTopBarShow = isTopBarShow,
-        hasCurrentMusic = audioViewModel.currentMusic != null,
+        hasCurrentMusic = audioViewModel.uiState.playback.currentMusic != null,
         isCutState = fileViewModel.isCutState,
         fabPosition = fabPosition,
         nestedScrollConnection = nestedScrollConnection,

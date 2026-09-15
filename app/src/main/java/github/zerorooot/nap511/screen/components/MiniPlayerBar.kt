@@ -42,14 +42,9 @@ import github.zerorooot.nap511.viewmodel.AudioViewModel
 fun MiniPlayerBar(
     audioViewModel: AudioViewModel, modifier: Modifier = Modifier, musicOnClick: () -> Unit
 ) {
-    val fileBean = audioViewModel.currentMusic ?: return
+    val playbackState = audioViewModel.uiState.playback
+    val fileBean = playbackState.currentMusic ?: return
 
-    // 如果处于用户拖动状态，优先显示用户拖拽的进度，否则显示播放器真实进度
-    val displayProgress = if (audioViewModel.isUserSeeking) {
-        audioViewModel.userSeekProgress
-    } else {
-        audioViewModel.progress
-    }
     val onClickEvent: ((String) -> Unit) = {
         when (it) {
             "onSeekStart" -> audioViewModel.onSeekStart()
@@ -63,11 +58,11 @@ fun MiniPlayerBar(
 
     MiniPlayerBarContent(
         fileBean = fileBean,
-        isPlaying = audioViewModel.isPlaying,
-        isLoading = audioViewModel.isLoading,
-        progress = displayProgress,
-        isUserSeeking = audioViewModel.isUserSeeking,
-        positionText = audioViewModel.currentPositionText,
+        isPlaying = playbackState.isPlaying,
+        isLoading = playbackState.isLoading,
+        progress = playbackState.displayProgress,
+        isUserSeeking = playbackState.isUserSeeking,
+        positionText = playbackState.currentPositionText,
         onSeekChange = { audioViewModel.onSeekChange(it) },
         modifier = modifier,
         musicOnClick = musicOnClick,
