@@ -20,6 +20,8 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.subtitle.SubtitleEntry
 import github.zerorooot.nap511.util.bus.AudioEvent
 import github.zerorooot.nap511.util.bus.AudioEventBus
+import github.zerorooot.nap511.util.bus.DialogEvent
+import github.zerorooot.nap511.util.bus.DialogEventBus
 import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.subtitle.SubtitleDelegate
 import kotlinx.coroutines.Job
@@ -78,9 +80,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     val isUserSeeking: Boolean get() = uiState.playback.isUserSeeking
     val userSeekProgress: Float get() = uiState.playback.userSeekProgress
 
-    val subtitleEntries: List<SubtitleEntry> get() = uiState.subtitle.entries
-    val currentSubtitleText: String get() = uiState.subtitle.currentText
-    val currentSubtitleIndex: Int get() = uiState.subtitle.currentIndex
     val subtitleOffsetMs: Long get() = uiState.subtitle.offsetMs
     val currentLocalSubtitles: List<SubtitleItem> get() = uiState.subtitle.currentLocalSubtitles
 
@@ -381,14 +380,20 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * 上传字幕到 115 同目录
+     * 保存并上传当前字幕（连同本地时间偏移修正）至当前音乐所在的 115 目录
      */
-    fun uploadSubtitleTo115(cacheDirFile: File, item: SubtitleItem, targetCid: String) {
-        subtitleDelegate.uploadSubtitleTo115(
+    fun saveAndUploadCurrentSubtitle(cacheDirFile: File, targetCid: String) {
+        val musicName = currentMusic?.name ?: ""
+        subtitleDelegate.saveAndUploadCurrentSubtitle(
             scope = viewModelScope,
             cacheDirFile = cacheDirFile,
-            item = item,
-            targetCid = targetCid
+            videoFileName = musicName,
+            targetCid = targetCid,
+            onSuccess = {
+                viewModelScope.launch {
+                    DialogEventBus.getInstance().emit(DialogEvent.RefreshFileList(targetCid))
+                }
+            }
         )
     }
 
@@ -416,11 +421,11 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             while (isPlaying) {
                 updateAudioTime()
                 val now = System.currentTimeMillis()
-                if (now - lastNotifyTime >= 1000L) {
+                if (now - lastNotifyTime >= 300L) {
                     notifyServiceUpdateState()
                     lastNotifyTime = now
                 }
-                delay(250.milliseconds)
+                delay(150.milliseconds)
             }
         }
     }

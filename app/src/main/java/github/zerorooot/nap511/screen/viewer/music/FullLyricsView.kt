@@ -104,7 +104,6 @@ fun FullLyricsView(
                         ),
                         color = textColor,
                         modifier = Modifier
-                            .fillMaxWidth()
                             .clickable { onEntryClick(entry) }
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     )

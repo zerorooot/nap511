@@ -184,7 +184,7 @@ class SubtitlePanelController(
             rvDrawer.visibility = View.GONE
         } else if (list.isEmpty()) {
             tvEmpty.visibility = View.VISIBLE
-            tvEmpty.text = "未找到相关字幕，可尝试使用搜索框重新搜索"
+            tvEmpty.text = "未找到相关字幕，请尝试换别的关键字重新搜索"
             rvDrawer.visibility = View.GONE
         } else {
             tvEmpty.visibility = View.GONE

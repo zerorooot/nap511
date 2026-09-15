@@ -66,9 +66,6 @@ fun SubtitleSelectionSheet(
     val context = LocalContext.current
     val subtitleState = audioViewModel.uiState.subtitle
     val musicName = audioViewModel.uiState.playback.currentMusic?.name ?: ""
-    LaunchedEffect(Unit) {
-        audioViewModel.loadSubtitles()
-    }
 
     SubtitleSelectionSheet(
         musicName = musicName,
@@ -83,10 +80,9 @@ fun SubtitleSelectionSheet(
         onSetSubtitleOffset = { offset -> audioViewModel.setSubtitleOffset(offset) },
         onSelectSubtitle = { item -> audioViewModel.selectSubtitle(context.cacheDir, item) },
         onRemoveSubtitle = { audioViewModel.removeSubtitle() },
-        onUploadTo115 = { item ->
-            audioViewModel.uploadSubtitleTo115(
+        onSaveAndUpload = {
+            audioViewModel.saveAndUploadCurrentSubtitle(
                 context.cacheDir,
-                item,
                 categoryId
             )
         },
@@ -115,7 +111,7 @@ fun SubtitleSelectionSheet(
  * @param onSetSubtitleOffset 设置特定字幕偏移量回调
  * @param onSelectSubtitle 选中某条字幕的回调
  * @param onRemoveSubtitle 清除已绑定的字幕回调
- * @param onUploadTo115 上传外源字幕到 115 网盘的回调
+ * @param onSaveAndUpload 上传外源字幕到 115 网盘的回调
  * @param onDismiss 关闭弹窗回调
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -133,7 +129,7 @@ fun SubtitleSelectionSheet(
     onSetSubtitleOffset: (Long) -> Unit,
     onSelectSubtitle: (SubtitleItem) -> Unit,
     onRemoveSubtitle: () -> Unit,
-    onUploadTo115: (SubtitleItem) -> Unit,
+    onSaveAndUpload: () -> Unit,
     onDismiss: () -> Unit
 ) {
     // 默认清除后缀名后的歌曲标题作为搜索关键词
@@ -208,7 +204,7 @@ fun SubtitleSelectionSheet(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-            // 3. 候选字幕列表 Header 及清除按钮
+            // 3. 候选字幕列表 Header 及保存/清除按钮
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -220,8 +216,13 @@ fun SubtitleSelectionSheet(
                 )
 
                 if (selectedSubtitle != null) {
-                    TextButton(onClick = onRemoveSubtitle) {
-                        Text("清除字幕", color = MaterialTheme.colorScheme.error)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = onSaveAndUpload) {
+                            Text("保存当前字幕", color = MaterialTheme.colorScheme.primary)
+                        }
+                        TextButton(onClick = onRemoveSubtitle) {
+                            Text("清除字幕", color = MaterialTheme.colorScheme.error)
+                        }
                     }
                 }
             }
@@ -301,14 +302,6 @@ fun SubtitleSelectionSheet(
                                         modifier = Modifier.size(24.dp),
                                         strokeWidth = 2.dp
                                     )
-                                } else if (item.sourceType == SubtitleSourceType.XUNLEI) {
-                                    IconButton(onClick = { onUploadTo115(item) }) {
-                                        Icon(
-                                            Icons.Default.CloudUpload,
-                                            contentDescription = "Upload to 115",
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
                                 }
                             }
                         }
