@@ -47,7 +47,8 @@ class SubtitleDelegate(
         mediaName: String,
         searchKeyword: String = "",
         localSubtitles: List<SubtitleItem> = state.currentLocalSubtitles,
-        mediaDurationMs: Long = 0L
+        mediaDurationMs: Long = 0L,
+        searchedSubtitle: Boolean = true
     ) {
         updateState { copy(currentLocalSubtitles = localSubtitles) }
         val keyword = searchKeyword.ifBlank {
@@ -55,7 +56,13 @@ class SubtitleDelegate(
         }
         if (keyword.isBlank()) return
 
-        updateState { copy(isSearchLoading = true, isLoading = true, defaultSearchKeyword = keyword) }
+        updateState {
+            copy(
+                isSearchLoading = true,
+                isLoading = true,
+                defaultSearchKeyword = keyword
+            )
+        }
         scope.launch {
             runCatching {
                 val result = subtitleRepository.getSubtitles(
@@ -66,7 +73,7 @@ class SubtitleDelegate(
                 updateState {
                     copy(
                         subtitles = result,
-                        searchedSubtitle = true,
+                        searchedSubtitle = searchedSubtitle,
                         isSearchLoading = false,
                         isLoading = false
                     )
@@ -244,7 +251,7 @@ class SubtitleDelegate(
                 if (result.state) {
                     // 5. 上传成功后，重置本地 offsetMs 归 0（因为偏移量已被应用并固化在上传的文件中）
                     //updateState { copy(offsetMs = 0L) }
-                    App.instance.toast("字幕已成功保存并上传至 115 网盘！")
+                    App.instance.toast("字幕已成功保存并上传至 115 网盘")
                     onSuccess?.invoke()
                 } else {
                     App.instance.toast("保存字幕失败: ${result.message}")

@@ -14,6 +14,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.media3.exoplayer.ExoPlayer
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.shuyu.gsyvideoplayer.GSYVideoManager
@@ -32,7 +33,6 @@ import github.zerorooot.nap511.util.network.isHandledException
 import github.zerorooot.nap511.viewmodel.VideoUiEvent
 import github.zerorooot.nap511.viewmodel.VideoViewModel
 import kotlinx.coroutines.launch
-import androidx.media3.exoplayer.ExoPlayer
 import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
 
 class VideoActivity : AppCompatActivity() {
@@ -99,7 +99,16 @@ class VideoActivity : AppCompatActivity() {
         videoPlayer.startPlayLogic()
 
         subtitlePanelController = SubtitlePanelController(this, videoPlayer, viewModel)
-        videoDrawerController = VideoDrawerController(this, videoPlayer, viewModel, subtitlePanelController)
+        videoDrawerController =
+            VideoDrawerController(this, videoPlayer, viewModel, subtitlePanelController)
+
+        if (launchVideoParams.localSubtitleItem.isNotEmpty()) {
+            viewModel.loadSubtitles(0L, false)
+            subtitlePanelController.applySubtitle(
+                launchVideoParams.localSubtitleItem.first(),
+                showToast = false
+            )
+        }
 
         onBackPressedDispatcher.addCallback(this) {
             if (videoPlayer.isAnyDrawerShowing) {

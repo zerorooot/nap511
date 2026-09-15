@@ -280,13 +280,14 @@ class VideoViewModel : ViewModel() {
     /**
      * 首次或默认初始化加载字幕列表（从迅雷 API 与 115 同目录获取）
      */
-    fun loadSubtitles(videoDurationMs: Long) {
+    fun loadSubtitles(videoDurationMs: Long, searchedSubtitle: Boolean = true) {
         val currentInfo = _uiState.value.videoInfo ?: return
         subtitleDelegate.loadSubtitles(
             scope = viewModelScope,
             mediaName = currentInfo.fileName,
             localSubtitles = launchVideoParams.localSubtitleItem,
-            mediaDurationMs = videoDurationMs
+            mediaDurationMs = videoDurationMs,
+            searchedSubtitle = searchedSubtitle
         )
     }
 
@@ -358,7 +359,8 @@ class VideoViewModel : ViewModel() {
      */
     fun saveAndUploadSubtitle(cacheDirFile: File) {
         val parentCid = launchVideoParams.categoryId
-        val videoFileName = _uiState.value.videoInfo?.fileName ?: launchVideoParams.videoInfo.fileName
+        val videoFileName =
+            _uiState.value.videoInfo?.fileName ?: launchVideoParams.videoInfo.fileName
         subtitleDelegate.saveAndUploadCurrentSubtitle(
             scope = viewModelScope,
             cacheDirFile = cacheDirFile,

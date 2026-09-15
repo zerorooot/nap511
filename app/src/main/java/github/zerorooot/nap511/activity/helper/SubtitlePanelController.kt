@@ -15,6 +15,7 @@ import com.shuyu.gsyvideoplayer.subtitle.GSYSubtitleSource
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.adapter.SubtitleAdapter
 import github.zerorooot.nap511.bean.FontFamilyType
+import github.zerorooot.nap511.bean.SubtitleItem
 import github.zerorooot.nap511.bean.SubtitleStyleBean
 import github.zerorooot.nap511.bean.VideoUiState
 import github.zerorooot.nap511.player.MyGSYVideoPlayer
@@ -54,23 +55,30 @@ class SubtitlePanelController(
             items = uiState.subtitles,
             selectedId = uiState.selectedSubtitle?.id ?: "",
         ) { subtitleItem ->
-            viewModel.selectSubtitle(context.cacheDir, subtitleItem) { srtFile ->
-                val source = GSYSubtitleSource.Builder(Uri.fromFile(srtFile).toString())
-                    .setLabel(subtitleItem.simpleName)
-                    .setId(subtitleItem.id)
-                    .setMimeType(GSYSubtitleMime.APPLICATION_SUBRIP)
-                    .setLanguage("zh")
-                    .setCharsetName("UTF-8")
-                    .setOffsetMs(viewModel.uiState.value.subtitleOffsetMs)
-                    .setDefault(true)
-                    .build()
-                videoPlayer.setSubtitleSource(source)
-                videoPlayer.setSubtitleEnabled(true)
-                App.instance.toast("字幕切换成功")
-            }
+            applySubtitle(subtitleItem, true)
         }
-
         initSubtitleControls()
+    }
+
+    fun applySubtitle(subtitleItem: SubtitleItem, showToast: Boolean = true) {
+        viewModel.selectSubtitle(context.cacheDir, subtitleItem) { srtFile ->
+            val source = GSYSubtitleSource.Builder(Uri.fromFile(srtFile).toString())
+                .setLabel(subtitleItem.simpleName)
+                .setId(subtitleItem.id)
+                .setMimeType(GSYSubtitleMime.APPLICATION_SUBRIP)
+                .setLanguage("zh")
+                .setCharsetName("UTF-8")
+                .setOffsetMs(viewModel.uiState.value.subtitleOffsetMs)
+                .setDefault(true)
+                .build()
+            videoPlayer.setSubtitleSource(source)
+            videoPlayer.setSubtitleEnabled(true)
+//            if (showToast) {
+//                App.instance.toast("字幕切换成功")
+//            } else {
+               // App.instance.toast("自动加载字幕: ${subtitleItem.simpleName}")
+//            }
+        }
     }
 
     private fun initSubtitleControls() {
