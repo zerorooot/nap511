@@ -46,6 +46,7 @@ import github.zerorooot.nap511.adapter.VideoOptionAdapter
 import github.zerorooot.nap511.bean.FontFamilyType
 import github.zerorooot.nap511.bean.LaunchVideoParams
 import github.zerorooot.nap511.bean.SubtitleStyleBean
+import github.zerorooot.nap511.bean.VideoUiState
 import github.zerorooot.nap511.player.MyGSYVideoPlayer
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -161,7 +162,7 @@ class VideoActivity : AppCompatActivity() {
             }
             episodeAdapter = VideoOptionAdapter(
                 options = episodeTitles,
-                selectedIndex = viewModel.fileBeanIndex.value
+                selectedIndex = viewModel.uiState.value.fileBeanIndex
             ) { index, _ ->
                 val isPortrait =
                     resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
@@ -212,7 +213,7 @@ class VideoActivity : AppCompatActivity() {
                 when (type) {
                     MyGSYVideoPlayer.DrawerType.EPISODE -> {
                         rvDrawer.adapter = episodeAdapter
-                        val currentIndex = viewModel.fileBeanIndex.value
+                        val currentIndex = viewModel.uiState.value.fileBeanIndex
                         if (currentIndex >= 0) {
                             rvDrawer.scrollToPosition(currentIndex)
                         }
@@ -229,12 +230,12 @@ class VideoActivity : AppCompatActivity() {
                     MyGSYVideoPlayer.DrawerType.SUBTITLE -> {
                         layoutSubtitlePanel?.visibility = View.VISIBLE
                         rvDrawer.adapter = subtitleAdapter
-                        if (viewModel.subtitles.value.isEmpty()) {
+                        if (viewModel.uiState.value.subtitles.isEmpty()) {
                             viewModel.loadSubtitles(videoPlayer.duration)
                         }
                         val etSearch = videoPlayer.findViewById<EditText>(R.id.et_subtitle_search)
                         if (etSearch != null && etSearch.text.isNullOrEmpty()) {
-                            etSearch.setText(viewModel.defaultSearchKeyword.value)
+                            etSearch.setText(viewModel.uiState.value.defaultSearchKeyword)
                         }
                     }
                 }
@@ -256,67 +257,39 @@ class VideoActivity : AppCompatActivity() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
-                    viewModel.fileBeanIndex.collect { currentIndex ->
+                    viewModel.uiState.collect { state ->
                         if (::episodeAdapter.isInitialized) {
-                            episodeAdapter.updateSelectedIndex(currentIndex)
-                            if (currentIndex >= 0 && videoPlayer.currentDrawerType == MyGSYVideoPlayer.DrawerType.EPISODE) {
+                            episodeAdapter.updateSelectedIndex(state.fileBeanIndex)
+                            if (state.fileBeanIndex >= 0 && videoPlayer.currentDrawerType == MyGSYVideoPlayer.DrawerType.EPISODE) {
                                 videoPlayer.findViewById<RecyclerView>(R.id.rv_drawer)
-                                    ?.scrollToPosition(currentIndex)
+                                    ?.scrollToPosition(state.fileBeanIndex)
                             }
                         }
-                    }
-                }
-                launch {
-                    viewModel.hasPrev.collect { hasPrev ->
                         videoPlayer.findViewById<View>(R.id.prev_episode)?.apply {
-                            isEnabled = hasPrev
-                            alpha = if (hasPrev) 1.0f else 0.3f
+                            isEnabled = state.hasPrev
+                            alpha = if (state.hasPrev) 1.0f else 0.3f
                         }
-                    }
-                }
-                launch {
-                    viewModel.hasNext.collect { hasNext ->
                         videoPlayer.findViewById<View>(R.id.next_episode)?.apply {
-                            isEnabled = hasNext
-                            alpha = if (hasNext) 1.0f else 0.3f
+                            isEnabled = state.hasNext
+                            alpha = if (state.hasNext) 1.0f else 0.3f
                         }
-                    }
-                }
-                launch {
-                    viewModel.subtitles.collect { list ->
-                        subtitleAdapter.updateData(list, viewModel.selectedSubtitle.value?.id ?: "")
-                        updateSubtitleEmptyState()
-                    }
-                }
-                launch {
-                    viewModel.isSubtitleLoading.collect {
-                        updateSubtitleEmptyState()
-                    }
-                }
-                launch {
-                    viewModel.selectedSubtitle.collect { selectedItem ->
-                        subtitleAdapter.updateSelectedId(selectedItem?.id ?: "")
-                    }
-                }
-                launch {
-                    viewModel.subtitleOffsetMs.collect { offsetMs ->
+                        if (::subtitleAdapter.isInitialized) {
+                            subtitleAdapter.updateData(state.subtitles, state.selectedSubtitle?.id ?: "")
+                            subtitleAdapter.updateSelectedId(state.selectedSubtitle?.id ?: "")
+                        }
+                        updateSubtitleEmptyState(state)
+
                         val tvOffsetLabel =
                             videoPlayer.findViewById<TextView>(R.id.tv_subtitle_offset_label)
-                        tvOffsetLabel?.text = "偏移: ${offsetMs}ms"
-                        videoPlayer.setSubtitleOffsetMs(offsetMs)
-                    }
-                }
-                launch {
-                    viewModel.subtitleStyle.collect { styleBean ->
-                        videoPlayer.applySubtitleStyle(styleBean)
-                        updateSubtitleStyleButtonVisuals(styleBean)
-                    }
-                }
-                launch {
-                    viewModel.defaultSearchKeyword.collect { keyword ->
+                        tvOffsetLabel?.text = "偏移: ${state.subtitleOffsetMs}ms"
+                        videoPlayer.setSubtitleOffsetMs(state.subtitleOffsetMs)
+
+                        videoPlayer.applySubtitleStyle(state.subtitleStyle)
+                        updateSubtitleStyleButtonVisuals(state.subtitleStyle)
+
                         val etSearch = videoPlayer.findViewById<EditText>(R.id.et_subtitle_search)
                         if (etSearch != null && etSearch.text.isNullOrEmpty()) {
-                            etSearch.setText(keyword)
+                            etSearch.setText(state.defaultSearchKeyword)
                         }
                     }
                 }
@@ -356,7 +329,7 @@ class VideoActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateSubtitleEmptyState() {
+    private fun updateSubtitleEmptyState(state: VideoUiState = viewModel.uiState.value) {
         val tvEmpty = videoPlayer.findViewById<TextView>(R.id.tv_subtitle_empty) ?: return
         val rvDrawer = videoPlayer.findViewById<RecyclerView>(R.id.rv_drawer) ?: return
 
@@ -366,8 +339,8 @@ class VideoActivity : AppCompatActivity() {
             return
         }
 
-        val isLoading = viewModel.isSubtitleLoading.value
-        val list = viewModel.subtitles.value
+        val isLoading = state.isSubtitleLoading
+        val list = state.subtitles
 
         if (isLoading) {
             tvEmpty.visibility = View.VISIBLE
@@ -421,9 +394,13 @@ class VideoActivity : AppCompatActivity() {
     }
 
     private fun initSubtitleControls() {
+        val uiState = viewModel.uiState.value
         subtitleAdapter = SubtitleAdapter(
-            items = viewModel.subtitles.value,
-            selectedId = viewModel.selectedSubtitle.value?.id ?: ""
+            items = uiState.subtitles,
+            selectedId = uiState.selectedSubtitle?.id ?: "",
+            onUploadClick = { subtitleItem ->
+                viewModel.uploadSubtitle(this, subtitleItem, videoPlayer.duration)
+            }
         ) { subtitleItem ->
             viewModel.selectSubtitle(this, subtitleItem) { srtFile ->
                 val source = GSYSubtitleSource.Builder(android.net.Uri.fromFile(srtFile).toString())
@@ -432,7 +409,7 @@ class VideoActivity : AppCompatActivity() {
                     .setMimeType(GSYSubtitleMime.APPLICATION_SUBRIP)
                     .setLanguage("zh")
                     .setCharsetName("UTF-8")
-                    .setOffsetMs(viewModel.subtitleOffsetMs.value)
+                    .setOffsetMs(viewModel.uiState.value.subtitleOffsetMs)
                     .setDefault(true)
                     .build()
                 videoPlayer.setSubtitleSource(source)
@@ -473,32 +450,32 @@ class VideoActivity : AppCompatActivity() {
 
         sizeMap.forEach { (id, size) ->
             videoPlayer.findViewById<View>(id)?.setOnClickListener {
-                viewModel.updateSubtitleStyle(viewModel.subtitleStyle.value.copy(textSizeSp = size))
+                viewModel.updateSubtitleStyle(viewModel.uiState.value.subtitleStyle.copy(textSizeSp = size))
             }
         }
 
         colorMap.forEach { (id, color) ->
             videoPlayer.findViewById<View>(id)?.setOnClickListener {
-                viewModel.updateSubtitleStyle(viewModel.subtitleStyle.value.copy(textColor = color))
+                viewModel.updateSubtitleStyle(viewModel.uiState.value.subtitleStyle.copy(textColor = color))
             }
         }
 
         fontMap.forEach { (id, font) ->
             videoPlayer.findViewById<View>(id)?.setOnClickListener {
-                viewModel.updateSubtitleStyle(viewModel.subtitleStyle.value.copy(fontFamily = font))
+                viewModel.updateSubtitleStyle(viewModel.uiState.value.subtitleStyle.copy(fontFamily = font))
             }
         }
 
         // 加粗 & 半透底
         videoPlayer.findViewById<View>(R.id.btn_style_bold)?.setOnClickListener {
-            val curBold = viewModel.subtitleStyle.value.isBold
-            viewModel.updateSubtitleStyle(viewModel.subtitleStyle.value.copy(isBold = !curBold))
+            val curBold = viewModel.uiState.value.subtitleStyle.isBold
+            viewModel.updateSubtitleStyle(viewModel.uiState.value.subtitleStyle.copy(isBold = !curBold))
         }
         videoPlayer.findViewById<View>(R.id.btn_style_bg_translucent)?.setOnClickListener {
-            val curBg = viewModel.subtitleStyle.value.backgroundColor
+            val curBg = viewModel.uiState.value.subtitleStyle.backgroundColor
             val nextBg =
                 if (curBg == Color.TRANSPARENT) "#80000000".toColorInt() else Color.TRANSPARENT
-            viewModel.updateSubtitleStyle(viewModel.subtitleStyle.value.copy(backgroundColor = nextBg))
+            viewModel.updateSubtitleStyle(viewModel.uiState.value.subtitleStyle.copy(backgroundColor = nextBg))
         }
 
         // 移除当前字幕
@@ -549,7 +526,7 @@ class VideoActivity : AppCompatActivity() {
                 } else {
                     "UNKNOWN_ERROR"
                 }
-            val title = viewModel.videoInfo.value?.fileName ?: ""
+            val title = viewModel.uiState.value.videoInfo?.fileName ?: ""
             XLog.e("$title 播放失败 $errorStatus")
             Toast.makeText(baseContext, errorStatus, Toast.LENGTH_SHORT).show()
             finish()

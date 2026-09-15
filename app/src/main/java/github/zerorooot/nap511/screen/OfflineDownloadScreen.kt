@@ -5,14 +5,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -21,12 +19,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -105,26 +100,15 @@ fun OfflineDownloadScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
-                title = {
-                    Text(text = ConfigKeyUtil.OFFLINE_DOWNLOAD)
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
-                navigationIcon = {
-                    TopAppBarActionButton(
-                        imageVector = Icons.Rounded.Menu,
-                        description = "navigationIcon"
-                    ) {
-                        onClick.invoke()
-                    }
-                },
-            )
+            BaseTopAppBar(title = {
+                Text(text = ConfigKeyUtil.OFFLINE_DOWNLOAD)
+            }, navigationIcon = {
+                TopAppBarActionButton(
+                    imageVector = Icons.Rounded.Menu, description = "navigationIcon"
+                ) {
+                    onClick.invoke()
+                }
+            })
         }
     ) { innerPadding ->
         if (isLandscape) {
@@ -167,8 +151,7 @@ fun OfflineDownloadScreen(
                     Text(text = "本月配额：剩${quotaBean.surplus}/总${quotaBean.count}个")
                     Spacer(modifier = Modifier.height(20.dp))
                     Button(
-                        onClick = onStartDownload,
-                        modifier = Modifier.fillMaxWidth()
+                        onClick = onStartDownload, modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(text = "开始离线下载")
                     }
@@ -184,8 +167,7 @@ fun OfflineDownloadScreen(
                         top = innerPadding.calculateTopPadding(),
                         bottom = innerPadding.calculateBottomPadding()
                     )
-                    .imePadding(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .imePadding(), horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 OutlinedTextField(
                     value = urlText,

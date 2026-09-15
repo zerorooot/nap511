@@ -13,6 +13,7 @@ data class VideoBean(
     val currentDuration: Int = -1,
 //    val fileBeanIndex: Int = -1,
     val pickCode: String,
+    val fileId: String = "",
     //playNextVideo中需要用到
     val name: String = ""
 )
@@ -26,7 +27,9 @@ data class VideoBean(
 data class LaunchVideoParams(
     val videoInfo: VideoInfoBean,
     val videoAttribute: VideoAttributeBean,
-    val videoList: List<VideoBean>
+    val localSubtitleItem: List<SubtitleItem>,
+    val videoList: List<VideoBean>,
+    val categoryId: String
 )
 
 data class VideoAttributeBean(

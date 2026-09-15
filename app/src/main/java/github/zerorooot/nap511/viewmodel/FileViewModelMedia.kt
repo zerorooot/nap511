@@ -10,6 +10,8 @@ import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ImageBean
 import github.zerorooot.nap511.bean.LaunchVideoParams
 import github.zerorooot.nap511.bean.Route
+import github.zerorooot.nap511.bean.SubtitleItem
+import github.zerorooot.nap511.bean.SubtitleSourceType
 import github.zerorooot.nap511.bean.VideoAttributeBean
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoInfoBean
@@ -19,8 +21,6 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.getCoilCacheUrl
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -54,9 +54,7 @@ internal fun FileViewModel.getImage(fileBean: FileBean) {
     if (cachedUrl != null) {
         XLog.d("FileViewModel.getImage hit Coil cache: fileBean=${fileBean.name}, cachedUrl=$cachedUrl")
         val cachedImageBean = ImageBean(
-            url = cachedUrl,
-            fileName = fileBean.name,
-            pickCode = pickCode
+            url = cachedUrl, fileName = fileBean.name, pickCode = pickCode
         )
         val oldMap = imageBeanCache[cid] ?: hashMapOf()
         val newMap = HashMap(oldMap)
@@ -102,8 +100,7 @@ internal fun FileViewModel.getImage(fileBean: FileBean) {
  * @param videoHistoryMap 包含 pickCode 与对应 VideoBean 的映射表
  */
 internal fun FileViewModel.updateVideoFileBeans(
-    cid: String,
-    videoHistoryMap: Map<String, VideoBean>
+    cid: String, videoHistoryMap: Map<String, VideoBean>
 ) {
     if (videoHistoryMap.isEmpty()) return
 
@@ -169,12 +166,36 @@ internal fun FileViewModel.updateVideoFileBeans(
     }
 }
 
+private fun isSubtitleFile(fileName: String): Boolean {
+    val SUPPORTED_SUBTITLE_EXTS = setOf("srt", "vtt", "ass", "ssa", "sub")
+    val ext = fileName.substringAfterLast('.', "").lowercase(Locale.US)
+    return SUPPORTED_SUBTITLE_EXTS.contains(ext)
+}
+
 internal fun FileViewModel.getVideoInfo(fileBean: FileBean) {
     val pickCode = fileBean.pickCode
     val fileName = fileBean.name
-    val videoList =
-        fileBeanList.filter { it.isVideo == 1 && it.playLong != 0.0 }
-            .map { VideoBean(name = it.name, pickCode = it.pickCode) }
+    val videoList = fileBeanList.filter { it.isVideo == 1 && it.playLong != 0.0 }
+        .map { VideoBean(name = it.name, pickCode = it.pickCode, fileId = fileBean.fileId) }
+
+
+    val localSubtitleList = fileBeanList.filter { fileBean ->
+        !fileBean.isFolder && isSubtitleFile(fileBean.name)
+    }.map { fileBean ->
+        val ext = fileBean.name.substringAfterLast('.', "srt").lowercase(Locale.US)
+        val durationMs = (fileBean.playLong * 1000).toLong()
+
+        SubtitleItem(
+            id = "115_${fileBean.pickCode}",
+            name = fileBean.name,
+            simpleName = fileBean.name,
+            sourceType = SubtitleSourceType.ONE_ONE_FIVE,
+            pickCode = fileBean.pickCode,
+            fileId = fileBean.fileId,
+            ext = ext,
+            durationMs = durationMs
+        )
+    }
 
     val fileBeanIndex = videoList.indexOfFirst { it.pickCode == pickCode }
 
@@ -188,8 +209,7 @@ internal fun FileViewModel.getVideoInfo(fileBean: FileBean) {
                 hideLoading = settingUiState.hideLoadingView
             )
             val video = if (settingUiState.videoLinkMode) {
-                fileRepository.video(pickCode)
-                    .copy(
+                fileRepository.video(pickCode).copy(
                         index = fileBeanIndex,
                     )
             } else {
@@ -203,12 +223,19 @@ internal fun FileViewModel.getVideoInfo(fileBean: FileBean) {
                     height = height,
                     index = fileBeanIndex,
                     fileName = fileName,
+                    parentId = fileBean.categoryId,
                     pickCode = pickCode,
                     videoUrl = "http://115.com/api/video/m3u8/${pickCode}.m3u8"
                 )
             }
             XLog.d("FileViewModel getVideoInfo $video")
-            val launchVideoParams = LaunchVideoParams(video, videoAttributeBean, videoList)
+            val launchVideoParams = LaunchVideoParams(
+                videoInfo = video,
+                videoAttribute = videoAttributeBean,
+                localSubtitleItem = localSubtitleList,
+                videoList = videoList,
+                categoryId = fileBean.categoryId
+            )
             _launchVideoEvent.emit(launchVideoParams)
         }.onFailureToastAndLog()
         setRefreshingStatus(false)
@@ -216,8 +243,7 @@ internal fun FileViewModel.getVideoInfo(fileBean: FileBean) {
 }
 
 internal fun FileViewModel.downloadSmallFile(
-    fileBean: FileBean,
-    onSuccess: (ByteArray) -> Unit
+    fileBean: FileBean, onSuccess: (ByteArray) -> Unit
 ) {
     viewModelScope.launch(Dispatchers.IO) {
         var bytes = textFileCache[fileBean]

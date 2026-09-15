@@ -1,152 +1,49 @@
 package github.zerorooot.nap511.activity
 
-
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.lifecycle.lifecycleScope
-import com.google.gson.Gson
-import github.zerorooot.nap511.bean.BaseReturnMessage
-import github.zerorooot.nap511.bean.InitUploadBean
+import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.network.NetworkClient
-import github.zerorooot.nap511.util.network.UserSessionManager
 import kotlinx.coroutines.launch
-import okhttp3.Call
-import okhttp3.Callback
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.MultipartBody
-import okhttp3.Request
-import okhttp3.RequestBody
-import okhttp3.RequestBody.Companion.asRequestBody
-import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 
 class TorrentTaskActivity : androidx.activity.ComponentActivity() {
+    private val fileRepository by lazy { FileRepository.getInstance() }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (intent.action == Intent.ACTION_VIEW && intent.data != null) {
             val torrentFile = fileFromContentUri(this, intent.data!!)
-            val uid = UserSessionManager.uid
             lifecycleScope.launch {
                 val defaultOfflineCid =
                     SettingsRepository.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
-                initUpload(torrentFile, UserSessionManager.cookie, uid, defaultOfflineCid)
-            }
-        }
-        moveTaskToBack(true)
-        finishAndRemoveTask()
-    }
-
-
-    private fun initUpload(torrentFile: File, cookie: String, uid: String, target: String) {
-        val url = "https://uplb.115.com/3.0/sampleinitupload.php"
-        val postBody =
-            "userid=$uid&filename=${torrentFile.name}&filesize=${torrentFile.length()}&target=U_1_$target".toRequestBody()
-
-        val okHttpClient = NetworkClient.sharedOkHttpClient
-        val request: Request = Request.Builder().url(url)
-            .addHeader("cookie", cookie)
-            .addHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-            .addHeader(
-                "User-Agent",
-                ConfigKeyUtil.USER_AGENT
-            ).post(postBody).build()
-        okHttpClient.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: okio.IOException) {
-                TODO("Not yet implemented")
-            }
-
-            override fun onResponse(call: Call, response: Response) {
-                val body = response.body
-                val string = body.string()
-                val initUploadBean = Gson().fromJson(
-                    string, InitUploadBean::class.java
+                val result = fileRepository.uploadFile(
+                    file = torrentFile,
+                    targetCid = defaultOfflineCid,
+                    mimeType = "application/x-bittorrent"
                 )
-//                println(initUploadBean)
-
-                val client = NetworkClient.sharedOkHttpClient
-                val requestBody: RequestBody = MultipartBody.Builder().setType(MultipartBody.FORM)
-                    .addFormDataPart("name", torrentFile.name)
-                    .addFormDataPart("key", initUploadBean.key)
-                    .addFormDataPart("policy", initUploadBean.policy)
-                    .addFormDataPart("OSSAccessKeyId", initUploadBean.oSSAccessKeyId)
-                    .addFormDataPart("success_action_status", "200")
-                    .addFormDataPart("callback", initUploadBean.callback)
-                    .addFormDataPart("signature", initUploadBean.signature)
-                    .addFormDataPart(
-                        "file",
-                        torrentFile.name,
-                        torrentFile.asRequestBody("application/x-bittorrent".toMediaType())
-                    )
-                    .build()
-                val uploadRequest: Request =
-                    Request.Builder().url(initUploadBean.host)
-                        .addHeader("origin", "https://115.com")
-                        .addHeader("referer", "https://115.com")
-                        .addHeader("cookie", cookie)
-                        .addHeader(
-                            "User-Agent",
-                            ConfigKeyUtil.USER_AGENT
-                        ).post(requestBody).build()
-
-                client.newCall(uploadRequest).enqueue(object : Callback {
-                    override fun onFailure(call: Call, e: okio.IOException) {
-                        TODO("Not yet implemented")
-                    }
-
-                    override fun onResponse(call: Call, response: Response) {
-                        val uploadBody = response.body.string()
-
-                        /**
-                         * {
-                         *     "state": true,
-                         *     "message": "",
-                         *     "code": 0,
-                         *     "data": {
-                         *         "aid": xxx,
-                         *         "cid": "0",
-                         *         "file_name": "xxxx",
-                         *         "file_ptime": xxx,
-                         *         "file_status": 1,
-                         *         "file_id": "xxx",
-                         *         "file_size": "229771",
-                         *         "pick_code": "xxx",
-                         *         "sha1": "xxx",
-                         *         "sp": 1,
-                         *         "file_type": 188,
-                         *         "is_video": 0
-                         *     }
-                         * }
-                         */
-                        val uploadJson = Gson().fromJson(
-                            uploadBody, BaseReturnMessage::class.java
-                        )
-                        val message = if (uploadJson.state) {
-                            "上传种子文件成功,种子文件保存到默认离线位置中"
-                        } else {
-                            "上传种子文件失败,${uploadJson.message}"
-                        }
-                        App.instance.toast(message)
-
-                    }
-
-                })
-
-
+                val message = if (result.state) {
+                    "上传种子文件成功,种子文件保存到默认离线位置中"
+                } else {
+                    "上传种子文件失败,${result.message}"
+                }
+                App.instance.toast(message)
+                moveTaskToBack(true)
+                finishAndRemoveTask()
             }
-        })
-
-
+        } else {
+            moveTaskToBack(true)
+            finishAndRemoveTask()
+        }
     }
-
 
     private fun fileFromContentUri(context: Context, contentUri: Uri): File {
         val fileName = File(contentUri.path!!).name
@@ -178,4 +75,3 @@ class TorrentTaskActivity : androidx.activity.ComponentActivity() {
         }
     }
 }
-

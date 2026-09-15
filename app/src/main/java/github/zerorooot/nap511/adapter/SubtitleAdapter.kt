@@ -4,6 +4,7 @@ import android.graphics.Typeface
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.cardview.widget.CardView
 import androidx.core.graphics.toColorInt
@@ -19,6 +20,7 @@ import java.util.Locale
 class SubtitleAdapter(
     private var items: List<SubtitleItem> = emptyList(),
     private var selectedId: String = "",
+    private val onUploadClick: ((SubtitleItem) -> Unit)? = null,
     private val onItemClick: (SubtitleItem) -> Unit
 ) : RecyclerView.Adapter<SubtitleAdapter.ViewHolder>() {
 
@@ -28,6 +30,7 @@ class SubtitleAdapter(
         val tvSource: TextView = itemView.findViewById(R.id.tv_subtitle_source)
         val tvExt: TextView = itemView.findViewById(R.id.tv_subtitle_ext)
         val tvDuration: TextView = itemView.findViewById(R.id.tv_subtitle_duration)
+        val btnUpload: ImageView = itemView.findViewById(R.id.btn_upload_subtitle)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -48,9 +51,15 @@ class SubtitleAdapter(
         if (item.sourceType == SubtitleSourceType.ONE_ONE_FIVE) {
             holder.tvSource.setBackgroundColor("#33FF9800".toColorInt())
             holder.tvSource.setTextColor("#FF9800".toColorInt())
+            // 已在 115 目录的字幕无需再上传
+            holder.btnUpload.visibility = View.GONE
         } else {
             holder.tvSource.setBackgroundColor("#3342A5F5".toColorInt())
             holder.tvSource.setTextColor("#42A5F5".toColorInt())
+            holder.btnUpload.visibility = View.VISIBLE
+            holder.btnUpload.setOnClickListener {
+                onUploadClick?.invoke(item)
+            }
         }
 
         // 时长文本（通过 SubtitleItem.durationMs 转换）

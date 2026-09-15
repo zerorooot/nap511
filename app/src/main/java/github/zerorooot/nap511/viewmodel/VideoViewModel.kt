@@ -12,9 +12,12 @@ import github.zerorooot.nap511.bean.SubtitleItem
 import github.zerorooot.nap511.bean.SubtitleStyleBean
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoInfoBean
+import github.zerorooot.nap511.bean.VideoUiState
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.bus.DialogEvent
+import github.zerorooot.nap511.util.bus.DialogEventBus
 import github.zerorooot.nap511.util.network.parseOssErrorWithDom
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -23,6 +26,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import okhttp3.MediaType
 import java.io.File
@@ -39,51 +43,21 @@ sealed class VideoUiEvent {
     ) : VideoUiEvent()
 }
 
-class VideoViewModel(
+class VideoViewModel : ViewModel() {
     internal val fileRepository: FileRepository = FileRepository.getInstance()
-) : ViewModel() {
-
     internal val subtitleRepository: SubtitleRepository = SubtitleRepository.getInstance()
 
     lateinit var launchVideoParams: LaunchVideoParams
         private set
 
-    private val _videoInfo = MutableStateFlow<VideoInfoBean?>(null)
-    val videoInfo: StateFlow<VideoInfoBean?> = _videoInfo.asStateFlow()
-
-    private val _fileBeanIndex = MutableStateFlow(-1)
-    val fileBeanIndex: StateFlow<Int> = _fileBeanIndex.asStateFlow()
+    private val _uiState = MutableStateFlow(VideoUiState())
+    val uiState: StateFlow<VideoUiState> = _uiState.asStateFlow()
 
     val videoList: List<VideoBean>
         get() = if (::launchVideoParams.isInitialized) launchVideoParams.videoList else emptyList()
 
-    private val _hasPrev = MutableStateFlow(false)
-    val hasPrev: StateFlow<Boolean> = _hasPrev.asStateFlow()
-
-    private val _hasNext = MutableStateFlow(false)
-    val hasNext: StateFlow<Boolean> = _hasNext.asStateFlow()
-
     private val _uiEvent = MutableSharedFlow<VideoUiEvent>()
     val uiEvent: SharedFlow<VideoUiEvent> = _uiEvent.asSharedFlow()
-
-    // --- 字幕管理 StateFlow 状态 ---
-    private val _subtitles = MutableStateFlow<List<SubtitleItem>>(emptyList())
-    val subtitles: StateFlow<List<SubtitleItem>> = _subtitles.asStateFlow()
-
-    private val _selectedSubtitle = MutableStateFlow<SubtitleItem?>(null)
-    val selectedSubtitle: StateFlow<SubtitleItem?> = _selectedSubtitle.asStateFlow()
-
-    private val _subtitleOffsetMs = MutableStateFlow(0L)
-    val subtitleOffsetMs: StateFlow<Long> = _subtitleOffsetMs.asStateFlow()
-
-    private val _subtitleStyle = MutableStateFlow(SubtitleStyleBean())
-    val subtitleStyle: StateFlow<SubtitleStyleBean> = _subtitleStyle.asStateFlow()
-
-    private val _isSubtitleLoading = MutableStateFlow(false)
-    val isSubtitleLoading: StateFlow<Boolean> = _isSubtitleLoading.asStateFlow()
-
-    private val _defaultSearchKeyword = MutableStateFlow("")
-    val defaultSearchKeyword: StateFlow<String> = _defaultSearchKeyword.asStateFlow()
 
     val videoAttribute by lazy { launchVideoParams.videoAttribute }
     val isAutoRotate by lazy { videoAttribute.isAutoRotate }
@@ -99,9 +73,17 @@ class VideoViewModel(
     fun initParams(params: LaunchVideoParams, isPortrait: Boolean) {
         launchVideoParams = params
         val initialVideoInfo = params.videoInfo
-        _videoInfo.value = initialVideoInfo
-        _fileBeanIndex.value = initialVideoInfo.index
-        updatePrevNextButtonsState()
+        val currentIndex = initialVideoInfo.index
+        val listSize = params.videoList.size
+
+        _uiState.update { currentState ->
+            currentState.copy(
+                videoInfo = initialVideoInfo,
+                fileBeanIndex = currentIndex,
+                hasPrev = currentIndex - 1 in 0 until listSize,
+                hasNext = currentIndex + 1 in 0 until listSize
+            )
+        }
 
         if (isAutoRotate) {
             if (initialVideoInfo.width < initialVideoInfo.height && isPortrait) {
@@ -112,28 +94,27 @@ class VideoViewModel(
         }
     }
 
-    private fun updatePrevNextButtonsState() {
-        val currentIndex = _fileBeanIndex.value
-        val listSize = launchVideoParams.videoList.size
-        _hasPrev.value = currentIndex - 1 in 0 until listSize
-        _hasNext.value = currentIndex + 1 in 0 until listSize
-    }
-
     fun playNextVideo(isNext: Boolean, isPortrait: Boolean, currentPositionMs: Long) {
-        val currentIndex = _fileBeanIndex.value
+        val currentIndex = _uiState.value.fileBeanIndex
         val nextIndex = if (isNext) currentIndex + 1 else currentIndex - 1
         playVideoAtIndex(nextIndex, isPortrait, currentPositionMs)
     }
 
     fun playVideoAtIndex(targetIndex: Int, isPortrait: Boolean, currentPositionMs: Long) {
-        if (targetIndex == _fileBeanIndex.value) return
+        if (targetIndex == _uiState.value.fileBeanIndex) return
         val fileBean = launchVideoParams.videoList.getOrNull(targetIndex)
         if (fileBean == null) {
             App.instance.toast("找不到视频")
             return
         }
-        _fileBeanIndex.value = targetIndex
-        updatePrevNextButtonsState()
+        val listSize = launchVideoParams.videoList.size
+        _uiState.update { currentState ->
+            currentState.copy(
+                fileBeanIndex = targetIndex,
+                hasPrev = targetIndex - 1 in 0 until listSize,
+                hasNext = targetIndex + 1 in 0 until listSize
+            )
+        }
 
         viewModelScope.launch {
             runCatching {
@@ -154,11 +135,12 @@ class VideoViewModel(
                         height = height,
                         index = targetIndex,
                         fileName = name,
+                        parentId = launchVideoParams.categoryId,
                         pickCode = pickCode,
                         videoUrl = "http://115.com/api/video/m3u8/${pickCode}.m3u8"
                     )
                 }
-                _videoInfo.value = video
+                _uiState.update { it.copy(videoInfo = video) }
                 _uiEvent.emit(VideoUiEvent.PlayNext(video.videoUrl, video.fileName))
             }.onFailureToastAndLog()
         }
@@ -170,7 +152,7 @@ class VideoViewModel(
         App.instance.toast("视频地址错误！正在重新获取新链接")
         viewModelScope.launch {
             try {
-                val currentInfo = _videoInfo.value ?: return@launch
+                val currentInfo = _uiState.value.videoInfo ?: return@launch
                 val video = fileRepository.video(currentInfo.pickCode)
                 XLog.i("playNewVideo $video")
                 _uiEvent.emit(VideoUiEvent.PlayNext(video.downloadUrl, video.fileName))
@@ -181,7 +163,7 @@ class VideoViewModel(
     }
 
     suspend fun updateVideoHistory(currentPositionMs: Long) {
-        val currentInfo = _videoInfo.value ?: return
+        val currentInfo = _uiState.value.videoInfo ?: return
         val currentDuration = (currentPositionMs / 1000).toInt()
         val pickCode = currentInfo.pickCode
         val name = currentInfo.fileName
@@ -228,16 +210,12 @@ class VideoViewModel(
     }
 
     fun handleInterceptorError(
-        currentPositionMs: Long,
-        url: String,
-        contentType: MediaType,
-        errorBody: String
+        currentPositionMs: Long, url: String, contentType: MediaType, errorBody: String
     ): Boolean {
         XLog.e(
             "GSY Player 网络请求 $url 失败: [$contentType] -> Body: ${
                 errorBody.replace(
-                    "\n",
-                    ""
+                    "\n", ""
                 )
             }"
         )
@@ -255,28 +233,26 @@ class VideoViewModel(
             return true
         }
 
-        runCatching { Gson().fromJson(errorBody, JsonObject::class.java) }
-            .onSuccess { fromJson ->
-                if (fromJson.has("error")) {
-                    val message = fromJson.get("error").asString
-                    back(
-                        currentPositionMs = currentPositionMs,
-                        nav = "VerifyVideoAccount",
-                        toast = message,
-                        resultCode = Activity.RESULT_CANCELED
-                    )
-                    return true
-                }
-            }
-        runCatching { parseOssErrorWithDom(errorBody).message }
-            .onSuccess { message ->
+        runCatching { Gson().fromJson(errorBody, JsonObject::class.java) }.onSuccess { fromJson ->
+            if (fromJson.has("error")) {
+                val message = fromJson.get("error").asString
                 back(
                     currentPositionMs = currentPositionMs,
+                    nav = "VerifyVideoAccount",
                     toast = message,
                     resultCode = Activity.RESULT_CANCELED
                 )
                 return true
             }
+        }
+        runCatching { parseOssErrorWithDom(errorBody).message }.onSuccess { message ->
+            back(
+                currentPositionMs = currentPositionMs,
+                toast = message,
+                resultCode = Activity.RESULT_CANCELED
+            )
+            return true
+        }
 
         return false
     }
@@ -287,9 +263,8 @@ class VideoViewModel(
      * 首次或默认初始化加载字幕列表（从迅雷 API 与 115 同目录获取）
      */
     fun loadSubtitles(videoDurationMs: Long) {
-        val currentInfo = _videoInfo.value ?: return
+        val currentInfo = _uiState.value.videoInfo ?: return
         val videoName = currentInfo.fileName
-        val parentCid = currentInfo.parentId
 
         // 默认将视频文件名去除后缀作为初始搜索关键字
         val keyword = if (videoName.contains(".")) {
@@ -297,21 +272,20 @@ class VideoViewModel(
         } else {
             videoName
         }
-        _defaultSearchKeyword.value = keyword
+        _uiState.update { it.copy(defaultSearchKeyword = keyword, isSubtitleLoading = true) }
 
         viewModelScope.launch {
-            _isSubtitleLoading.value = true
             runCatching {
                 val list = subtitleRepository.getSubtitles(
                     searchKeyword = keyword,
-                    parentCid = parentCid,
+                    oneOneFiveSubtitles = launchVideoParams.localSubtitleItem,
                     videoDurationMs = videoDurationMs
                 )
-                _subtitles.value = list
+                _uiState.update { it.copy(subtitles = list, isSubtitleLoading = false) }
             }.onFailure { e ->
                 XLog.e("加载字幕列表失败", e)
+                _uiState.update { it.copy(isSubtitleLoading = false) }
             }
-            _isSubtitleLoading.value = false
         }
     }
 
@@ -320,22 +294,20 @@ class VideoViewModel(
      */
     fun searchSubtitlesByName(keyword: String, videoDurationMs: Long) {
         if (keyword.isBlank()) return
-        val currentInfo = _videoInfo.value ?: return
-        val parentCid = currentInfo.parentId
+        _uiState.update { it.copy(isSubtitleLoading = true) }
 
         viewModelScope.launch {
-            _isSubtitleLoading.value = true
             runCatching {
                 val list = subtitleRepository.getSubtitles(
                     searchKeyword = keyword,
-                    parentCid = parentCid,
+                    oneOneFiveSubtitles = launchVideoParams.localSubtitleItem,
                     videoDurationMs = videoDurationMs
                 )
-                _subtitles.value = list
+                _uiState.update { it.copy(subtitles = list, isSubtitleLoading = false) }
             }.onFailure { e ->
                 XLog.e("自定义关键字搜索字幕失败: $keyword", e)
+                _uiState.update { it.copy(isSubtitleLoading = false) }
             }
-            _isSubtitleLoading.value = false
         }
     }
 
@@ -344,11 +316,9 @@ class VideoViewModel(
      */
     fun selectSubtitle(context: Context, item: SubtitleItem, onReady: (File) -> Unit) {
         viewModelScope.launch {
-            //_isSubtitleLoading.value = true
             val file = subtitleRepository.downloadAndPrepareSubtitle(context, item)
-            //_isSubtitleLoading.value = false
             if (file != null) {
-                _selectedSubtitle.value = item
+                _uiState.update { it.copy(selectedSubtitle = item) }
                 onReady(file)
             } else {
                 _uiEvent.emit(VideoUiEvent.Toast("下载或格式转换字幕失败: ${item.simpleName}"))
@@ -360,27 +330,53 @@ class VideoViewModel(
      * 设置精确的时间偏移量 (ms)
      */
     fun setSubtitleOffset(offsetMs: Long) {
-        _subtitleOffsetMs.value = offsetMs
+        _uiState.update { it.copy(subtitleOffsetMs = offsetMs) }
     }
 
     /**
      * 微调时间偏移量 (ms)
      */
     fun addSubtitleOffset(deltaMs: Long) {
-        _subtitleOffsetMs.value += deltaMs
+        _uiState.update { it.copy(subtitleOffsetMs = it.subtitleOffsetMs + deltaMs) }
     }
 
     /**
      * 更新字幕样式（字号、颜色、字体、加粗、底色）
      */
     fun updateSubtitleStyle(styleBean: SubtitleStyleBean) {
-        _subtitleStyle.value = styleBean
+        _uiState.update { it.copy(subtitleStyle = styleBean) }
     }
 
     /**
      * 清除/移除当前字幕
      */
     fun removeSubtitle() {
-        _selectedSubtitle.value = null
+        _uiState.update { it.copy(selectedSubtitle = null) }
+    }
+
+    /**
+     * 上传指定的字幕文件到当前视频所在的 115 目录 (parentCid)
+     */
+    fun uploadSubtitle(context: Context, item: SubtitleItem, videoDurationMs: Long = 0L) {
+        val parentCid = launchVideoParams.categoryId
+        viewModelScope.launch {
+            _uiEvent.emit(VideoUiEvent.Toast("正在将字幕上传至 115 网盘..."))
+            runCatching {
+                subtitleRepository.uploadSubtitleTo115(context, item, parentCid)
+            }.onSuccess { result ->
+                if (result.state) {
+                    App.instance.toast("字幕上传成功！已保存到 115 当前目录")
+                    // 重新加载当前字幕列表，以便显示刚上传到 115 同目录的字幕
+                    loadSubtitles(videoDurationMs)
+                    //刷新文件列表
+                    DialogEventBus.getInstance().emit(DialogEvent.RefreshFileList(parentCid))
+                } else {
+                    App.instance.toast("字幕上传失败: ${result.message}")
+                }
+            }.onFailure { e ->
+                XLog.e("上传字幕发生异常: ${item.name}", e)
+                App.instance.toast("上传字幕发生异常: ${e.localizedMessage}")
+            }
+        }
     }
 }

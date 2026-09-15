@@ -71,6 +71,20 @@
                 android:textColor="#80FFFFFF"
                 android:textSize="11sp"
                 tools:text="01:04:39" />
+
+            <!-- 上传到115按钮 -->
+            <ImageView
+                android:id="@+id/btn_upload_subtitle"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginStart="8dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:padding="2dp"
+                android:src="@drawable/ic_upload"
+                app:tint="#D0FFFFFF"
+                tools:ignore="ContentDescription" />
         </LinearLayout>
     </LinearLayout>
 
