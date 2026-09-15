@@ -21,7 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.zerorooot.nap511.util.SubtitleEntry
+import github.zerorooot.nap511.util.subtitle.SubtitleEntry
 
 /**
  * 全屏 / 扩展歌词滚动视图组件

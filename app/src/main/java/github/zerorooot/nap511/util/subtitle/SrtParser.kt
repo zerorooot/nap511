@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.util
+package github.zerorooot.nap511.util.subtitle
 
 import com.elvishew.xlog.XLog
 import java.io.File

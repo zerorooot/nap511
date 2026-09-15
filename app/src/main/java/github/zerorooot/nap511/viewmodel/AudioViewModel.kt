@@ -7,21 +7,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.elvishew.xlog.XLog
 import com.shuyu.gsyvideoplayer.listener.GSYMediaPlayerListener
 import com.shuyu.gsyvideoplayer.player.PlayerFactory
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.SubtitleItem
+import github.zerorooot.nap511.bean.SubtitleUiState
 import github.zerorooot.nap511.player.AudioGSYManager
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.service.AudioService
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.SrtParser
-import github.zerorooot.nap511.util.SubtitleEntry
+import github.zerorooot.nap511.util.subtitle.SubtitleEntry
 import github.zerorooot.nap511.util.bus.AudioEvent
 import github.zerorooot.nap511.util.bus.AudioEventBus
 import github.zerorooot.nap511.util.network.UserSessionManager
+import github.zerorooot.nap511.util.subtitle.SubtitleDelegate
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -44,18 +44,6 @@ data class AudioPlaybackUiState(
         get() = if (isUserSeeking) userSeekProgress else progress
 }
 
-data class SubtitleUiState(
-    val subtitles: List<SubtitleItem> = emptyList(),
-    val selectedSubtitle: SubtitleItem? = null,
-    val entries: List<SubtitleEntry> = emptyList(),
-    val currentText: String = "",
-    val currentIndex: Int = -1,
-    val offsetMs: Long = 0L,
-    val isLoading: Boolean = false,
-    val isSearchLoading: Boolean = false,
-    val currentLocalSubtitles: List<SubtitleItem> = emptyList()
-)
-
 data class AudioUiState(
     val playback: AudioPlaybackUiState = AudioPlaybackUiState(),
     val subtitle: SubtitleUiState = SubtitleUiState()
@@ -73,6 +61,10 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         SubtitleRepository.getInstance()
     }
 
+    private val subtitleDelegate = SubtitleDelegate(subtitleRepository) { newSubtitleState ->
+        uiState = uiState.copy(subtitle = newSubtitleState)
+    }
+
     var uiState by mutableStateOf(AudioUiState())
         private set
 
@@ -85,7 +77,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     val playbackSpeed: Float get() = uiState.playback.playbackSpeed
     val isUserSeeking: Boolean get() = uiState.playback.isUserSeeking
     val userSeekProgress: Float get() = uiState.playback.userSeekProgress
-
 
     val subtitleEntries: List<SubtitleEntry> get() = uiState.subtitle.entries
     val currentSubtitleText: String get() = uiState.subtitle.currentText
@@ -101,10 +92,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun updatePlayback(update: AudioPlaybackUiState.() -> AudioPlaybackUiState) {
         uiState = uiState.copy(playback = uiState.playback.update())
-    }
-
-    private fun updateSubtitle(update: SubtitleUiState.() -> SubtitleUiState) {
-        uiState = uiState.copy(subtitle = uiState.subtitle.update())
     }
 
     private val listener = object : GSYMediaPlayerListener {
@@ -227,13 +214,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                 currentPositionText = "00:00"
             )
         }
-        updateSubtitle {
-            copy(
-                subtitles = emptyList(),
-                currentLocalSubtitles = localSubtitles,
-                offsetMs = 0L
-            )
-        }
 
         viewModelScope.launch {
             try {
@@ -314,13 +294,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                 currentPositionText = "00:00"
             )
         }
-        updateSubtitle {
-            copy(
-                subtitles = emptyList(),
-                currentLocalSubtitles = emptyList(),
-                offsetMs = 0L
-            )
-        }
         videoManger.releaseMediaPlayer()
     }
 
@@ -356,7 +329,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         videoManger.setVolume(v)
     }
 
-    // --- 字幕业务函数 ---
+    // --- 字幕业务代理函数 ---
 
     /**
      * 搜集/检索字幕（结合迅雷 API 与 115 同目录字幕）
@@ -365,96 +338,58 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         searchKeyword: String = "",
         localSubtitles: List<SubtitleItem> = currentLocalSubtitles
     ) {
-        updateSubtitle { copy(currentLocalSubtitles = localSubtitles) }
-        val musicName = currentMusic?.name ?: ""
-        val keyword = searchKeyword.ifBlank {
-            if (musicName.contains(".")) musicName.substringBeforeLast(".") else musicName
-        }
-        if (keyword.isBlank()) return
-
-        updateSubtitle { copy(isSearchLoading = true) }
-        viewModelScope.launch {
-            runCatching {
-                val durationMs = videoManger.duration
-                val result = subtitleRepository.getSubtitles(
-                    searchKeyword = keyword,
-                    oneOneFiveSubtitles = localSubtitles,
-                    videoDurationMs = if (durationMs > 0) durationMs else 0L
-                )
-                updateSubtitle { copy(subtitles = result) }
-            }.onFailure { e ->
-                XLog.e("AudioViewModel: 检索字幕失败", e)
-            }
-            updateSubtitle { copy(isSearchLoading = false) }
-        }
+        subtitleDelegate.loadSubtitles(
+            scope = viewModelScope,
+            mediaName = currentMusic?.name ?: "",
+            searchKeyword = searchKeyword,
+            localSubtitles = localSubtitles,
+            mediaDurationMs = videoManger.duration
+        )
     }
 
     /**
      * 选择并下载准备字幕
      */
     fun selectSubtitle(cacheDirFile: File, item: SubtitleItem) {
-        updateSubtitle { copy(isLoading = true) }
-        viewModelScope.launch {
-            val srtFile = subtitleRepository.downloadAndPrepareSubtitle(cacheDirFile, item)
-            if (srtFile != null) {
-                val parsedEntries = SrtParser.parse(srtFile)
-                updateSubtitle { copy(selectedSubtitle = item, entries = parsedEntries) }
-                updateSubtitleForPosition()
-            } else {
-                App.instance.toast("加载字幕失败: ${item.simpleName}")
-            }
-            updateSubtitle { copy(isLoading = false) }
-        }
+        subtitleDelegate.selectSubtitle(
+            scope = viewModelScope,
+            cacheDirFile = cacheDirFile,
+            item = item,
+            currentPositionMs = videoManger.currentPosition
+        )
     }
 
     /**
      * 移除当前选中的字幕
      */
     fun removeSubtitle() {
-        updateSubtitle {
-            copy(
-                selectedSubtitle = null,
-                entries = emptyList(),
-                currentText = "",
-                currentIndex = -1
-            )
-        }
+        subtitleDelegate.removeSubtitle()
     }
 
     /**
      * 设置时间偏移量 (ms)
      */
     fun setSubtitleOffset(offsetMs: Long) {
-        updateSubtitle { copy(offsetMs = offsetMs) }
-        updateSubtitleForPosition()
+        subtitleDelegate.setSubtitleOffset(offsetMs, videoManger.currentPosition)
     }
 
     /**
      * 微调时间偏移量 (ms)
      */
     fun addSubtitleOffset(deltaMs: Long) {
-        updateSubtitle { copy(offsetMs = offsetMs + deltaMs) }
-        updateSubtitleForPosition()
+        subtitleDelegate.addSubtitleOffset(deltaMs, videoManger.currentPosition)
     }
 
     /**
      * 上传字幕到 115 同目录
      */
     fun uploadSubtitleTo115(cacheDirFile: File, item: SubtitleItem, targetCid: String) {
-        if (targetCid.isBlank() || targetCid == "0") {
-            App.instance.toast("无法获取当前音频所在目录 ID")
-            return
-        }
-        viewModelScope.launch {
-            App.instance.toast("正在将字幕上传至 115 网盘...")
-            val result = subtitleRepository.uploadSubtitleTo115(cacheDirFile, item, targetCid)
-            if (result.state) {
-                App.instance.toast("字幕上传成功！已保存到 115 当前目录")
-                //loadSubtitles(localSubtitles = currentLocalSubtitles)
-            } else {
-                App.instance.toast("字幕上传失败: ${result.message}")
-            }
-        }
+        subtitleDelegate.uploadSubtitleTo115(
+            scope = viewModelScope,
+            cacheDirFile = cacheDirFile,
+            item = item,
+            targetCid = targetCid
+        )
     }
 
     /**
@@ -470,27 +405,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
      * 根据当前播放时刻与偏移量，匹配当前显示的字幕文本与行号
      */
     fun updateSubtitleForPosition(currentMs: Long = videoManger.currentPosition) {
-        val entries = subtitleEntries
-        if (entries.isEmpty()) {
-            if (currentSubtitleText.isNotEmpty() || currentSubtitleIndex != -1) {
-                updateSubtitle { copy(currentText = "", currentIndex = -1) }
-            }
-            return
-        }
-
-        val adjustedMs = currentMs + subtitleOffsetMs
-
-        val index = entries.indexOfLast { entry ->
-            adjustedMs >= entry.startMs
-        }
-
-        if (index != -1) {
-            val entry = entries[index]
-            updateSubtitle { copy(currentText = entry.text, currentIndex = index) }
-        } else {
-            val text = entries.firstOrNull()?.text ?: ""
-            updateSubtitle { copy(currentText = text, currentIndex = 0) }
-        }
+        subtitleDelegate.updateSubtitleForPosition(currentMs)
     }
 
     // 修改轮询进度逻辑：高频轮询同步字幕与进度

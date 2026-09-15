@@ -7,7 +7,7 @@ import github.zerorooot.nap511.bean.SubtitleItem
 import github.zerorooot.nap511.bean.SubtitleSourceType
 import github.zerorooot.nap511.bean.XunleiSubtitleResponse
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.SubtitleConverter
+import github.zerorooot.nap511.util.subtitle.SubtitleConverter
 import github.zerorooot.nap511.util.network.NetworkClient
 import github.zerorooot.nap511.util.network.UserSessionManager
 import kotlinx.coroutines.Dispatchers

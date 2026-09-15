@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.util
+package github.zerorooot.nap511.util.subtitle
 
 import com.elvishew.xlog.XLog
 import java.io.File
@@ -8,6 +8,7 @@ import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
 import java.util.Locale
 import java.util.regex.Pattern
+import kotlin.text.iterator
 
 /**
  * 字幕/歌词格式转换与编码识别工具类
