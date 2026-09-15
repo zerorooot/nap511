@@ -157,14 +157,6 @@ fun FileCellItem(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            if (size.isNotEmpty()) {
-                                Text(
-                                    text = size,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1
-                                )
-                            }
                             if (isMedia) {
                                 if (playLong.isNotEmpty()) {
                                     Box(
@@ -178,7 +170,10 @@ fun FileCellItem(
                                             text = playLong,
                                             style = MaterialTheme.typography.labelMedium,
                                             color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                            modifier = Modifier.padding(horizontal = 2.dp, vertical = 1.dp),
+                                            modifier = Modifier.padding(
+                                                horizontal = 2.dp,
+                                                vertical = 1.dp
+                                            ),
                                             maxLines = 1
                                         )
                                     }
@@ -188,7 +183,10 @@ fun FileCellItem(
                                         text = playLongRatio,
                                         style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.padding(horizontal = 1.dp, vertical = 1.dp),
+                                        modifier = Modifier.padding(
+                                            horizontal = 1.dp,
+                                            vertical = 1.dp
+                                        ),
                                         maxLines = 1
                                     )
                                 }
@@ -196,15 +194,13 @@ fun FileCellItem(
                         }
                     }
                     // 3. 修改时间
-                    if (time.isNotEmpty()) {
-                        Text(
-                            text = time,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    Text(
+                        text = size + time,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
 
                 val dispatchMenuClick: (MenuItemAction, Int) -> Unit = { action, _ ->

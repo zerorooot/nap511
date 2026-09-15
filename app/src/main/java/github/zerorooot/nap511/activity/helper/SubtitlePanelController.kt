@@ -53,9 +53,6 @@ class SubtitlePanelController(
         subtitleAdapter = SubtitleAdapter(
             items = uiState.subtitles,
             selectedId = uiState.selectedSubtitle?.id ?: "",
-            onUploadClick = { subtitleItem ->
-                viewModel.uploadSubtitle(context.cacheDir, subtitleItem)
-            }
         ) { subtitleItem ->
             viewModel.selectSubtitle(context.cacheDir, subtitleItem) { srtFile ->
                 val source = GSYSubtitleSource.Builder(Uri.fromFile(srtFile).toString())

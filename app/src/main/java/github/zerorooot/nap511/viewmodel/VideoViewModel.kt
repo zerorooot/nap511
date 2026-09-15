@@ -352,23 +352,6 @@ class VideoViewModel : ViewModel() {
         subtitleDelegate.removeSubtitle()
     }
 
-    /**
-     * 上传指定的字幕文件到当前视频所在的 115 目录 (parentCid)
-     */
-    fun uploadSubtitle(cacheDirFile: File, item: SubtitleItem) {
-        val parentCid = launchVideoParams.categoryId
-        subtitleDelegate.uploadSubtitleTo115(
-            scope = viewModelScope,
-            cacheDirFile = cacheDirFile,
-            item = item,
-            targetCid = parentCid,
-            onSuccess = {
-                viewModelScope.launch {
-                    DialogEventBus.getInstance().emit(DialogEvent.RefreshFileList(parentCid))
-                }
-            }
-        )
-    }
 
     /**
      * 保存并上传当前字幕（连同本地时间偏移修正）至当前视频所在的 115 目录
