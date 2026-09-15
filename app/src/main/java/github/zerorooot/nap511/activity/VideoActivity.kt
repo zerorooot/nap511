@@ -294,6 +294,7 @@ class VideoActivity : AppCompatActivity() {
             }
         }
 
+        updatePrevNextButtonsState()
 
         videoPlayer.startPlayLogic()
 
@@ -346,10 +347,8 @@ class VideoActivity : AppCompatActivity() {
 
     private fun back(nav: String = "", toast: String = "", resultCode: Int = RESULT_OK) {
         lifecycleScope.launch {
-            //只看了一个视频
-            if (videoHistoryMap.isEmpty()) {
-                updateVideoHistory()
-            }
+            //更新当前视频
+            updateVideoHistory()
             val videoHistoryMapJson = Gson().toJson(videoHistoryMap)
             val returnIntent = Intent().apply {
                 putExtra("videoHistory", videoHistoryMapJson)
@@ -505,24 +504,33 @@ class VideoActivity : AppCompatActivity() {
         }
     }
 
-    fun playNextVideo(isNext: Boolean) {
-        if (isNext) {
-            fileBeanIndex -= 1
-        } else {
-            fileBeanIndex += 1
+    private fun updatePrevNextButtonsState() {
+        val prevBtn = videoPlayer.findViewById<View>(R.id.prev_episode)
+        val nextBtn = videoPlayer.findViewById<View>(R.id.next_episode)
+
+        val hasPrev = fileBeanIndex - 1 >= 0 && fileBeanIndex - 1 < launchVideoParams.videoList.size
+        val hasNext = fileBeanIndex + 1 >= 0 && fileBeanIndex + 1 < launchVideoParams.videoList.size
+
+        prevBtn?.apply {
+            isEnabled = hasPrev
+            alpha = if (hasPrev) 1.0f else 0.3f
         }
-        val fileBean = launchVideoParams.videoList.getOrNull(fileBeanIndex)
+        nextBtn?.apply {
+            isEnabled = hasNext
+            alpha = if (hasNext) 1.0f else 0.3f
+        }
+    }
+
+    fun playNextVideo(isNext: Boolean) {
+        val nextIndex = if (isNext) fileBeanIndex + 1 else fileBeanIndex - 1
+        val fileBean = launchVideoParams.videoList.getOrNull(nextIndex)
         if (fileBean == null) {
             App.instance.toast("找不到新视频")
-            if (isNext) {
-                //下一个按钮disable
-                // TODO()
-            } else {
-                //上一个按钮disable
-                // TODO()
-            }
+            updatePrevNextButtonsState()
             return
         }
+        fileBeanIndex = nextIndex
+        updatePrevNextButtonsState()
         lifecycleScope.launch {
             runCatching {
                 updateVideoHistory()

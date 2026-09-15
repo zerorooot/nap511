@@ -218,6 +218,24 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     }
 
     @Override
+    protected void changeUiToPreparingShow() {
+        super.changeUiToPreparingShow();
+        setViewShowState(mStartButton, VISIBLE);
+    }
+
+    @Override
+    protected void changeUiToPlayingBufferingShow() {
+        super.changeUiToPlayingBufferingShow();
+        setViewShowState(mStartButton, VISIBLE);
+    }
+
+    @Override
+    protected void changeUiToPlayingBufferingClear() {
+        super.changeUiToPlayingBufferingClear();
+        setViewShowState(mStartButton, VISIBLE);
+    }
+
+    @Override
     public void touchDoubleUp(MotionEvent event) {
         float x = event.getX();
         DisplayMetrics displayMetrics = mContext.getResources().getDisplayMetrics();
