@@ -223,7 +223,6 @@ internal fun FileViewModel.getVideoInfo(fileBean: FileBean) {
                     height = height,
                     index = fileBeanIndex,
                     fileName = fileName,
-                    parentId = fileBean.categoryId,
                     pickCode = pickCode,
                     videoUrl = "http://115.com/api/video/m3u8/${pickCode}.m3u8"
                 )

@@ -1,6 +1,5 @@
 package github.zerorooot.nap511.repository
 
-import android.content.Context
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import github.zerorooot.nap511.bean.BaseReturnMessage
@@ -26,7 +25,6 @@ import kotlin.math.abs
 class SubtitleRepository(
     private val fileRepository: FileRepository = FileRepository.getInstance()
 ) {
-
     companion object {
         @Volatile
         private var INSTANCE: SubtitleRepository? = null
@@ -36,8 +34,6 @@ class SubtitleRepository(
                 INSTANCE ?: SubtitleRepository().also { INSTANCE = it }
             }
         }
-
-        private val SUPPORTED_SUBTITLE_EXTS = setOf("srt", "vtt", "ass", "ssa", "sub")
     }
 
     private val gson by lazy { Gson() }
@@ -57,7 +53,6 @@ class SubtitleRepository(
 
         // 1. 获取迅雷字幕
         val xunleiSubtitles = fetchXunleiSubtitles(searchKeyword)
-        resultList.addAll(xunleiSubtitles)
 
         // 2. 获取 115 网盘同目录下的字幕文件
         if (oneOneFiveSubtitles.isNotEmpty()) {
@@ -66,13 +61,13 @@ class SubtitleRepository(
 
         // 3. 按照字幕时长与视频时长的差值 (abs(subtitleDuration - videoDuration)) 从小到大排序
         if (videoDurationMs > 0) {
-            resultList.sortBy { item ->
+            resultList.addAll(xunleiSubtitles.sortedBy { item ->
                 if (item.durationMs > 0) {
                     abs(item.durationMs - videoDurationMs)
                 } else {
                     Long.MAX_VALUE / 2 // 无时长信息的字幕排在后侧
                 }
-            }
+            })
         }
 
         XLog.i("SubtitleRepository: 搜索关键字 [$searchKeyword] 共获取 ${resultList.size} 条字幕 (迅雷: ${xunleiSubtitles.size}, 115: ${resultList.size - xunleiSubtitles.size})")
@@ -135,10 +130,10 @@ class SubtitleRepository(
      * 下载字幕并处理转换（若为 ASS/SSA/SUB 格式自动转换为 SRT 文本）
      * @return 转换或保存后的标准本地 SRT/VTT File，方便传给播放器 GSYSubtitleSource
      */
-    suspend fun downloadAndPrepareSubtitle(context: Context, item: SubtitleItem): File? =
+    suspend fun downloadAndPrepareSubtitle(cacheDirFile: File, item: SubtitleItem): File? =
         withContext(Dispatchers.IO) {
             try {
-                val cacheDir = File(context.cacheDir, "subtitles").apply { if (!exists()) mkdirs() }
+                val cacheDir = File(cacheDirFile, "subtitles").apply { if (!exists()) mkdirs() }
                 val rawFile = File(cacheDir, "raw_${item.id}.${item.ext}")
                 val targetSrtFile = File(cacheDir, "ready_${item.id}.srt")
 
@@ -189,12 +184,12 @@ class SubtitleRepository(
 
     /**
      * 将字幕文件下载并上传到 115 目录
-     * @param context Context
+     * @param cacheDirFile context.cacheDir
      * @param item 字幕数据对象
      * @param targetCid 115 目标目录 CID
      */
     suspend fun uploadSubtitleTo115(
-        context: Context,
+        cacheDirFile: File,
         item: SubtitleItem,
         targetCid: String
     ): BaseReturnMessage = withContext(Dispatchers.IO) {
@@ -206,7 +201,7 @@ class SubtitleRepository(
         }
 
         // 1. 下载并转换/准备本地字幕文件
-        val srtFile = downloadAndPrepareSubtitle(context, item)
+        val srtFile = downloadAndPrepareSubtitle(cacheDirFile, item)
             ?: return@withContext BaseReturnMessage(state = false, message = "下载字幕文件失败")
 
         // 2. 构造目标文件名（保证扩展名为 .srt 或原始扩展名）
@@ -219,7 +214,7 @@ class SubtitleRepository(
             "$rawName.srt"
         }
 
-        val cacheDir = srtFile.parentFile ?: context.cacheDir
+        val cacheDir = srtFile.parentFile ?: cacheDirFile
         val tempUploadFile = File(cacheDir, uploadFileName)
         srtFile.copyTo(tempUploadFile, overwrite = true)
 

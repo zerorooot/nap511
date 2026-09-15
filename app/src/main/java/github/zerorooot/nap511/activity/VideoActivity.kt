@@ -175,8 +175,20 @@ class VideoActivity : AppCompatActivity() {
             }
 
             // 2. 倍速适配器
-            val speedValues = floatArrayOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 2.5f, 3.0f)
-            val speedTitles = listOf("0.5X", "0.75X", "1.0X", "1.25X", "1.5X", "1.75X", "2.0X", "2.25X", "2.5X", "3.0X")
+            val speedValues =
+                floatArrayOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 2.5f, 3.0f)
+            val speedTitles = listOf(
+                "0.5X",
+                "0.75X",
+                "1.0X",
+                "1.25X",
+                "1.5X",
+                "1.75X",
+                "2.0X",
+                "2.25X",
+                "2.5X",
+                "3.0X"
+            )
             val defaultSpeedIndex = 2
             val speedAdapter = VideoOptionAdapter(speedTitles, defaultSpeedIndex) { index, _ ->
                 val speedVal = speedValues[index]
@@ -274,7 +286,10 @@ class VideoActivity : AppCompatActivity() {
                             alpha = if (state.hasNext) 1.0f else 0.3f
                         }
                         if (::subtitleAdapter.isInitialized) {
-                            subtitleAdapter.updateData(state.subtitles, state.selectedSubtitle?.id ?: "")
+                            subtitleAdapter.updateData(
+                                state.subtitles,
+                                state.selectedSubtitle?.id ?: ""
+                            )
                             subtitleAdapter.updateSelectedId(state.selectedSubtitle?.id ?: "")
                         }
                         updateSubtitleEmptyState(state)
@@ -399,10 +414,10 @@ class VideoActivity : AppCompatActivity() {
             items = uiState.subtitles,
             selectedId = uiState.selectedSubtitle?.id ?: "",
             onUploadClick = { subtitleItem ->
-                viewModel.uploadSubtitle(this, subtitleItem, videoPlayer.duration)
+                viewModel.uploadSubtitle(this.cacheDir, subtitleItem)
             }
         ) { subtitleItem ->
-            viewModel.selectSubtitle(this, subtitleItem) { srtFile ->
+            viewModel.selectSubtitle(this.cacheDir, subtitleItem) { srtFile ->
                 val source = GSYSubtitleSource.Builder(android.net.Uri.fromFile(srtFile).toString())
                     .setLabel(subtitleItem.simpleName)
                     .setId(subtitleItem.id)

@@ -707,7 +707,7 @@
                     android:layout_marginBottom="8dp"
                     android:background="@drawable/bg_control_pill"
                     android:gravity="center"
-                    android:text="清除/移除当前字幕"
+                    android:text="移除当前字幕"
                     android:textColor="#FF5252"
                     android:textSize="12sp" />
 

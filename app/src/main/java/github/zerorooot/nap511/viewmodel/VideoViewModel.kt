@@ -135,7 +135,6 @@ class VideoViewModel : ViewModel() {
                         height = height,
                         index = targetIndex,
                         fileName = name,
-                        parentId = launchVideoParams.categoryId,
                         pickCode = pickCode,
                         videoUrl = "http://115.com/api/video/m3u8/${pickCode}.m3u8"
                     )
@@ -314,9 +313,9 @@ class VideoViewModel : ViewModel() {
     /**
      * 下载选中的字幕文件并回调准备好的本地 File
      */
-    fun selectSubtitle(context: Context, item: SubtitleItem, onReady: (File) -> Unit) {
+    fun selectSubtitle(cacheDirFile: File, item: SubtitleItem, onReady: (File) -> Unit) {
         viewModelScope.launch {
-            val file = subtitleRepository.downloadAndPrepareSubtitle(context, item)
+            val file = subtitleRepository.downloadAndPrepareSubtitle(cacheDirFile, item)
             if (file != null) {
                 _uiState.update { it.copy(selectedSubtitle = item) }
                 onReady(file)
@@ -357,17 +356,17 @@ class VideoViewModel : ViewModel() {
     /**
      * 上传指定的字幕文件到当前视频所在的 115 目录 (parentCid)
      */
-    fun uploadSubtitle(context: Context, item: SubtitleItem, videoDurationMs: Long = 0L) {
+    fun uploadSubtitle(cacheDirFile: File, item: SubtitleItem) {
         val parentCid = launchVideoParams.categoryId
         viewModelScope.launch {
             _uiEvent.emit(VideoUiEvent.Toast("正在将字幕上传至 115 网盘..."))
             runCatching {
-                subtitleRepository.uploadSubtitleTo115(context, item, parentCid)
+                subtitleRepository.uploadSubtitleTo115(cacheDirFile, item, parentCid)
             }.onSuccess { result ->
                 if (result.state) {
                     App.instance.toast("字幕上传成功！已保存到 115 当前目录")
                     // 重新加载当前字幕列表，以便显示刚上传到 115 同目录的字幕
-                    loadSubtitles(videoDurationMs)
+                    //loadSubtitles(videoDurationMs)
                     //刷新文件列表
                     DialogEventBus.getInstance().emit(DialogEvent.RefreshFileList(parentCid))
                 } else {
