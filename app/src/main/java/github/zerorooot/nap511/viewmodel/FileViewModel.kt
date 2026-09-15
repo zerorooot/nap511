@@ -52,10 +52,10 @@ import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DialogEvent
-import github.zerorooot.nap511.util.DialogEventBus
-import github.zerorooot.nap511.util.FileCacheManager
-import github.zerorooot.nap511.util.UserSessionManager
+import github.zerorooot.nap511.util.bus.DialogEvent
+import github.zerorooot.nap511.util.bus.DialogEventBus
+import github.zerorooot.nap511.util.cache.FileCacheManager
+import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.deleteCoilCache
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.worker.OfflineTaskWorker

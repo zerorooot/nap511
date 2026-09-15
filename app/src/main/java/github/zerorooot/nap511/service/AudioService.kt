@@ -14,8 +14,8 @@ import androidx.core.app.NotificationCompat
 import androidx.media.app.NotificationCompat.MediaStyle
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.player.AudioGSYManager
-import github.zerorooot.nap511.util.AudioEvent
-import github.zerorooot.nap511.util.AudioEventBus
+import github.zerorooot.nap511.util.bus.AudioEvent
+import github.zerorooot.nap511.util.bus.AudioEventBus
 
 /**
  */

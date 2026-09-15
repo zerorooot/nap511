@@ -1,10 +1,11 @@
-package github.zerorooot.nap511.util
+package github.zerorooot.nap511.util.network
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import github.zerorooot.nap511.repository.SettingsRepository
+import github.zerorooot.nap511.util.ConfigKeyUtil
 
 object UserSessionManager {
     var cookie: String by mutableStateOf("")

@@ -4,8 +4,8 @@ import github.zerorooot.nap511.bean.BaseResponse
 import github.zerorooot.nap511.bean.CategoryDetailResponse
 import github.zerorooot.nap511.bean.RepeatListResponse
 import github.zerorooot.nap511.bean.RepeatStatusResponse
-import github.zerorooot.nap511.util.NetworkClient
-import github.zerorooot.nap511.util.UserSessionManager
+import github.zerorooot.nap511.util.network.NetworkClient
+import github.zerorooot.nap511.util.network.UserSessionManager
 import okhttp3.Interceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory

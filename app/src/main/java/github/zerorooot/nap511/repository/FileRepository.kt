@@ -24,9 +24,9 @@ import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.OfflineService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.NetworkClient
-import github.zerorooot.nap511.util.Sha1Util
-import github.zerorooot.nap511.util.UserSessionManager
+import github.zerorooot.nap511.util.crypto.Sha1Util
+import github.zerorooot.nap511.util.network.NetworkClient
+import github.zerorooot.nap511.util.network.UserSessionManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import okhttp3.FormBody

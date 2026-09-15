@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.util
+package github.zerorooot.nap511.util.crypto
 
 import java.math.BigInteger
 

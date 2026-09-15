@@ -88,9 +88,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.LoginResult
-import github.zerorooot.nap511.util.OneOneFiveAuthManager
-import github.zerorooot.nap511.util.UserSessionManager
+import github.zerorooot.nap511.util.network.LoginResult
+import github.zerorooot.nap511.util.network.OneOneFiveAuthManager
+import github.zerorooot.nap511.util.network.UserSessionManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds

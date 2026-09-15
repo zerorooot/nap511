@@ -6,8 +6,8 @@ import github.zerorooot.nap511.bean.OfflineListCount
 import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.bean.SignBean
 import github.zerorooot.nap511.bean.TorrentFileBean
-import github.zerorooot.nap511.util.NetworkClient
-import github.zerorooot.nap511.util.UserSessionManager
+import github.zerorooot.nap511.util.network.NetworkClient
+import github.zerorooot.nap511.util.network.UserSessionManager
 import okhttp3.Interceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory

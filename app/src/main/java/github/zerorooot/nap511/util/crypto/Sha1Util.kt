@@ -1,11 +1,10 @@
-package github.zerorooot.nap511.util
+package github.zerorooot.nap511.util.crypto
 
 import java.math.BigInteger
 import java.security.MessageDigest
 import java.util.*
 import kotlin.math.floor
 import kotlin.math.min
-
 
 class Sha1Util {
     data class KeyBean(val data: String, val key: List<Int>)

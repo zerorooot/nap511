@@ -32,10 +32,10 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.LaunchVideoParams
 import github.zerorooot.nap511.player.MyGSYVideoPlayer
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.UserSessionManager
-import github.zerorooot.nap511.util.VideoErrorInterceptor
-import github.zerorooot.nap511.util.VideoErrorMapper
-import github.zerorooot.nap511.util.isHandledException
+import github.zerorooot.nap511.util.network.UserSessionManager
+import github.zerorooot.nap511.util.network.VideoErrorInterceptor
+import github.zerorooot.nap511.util.network.VideoErrorMapper
+import github.zerorooot.nap511.util.network.isHandledException
 import github.zerorooot.nap511.viewmodel.VideoUiEvent
 import github.zerorooot.nap511.viewmodel.VideoViewModel
 import kotlinx.coroutines.launch

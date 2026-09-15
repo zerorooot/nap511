@@ -1,9 +1,23 @@
-package github.zerorooot.nap511.util
+package github.zerorooot.nap511.util.bus
 
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+
+object AudioEventBus {
+    private val _events = MutableSharedFlow<AudioEvent>(extraBufferCapacity = 1)
+    val events = _events.asSharedFlow()
+
+    fun sendEvent(event: AudioEvent) {
+        _events.tryEmit(event)
+    }
+}
+
+sealed class AudioEvent {
+    object SyncState : AudioEvent()
+    object Stop : AudioEvent()
+}
 
 sealed interface DialogEvent {
 

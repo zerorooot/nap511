@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.util
+package github.zerorooot.nap511.util.network
 
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit

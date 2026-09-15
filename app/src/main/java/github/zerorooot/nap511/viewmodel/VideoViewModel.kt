@@ -11,8 +11,8 @@ import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.network.parseOssErrorWithDom
 import github.zerorooot.nap511.util.onFailureToastAndLog
-import github.zerorooot.nap511.util.parseOssErrorWithDom
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow

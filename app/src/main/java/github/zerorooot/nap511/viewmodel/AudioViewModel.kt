@@ -15,9 +15,9 @@ import github.zerorooot.nap511.player.AudioGSYManager
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.service.AudioService
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.AudioEvent
-import github.zerorooot.nap511.util.AudioEventBus
-import github.zerorooot.nap511.util.UserSessionManager
+import github.zerorooot.nap511.util.bus.AudioEvent
+import github.zerorooot.nap511.util.bus.AudioEventBus
+import github.zerorooot.nap511.util.network.UserSessionManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

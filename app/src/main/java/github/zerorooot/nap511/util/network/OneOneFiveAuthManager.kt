@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.util
+package github.zerorooot.nap511.util.network
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory

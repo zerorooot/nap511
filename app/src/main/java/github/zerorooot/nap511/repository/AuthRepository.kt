@@ -9,8 +9,8 @@ import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.bean.Base115Response
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.NetworkClient
-import github.zerorooot.nap511.util.UserSessionManager
+import github.zerorooot.nap511.util.network.NetworkClient
+import github.zerorooot.nap511.util.network.UserSessionManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
