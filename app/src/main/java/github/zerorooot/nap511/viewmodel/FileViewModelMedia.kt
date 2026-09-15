@@ -22,6 +22,7 @@ import github.zerorooot.nap511.util.getCoilCacheUrl
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -167,19 +168,13 @@ internal fun FileViewModel.updateVideoFileBeans(
 }
 
 private fun isSubtitleFile(fileName: String): Boolean {
-    val SUPPORTED_SUBTITLE_EXTS = setOf("srt", "vtt", "ass", "ssa", "sub")
+    val SUPPORTED_SUBTITLE_EXTS = setOf("srt", "vtt", "ass", "ssa", "sub", "lrc")
     val ext = fileName.substringAfterLast('.', "").lowercase(Locale.US)
     return SUPPORTED_SUBTITLE_EXTS.contains(ext)
 }
 
-internal fun FileViewModel.getVideoInfo(fileBean: FileBean) {
-    val pickCode = fileBean.pickCode
-    val fileName = fileBean.name
-    val videoList = fileBeanList.filter { it.isVideo == 1 && it.playLong != 0.0 }
-        .map { VideoBean(name = it.name, pickCode = it.pickCode, fileId = fileBean.fileId) }
-    val fileBeanIndex = videoList.indexOfFirst { it.pickCode == pickCode }
-
-    val localSubtitleList = fileBeanList.filter { fileBean ->
+internal fun FileViewModel.getLocalSubtitleList(): List<SubtitleItem> {
+    return fileBeanList.filter { fileBean ->
         !fileBean.isFolder && isSubtitleFile(fileBean.name)
     }.map { fileBean ->
         val ext = fileBean.name.substringAfterLast('.', "srt").lowercase(Locale.US)
@@ -196,6 +191,16 @@ internal fun FileViewModel.getVideoInfo(fileBean: FileBean) {
             durationMs = durationMs
         )
     }
+}
+
+internal fun FileViewModel.getVideoInfo(fileBean: FileBean) {
+    val pickCode = fileBean.pickCode
+    val fileName = fileBean.name
+    val videoList = fileBeanList.filter { it.isVideo == 1 && it.playLong != 0.0 }
+        .map { VideoBean(name = it.name, pickCode = it.pickCode, fileId = fileBean.fileId) }
+    val fileBeanIndex = videoList.indexOfFirst { it.pickCode == pickCode }
+
+    val localSubtitleList = getLocalSubtitleList()
 
 
 
@@ -260,7 +265,9 @@ internal fun FileViewModel.downloadSmallFile(
         }
         if (bytes != null) {
             setRefreshingStatus(false)
-            onSuccess(bytes)
+            withContext(Dispatchers.Main) {
+                onSuccess(bytes)
+            }
         } else {
             setRefreshingStatus(false)
         }

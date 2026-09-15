@@ -13,6 +13,7 @@ import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.downloadText
 import github.zerorooot.nap511.viewmodel.downloadWeb
+import github.zerorooot.nap511.viewmodel.getLocalSubtitleList
 import github.zerorooot.nap511.viewmodel.getTorrentTask
 import github.zerorooot.nap511.viewmodel.getVideoInfo
 import github.zerorooot.nap511.viewmodel.getZipListFile
@@ -49,7 +50,8 @@ class FileClickHandler(
     fun handleAudioClick(fileBean: FileBean) {
         onBottomBarShowChange(true)
         fileViewModel.setRefreshingStatus(false)
-        audioViewModel.playAudio(fileBean)
+        val localSubtitles = fileViewModel.getLocalSubtitleList()
+        audioViewModel.playAudio(fileBean, localSubtitles)
     }
 
     fun handlePhotoClick(fileBean: FileBean) {
