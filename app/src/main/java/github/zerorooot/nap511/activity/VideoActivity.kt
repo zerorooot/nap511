@@ -31,7 +31,6 @@ import com.shuyu.gsyvideoplayer.GSYVideoManager
 import com.shuyu.gsyvideoplayer.listener.GSYSampleCallBack
 import com.shuyu.gsyvideoplayer.player.PlayerFactory
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.adapter.VideoEpisodeAdapter
 import github.zerorooot.nap511.adapter.VideoOptionAdapter
 import github.zerorooot.nap511.bean.LaunchVideoParams
 import github.zerorooot.nap511.player.MyGSYVideoPlayer
@@ -52,7 +51,7 @@ import java.io.File
 class VideoActivity : AppCompatActivity() {
     private val viewModel: VideoViewModel by viewModels()
     private lateinit var videoPlayer: MyGSYVideoPlayer
-    private lateinit var episodeAdapter: VideoEpisodeAdapter
+    private lateinit var episodeAdapter: VideoOptionAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -114,9 +113,17 @@ class VideoActivity : AppCompatActivity() {
             rvDrawer.layoutManager = LinearLayoutManager(this)
 
             // 1. 选集适配器
-            episodeAdapter = VideoEpisodeAdapter(
-                videoList = viewModel.videoList,
-                currentPlayingIndex = viewModel.fileBeanIndex.value
+            val episodeTitles = viewModel.videoList.mapIndexed { index, item ->
+                val displayIndex = index + 1
+                if (item.name.isNotEmpty()) {
+                    "P$displayIndex  ${item.name}"
+                } else {
+                    "第 $displayIndex 集"
+                }
+            }
+            episodeAdapter = VideoOptionAdapter(
+                options = episodeTitles,
+                selectedIndex = viewModel.fileBeanIndex.value
             ) { index, _ ->
                 val isPortrait = resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
                 viewModel.playVideoAtIndex(index, isPortrait, videoPlayer.currentPositionWhenPlaying)
@@ -180,7 +187,7 @@ class VideoActivity : AppCompatActivity() {
                 launch {
                     viewModel.fileBeanIndex.collect { currentIndex ->
                         if (::episodeAdapter.isInitialized) {
-                            episodeAdapter.updateCurrentIndex(currentIndex)
+                            episodeAdapter.updateSelectedIndex(currentIndex)
                             if (currentIndex >= 0 && videoPlayer.currentDrawerType == MyGSYVideoPlayer.DrawerType.EPISODE) {
                                 videoPlayer.findViewById<RecyclerView>(R.id.rv_drawer)?.scrollToPosition(currentIndex)
                             }

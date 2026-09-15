@@ -15,7 +15,7 @@
     app:cardElevation="0dp">
 
     <TextView
-        android:id="@+id/tv_option_title"
+        android:id="@+id/tv_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
@@ -24,6 +24,8 @@
         android:paddingVertical="10dp"
         android:textColor="#D0FFFFFF"
         android:textSize="14sp"
+        android:maxLines="2"
+        android:ellipsize="end"
         tools:text="1.0X" />
 
 </androidx.cardview.widget.CardView>

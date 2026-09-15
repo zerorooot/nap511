@@ -1,12 +1,12 @@
 package github.zerorooot.nap511.adapter
 
-import android.graphics.Color
 import android.graphics.Typeface
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.cardview.widget.CardView
+import androidx.core.graphics.toColorInt
 import androidx.recyclerview.widget.RecyclerView
 import github.zerorooot.nap511.R
 
@@ -18,7 +18,7 @@ class VideoOptionAdapter(
 
     class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val cardOption: CardView = itemView.findViewById(R.id.card_option)
-        val tvOptionTitle: TextView = itemView.findViewById(R.id.tv_option_title)
+        val tvTitle: TextView = itemView.findViewById(R.id.tv_title)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -28,17 +28,17 @@ class VideoOptionAdapter(
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val title = options[position]
-        holder.tvOptionTitle.text = title
+        val titleText = options[position]
+        holder.tvTitle.text = titleText
 
         if (position == selectedIndex) {
-            holder.cardOption.setCardBackgroundColor(Color.parseColor("#3342A5F5"))
-            holder.tvOptionTitle.setTypeface(null, Typeface.BOLD)
-            holder.tvOptionTitle.setTextColor(Color.parseColor("#42A5F5"))
+            holder.cardOption.setCardBackgroundColor("#3342A5F5".toColorInt())
+            holder.tvTitle.setTypeface(null, Typeface.BOLD)
+            holder.tvTitle.setTextColor("#42A5F5".toColorInt())
         } else {
-            holder.cardOption.setCardBackgroundColor(Color.parseColor("#1AFFFFFF"))
-            holder.tvOptionTitle.setTypeface(null, Typeface.NORMAL)
-            holder.tvOptionTitle.setTextColor(Color.parseColor("#D0FFFFFF"))
+            holder.cardOption.setCardBackgroundColor("#1AFFFFFF".toColorInt())
+            holder.tvTitle.setTypeface(null, Typeface.NORMAL)
+            holder.tvTitle.setTextColor("#D0FFFFFF".toColorInt())
         }
 
         holder.itemView.setOnClickListener {
@@ -48,18 +48,24 @@ class VideoOptionAdapter(
                 notifyItemChanged(oldIndex)
                 notifyItemChanged(selectedIndex)
             }
-            onOptionSelected(position, title)
+            onOptionSelected(position, titleText)
         }
     }
 
     override fun getItemCount(): Int = options.size
 
     fun updateSelectedIndex(newIndex: Int) {
-        if (selectedIndex != newIndex && newIndex in options.indices) {
+        if (selectedIndex != newIndex) {
             val oldIndex = selectedIndex
             selectedIndex = newIndex
-            notifyItemChanged(oldIndex)
-            notifyItemChanged(selectedIndex)
+            if (oldIndex in options.indices) notifyItemChanged(oldIndex)
+            if (newIndex in options.indices) notifyItemChanged(newIndex)
         }
+    }
+
+    fun updateData(newOptions: List<String>, newIndex: Int = selectedIndex) {
+        options = newOptions
+        selectedIndex = newIndex
+        notifyDataSetChanged()
     }
 }
