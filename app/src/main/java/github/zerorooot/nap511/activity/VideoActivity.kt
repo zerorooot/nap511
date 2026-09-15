@@ -108,9 +108,12 @@ class VideoActivity : AppCompatActivity() {
         videoPlayer.setVideoAllCallBack(gSYErrorCallBack)
         videoPlayer.startPlayLogic()
 
-        val rvEpisodes = videoPlayer.findViewById<RecyclerView>(R.id.rv_episodes)
-        if (rvEpisodes != null) {
-            rvEpisodes.layoutManager = LinearLayoutManager(this)
+        // 通用合并抽屉面板设置：初始化单一 RecyclerView 及其各项适配器
+        val rvDrawer = videoPlayer.findViewById<RecyclerView>(R.id.rv_drawer)
+        if (rvDrawer != null) {
+            rvDrawer.layoutManager = LinearLayoutManager(this)
+
+            // 1. 选集适配器
             episodeAdapter = VideoEpisodeAdapter(
                 videoList = viewModel.videoList,
                 currentPlayingIndex = viewModel.fileBeanIndex.value
@@ -119,32 +122,44 @@ class VideoActivity : AppCompatActivity() {
                 viewModel.playVideoAtIndex(index, isPortrait, videoPlayer.currentPositionWhenPlaying)
                 videoPlayer.hideAllDrawers()
             }
-            rvEpisodes.adapter = episodeAdapter
-        }
 
-        val rvSpeeds = videoPlayer.findViewById<RecyclerView>(R.id.rv_speeds)
-        if (rvSpeeds != null) {
-            rvSpeeds.layoutManager = LinearLayoutManager(this)
+            // 2. 倍速适配器
             val speedValues = floatArrayOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 2.5f, 3.0f)
             val speedTitles = listOf("0.5X", "0.75X", "1.0X", "1.25X", "1.5X", "1.75X", "2.0X", "2.25X", "2.5X", "3.0X")
             val defaultSpeedIndex = 2
-            rvSpeeds.adapter = VideoOptionAdapter(speedTitles, defaultSpeedIndex) { index, _ ->
+            val speedAdapter = VideoOptionAdapter(speedTitles, defaultSpeedIndex) { index, _ ->
                 val speedVal = speedValues[index]
                 videoPlayer.currentPlayer.setSpeed(speedVal, true)
                 videoPlayer.setSpeedText(if (speedVal == 1.0f) "倍速" else "${speedVal}X")
                 videoPlayer.hideAllDrawers()
             }
-        }
 
-        val rvScales = videoPlayer.findViewById<RecyclerView>(R.id.rv_scales)
-        if (rvScales != null) {
-            rvScales.layoutManager = LinearLayoutManager(this)
+            // 3. 画面比例适配器
             val scaleTypes = intArrayOf(0, 1, 2, 3, 4)
             val scaleTitles = listOf("默认", "16:9", "4:3", "全屏", "拉伸")
             val defaultScaleIndex = 0
-            rvScales.adapter = VideoOptionAdapter(scaleTitles, defaultScaleIndex) { index, _ ->
+            val scaleAdapter = VideoOptionAdapter(scaleTitles, defaultScaleIndex) { index, _ ->
                 videoPlayer.setAspectScale(scaleTypes[index])
                 videoPlayer.hideAllDrawers()
+            }
+
+            // 4. 监听抽屉打开事件，根据抽屉类型 (选集/倍速/画面比例) 动态切换 rvDrawer 的 Adapter
+            videoPlayer.setOnDrawerOpenListener { type ->
+                when (type) {
+                    MyGSYVideoPlayer.DrawerType.EPISODE -> {
+                        rvDrawer.adapter = episodeAdapter
+                        val currentIndex = viewModel.fileBeanIndex.value
+                        if (currentIndex >= 0) {
+                            rvDrawer.scrollToPosition(currentIndex)
+                        }
+                    }
+                    MyGSYVideoPlayer.DrawerType.SPEED -> {
+                        rvDrawer.adapter = speedAdapter
+                    }
+                    MyGSYVideoPlayer.DrawerType.SCALE -> {
+                        rvDrawer.adapter = scaleAdapter
+                    }
+                }
             }
         }
 
@@ -166,8 +181,8 @@ class VideoActivity : AppCompatActivity() {
                     viewModel.fileBeanIndex.collect { currentIndex ->
                         if (::episodeAdapter.isInitialized) {
                             episodeAdapter.updateCurrentIndex(currentIndex)
-                            if (currentIndex >= 0) {
-                                videoPlayer.findViewById<RecyclerView>(R.id.rv_episodes)?.scrollToPosition(currentIndex)
+                            if (currentIndex >= 0 && videoPlayer.currentDrawerType == MyGSYVideoPlayer.DrawerType.EPISODE) {
+                                videoPlayer.findViewById<RecyclerView>(R.id.rv_drawer)?.scrollToPosition(currentIndex)
                             }
                         }
                     }

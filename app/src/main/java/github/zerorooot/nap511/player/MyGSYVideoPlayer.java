@@ -29,12 +29,28 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     private TextView mMoreScale;
     private TextView switchSpeed;
     private TextView switchEpisode;
-    private View layoutEpisodeDrawer;
-    private View closeEpisodeDrawer;
-    private View layoutSpeedDrawer;
-    private View closeSpeedDrawer;
-    private View layoutScaleDrawer;
-    private View closeScaleDrawer;
+
+    // 统一的合并抽屉面板组件
+    private View layoutDrawer;
+    private TextView tvDrawerTitle;
+    private View closeDrawer;
+    private DrawerType mCurrentDrawerType = null;
+    private OnDrawerOpenListener mOnDrawerOpenListener;
+
+    /**
+     * 抽屉类型枚举：选集、倍速、画面比例
+     */
+    public enum DrawerType {
+        EPISODE, SPEED, SCALE
+    }
+
+    /**
+     * 抽屉打开监听接口，用于 Activity/Fragment 动态切换 RecyclerView 适配器
+     */
+    public interface OnDrawerOpenListener {
+        void onDrawerOpen(DrawerType type);
+    }
+
     private int mType = 0;
 
     long forwardRewindIncrementMs = 15000;
@@ -80,6 +96,20 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         }
     }
 
+    /**
+     * 设置抽屉打开监听器
+     */
+    public void setOnDrawerOpenListener(OnDrawerOpenListener listener) {
+        this.mOnDrawerOpenListener = listener;
+    }
+
+    /**
+     * 获取当前打开的抽屉类型
+     */
+    public DrawerType getCurrentDrawerType() {
+        return mCurrentDrawerType;
+    }
+
     private void initView() {
         batteryTextView = findViewById(R.id.batteryTextView);
         timeTextView = findViewById(R.id.timeTextView);
@@ -88,31 +118,25 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         switchSpeed = findViewById(R.id.switchSpeed);
         switchEpisode = findViewById(R.id.switchEpisode);
 
-        layoutEpisodeDrawer = findViewById(R.id.layout_episode_drawer);
-        closeEpisodeDrawer = findViewById(R.id.close_episode_drawer);
-        layoutSpeedDrawer = findViewById(R.id.layout_speed_drawer);
-        closeSpeedDrawer = findViewById(R.id.close_speed_drawer);
-        layoutScaleDrawer = findViewById(R.id.layout_scale_drawer);
-        closeScaleDrawer = findViewById(R.id.close_scale_drawer);
+        // 绑定统一的右侧抽屉面板及其组件
+        layoutDrawer = findViewById(R.id.layout_drawer);
+        tvDrawerTitle = findViewById(R.id.tv_drawer_title);
+        closeDrawer = findViewById(R.id.close_drawer);
 
+        // 底部各按钮绑定点击事件，打开对应类型的抽屉
         if (switchEpisode != null) {
-            switchEpisode.setOnClickListener(v -> toggleDrawer(layoutEpisodeDrawer));
+            switchEpisode.setOnClickListener(v -> openDrawer(DrawerType.EPISODE, "选集"));
         }
         if (switchSpeed != null) {
-            switchSpeed.setOnClickListener(v -> toggleDrawer(layoutSpeedDrawer));
+            switchSpeed.setOnClickListener(v -> openDrawer(DrawerType.SPEED, "播放倍速"));
         }
         if (mMoreScale != null) {
-            mMoreScale.setOnClickListener(v -> toggleDrawer(layoutScaleDrawer));
+            mMoreScale.setOnClickListener(v -> openDrawer(DrawerType.SCALE, "画面比例"));
         }
 
-        if (closeEpisodeDrawer != null) {
-            closeEpisodeDrawer.setOnClickListener(v -> hideAllDrawers());
-        }
-        if (closeSpeedDrawer != null) {
-            closeSpeedDrawer.setOnClickListener(v -> hideAllDrawers());
-        }
-        if (closeScaleDrawer != null) {
-            closeScaleDrawer.setOnClickListener(v -> hideAllDrawers());
+        // 抽屉关闭按钮事件
+        if (closeDrawer != null) {
+            closeDrawer.setOnClickListener(v -> hideAllDrawers());
         }
     }
 
@@ -249,33 +273,45 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         }
     }
 
-    public void showDrawer(View drawer) {
-        hideAllDrawers();
-        if (drawer != null) {
-            drawer.setVisibility(VISIBLE);
-        }
-    }
-
-    public void toggleDrawer(View drawer) {
-        if (drawer != null) {
-            if (drawer.getVisibility() == VISIBLE) {
-                drawer.setVisibility(GONE);
-            } else {
-                showDrawer(drawer);
+    /**
+     * 打开指定类型的抽屉并更新标题
+     *
+     * @param type  抽屉类型 (选集/倍速/画面比例)
+     * @param title 抽屉标题文本
+     */
+    public void openDrawer(DrawerType type, String title) {
+        if (layoutDrawer != null) {
+            // 如果当前点击的抽屉已经处于显示状态，再次点击时则进行关抽屉切换
+            if (layoutDrawer.getVisibility() == VISIBLE && mCurrentDrawerType == type) {
+                hideAllDrawers();
+                return;
+            }
+            if (tvDrawerTitle != null) {
+                tvDrawerTitle.setText(title);
+            }
+            mCurrentDrawerType = type;
+            layoutDrawer.setVisibility(VISIBLE);
+            if (mOnDrawerOpenListener != null) {
+                mOnDrawerOpenListener.onDrawerOpen(type);
             }
         }
     }
 
+    /**
+     * 隐藏抽屉面板
+     */
     public void hideAllDrawers() {
-        if (layoutEpisodeDrawer != null) layoutEpisodeDrawer.setVisibility(GONE);
-        if (layoutSpeedDrawer != null) layoutSpeedDrawer.setVisibility(GONE);
-        if (layoutScaleDrawer != null) layoutScaleDrawer.setVisibility(GONE);
+        if (layoutDrawer != null) {
+            layoutDrawer.setVisibility(GONE);
+        }
+        mCurrentDrawerType = null;
     }
 
+    /**
+     * 判断当前抽屉面板是否正在显示
+     */
     public boolean isAnyDrawerShowing() {
-        return (layoutEpisodeDrawer != null && layoutEpisodeDrawer.getVisibility() == VISIBLE)
-                || (layoutSpeedDrawer != null && layoutSpeedDrawer.getVisibility() == VISIBLE)
-                || (layoutScaleDrawer != null && layoutScaleDrawer.getVisibility() == VISIBLE);
+        return layoutDrawer != null && layoutDrawer.getVisibility() == VISIBLE;
     }
 
     @Override

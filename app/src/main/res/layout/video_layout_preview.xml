@@ -305,9 +305,9 @@
         android:max="100"
         android:progressDrawable="@drawable/video_progress" />
 
-    <!-- 右侧选集抽屉面板 (280dp) -->
+    <!-- 右侧通用抽屉面板 (280dp)，合并了选集、倍速、画面比例抽屉 -->
     <LinearLayout
-        android:id="@+id/layout_episode_drawer"
+        android:id="@+id/layout_drawer"
         android:layout_width="280dp"
         android:layout_height="match_parent"
         android:layout_alignParentEnd="true"
@@ -320,6 +320,7 @@
         android:paddingBottom="16dp"
         android:visibility="gone">
 
+        <!-- 抽屉头部标题及关闭按钮 -->
         <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -327,17 +328,22 @@
             android:layout_marginBottom="12dp">
 
             <TextView
+                android:id="@+id/tv_drawer_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_alignParentStart="true"
                 android:layout_centerVertical="true"
-                android:text="选集"
+                android:layout_toStartOf="@+id/close_drawer"
+                android:layout_marginEnd="8dp"
+                android:ellipsize="end"
+                android:singleLine="true"
                 android:textColor="@android:color/white"
                 android:textSize="16sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                tools:text="抽屉标题" />
 
             <ImageView
-                android:id="@+id/close_episode_drawer"
+                android:id="@+id/close_drawer"
                 android:layout_width="28dp"
                 android:layout_height="28dp"
                 android:layout_alignParentEnd="true"
@@ -348,111 +354,20 @@
                 android:src="@drawable/video_small_close" />
         </RelativeLayout>
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rv_episodes"
+        <!-- 列表容器：利用 FrameLayout 权重填充剩余空间，并通过 layout_gravity="center" 让内嵌的 RecyclerView 在选项较少时垂直居中 -->
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scrollbars="vertical" />
-    </LinearLayout>
+            android:layout_height="0dp"
+            android:layout_weight="1">
 
-    <!-- 右侧倍速抽屉面板 (280dp) -->
-    <LinearLayout
-        android:id="@+id/layout_speed_drawer"
-        android:layout_width="280dp"
-        android:layout_height="match_parent"
-        android:layout_alignParentEnd="true"
-        android:background="#E6000000"
-        android:clickable="true"
-        android:focusable="true"
-        android:orientation="vertical"
-        android:paddingHorizontal="12dp"
-        android:paddingTop="16dp"
-        android:paddingBottom="16dp"
-        android:visibility="gone">
-
-        <RelativeLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="4dp"
-            android:layout_marginBottom="12dp">
-
-            <TextView
-                android:layout_width="wrap_content"
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rv_drawer"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_alignParentStart="true"
-                android:layout_centerVertical="true"
-                android:text="播放倍速"
-                android:textColor="@android:color/white"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <ImageView
-                android:id="@+id/close_speed_drawer"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:padding="4dp"
-                android:scaleType="centerInside"
-                android:src="@drawable/video_small_close" />
-        </RelativeLayout>
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rv_speeds"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scrollbars="vertical" />
-    </LinearLayout>
-
-    <!-- 右侧画面比例抽屉面板 (280dp) -->
-    <LinearLayout
-        android:id="@+id/layout_scale_drawer"
-        android:layout_width="280dp"
-        android:layout_height="match_parent"
-        android:layout_alignParentEnd="true"
-        android:background="#E6000000"
-        android:clickable="true"
-        android:focusable="true"
-        android:orientation="vertical"
-        android:paddingHorizontal="12dp"
-        android:paddingTop="16dp"
-        android:paddingBottom="16dp"
-        android:visibility="gone">
-
-        <RelativeLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="4dp"
-            android:layout_marginBottom="12dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentStart="true"
-                android:layout_centerVertical="true"
-                android:text="画面比例"
-                android:textColor="@android:color/white"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <ImageView
-                android:id="@+id/close_scale_drawer"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:padding="4dp"
-                android:scaleType="centerInside"
-                android:src="@drawable/video_small_close" />
-        </RelativeLayout>
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rv_scales"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scrollbars="vertical" />
+                android:layout_gravity="center"
+                android:overScrollMode="never"
+                android:scrollbars="vertical" />
+        </FrameLayout>
     </LinearLayout>
 
 </RelativeLayout>
