@@ -278,25 +278,18 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
                 || (layoutScaleDrawer != null && layoutScaleDrawer.getVisibility() == VISIBLE);
     }
 
-    public void showEpisodeDrawer() {
-        showDrawer(layoutEpisodeDrawer);
-    }
-
-    public void hideEpisodeDrawer() {
-        hideAllDrawers();
-    }
-
-    public boolean isEpisodeDrawerShowing() {
-        return isAnyDrawerShowing();
+    @Override
+    protected void onClickUiToggle(MotionEvent e) {
+        if (isAnyDrawerShowing()) {
+            hideAllDrawers();
+            return;
+        }
+        super.onClickUiToggle(e);
     }
 
     public void setAspectScale(int type) {
         mType = type;
         resolveTypeUI();
-    }
-
-    public int getAspectScaleType() {
-        return mType;
     }
 
     public void setSpeedText(String text) {
@@ -305,15 +298,4 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         }
     }
 
-    public void setMoreScaleText(String text) {
-        if (mMoreScale != null) {
-            mMoreScale.setText(text);
-        }
-    }
-
-    @Override
-    protected void hideAllWidget() {
-        super.hideAllWidget();
-        hideAllDrawers();
-    }
 }
