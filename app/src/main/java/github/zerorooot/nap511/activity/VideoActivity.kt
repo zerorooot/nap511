@@ -23,12 +23,16 @@ import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MediaSource
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.shuyu.gsyvideoplayer.GSYVideoManager
 import com.shuyu.gsyvideoplayer.listener.GSYSampleCallBack
 import com.shuyu.gsyvideoplayer.player.PlayerFactory
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.adapter.VideoEpisodeAdapter
+import github.zerorooot.nap511.adapter.VideoOptionAdapter
 import github.zerorooot.nap511.bean.LaunchVideoParams
 import github.zerorooot.nap511.player.MyGSYVideoPlayer
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -48,6 +52,7 @@ import java.io.File
 class VideoActivity : AppCompatActivity() {
     private val viewModel: VideoViewModel by viewModels()
     private lateinit var videoPlayer: MyGSYVideoPlayer
+    private lateinit var episodeAdapter: VideoEpisodeAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -103,8 +108,52 @@ class VideoActivity : AppCompatActivity() {
         videoPlayer.setVideoAllCallBack(gSYErrorCallBack)
         videoPlayer.startPlayLogic()
 
+        val rvEpisodes = videoPlayer.findViewById<RecyclerView>(R.id.rv_episodes)
+        if (rvEpisodes != null) {
+            rvEpisodes.layoutManager = LinearLayoutManager(this)
+            episodeAdapter = VideoEpisodeAdapter(
+                videoList = viewModel.videoList,
+                currentPlayingIndex = viewModel.fileBeanIndex.value
+            ) { index, _ ->
+                val isPortrait = resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+                viewModel.playVideoAtIndex(index, isPortrait, videoPlayer.currentPositionWhenPlaying)
+                videoPlayer.hideAllDrawers()
+            }
+            rvEpisodes.adapter = episodeAdapter
+        }
+
+        val rvSpeeds = videoPlayer.findViewById<RecyclerView>(R.id.rv_speeds)
+        if (rvSpeeds != null) {
+            rvSpeeds.layoutManager = LinearLayoutManager(this)
+            val speedValues = floatArrayOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 2.5f, 3.0f)
+            val speedTitles = listOf("0.5X", "0.75X", "1.0X", "1.25X", "1.5X", "1.75X", "2.0X", "2.25X", "2.5X", "3.0X")
+            val defaultSpeedIndex = 2
+            rvSpeeds.adapter = VideoOptionAdapter(speedTitles, defaultSpeedIndex) { index, _ ->
+                val speedVal = speedValues[index]
+                videoPlayer.currentPlayer.setSpeed(speedVal, true)
+                videoPlayer.setSpeedText(if (speedVal == 1.0f) "倍速" else "${speedVal}X")
+                videoPlayer.hideAllDrawers()
+            }
+        }
+
+        val rvScales = videoPlayer.findViewById<RecyclerView>(R.id.rv_scales)
+        if (rvScales != null) {
+            rvScales.layoutManager = LinearLayoutManager(this)
+            val scaleTypes = intArrayOf(0, 1, 2, 3, 4)
+            val scaleTitles = listOf("默认", "16:9", "4:3", "全屏", "拉伸")
+            val defaultScaleIndex = 0
+            rvScales.adapter = VideoOptionAdapter(scaleTitles, defaultScaleIndex) { index, _ ->
+                videoPlayer.setAspectScale(scaleTypes[index])
+                videoPlayer.hideAllDrawers()
+            }
+        }
+
         onBackPressedDispatcher.addCallback(this) {
-            performBack()
+            if (videoPlayer.isAnyDrawerShowing) {
+                videoPlayer.hideAllDrawers()
+            } else {
+                performBack()
+            }
         }
 
         observeViewModel()
@@ -113,6 +162,16 @@ class VideoActivity : AppCompatActivity() {
     private fun observeViewModel() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    viewModel.fileBeanIndex.collect { currentIndex ->
+                        if (::episodeAdapter.isInitialized) {
+                            episodeAdapter.updateCurrentIndex(currentIndex)
+                            if (currentIndex >= 0) {
+                                videoPlayer.findViewById<RecyclerView>(R.id.rv_episodes)?.scrollToPosition(currentIndex)
+                            }
+                        }
+                    }
+                }
                 launch {
                     viewModel.hasPrev.collect { hasPrev ->
                         videoPlayer.findViewById<View>(R.id.prev_episode)?.apply {

@@ -148,13 +148,12 @@ inline fun <T> runCatchingWithToast(
     return runCatching(block).onFailureToastAndLog(tag, customMsg)
 }
 
-// 40位十六进制哈希正则 (BTih v1 标准)
-private val HEX_40_PATTERN = Pattern.compile("^[0-9a-fA-F]{40}$")
-
-// 32位Base32哈希正则 (早期或简短版磁力链标准)
-private val BASE32_32_PATTERN = Pattern.compile("^[a-zA-Z2-7]{32}$")
 
 fun String.handleText(): Set<String> {
+    // 40位十六进制哈希正则 (BTih v1 标准)
+    val HEX_40_PATTERN = Pattern.compile("^[0-9a-fA-F]{40}$")
+    // 32位Base32哈希正则 (早期或简短版磁力链标准)
+    val BASE32_32_PATTERN = Pattern.compile("^[a-zA-Z2-7]{32}$")
     return this.split("\n").map { i ->
         //支持复制无头磁力链接
         val a =

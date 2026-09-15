@@ -45,7 +45,10 @@ class VideoViewModel(
     val videoInfo: StateFlow<VideoInfoBean?> = _videoInfo.asStateFlow()
 
     private val _fileBeanIndex = MutableStateFlow(-1)
-//    val fileBeanIndex: StateFlow<Int> = _fileBeanIndex.asStateFlow()
+    val fileBeanIndex: StateFlow<Int> = _fileBeanIndex.asStateFlow()
+
+    val videoList: List<VideoBean>
+        get() = if (::launchVideoParams.isInitialized) launchVideoParams.videoList else emptyList()
 
     private val _hasPrev = MutableStateFlow(false)
     val hasPrev: StateFlow<Boolean> = _hasPrev.asStateFlow()
@@ -93,13 +96,17 @@ class VideoViewModel(
     fun playNextVideo(isNext: Boolean, isPortrait: Boolean, currentPositionMs: Long) {
         val currentIndex = _fileBeanIndex.value
         val nextIndex = if (isNext) currentIndex + 1 else currentIndex - 1
-        val fileBean = launchVideoParams.videoList.getOrNull(nextIndex)
+        playVideoAtIndex(nextIndex, isPortrait, currentPositionMs)
+    }
+
+    fun playVideoAtIndex(targetIndex: Int, isPortrait: Boolean, currentPositionMs: Long) {
+        if (targetIndex == _fileBeanIndex.value) return
+        val fileBean = launchVideoParams.videoList.getOrNull(targetIndex)
         if (fileBean == null) {
-            App.instance.toast("找不到新视频")
-            updatePrevNextButtonsState()
+            App.instance.toast("找不到视频")
             return
         }
-        _fileBeanIndex.value = nextIndex
+        _fileBeanIndex.value = targetIndex
         updatePrevNextButtonsState()
 
         viewModelScope.launch {
@@ -119,7 +126,7 @@ class VideoViewModel(
                     VideoInfoBean(
                         width = width,
                         height = height,
-                        index = nextIndex,
+                        index = targetIndex,
                         fileName = name,
                         pickCode = pickCode,
                         videoUrl = "http://115.com/api/video/m3u8/${pickCode}.m3u8"

@@ -10,6 +10,7 @@ import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.view.MenuItem;
 import android.view.MotionEvent;
+import android.view.View;
 import android.widget.TextView;
 
 import com.elvishew.xlog.XLog;
@@ -27,6 +28,13 @@ import github.zerorooot.nap511.R;
 public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     private TextView mMoreScale;
     private TextView switchSpeed;
+    private TextView switchEpisode;
+    private View layoutEpisodeDrawer;
+    private View closeEpisodeDrawer;
+    private View layoutSpeedDrawer;
+    private View closeSpeedDrawer;
+    private View layoutScaleDrawer;
+    private View closeScaleDrawer;
     private int mType = 0;
 
     long forwardRewindIncrementMs = 15000;
@@ -78,44 +86,34 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
 
         mMoreScale = findViewById(R.id.moreScale);
         switchSpeed = findViewById(R.id.switchSpeed);
+        switchEpisode = findViewById(R.id.switchEpisode);
 
-        // 切换画面比例
-        mMoreScale.setOnClickListener(v -> {
-            if (!mHadPlay) return;
-            mType = (mType + 1) % 5;
-            resolveTypeUI();
-        });
+        layoutEpisodeDrawer = findViewById(R.id.layout_episode_drawer);
+        closeEpisodeDrawer = findViewById(R.id.close_episode_drawer);
+        layoutSpeedDrawer = findViewById(R.id.layout_speed_drawer);
+        closeSpeedDrawer = findViewById(R.id.close_speed_drawer);
+        layoutScaleDrawer = findViewById(R.id.layout_scale_drawer);
+        closeScaleDrawer = findViewById(R.id.close_scale_drawer);
 
-        // 切换倍速
-        switchSpeed.setOnClickListener(v -> {
-            v.setOnCreateContextMenuListener((menu, v1, menuInfo) -> {
-                MenuItem speed5 = menu.add("× 0.5");
-                speed5.setOnMenuItemClickListener(e -> {
-                    getCurrentPlayer().setSpeed(0.5f, true);
-                    switchSpeed.setText("0.5X");
-                    return true;
-                });
-                MenuItem speed1 = menu.add("× 1.0");
-                speed1.setOnMenuItemClickListener(e -> {
-                    getCurrentPlayer().setSpeed(1f, true);
-                    switchSpeed.setText("倍速");
-                    return true;
-                });
-                MenuItem speed15 = menu.add("× 1.5");
-                speed15.setOnMenuItemClickListener(e -> {
-                    getCurrentPlayer().setSpeed(1.5f, true);
-                    switchSpeed.setText("1.5X");
-                    return true;
-                });
-                MenuItem speed2 = menu.add("× 2.0");
-                speed2.setOnMenuItemClickListener(e -> {
-                    getCurrentPlayer().setSpeed(2f, true);
-                    switchSpeed.setText("2.0X");
-                    return true;
-                });
-            });
-            v.showContextMenu(v.getX(), v.getY());
-        });
+        if (switchEpisode != null) {
+            switchEpisode.setOnClickListener(v -> toggleDrawer(layoutEpisodeDrawer));
+        }
+        if (switchSpeed != null) {
+            switchSpeed.setOnClickListener(v -> toggleDrawer(layoutSpeedDrawer));
+        }
+        if (mMoreScale != null) {
+            mMoreScale.setOnClickListener(v -> toggleDrawer(layoutScaleDrawer));
+        }
+
+        if (closeEpisodeDrawer != null) {
+            closeEpisodeDrawer.setOnClickListener(v -> hideAllDrawers());
+        }
+        if (closeSpeedDrawer != null) {
+            closeSpeedDrawer.setOnClickListener(v -> hideAllDrawers());
+        }
+        if (closeScaleDrawer != null) {
+            closeScaleDrawer.setOnClickListener(v -> hideAllDrawers());
+        }
     }
 
     /**
@@ -249,5 +247,73 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         } else if (x >= screenWidth * 0.6) {
             forwardOrRewind(forwardRewindIncrementMs);
         }
+    }
+
+    public void showDrawer(View drawer) {
+        hideAllDrawers();
+        if (drawer != null) {
+            drawer.setVisibility(VISIBLE);
+        }
+    }
+
+    public void toggleDrawer(View drawer) {
+        if (drawer != null) {
+            if (drawer.getVisibility() == VISIBLE) {
+                drawer.setVisibility(GONE);
+            } else {
+                showDrawer(drawer);
+            }
+        }
+    }
+
+    public void hideAllDrawers() {
+        if (layoutEpisodeDrawer != null) layoutEpisodeDrawer.setVisibility(GONE);
+        if (layoutSpeedDrawer != null) layoutSpeedDrawer.setVisibility(GONE);
+        if (layoutScaleDrawer != null) layoutScaleDrawer.setVisibility(GONE);
+    }
+
+    public boolean isAnyDrawerShowing() {
+        return (layoutEpisodeDrawer != null && layoutEpisodeDrawer.getVisibility() == VISIBLE)
+                || (layoutSpeedDrawer != null && layoutSpeedDrawer.getVisibility() == VISIBLE)
+                || (layoutScaleDrawer != null && layoutScaleDrawer.getVisibility() == VISIBLE);
+    }
+
+    public void showEpisodeDrawer() {
+        showDrawer(layoutEpisodeDrawer);
+    }
+
+    public void hideEpisodeDrawer() {
+        hideAllDrawers();
+    }
+
+    public boolean isEpisodeDrawerShowing() {
+        return isAnyDrawerShowing();
+    }
+
+    public void setAspectScale(int type) {
+        mType = type;
+        resolveTypeUI();
+    }
+
+    public int getAspectScaleType() {
+        return mType;
+    }
+
+    public void setSpeedText(String text) {
+        if (switchSpeed != null) {
+            switchSpeed.setText(text);
+        }
+    }
+
+    public void setMoreScaleText(String text) {
+        if (mMoreScale != null) {
+            mMoreScale.setText(text);
+        }
+    }
+
+    @Override
+    protected void hideAllWidget() {
+        super.hideAllWidget();
+        hideAllDrawers();
     }
 }
