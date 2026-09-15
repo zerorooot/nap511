@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,6 +66,9 @@ fun SubtitleSelectionSheet(
     val context = LocalContext.current
     val subtitleState = audioViewModel.uiState.subtitle
     val musicName = audioViewModel.uiState.playback.currentMusic?.name ?: ""
+    LaunchedEffect(Unit) {
+        audioViewModel.loadSubtitles()
+    }
 
     SubtitleSelectionSheet(
         musicName = musicName,
@@ -79,7 +83,13 @@ fun SubtitleSelectionSheet(
         onSetSubtitleOffset = { offset -> audioViewModel.setSubtitleOffset(offset) },
         onSelectSubtitle = { item -> audioViewModel.selectSubtitle(context.cacheDir, item) },
         onRemoveSubtitle = { audioViewModel.removeSubtitle() },
-        onUploadTo115 = { item -> audioViewModel.uploadSubtitleTo115(context.cacheDir, item, categoryId) },
+        onUploadTo115 = { item ->
+            audioViewModel.uploadSubtitleTo115(
+                context.cacheDir,
+                item,
+                categoryId
+            )
+        },
         onDismiss = onDismiss
     )
 }
@@ -129,21 +139,6 @@ fun SubtitleSelectionSheet(
     // 默认清除后缀名后的歌曲标题作为搜索关键词
     var searchInput by remember {
         mutableStateOf(if (musicName.contains(".")) musicName.substringBeforeLast(".") else musicName)
-    }
-
-    // 按照字幕时长与音频时长的绝对差值 |subtitleDuration - musicDuration| 从小到大排序
-    val sortedSubtitles = remember(subtitles, musicDurationMs) {
-        if (musicDurationMs > 0) {
-            subtitles.sortedBy { item ->
-                if (item.durationMs > 0) {
-                    abs(item.durationMs - musicDurationMs)
-                } else {
-                    Long.MAX_VALUE
-                }
-            }
-        } else {
-            subtitles
-        }
     }
 
     ModalBottomSheet(
@@ -220,7 +215,7 @@ fun SubtitleSelectionSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "候选字幕列表 (${sortedSubtitles.size})",
+                    text = "候选字幕列表 (${subtitles.size})",
                     style = MaterialTheme.typography.titleMedium
                 )
 
@@ -241,7 +236,7 @@ fun SubtitleSelectionSheet(
                 ) {
                     CircularProgressIndicator()
                 }
-            } else if (sortedSubtitles.isEmpty()) {
+            } else if (subtitles.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -256,7 +251,7 @@ fun SubtitleSelectionSheet(
                         .fillMaxWidth()
                         .heightIn(max = 300.dp)
                 ) {
-                    itemsIndexed(sortedSubtitles) { _, item ->
+                    itemsIndexed(subtitles) { _, item ->
                         val isSelected = item.id == selectedSubtitle?.id
                         val containerColor = if (isSelected) {
                             MaterialTheme.colorScheme.primaryContainer

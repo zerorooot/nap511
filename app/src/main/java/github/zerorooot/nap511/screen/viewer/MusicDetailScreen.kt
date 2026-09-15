@@ -145,7 +145,9 @@ fun MusicDetailScreen(
                                     currentIndex = subtitleState.currentIndex,
                                     onEntryClick = { audioViewModel.seekToSubtitleEntry(it) },
                                     onClose = { showFullLyrics = false },
-                                    modifier = Modifier.fillMaxSize()
+                                    modifier = Modifier
+                                        .aspectRatio(1f)
+                                        .fillMaxSize()
                                 )
                             } else {
                                 AlbumCover(
@@ -375,11 +377,26 @@ fun MusicDetailScreenPreview() {
                         ) {
                             MusicInfo(fileBean = mockFile)
                             Spacer(modifier = Modifier.height(16.dp))
-                            SpeedAndVolume(speed = 1.0f, volume = 0.5f, onChangeSpeed = {}, onChangeVolume = {})
+                            SpeedAndVolume(
+                                speed = 1.0f,
+                                volume = 0.5f,
+                                onChangeSpeed = {},
+                                onChangeVolume = {})
                             Spacer(modifier = Modifier.height(16.dp))
-                            PlaybackProgress(progress = 0.5f, positionText = "02:30/05:00", isUserSeeking = false, onSeekStart = {}, onSeekChange = {}, onSeekEnd = {})
+                            PlaybackProgress(
+                                progress = 0.5f,
+                                positionText = "02:30/05:00",
+                                isUserSeeking = false,
+                                onSeekStart = {},
+                                onSeekChange = {},
+                                onSeekEnd = {})
                             Spacer(modifier = Modifier.height(16.dp))
-                            PlaybackControls(isPlaying = true, isLoading = false, onRewind = {}, onFastForward = {}, onTogglePlayPause = {})
+                            PlaybackControls(
+                                isPlaying = true,
+                                isLoading = false,
+                                onRewind = {},
+                                onFastForward = {},
+                                onTogglePlayPause = {})
                         }
                     }
                 } else {
@@ -399,9 +416,24 @@ fun MusicDetailScreenPreview() {
                                 .padding(24.dp)
                         )
                         MusicInfo(fileBean = mockFile)
-                        SpeedAndVolume(speed = 1.0f, volume = 0.5f, onChangeSpeed = {}, onChangeVolume = {})
-                        PlaybackProgress(progress = 0.5f, positionText = "02:30/05:00", isUserSeeking = false, onSeekStart = {}, onSeekChange = {}, onSeekEnd = {})
-                        PlaybackControls(isPlaying = true, isLoading = false, onRewind = {}, onFastForward = {}, onTogglePlayPause = {})
+                        SpeedAndVolume(
+                            speed = 1.0f,
+                            volume = 0.5f,
+                            onChangeSpeed = {},
+                            onChangeVolume = {})
+                        PlaybackProgress(
+                            progress = 0.5f,
+                            positionText = "02:30/05:00",
+                            isUserSeeking = false,
+                            onSeekStart = {},
+                            onSeekChange = {},
+                            onSeekEnd = {})
+                        PlaybackControls(
+                            isPlaying = true,
+                            isLoading = false,
+                            onRewind = {},
+                            onFastForward = {},
+                            onTogglePlayPause = {})
                     }
                 }
             }

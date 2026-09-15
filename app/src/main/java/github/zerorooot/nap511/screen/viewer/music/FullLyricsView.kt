@@ -50,9 +50,9 @@ fun FullLyricsView(
     // 监听当前歌词索引变更，实现自动跟随滚动
     LaunchedEffect(currentIndex) {
         if (currentIndex in entries.indices) {
-            // 将当前行提前 2 行显示，使播放行接近中央
+            // 将当前行提前 5 行显示，使播放行接近中央
             listState.animateScrollToItem(
-                index = (currentIndex - 2).coerceAtLeast(0)
+                index = (currentIndex - 5).coerceAtLeast(0)
             )
         }
     }

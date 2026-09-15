@@ -450,7 +450,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             val result = subtitleRepository.uploadSubtitleTo115(cacheDirFile, item, targetCid)
             if (result.state) {
                 App.instance.toast("字幕上传成功！已保存到 115 当前目录")
-                loadSubtitles(localSubtitles = currentLocalSubtitles)
+                //loadSubtitles(localSubtitles = currentLocalSubtitles)
             } else {
                 App.instance.toast("字幕上传失败: ${result.message}")
             }
