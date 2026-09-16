@@ -239,6 +239,7 @@ class SubtitlePanelController(
         applyGroupVisual(
             styleBean,
             colorMap,
+            affectTextColor = false, // 颜色组不改文字颜色，保留 XML 原色
             affectBackground = true
         ) { style, v -> style.textColor == v }
 
@@ -275,6 +276,7 @@ class SubtitlePanelController(
     private inline fun <V> applyGroupVisual(
         style: SubtitleStyleBean,
         map: Map<Int, V>,
+        affectTextColor: Boolean = true,
         affectBackground: Boolean = false,
         crossinline isSelected: (SubtitleStyleBean, V) -> Boolean
     ) {
@@ -283,6 +285,7 @@ class SubtitlePanelController(
             videoPlayer.findViewById<TextView>(id)?.applySelectedVisual(
                 // 用传进来的规则，算出这个按钮当前该不该高亮
                 isSelected = isSelected(style, value),
+                affectTextColor = affectTextColor,
                 // 把"是否用背景高亮"透传给下面的视觉函数
                 affectBackground = affectBackground
             )
@@ -317,7 +320,12 @@ class SubtitlePanelController(
 
         // 背景色：选中用半透明蓝，未选中透明（仅在允许改背景时执行）
         if (affectBackground) {
-            setBackgroundColor(if (isSelected) ACTIVE_BG else Color.TRANSPARENT)
+            if (isSelected) {
+                setBackgroundColor(ACTIVE_BG)
+            } else {
+                // 恢复 XML 中定义的原本 Drawable 背景，而不是设为透明 ColorDrawable
+                setBackgroundResource(R.drawable.bg_control_pill)
+            }
         }
     }
 }
