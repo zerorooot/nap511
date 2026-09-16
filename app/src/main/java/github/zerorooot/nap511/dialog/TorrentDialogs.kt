@@ -1,22 +1,25 @@
 package github.zerorooot.nap511.dialog
 
 import android.text.format.Formatter
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CheckBox
-import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -33,13 +36,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.TorrentFileListWeb
-import github.zerorooot.nap511.screenitem.AutoSizableTextField
 import github.zerorooot.nap511.repository.SettingsRepository
+import github.zerorooot.nap511.screenitem.TorrentFileCellItem
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import my.nanihadesuka.compose.LazyColumnScrollbar
@@ -101,6 +102,8 @@ private fun SelectTorrentFileDialog(
     LaunchedEffect(Unit) {
         listState.requestScrollToItem(0)
     }
+
+    // 已选文件的索引与内容映射状态
     val selectMap = remember(torrentFileListWeb) {
         mutableStateMapOf<Int, TorrentFileListWeb>().apply {
             torrentFileListWeb.forEachIndexed { index, item ->
@@ -151,96 +154,172 @@ private fun SelectTorrentFileDialog(
     val maxDialogHeight =
         with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() * 0.65f }
 
-    AlertDialog(onDismissRequest = ::cancel, confirmButton = {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.offset(y = (-20).dp)
-        ) {
-            TextButton(
-                onClick = ::default,
-            ) {
-                Text(text = "默认")
-            }
-            TextButton(
-                onClick = {
-                    enter.invoke(selectMap)
-                },
+    AlertDialog(
+        onDismissRequest = ::cancel,
+        confirmButton = {
+            Button(
+                onClick = { enter.invoke(selectMap) }
             ) {
                 Text(text = "下载")
             }
-            TextButton(
-                onClick = ::selectAll,
-            ) {
-                Text(text = "全选")
-            }
-            TextButton(
-                onClick = ::reversal,
-            ) {
-                Text(text = "反选")
-            }
-            TextButton(
-                onClick = ::cancel,
-            ) {
+        },
+        dismissButton = {
+            TextButton(onClick = ::cancel) {
                 Text(text = "取消")
             }
-        }
-    }, title = { Text(text = "选择要下载的文件") }, text = {
-        Column(
-            modifier = Modifier.heightIn(max = maxDialogHeight)
-        ) {
-            AutoSizableTextField(
-                value = "已经选择${selectMap.size}/${fileCount}个，总计：${
-                    Formatter.formatFileSize(
-                        App.instance, selectMap.values.sumOf { it.size })
-                }\n" + "共${fileCount}个文件，总计：${fileSizeString}",
-                minFontSize = 30.sp,
-                maxLines = 2
+        },
+        title = {
+            Text(
+                text = "选择要下载的文件",
+                style = MaterialTheme.typography.titleLarge
             )
-            LazyColumnScrollbar(
-                state = listState,
-                settings = ScrollbarSettings.Default.copy(
-                    thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
-                )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = maxDialogHeight)
             ) {
-                LazyColumn(
-                    state = listState
+                // 1. 顶部摘要卡片
+                TorrentSummaryCard(
+                    selectedCount = selectMap.size,
+                    totalCount = fileCount,
+                    selectedSize = selectMap.values.sumOf { it.size },
+                    totalSizeString = fileSizeString
+                )
+
+                // 2. 批量操作按钮栏
+                TorrentBatchActionsRow(
+                    onSelectAll = ::selectAll,
+                    onReversal = ::reversal,
+                    onDefault = ::default
+                )
+
+                // 3. 文件列表区域
+                LazyColumnScrollbar(
+                    state = listState,
+                    settings = ScrollbarSettings.Default.copy(
+                        thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
+                    )
                 ) {
-                    itemsIndexed(items = torrentFileListWeb, key = { _, item ->
-                        item.hashCode()
-                    }) { index, item ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .selectable(
-                                    selected = isSelectedItem(index), onClick = {
-                                        onChangeState(index, item)
-                                    }, role = Role.RadioButton
-                                )
-                                .padding(8.dp)
-                        ) {
-                            Icon(
-                                modifier = Modifier.padding(end = 16.dp),
-                                imageVector = if (isSelectedItem(index)) {
-                                    Icons.Outlined.CheckBox
-                                } else {
-                                    Icons.Outlined.CheckBoxOutlineBlank
-                                },
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            DynamicEllipsizedTextView(
-                                text = item.path,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Text(
-                                text = item.sizeString, modifier = Modifier.weight(0.5f),
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        itemsIndexed(
+                            items = torrentFileListWeb,
+                            key = { _, item -> item.hashCode() }
+                        ) { index, item ->
+                            TorrentFileCellItem(
+                                item = item,
+                                isSelected = isSelectedItem(index),
+                                onClick = { onChangeState(index, item) }
                             )
                         }
                     }
                 }
             }
         }
-    })
+    )
+}
+
+/**
+ * 种子文件选择摘要卡片，展示已选文件数量与大小、总文件数量与大小。
+ */
+@Composable
+private fun TorrentSummaryCard(
+    selectedCount: Int,
+    totalCount: Int,
+    selectedSize: Long,
+    totalSizeString: String
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+        ),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "已选: $selectedCount / $totalCount 个文件",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = Formatter.formatFileSize(App.instance, selectedSize),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "总计: $totalCount 个文件",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                )
+                Text(
+                    text = totalSizeString,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 批量选择操作按钮栏（全选、反选、默认）。
+ */
+@Composable
+private fun TorrentBatchActionsRow(
+    onSelectAll: () -> Unit,
+    onReversal: () -> Unit,
+    onDefault: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OutlinedButton(
+            onClick = onSelectAll,
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+        ) {
+            Text(text = "全选", style = MaterialTheme.typography.labelMedium)
+        }
+        OutlinedButton(
+            onClick = onReversal,
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+        ) {
+            Text(text = "反选", style = MaterialTheme.typography.labelMedium)
+        }
+        OutlinedButton(
+            onClick = onDefault,
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+        ) {
+            Text(text = "默认", style = MaterialTheme.typography.labelMedium)
+        }
+    }
 }
 
 @Composable

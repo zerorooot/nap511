@@ -7,6 +7,7 @@ import android.view.View
 import android.widget.EditText
 import android.widget.FrameLayout
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.LinearSmoothScroller
 import androidx.recyclerview.widget.RecyclerView
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.adapter.VideoOptionAdapter
@@ -93,7 +94,8 @@ class VideoDrawerController(
                         rvDrawer.adapter = episodeAdapter
                         val currentIndex = viewModel.uiState.value.fileBeanIndex
                         if (currentIndex >= 0) {
-                            rvDrawer.scrollToPosition(currentIndex)
+                            // 将当前行提前 3 行显示，使播放行接近中央
+                            rvDrawer.scrollToPosition((currentIndex - 3).coerceAtLeast(0))
                         }
                     }
 
@@ -123,11 +125,13 @@ class VideoDrawerController(
         }
     }
 
+    // 更新选中的视频集数时
     fun updateEpisodeSelectedIndex(fileBeanIndex: Int) {
         episodeAdapter.updateSelectedIndex(fileBeanIndex)
         if (fileBeanIndex >= 0 && videoPlayer.currentDrawerType == MyGSYVideoPlayer.DrawerType.EPISODE) {
+            // 将当前行提前 3 行显示，使播放行接近中央
             videoPlayer.findViewById<RecyclerView>(R.id.rv_drawer)
-                ?.scrollToPosition(fileBeanIndex)
+                ?.scrollToPosition((fileBeanIndex - 3).coerceAtLeast(0))
         }
     }
 }
