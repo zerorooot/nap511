@@ -42,6 +42,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.screen.components.BaseTopAppBar
 import github.zerorooot.nap511.screen.viewer.music.AlbumCover
 import github.zerorooot.nap511.screen.viewer.music.FullLyricsView
@@ -52,6 +53,7 @@ import github.zerorooot.nap511.screen.viewer.music.SpeedAndVolume
 import github.zerorooot.nap511.screen.viewer.music.SubtitleDisplay
 import github.zerorooot.nap511.screen.viewer.music.SubtitleSelectionSheet
 import github.zerorooot.nap511.ui.theme.Nap511Theme
+import github.zerorooot.nap511.util.keyWord
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 
 /**

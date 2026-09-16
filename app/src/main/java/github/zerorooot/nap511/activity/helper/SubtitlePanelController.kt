@@ -73,11 +73,11 @@ class SubtitlePanelController(
                 .build()
             videoPlayer.setSubtitleSource(source)
             videoPlayer.setSubtitleEnabled(true)
-//            if (showToast) {
-//                App.instance.toast("字幕切换成功")
-//            } else {
-               // App.instance.toast("自动加载字幕: ${subtitleItem.simpleName}")
-//            }
+            if (showToast) {
+                App.instance.toast("字幕切换成功")
+            } else {
+                App.instance.toast("自动加载字幕: ${subtitleItem.simpleName}")
+            }
         }
     }
 
@@ -192,7 +192,7 @@ class SubtitlePanelController(
             rvDrawer.visibility = View.GONE
         } else if (list.isEmpty()) {
             tvEmpty.visibility = View.VISIBLE
-            tvEmpty.text = "未找到相关字幕，请尝试换别的关键字重新搜索"
+            tvEmpty.text = "'${viewModel.uiState.value.defaultSearchKeyword}'未找到相关字幕，请尝试换别的关键字重新搜索"
             rvDrawer.visibility = View.GONE
         } else {
             tvEmpty.visibility = View.GONE

@@ -148,6 +148,19 @@ inline fun <T> runCatchingWithToast(
     return runCatching(block).onFailureToastAndLog(tag, customMsg)
 }
 
+fun String.keyWord(positionAfterAt: Boolean): String {
+    return if (this.contains(".")) {
+        this.substringBeforeLast(".").let {
+            if (positionAfterAt) {
+                it.substringAfterLast(" ").substringAfterLast("@")
+            } else {
+                it
+            }
+        }
+    } else {
+        this
+    }
+}
 
 fun String.handleText(): Set<String> {
     // 40位十六进制哈希正则 (BTih v1 标准)

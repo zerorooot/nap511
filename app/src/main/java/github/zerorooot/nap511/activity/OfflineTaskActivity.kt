@@ -146,7 +146,7 @@ class OfflineTaskActivity : ComponentActivity() {
                     val notificationManager =
                         getSystemService(NOTIFICATION_SERVICE) as NotificationManager
                     notificationManager.cancel(PENDING_NOTIFICATION_ID)
-                    App.instance.toast("已开始离线下载")
+                    App.instance.toast("开始离线下载")
                 }
             } finally {
                 finishAndRemoveTask()

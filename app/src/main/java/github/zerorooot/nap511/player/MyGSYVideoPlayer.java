@@ -135,7 +135,7 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
             mMoreScale.setOnClickListener(v -> openDrawer(DrawerType.SCALE, "画面比例"));
         }
         if (switchSubtitle != null) {
-            switchSubtitle.setOnClickListener(v -> openDrawer(DrawerType.SUBTITLE, "字幕 " + mTitleTextView.getText() + " " + CommonUtil.stringForTime(getDuration())));
+            switchSubtitle.setOnClickListener(v -> openDrawer(DrawerType.SUBTITLE, mTitleTextView.getText() + " " + CommonUtil.stringForTime(getDuration())));
         }
 
         // 抽屉关闭按钮事件

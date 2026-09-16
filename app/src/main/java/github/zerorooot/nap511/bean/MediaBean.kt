@@ -37,6 +37,7 @@ data class VideoAttributeBean(
     val videoLinkMode: Boolean = false,
     val autoJumpRetry: Boolean = true,
     val hideLoading: Boolean = false,
+    val positionAfterAt: Boolean = false
 )
 
 data class VideoInfoBean(

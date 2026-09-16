@@ -163,9 +163,9 @@ fun FileMoreMenu(onClick: (MenuItemAction, Int) -> Unit) {
     val listOf = listOf(
         MenuItemAction.CUT_FILE,
         MenuItemAction.RENAME_FILE,
-        MenuItemAction.UNZIP_FILE,
         MenuItemAction.FILE_INFO,
         MenuItemAction.FORCE_OPEN,
+        MenuItemAction.UNZIP_FILE,
         MenuItemAction.ARIA2_DOWNLOAD,
         MenuItemAction.DELETE_FILE
     )

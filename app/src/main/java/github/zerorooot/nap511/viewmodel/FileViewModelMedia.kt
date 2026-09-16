@@ -209,7 +209,8 @@ internal fun FileViewModel.getVideoInfo(fileBean: FileBean) {
                 isAutoRotate = settingUiState.autoRotateEnabled,
                 videoLinkMode = settingUiState.videoLinkMode,
                 autoJumpRetry = settingUiState.autoJumpRetry,
-                hideLoading = settingUiState.hideLoadingView
+                hideLoading = settingUiState.hideLoadingView,
+                positionAfterAt = settingUiState.positionAfterAt
             )
             val video = if (settingUiState.videoLinkMode) {
                 fileRepository.video(pickCode).copy(

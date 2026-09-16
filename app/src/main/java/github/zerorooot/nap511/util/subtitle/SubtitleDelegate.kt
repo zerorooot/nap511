@@ -4,8 +4,11 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.SubtitleItem
 import github.zerorooot.nap511.bean.SubtitleStyleBean
 import github.zerorooot.nap511.bean.SubtitleUiState
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.keyWord
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -51,19 +54,20 @@ class SubtitleDelegate(
         searchedSubtitle: Boolean = true
     ) {
         updateState { copy(currentLocalSubtitles = localSubtitles) }
-        val keyword = searchKeyword.ifBlank {
-            if (mediaName.contains(".")) mediaName.substringBeforeLast(".") else mediaName
-        }
-        if (keyword.isBlank()) return
-
-        updateState {
-            copy(
-                isSearchLoading = true,
-                isLoading = true,
-                defaultSearchKeyword = keyword
-            )
-        }
         scope.launch {
+            val positionAfterAt =
+                SettingsRepository.getDataSuspend(ConfigKeyUtil.POSITION_AFTER_AT, false)
+            val keyword = searchKeyword.ifBlank {
+                mediaName.keyWord(positionAfterAt)
+            }
+
+            updateState {
+                copy(
+                    isSearchLoading = true,
+                    isLoading = true,
+                    defaultSearchKeyword = keyword
+                )
+            }
             runCatching {
                 val result = subtitleRepository.getSubtitles(
                     searchKeyword = keyword,

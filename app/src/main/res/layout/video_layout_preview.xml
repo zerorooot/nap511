@@ -71,7 +71,19 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent">
-
+            <!-- 播放倍速 (胶囊样式) -->
+            <TextView
+                android:id="@+id/switchSpeed"
+                android:layout_width="wrap_content"
+                android:layout_height="28dp"
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/bg_control_pill"
+                android:gravity="center"
+                android:minWidth="44dp"
+                android:paddingHorizontal="10dp"
+                android:text="倍速"
+                android:textColor="@android:color/white"
+                android:textSize="12sp" />
             <!-- 画面比例切换按钮 (胶囊样式) -->
             <TextView
                 android:id="@+id/moreScale"
@@ -270,19 +282,6 @@
             android:textColor="@android:color/white"
             android:textSize="12sp" />
 
-        <!-- 播放倍速 (胶囊样式) -->
-        <TextView
-            android:id="@+id/switchSpeed"
-            android:layout_width="wrap_content"
-            android:layout_height="28dp"
-            android:layout_marginEnd="12dp"
-            android:background="@drawable/bg_control_pill"
-            android:gravity="center"
-            android:minWidth="44dp"
-            android:paddingHorizontal="10dp"
-            android:text="倍速"
-            android:textColor="@android:color/white"
-            android:textSize="12sp" />
 
         <!-- 选集按钮 (胶囊样式) -->
         <TextView

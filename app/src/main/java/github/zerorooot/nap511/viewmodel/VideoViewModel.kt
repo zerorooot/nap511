@@ -17,6 +17,7 @@ import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.bus.DialogEvent
 import github.zerorooot.nap511.util.bus.DialogEventBus
+import github.zerorooot.nap511.util.keyWord
 import github.zerorooot.nap511.util.network.parseOssErrorWithDom
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.util.subtitle.SubtitleDelegate
@@ -121,11 +122,7 @@ class VideoViewModel : ViewModel() {
             )
         }
         // 默认将视频文件名去除后缀作为初始搜索关键字
-        val keyword = if (videoName.contains(".")) {
-            videoName.substringBeforeLast(".")
-        } else {
-            videoName
-        }
+        val keyword = videoName.keyWord(launchVideoParams.videoAttribute.positionAfterAt)
 
         viewModelScope.launch {
             runCatching {
