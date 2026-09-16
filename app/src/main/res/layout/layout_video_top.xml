@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 播放器顶部控制栏 (高度 56dp，兼顾横竖屏触摸热区) -->
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/layout_top"
+    android:layout_width="match_parent"
+    android:layout_height="56dp"
+    android:layout_alignParentTop="true"
+    android:background="@drawable/bg_top_gradient"
+    android:paddingHorizontal="12dp"
+    tools:showIn="@layout/video_layout_preview">
+
+    <!-- 返回按钮 -->
+    <ImageView
+        android:id="@+id/back"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:padding="8dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/video_back"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- 视频标题 (单行超出省略) -->
+    <TextView
+        android:id="@+id/title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
+        android:layout_marginEnd="12dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@android:color/white"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/top_right_panel"
+        app:layout_constraintStart_toEndOf="@+id/back"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:text="视频标题示例" />
+
+    <!-- 顶部右侧整合面板：[倍速胶囊] | [比例胶囊] | [电量 时间] -->
+    <LinearLayout
+        android:id="@+id/top_right_panel"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <!-- 播放倍速 (胶囊样式) -->
+        <TextView
+            android:id="@+id/switchSpeed"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/bg_control_pill"
+            android:gravity="center"
+            android:minWidth="44dp"
+            android:paddingHorizontal="10dp"
+            android:text="倍速"
+            android:textColor="@android:color/white"
+            android:textSize="12sp" />
+
+        <!-- 画面比例切换按钮 (胶囊样式) -->
+        <TextView
+            android:id="@+id/moreScale"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:background="@drawable/bg_control_pill"
+            android:gravity="center"
+            android:minWidth="44dp"
+            android:paddingHorizontal="10dp"
+            android:text="默认"
+            android:textColor="@android:color/white"
+            android:textSize="12sp" />
+
+        <!-- 系统状态显示区 (设备电量百分比 + 充电状态标识 + 实时系统时间) -->
+        <LinearLayout
+            android:id="@+id/layout_status_info"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <!-- 竖向半透明分割线 -->
+            <View
+                android:layout_width="1dp"
+                android:layout_height="14dp"
+                android:layout_marginHorizontal="10dp"
+                android:background="#33FFFFFF" />
+
+            <!-- 电量显示 -->
+            <TextView
+                android:id="@+id/batteryTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:textColor="#B3FFFFFF"
+                android:textSize="12sp"
+                android:typeface="monospace"
+                tools:text="98% ⚡" />
+
+            <!-- 系统时间显示 -->
+            <TextView
+                android:id="@+id/timeTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#B3FFFFFF"
+                android:textSize="12sp"
+                android:typeface="monospace"
+                tools:text="14:30" />
+        </LinearLayout>
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

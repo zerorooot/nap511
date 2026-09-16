@@ -13,6 +13,10 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.TextView;
 
+import androidx.constraintlayout.widget.ConstraintLayout;
+import androidx.constraintlayout.widget.ConstraintSet;
+import androidx.transition.TransitionManager;
+
 import com.elvishew.xlog.XLog;
 import com.shuyu.gsyvideoplayer.subtitle.GSYSubtitleStyle;
 import com.shuyu.gsyvideoplayer.utils.CommonUtil;
@@ -57,6 +61,9 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     private TextView batteryTextView;
     private TextView timeTextView;
     private View layoutStatusInfo;
+    private ConstraintLayout mLayoutBottom;
+    private ConstraintSet mBottomConstraintLand;
+    private ConstraintSet mBottomConstraintPort;
     public static String TAG = "MyGSYVideoPlayer";
 
     // 独立的 UI 主线程定时器，独立于 GSY 播放状态
@@ -115,6 +122,7 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         batteryTextView = findViewById(R.id.batteryTextView);
         timeTextView = findViewById(R.id.timeTextView);
         layoutStatusInfo = findViewById(R.id.layout_status_info);
+        mLayoutBottom = findViewById(R.id.layout_bottom);
 
         mMoreScale = findViewById(R.id.moreScale);
         switchSpeed = findViewById(R.id.switchSpeed);
@@ -145,19 +153,34 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
             closeDrawer.setOnClickListener(v -> hideAllDrawers());
         }
 
-        updateStatusInfoVisibility();
+        if (mLayoutBottom != null) {
+            mBottomConstraintLand = new ConstraintSet();
+            mBottomConstraintPort = new ConstraintSet();
+            mBottomConstraintLand.clone(getContext(), R.layout.video_layout_bottom_land);
+            mBottomConstraintPort.clone(getContext(), R.layout.video_layout_bottom_port);
+        }
+
+        updateLayoutForOrientation();
     }
 
     @Override
     protected void onConfigurationChanged(android.content.res.Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        updateStatusInfoVisibility();
+        updateLayoutForOrientation();
     }
 
-    private void updateStatusInfoVisibility() {
+    private void updateLayoutForOrientation() {
+        boolean isPortrait = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT;
         if (layoutStatusInfo != null) {
-            boolean isPortrait = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT;
             layoutStatusInfo.setVisibility(isPortrait ? GONE : VISIBLE);
+        }
+        if (mLayoutBottom != null) {
+            TransitionManager.beginDelayedTransition(mLayoutBottom);
+            if (isPortrait && mBottomConstraintPort != null) {
+                mBottomConstraintPort.applyTo(mLayoutBottom);
+            } else if (!isPortrait && mBottomConstraintLand != null) {
+                mBottomConstraintLand.applyTo(mLayoutBottom);
+            }
         }
     }
 
