@@ -152,11 +152,8 @@ fun FileScreen(
         isNotificationEnabled = context.isNotificationEnabled()
     }
 
-    var isIgnoringBatteryOptimizations by remember {
-        mutableStateOf(true)
-    }
-    LaunchedEffect(Unit) {
-        isIgnoringBatteryOptimizations = context.isIgnoringBatteryOptimizations()
+    var isIgnoringBatteryOptimizations by rememberSaveable {
+        mutableStateOf(context.isIgnoringBatteryOptimizations())
     }
 
     val isBatteryBannerDismissed = settingUiState.hideBatteryBanner
@@ -492,6 +489,18 @@ fun FileScreen(
                     return@FileItemActions
                 }
                 fileViewModel.unzipFile(fileBean)
+            },
+            onSetOfflineCid = { fileBean ->
+                scope.launch {
+                    SettingsRepository.saveData(
+                        ConfigKeyUtil.DEFAULT_OFFLINE_CID,
+                        fileBean.categoryId
+                    )
+                    val pathString =
+                        fileViewModel.pathList.joinToString(separator = "/") { it.name } + "/${fileBean.name}"
+                    SettingsRepository.saveData(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, pathString)
+                }
+                App.instance.toast("设置默认离线位置为: ${fileBean.name}")
             },
             onAria2Download = ::onMenuAria2Download,
             onForceOpen = { showForceOpenDialog = it },

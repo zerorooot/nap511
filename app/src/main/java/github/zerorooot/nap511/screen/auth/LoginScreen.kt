@@ -210,7 +210,7 @@ fun LoginScreen(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Cookie登录 / 配置导入")
+                    Text("配置导入 / Cookie登录")
                 }
             }
         }
@@ -549,7 +549,7 @@ private fun AdvancedLoginSheetContent(
     onCookieSubmit: (String) -> Unit,
     onConfigImported: (String) -> Unit
 ) {
-    var subTab by remember { mutableIntStateOf(0) } // 0: Cookie, 1: 导入文件
+    var subTab by remember { mutableIntStateOf(0) } // 0: 导入文件 , 1: Cookie
     var cookieInput by remember { mutableStateOf("") }
     val clipboardManager = LocalClipboard.current
     val context = LocalContext.current
@@ -586,10 +586,10 @@ private fun AdvancedLoginSheetContent(
         // 二级切换选项
         PrimaryTabRow(selectedTabIndex = subTab) {
             Tab(selected = subTab == 0, onClick = { subTab = 0 }) {
-                Text("手动 Cookie", modifier = Modifier.padding(vertical = 12.dp))
+                Text("导入配置文件", modifier = Modifier.padding(vertical = 12.dp))
             }
             Tab(selected = subTab == 1, onClick = { subTab = 1 }) {
-                Text("导入配置文件", modifier = Modifier.padding(vertical = 12.dp))
+                Text("手动 Cookie", modifier = Modifier.padding(vertical = 12.dp))
             }
         }
 
@@ -597,38 +597,6 @@ private fun AdvancedLoginSheetContent(
 
         when (subTab) {
             0 -> {
-                // Cookie 粘贴区域
-                OutlinedTextField(
-                    value = cookieInput,
-                    onValueChange = { cookieInput = it },
-                    label = { Text("粘贴 Cookie 字符串") },
-                    placeholder = { Text("session=xxxx; token=yyyy") },
-                    trailingIcon = {
-                        IconButton(onClick = {
-                            clipboardManager.nativeClipboardManager.primaryClip?.getItemAt(0)?.text?.toString()
-                                ?.let {
-                                    cookieInput = it
-                                }
-                        }) {
-                            Icon(Icons.Default.ContentPaste, contentDescription = "粘贴剪贴板")
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    maxLines = 4,
-                    shape = RoundedCornerShape(12.dp)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    onClick = { onCookieSubmit(cookieInput) },
-                    enabled = cookieInput.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("使用 Cookie 登录")
-                }
-            }
-
-            1 -> {
                 // 配置文件导入区域
                 OutlinedCard(
                     onClick = { filePickerLauncher.launch("*/*") },
@@ -660,6 +628,38 @@ private fun AdvancedLoginSheetContent(
                             color = MaterialTheme.colorScheme.outline
                         )
                     }
+                }
+            }
+
+            1 -> {
+                // Cookie 粘贴区域
+                OutlinedTextField(
+                    value = cookieInput,
+                    onValueChange = { cookieInput = it },
+                    label = { Text("粘贴 Cookie 字符串") },
+                    placeholder = { Text("session=xxxx; token=yyyy") },
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            clipboardManager.nativeClipboardManager.primaryClip?.getItemAt(0)?.text?.toString()
+                                ?.let {
+                                    cookieInput = it
+                                }
+                        }) {
+                            Icon(Icons.Default.ContentPaste, contentDescription = "粘贴剪贴板")
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 4,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = { onCookieSubmit(cookieInput) },
+                    enabled = cookieInput.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("使用 Cookie 登录")
                 }
             }
         }

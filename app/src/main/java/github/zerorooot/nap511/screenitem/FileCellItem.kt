@@ -209,6 +209,7 @@ fun FileCellItem(
                         MenuItemAction.DELETE_FILE -> itemActions.onDelete.invoke(fileBean)
                         MenuItemAction.UNZIP_FILE -> itemActions.onUnzip.invoke(fileBean)
                         MenuItemAction.RENAME_FILE -> itemActions.onRename.invoke(index)
+                        MenuItemAction.OFFLINE_CID -> itemActions.onSetOfflineCid.invoke(fileBean)
                         MenuItemAction.FILE_INFO -> itemActions.onFileInfo.invoke(fileBean)
                         MenuItemAction.ARIA2_DOWNLOAD -> itemActions.onAria2Download.invoke(index)
                         MenuItemAction.FORCE_OPEN -> itemActions.onForceOpen.invoke(index)

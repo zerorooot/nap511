@@ -56,6 +56,7 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     long forwardRewindIncrementMs = 15000;
     private TextView batteryTextView;
     private TextView timeTextView;
+    private View layoutStatusInfo;
     public static String TAG = "MyGSYVideoPlayer";
 
     // 独立的 UI 主线程定时器，独立于 GSY 播放状态
@@ -113,6 +114,7 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     private void initView() {
         batteryTextView = findViewById(R.id.batteryTextView);
         timeTextView = findViewById(R.id.timeTextView);
+        layoutStatusInfo = findViewById(R.id.layout_status_info);
 
         mMoreScale = findViewById(R.id.moreScale);
         switchSpeed = findViewById(R.id.switchSpeed);
@@ -141,6 +143,21 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         // 抽屉关闭按钮事件
         if (closeDrawer != null) {
             closeDrawer.setOnClickListener(v -> hideAllDrawers());
+        }
+
+        updateStatusInfoVisibility();
+    }
+
+    @Override
+    protected void onConfigurationChanged(android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        updateStatusInfoVisibility();
+    }
+
+    private void updateStatusInfoVisibility() {
+        if (layoutStatusInfo != null) {
+            boolean isPortrait = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT;
+            layoutStatusInfo.setVisibility(isPortrait ? GONE : VISIBLE);
         }
     }
 

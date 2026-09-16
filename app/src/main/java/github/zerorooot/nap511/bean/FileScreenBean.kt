@@ -110,6 +110,7 @@ data class FileItemActions(
     val onDelete: (FileBean) -> Unit,
     val onRename: (Int) -> Unit,
     val onFileInfo: (FileBean) -> Unit,
+    val onSetOfflineCid: (FileBean) -> Unit,
     val onAria2Download: (Int) -> Unit,
     val onForceOpen: (Int) -> Unit,
     val onLoadImage: ((FileBean) -> Unit)? = null

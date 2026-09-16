@@ -6,8 +6,8 @@ import android.view.Gravity
 import android.view.View
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.LinearSmoothScroller
 import androidx.recyclerview.widget.RecyclerView
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.adapter.VideoOptionAdapter
@@ -88,6 +88,9 @@ class VideoDrawerController(
                 }
                 rvDrawer.layoutParams = rvParams
                 layoutSubtitlePanel?.visibility = View.GONE
+
+                // 切换抽屉时统一更新/重置空状态与列表控件显隐
+                subtitlePanelController.updateSubtitleEmptyState()
 
                 when (type) {
                     MyGSYVideoPlayer.DrawerType.EPISODE -> {

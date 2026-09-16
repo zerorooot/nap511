@@ -49,7 +49,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="6dp"
-            android:layout_marginEnd="16dp"
+            android:layout_marginEnd="12dp"
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="@android:color/white"
@@ -76,7 +76,7 @@
                 android:id="@+id/switchSpeed"
                 android:layout_width="wrap_content"
                 android:layout_height="28dp"
-                android:layout_marginEnd="12dp"
+                android:layout_marginEnd="8dp"
                 android:background="@drawable/bg_control_pill"
                 android:gravity="center"
                 android:minWidth="44dp"
@@ -97,13 +97,6 @@
                 android:textColor="@android:color/white"
                 android:textSize="12sp" />
 
-            <!-- 竖向半透明分割线 -->
-            <View
-                android:layout_width="1dp"
-                android:layout_height="14dp"
-                android:layout_marginHorizontal="12dp"
-                android:background="#33FFFFFF" />
-
             <!-- 系统状态显示区 -->
             <LinearLayout
                 android:id="@+id/layout_status_info"
@@ -111,6 +104,13 @@
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
+
+                <!-- 竖向半透明分割线 -->
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="14dp"
+                    android:layout_marginHorizontal="10dp"
+                    android:background="#33FFFFFF" />
 
                 <TextView
                     android:id="@+id/batteryTextView"
@@ -189,50 +189,17 @@
         android:visibility="gone" />
 
     <!-- 底部控制栏 -->
-    <LinearLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/layout_bottom"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="68dp"
         android:layout_alignParentBottom="true"
         android:background="@drawable/bg_bottom_gradient"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
+        android:paddingHorizontal="12dp"
+        android:paddingBottom="4dp"
         android:visibility="invisible">
 
-        <!-- 上一集图标按钮 -->
-        <ImageView
-            android:id="@+id/prev_episode"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:layout_marginEnd="4dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:padding="4dp"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_skip_previous" />
-
-        <!-- 播放 / 暂停按钮 -->
-        <ImageView
-            android:id="@+id/start"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:layout_marginEnd="4dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:padding="4dp"
-            android:scaleType="centerInside"
-            android:src="@drawable/video_click_play_selector" />
-
-        <!-- 下一集图标按钮 -->
-        <ImageView
-            android:id="@+id/next_episode"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:layout_marginEnd="12dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:padding="4dp"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_skip_next" />
-
+        <!-- 第一行：当前时间、进度条、总时间 -->
         <TextView
             android:id="@+id/current"
             android:layout_width="wrap_content"
@@ -240,6 +207,9 @@
             android:textColor="#E6FFFFFF"
             android:textSize="12sp"
             android:typeface="monospace"
+            app:layout_constraintBottom_toTopOf="@+id/start"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
             tools:text="00:00" />
 
         <SeekBar
@@ -247,8 +217,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_gravity="center_vertical"
-            android:layout_marginHorizontal="8dp"
-            android:layout_weight="1"
+            android:layout_marginHorizontal="4dp"
             android:background="@null"
             android:max="100"
             android:maxHeight="3dp"
@@ -256,46 +225,59 @@
             android:paddingVertical="10dp"
             android:progressDrawable="@drawable/video_seek_progress"
             android:splitTrack="false"
-            android:thumb="@drawable/video_seek_thumb" />
+            android:thumb="@drawable/video_seek_thumb"
+            app:layout_constraintBottom_toBottomOf="@+id/current"
+            app:layout_constraintEnd_toStartOf="@+id/total"
+            app:layout_constraintStart_toEndOf="@+id/current"
+            app:layout_constraintTop_toTopOf="@+id/current" />
 
         <TextView
             android:id="@+id/total"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="12dp"
             android:textColor="#80FFFFFF"
             android:textSize="12sp"
             android:typeface="monospace"
+            app:layout_constraintBottom_toBottomOf="@+id/current"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@+id/current"
             tools:text="00:00" />
 
-        <!-- 字幕按钮 (胶囊样式) -->
-        <TextView
-            android:id="@+id/switchSubtitle"
-            android:layout_width="wrap_content"
-            android:layout_height="28dp"
-            android:layout_marginEnd="12dp"
-            android:background="@drawable/bg_control_pill"
-            android:gravity="center"
-            android:minWidth="44dp"
-            android:paddingHorizontal="10dp"
-            android:text="字幕"
-            android:textColor="@android:color/white"
-            android:textSize="12sp" />
+        <!-- 第二行：播放控制按钮与功能按钮 -->
+        <ImageView
+            android:id="@+id/prev_episode"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="4dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_skip_previous"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
 
+        <ImageView
+            android:id="@+id/start"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginStart="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="4dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/video_click_play_selector"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/prev_episode" />
 
-        <!-- 选集按钮 (胶囊样式) -->
-        <TextView
-            android:id="@+id/switchEpisode"
-            android:layout_width="wrap_content"
-            android:layout_height="28dp"
-            android:layout_marginEnd="12dp"
-            android:background="@drawable/bg_control_pill"
-            android:gravity="center"
-            android:minWidth="44dp"
-            android:paddingHorizontal="10dp"
-            android:text="选集"
-            android:textColor="@android:color/white"
-            android:textSize="12sp" />
+        <ImageView
+            android:id="@+id/next_episode"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginStart="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="4dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_skip_next"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/start" />
 
         <ImageView
             android:id="@+id/fullscreen"
@@ -304,9 +286,45 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:padding="4dp"
             android:scaleType="centerInside"
-            android:src="@drawable/video_enlarge" />
+            android:src="@drawable/video_enlarge"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
 
-    </LinearLayout>
+        <!-- 选集按钮 (胶囊样式) -->
+        <TextView
+            android:id="@+id/switchEpisode"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/bg_control_pill"
+            android:gravity="center"
+            android:minWidth="44dp"
+            android:paddingHorizontal="10dp"
+            android:text="选集"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            app:layout_constraintBottom_toBottomOf="@+id/fullscreen"
+            app:layout_constraintEnd_toStartOf="@+id/fullscreen"
+            app:layout_constraintTop_toTopOf="@+id/fullscreen" />
+
+        <!-- 字幕按钮 (胶囊样式) -->
+        <TextView
+            android:id="@+id/switchSubtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/bg_control_pill"
+            android:gravity="center"
+            android:minWidth="44dp"
+            android:paddingHorizontal="10dp"
+            android:text="字幕"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            app:layout_constraintBottom_toBottomOf="@+id/fullscreen"
+            app:layout_constraintEnd_toStartOf="@+id/switchEpisode"
+            app:layout_constraintTop_toTopOf="@+id/fullscreen" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- 底部微型进度条 -->
     <ProgressBar
@@ -318,10 +336,10 @@
         android:max="100"
         android:progressDrawable="@drawable/video_progress" />
 
-    <!-- 右侧通用抽屉面板 (320dp)，合并了选集、倍速、画面比例、字幕抽屉 -->
+    <!-- 右侧通用抽屉面板 (290dp)，合并了选集、倍速、画面比例、字幕抽屉 -->
     <LinearLayout
         android:id="@+id/layout_drawer"
-        android:layout_width="320dp"
+        android:layout_width="290dp"
         android:layout_height="match_parent"
         android:layout_alignParentEnd="true"
         android:background="#E6000000"

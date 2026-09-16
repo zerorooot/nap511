@@ -174,7 +174,9 @@ class SubtitlePanelController(
     }
 
     fun updateSubtitleEmptyState(state: VideoUiState = viewModel.uiState.value) {
+        // 显示空提示文本
         val tvEmpty = videoPlayer.findViewById<TextView>(R.id.tv_subtitle_empty) ?: return
+        // 列表 RecyclerView
         val rvDrawer = videoPlayer.findViewById<RecyclerView>(R.id.rv_drawer) ?: return
 
         if (videoPlayer.currentDrawerType != MyGSYVideoPlayer.DrawerType.SUBTITLE) {
@@ -186,17 +188,15 @@ class SubtitlePanelController(
         val isLoading = state.isSubtitleLoading
         val list = state.subtitles
 
-        if (isLoading) {
-            tvEmpty.visibility = View.VISIBLE
-            tvEmpty.text = "正在搜索获取字幕..."
-            rvDrawer.visibility = View.GONE
-        } else if (list.isEmpty()) {
-            tvEmpty.visibility = View.VISIBLE
-            tvEmpty.text = "'${viewModel.uiState.value.defaultSearchKeyword}'未找到相关字幕，请尝试换别的关键字重新搜索"
-            rvDrawer.visibility = View.GONE
-        } else {
-            tvEmpty.visibility = View.GONE
-            rvDrawer.visibility = View.VISIBLE
+        val showEmpty = isLoading || list.isEmpty()
+
+        tvEmpty.visibility = if (showEmpty) View.VISIBLE else View.GONE
+        rvDrawer.visibility = if (showEmpty) View.GONE else View.VISIBLE
+
+        tvEmpty.text = when {
+            isLoading -> "正在搜索获取字幕..."
+            list.isEmpty() -> "'${viewModel.uiState.value.defaultSearchKeyword}'未找到相关字幕，请尝试换别的关键字重新搜索"
+            else -> tvEmpty.text  // 列表正常时无需改文案
         }
     }
 

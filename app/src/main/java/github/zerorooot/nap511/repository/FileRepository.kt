@@ -117,6 +117,13 @@ class FileRepository {
         if (!downloadPath.state) {
             App.instance.toast("设置离线位置失败，默认保存到\"云下载\"目录")
         }
+        val quota = offlineService.quota()
+        val surplus = quota.surplus - list.size
+        val offlinePath = SettingsRepository.getDataSuspend(
+            ConfigKeyUtil.DEFAULT_OFFLINE_PATH,
+            "根目录/云下载"
+        ).substringAfterLast("/")
+
 
         val map = HashMap<String, String>()
         map["savepath"] = ""
@@ -130,12 +137,7 @@ class FileRepository {
         val addTask = offlineService.addTask(map)
         XLog.d("add task addTask $addTask")
         val message = if (addTask.state) {
-            "成功将任务添加到‘${
-                SettingsRepository.getDataSuspend(
-                    ConfigKeyUtil.DEFAULT_OFFLINE_PATH,
-                    "根目录/云下载"
-                ).substringAfterLast("/")
-            }’目录"
+            "成功将任务添加到‘${offlinePath}’目录，剩余配额${surplus}个"
         } else {
             if (addTask.errorMsg.contains("请验证账号")) {
                 handle.invoke(true)

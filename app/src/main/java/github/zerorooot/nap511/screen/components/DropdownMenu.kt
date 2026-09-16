@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.AutoFixHigh
+import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.ContentCut
@@ -18,6 +19,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.DoneAll
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.DownloadForOffline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FindInPage
 import androidx.compose.material.icons.outlined.FolderZip
@@ -61,6 +63,7 @@ enum class MenuItemAction(
     CUT_FILE("剪切文件", Icons.Outlined.ContentCut),
     RENAME_FILE("重新命名", Icons.Outlined.Edit),
     FILE_INFO("文件信息", Icons.Outlined.Info),
+    OFFLINE_CID("设为离线", Icons.Outlined.DownloadForOffline),
     UNZIP_FILE("解压文件", Icons.Outlined.FolderZip),
     FORCE_OPEN("强行打开", Icons.AutoMirrored.Outlined.OpenInNew),
     ARIA2_DOWNLOAD("Aria2下载", Icons.Outlined.Download),
@@ -176,6 +179,7 @@ fun FolderMoreMenu(onClick: (MenuItemAction, Int) -> Unit) {
     val listOf = listOf(
         MenuItemAction.CUT_FILE,
         MenuItemAction.RENAME_FILE,
+        MenuItemAction.OFFLINE_CID,
         MenuItemAction.FILE_INFO,
         MenuItemAction.DELETE_FILE
     )
