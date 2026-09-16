@@ -83,3 +83,15 @@ data class ImageBean(
     @SerializedName("file_sha1") var fileSha1: String = "",
     @SerializedName("pick_code") var pickCode: String = "",
 )
+
+data class UploadBean(
+    @SerializedName("aid") val areaId: String = "",
+    @SerializedName("cid") val categoryId: String = "",
+    @SerializedName("file_name") val name: String = "",
+    @SerializedName("file_ptime") val createTime: String = "",
+    @SerializedName("file_id") val fileId: String = "",
+    @SerializedName("file_size") val size: String = "0",
+    @SerializedName("pick_code") val pickCode: String = "",
+    @SerializedName("sha1") val sha1: String = "",
+    @SerializedName("is_video") val isVideo: Int = 0,
+)

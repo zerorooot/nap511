@@ -2,14 +2,15 @@ package github.zerorooot.nap511.repository
 
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
-import github.zerorooot.nap511.bean.BaseReturnMessage
+import github.zerorooot.nap511.bean.Base115Response
 import github.zerorooot.nap511.bean.SubtitleItem
 import github.zerorooot.nap511.bean.SubtitleSourceType
+import github.zerorooot.nap511.bean.UploadBean
 import github.zerorooot.nap511.bean.XunleiSubtitleResponse
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.subtitle.SubtitleConverter
 import github.zerorooot.nap511.util.network.NetworkClient
 import github.zerorooot.nap511.util.network.UserSessionManager
+import github.zerorooot.nap511.util.subtitle.SubtitleConverter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -182,58 +183,6 @@ class SubtitleRepository(
             }
         }
 
-    /**
-     * 将字幕文件下载并上传到 115 目录
-     * @param cacheDirFile context.cacheDir
-     * @param item 字幕数据对象
-     * @param targetCid 115 目标目录 CID
-     */
-    suspend fun uploadSubtitleTo115(
-        cacheDirFile: File,
-        item: SubtitleItem,
-        targetCid: String
-    ): BaseReturnMessage = withContext(Dispatchers.IO) {
-        if (targetCid.isBlank() || targetCid == "0") {
-            return@withContext BaseReturnMessage(
-                state = false,
-                message = "当前视频未获取到有效父目录 CID"
-            )
-        }
-
-        // 1. 下载并转换/准备本地字幕文件
-        val srtFile = downloadAndPrepareSubtitle(cacheDirFile, item)
-            ?: return@withContext BaseReturnMessage(state = false, message = "下载字幕文件失败")
-
-        // 2. 构造目标文件名（保证扩展名为 .srt 或原始扩展名）
-        val rawName = item.name.ifBlank { item.simpleName }.ifBlank { "subtitle" }
-        val uploadFileName = if (rawName.endsWith(".srt", ignoreCase = true)) {
-            rawName
-        } else if (rawName.contains(".")) {
-            rawName.substringBeforeLast(".") + ".srt"
-        } else {
-            "$rawName.srt"
-        }
-
-        val cacheDir = srtFile.parentFile ?: cacheDirFile
-        val tempUploadFile = File(cacheDir, uploadFileName)
-        srtFile.copyTo(tempUploadFile, overwrite = true)
-
-        // 3. 调用 FileRepository 上传接口
-        val result = fileRepository.uploadFile(
-            file = tempUploadFile,
-            targetCid = targetCid,
-            uploadFileName = uploadFileName,
-            mimeType = "application/x-subrip"
-        )
-
-        // 4. 删除用于重命名的临时文件
-        if (tempUploadFile.exists() && tempUploadFile != srtFile) {
-            tempUploadFile.delete()
-        }
-
-
-        result
-    }
 
     /**
      * 将自定义本地 SRT 文件上传到 115 指定目录 CID
@@ -245,16 +194,16 @@ class SubtitleRepository(
         srtFile: File,
         uploadFileName: String,
         targetCid: String
-    ): BaseReturnMessage = withContext(Dispatchers.IO) {
+    ): Base115Response<UploadBean> = withContext(Dispatchers.IO) {
         if (targetCid.isBlank() || targetCid == "0") {
-            return@withContext BaseReturnMessage(
+            return@withContext Base115Response(
                 state = false,
                 message = "当前视频未获取到有效父目录 CID"
             )
         }
 
         if (!srtFile.exists() || srtFile.length() <= 0) {
-            return@withContext BaseReturnMessage(
+            return@withContext Base115Response(
                 state = false,
                 message = "字幕文件不存在或内容为空"
             )
@@ -272,6 +221,7 @@ class SubtitleRepository(
             uploadFileName = uploadFileName,
             mimeType = "application/x-subrip"
         )
+        XLog.d("fileRepository.uploadFile $result")
 
         if (tempUploadFile.exists() && tempUploadFile != srtFile) {
             tempUploadFile.delete()

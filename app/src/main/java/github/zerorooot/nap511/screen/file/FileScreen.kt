@@ -153,8 +153,12 @@ fun FileScreen(
     }
 
     var isIgnoringBatteryOptimizations by remember {
-        mutableStateOf(context.isIgnoringBatteryOptimizations())
+        mutableStateOf(true)
     }
+    LaunchedEffect(Unit) {
+        isIgnoringBatteryOptimizations = context.isIgnoringBatteryOptimizations()
+    }
+
     val isBatteryBannerDismissed = settingUiState.hideBatteryBanner
 
     val batterySettingLauncher = rememberLauncherForActivityResult(

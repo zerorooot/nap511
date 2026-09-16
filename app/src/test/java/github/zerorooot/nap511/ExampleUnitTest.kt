@@ -11,7 +11,7 @@ import org.junit.Test
 class ExampleUnitTest {
     @Test
     fun addition_isCorrect() {
-        val a = "123 - ni@hao.mp3"
+        val a = "123 - ni@hao"
         println(a.substringBeforeLast(".").takeIf { true }!!.substringAfterLast(" ").substringAfterLast("@"))
     }
 }

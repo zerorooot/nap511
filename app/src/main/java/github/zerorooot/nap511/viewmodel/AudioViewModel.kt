@@ -199,7 +199,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun playAudio(fileBean: FileBean, localSubtitles: List<SubtitleItem> = emptyList()) {
+    fun playAudio(fileBean: FileBean, localSubtitles: List<SubtitleItem>) {
         // 防止在同一个文件加载中重复点击
         if (isLoading || currentMusic?.fileId == fileBean.fileId) return
 

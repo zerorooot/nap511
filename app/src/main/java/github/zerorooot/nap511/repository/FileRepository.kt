@@ -4,7 +4,9 @@ import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.bean.Base115Response
 import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.CreateFolderMessage
 import github.zerorooot.nap511.bean.FileBean
@@ -18,6 +20,7 @@ import github.zerorooot.nap511.bean.OfflineTaskType
 import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.bean.SignBean
 import github.zerorooot.nap511.bean.TorrentFileBean
+import github.zerorooot.nap511.bean.UploadBean
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.bean.ZipStatus
@@ -518,13 +521,15 @@ class FileRepository {
         targetCid: String,
         uploadFileName: String = file.name,
         mimeType: String = "application/octet-stream"
-    ): BaseReturnMessage = withContext(Dispatchers.IO) {
+    ): Base115Response<UploadBean> = withContext(Dispatchers.IO) {
         val uid = UserSessionManager.uid
         val cookie = UserSessionManager.cookie
+        val gson = Gson()
 
         val initUrl = "https://uplb.115.com/3.0/sampleinitupload.php"
-        val postBody = "userid=$uid&filename=$uploadFileName&filesize=${file.length()}&target=U_1_$targetCid"
-            .toRequestBody("application/x-www-form-urlencoded; charset=UTF-8".toMediaType())
+        val postBody =
+            "userid=$uid&filename=$uploadFileName&filesize=${file.length()}&target=U_1_$targetCid"
+                .toRequestBody("application/x-www-form-urlencoded; charset=UTF-8".toMediaType())
 
         val initRequest = Request.Builder()
             .url(initUrl)
@@ -536,17 +541,20 @@ class FileRepository {
         val response = NetworkClient.sharedOkHttpClient.newCall(initRequest).execute()
         if (!response.isSuccessful) {
             XLog.e("FileRepository.uploadFile: 初始化上传失败, Code: ${response.code}")
-            return@withContext BaseReturnMessage(state = false, message = "初始化上传失败 (HTTP ${response.code})")
+            return@withContext Base115Response(
+                state = false,
+                message = "初始化上传失败 (HTTP ${response.code})"
+            )
         }
 
         val bodyString = response.body.string()
         val initUploadBean = runCatching {
-            Gson().fromJson(bodyString, InitUploadBean::class.java)
+            gson.fromJson(bodyString, InitUploadBean::class.java)
         }.getOrNull()
 
         if (initUploadBean == null || initUploadBean.host.isBlank()) {
             XLog.e("FileRepository.uploadFile: 解析初始化上传响应失败: $bodyString")
-            return@withContext BaseReturnMessage(state = false, message = "解析初始化上传结果失败")
+            return@withContext Base115Response(state = false, message = "解析初始化上传结果失败")
         }
 
         val requestBody: RequestBody = MultipartBody.Builder().setType(MultipartBody.FORM)
@@ -576,14 +584,21 @@ class FileRepository {
         val uploadResponse = NetworkClient.sharedOkHttpClient.newCall(uploadRequest).execute()
         if (!uploadResponse.isSuccessful) {
             XLog.e("FileRepository.uploadFile: 上传文件至 OSS 失败, Code: ${uploadResponse.code}")
-            return@withContext BaseReturnMessage(state = false, message = "上传文件失败 (HTTP ${uploadResponse.code})")
+            return@withContext Base115Response(
+                state = false,
+                message = "上传文件失败 (HTTP ${uploadResponse.code})"
+            )
         }
 
         val uploadBody = uploadResponse.body.string()
+
+        val type = object : TypeToken<Base115Response<UploadBean>>() {}.type
+        val result = gson.fromJson<Base115Response<UploadBean>>(uploadBody, type)
+
         runCatching {
-            Gson().fromJson(uploadBody, BaseReturnMessage::class.java)
+            result
         }.getOrElse {
-            BaseReturnMessage(state = false, message = "解析上传响应失败")
+            Base115Response(state = false, message = "解析上传响应失败")
         }
     }
 }

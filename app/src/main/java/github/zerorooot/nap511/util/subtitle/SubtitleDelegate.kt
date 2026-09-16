@@ -2,6 +2,7 @@ package github.zerorooot.nap511.util.subtitle
 
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.SubtitleItem
+import github.zerorooot.nap511.bean.SubtitleSourceType
 import github.zerorooot.nap511.bean.SubtitleStyleBean
 import github.zerorooot.nap511.bean.SubtitleUiState
 import github.zerorooot.nap511.repository.SettingsRepository
@@ -49,7 +50,7 @@ class SubtitleDelegate(
         scope: CoroutineScope,
         mediaName: String,
         searchKeyword: String = "",
-        localSubtitles: List<SubtitleItem> = state.currentLocalSubtitles,
+        localSubtitles: List<SubtitleItem>,
         mediaDurationMs: Long = 0L,
         searchedSubtitle: Boolean = true
     ) {
@@ -171,37 +172,6 @@ class SubtitleDelegate(
         updateState { copy(subtitleStyle = styleBean) }
     }
 
-    /**
-     * 上传字幕文件至 115 目录
-     */
-    fun uploadSubtitleTo115(
-        scope: CoroutineScope,
-        cacheDirFile: File,
-        item: SubtitleItem,
-        targetCid: String,
-        onSuccess: (() -> Unit)? = null
-    ) {
-        if (targetCid.isBlank() || targetCid == "0") {
-            App.instance.toast("无法获取当前媒体所在目录 ID")
-            return
-        }
-        scope.launch {
-            App.instance.toast("正在将字幕上传至 115 网盘...")
-            runCatching {
-                subtitleRepository.uploadSubtitleTo115(cacheDirFile, item, targetCid)
-            }.onSuccess { result ->
-                if (result.state) {
-                    App.instance.toast("字幕上传成功！已保存到 115 当前目录")
-                    onSuccess?.invoke()
-                } else {
-                    App.instance.toast("字幕上传失败: ${result.message}")
-                }
-            }.onFailure { e ->
-                XLog.e("SubtitleDelegate: 上传字幕发生异常: ${item.name}", e)
-                App.instance.toast("上传字幕发生异常: ${e.localizedMessage}")
-            }
-        }
-    }
 
     /**
      * 保存当前字幕至 115 目录（自动将本地设置的时间偏移量应用并修正到字幕文件中）
@@ -225,6 +195,12 @@ class SubtitleDelegate(
         }
 
         val offsetMs = state.offsetMs
+        // 构造上传至 115 的同名字幕文件名（例如 VideoName.srt）
+        val subtitleCount = state.currentLocalSubtitles.size
+        val baseName = videoFileName.substringBeforeLast(".") +
+                if (subtitleCount > 0) "($subtitleCount)" else ""
+
+        val uploadFileName = "$baseName.srt"
 
         scope.launch {
             App.instance.toast("正在处理并保存字幕至 115 网盘...")
@@ -241,13 +217,6 @@ class SubtitleDelegate(
                 val tempSrtFile = File(subDir, "save_${selectedItem.id}.srt")
                 tempSrtFile.writeText(srtContent, Charsets.UTF_8)
 
-                // 3. 构造上传至 115 的同名字幕文件名（例如 VideoName.srt）
-                val baseName = if (videoFileName.contains(".")) {
-                    videoFileName.substringBeforeLast(".")
-                } else {
-                    videoFileName
-                }
-                val uploadFileName = "$baseName.srt"
 
                 // 4. 上传至 115 网盘
                 subtitleRepository.uploadCustomSrtFileTo115(tempSrtFile, uploadFileName, targetCid)
@@ -256,6 +225,17 @@ class SubtitleDelegate(
                     // 5. 上传成功后，重置本地 offsetMs 归 0（因为偏移量已被应用并固化在上传的文件中）
                     //updateState { copy(offsetMs = 0L) }
                     App.instance.toast("字幕已成功保存并上传至 115 网盘")
+                    if (result.data != null) {
+                        val subtitleItem = SubtitleItem(
+                            id = "115_${result.data.pickCode}",
+                            name = uploadFileName,
+                            simpleName = uploadFileName,
+                            sourceType = SubtitleSourceType.ONE_ONE_FIVE,
+                            pickCode = result.data.pickCode,
+                            fileId = result.data.fileId
+                        )
+                        updateState { copy(currentLocalSubtitles = currentLocalSubtitles + subtitleItem) }
+                    }
                     onSuccess?.invoke()
                 } else {
                     App.instance.toast("保存字幕失败: ${result.message}")
