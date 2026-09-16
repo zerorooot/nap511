@@ -26,7 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.bean.FilePathActions
 import github.zerorooot.nap511.bean.PathBean
-import github.zerorooot.nap511.screen.MiddleEllipsisText
+import github.zerorooot.nap511.screen.components.MiddleEllipsisText
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

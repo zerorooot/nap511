@@ -36,6 +36,7 @@ import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.FileInfo
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.ImageBean
+import github.zerorooot.nap511.bean.LaunchVideoParams
 import github.zerorooot.nap511.bean.LocationBean
 import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.OrderBean
@@ -51,10 +52,10 @@ import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DialogEvent
-import github.zerorooot.nap511.util.DialogEventBus
-import github.zerorooot.nap511.util.FileCacheManager
-import github.zerorooot.nap511.util.UserSessionManager
+import github.zerorooot.nap511.util.bus.DialogEvent
+import github.zerorooot.nap511.util.bus.DialogEventBus
+import github.zerorooot.nap511.util.cache.FileCacheManager
+import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.deleteCoilCache
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.worker.OfflineTaskWorker
@@ -198,7 +199,7 @@ class FileViewModel(
         FileRepository.getInstance()
     }
 
-    internal val _launchVideoEvent = MutableSharedFlow<VideoInfoBean>()
+    internal val _launchVideoEvent = MutableSharedFlow<LaunchVideoParams>()
     val launchVideoEvent = _launchVideoEvent.asSharedFlow()
 
     private val _navigationEvent = Channel<NavEvent>()

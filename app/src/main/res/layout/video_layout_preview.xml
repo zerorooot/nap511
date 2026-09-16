@@ -71,7 +71,19 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent">
-
+            <!-- 播放倍速 (胶囊样式) -->
+            <TextView
+                android:id="@+id/switchSpeed"
+                android:layout_width="wrap_content"
+                android:layout_height="28dp"
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/bg_control_pill"
+                android:gravity="center"
+                android:minWidth="44dp"
+                android:paddingHorizontal="10dp"
+                android:text="倍速"
+                android:textColor="@android:color/white"
+                android:textSize="12sp" />
             <!-- 画面比例切换按钮 (胶囊样式) -->
             <TextView
                 android:id="@+id/moreScale"
@@ -139,16 +151,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-        <moe.codeest.enviews.ENPlayView
-            android:id="@+id/start"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- 锁屏按钮 -->
@@ -198,6 +200,39 @@
         android:paddingHorizontal="16dp"
         android:visibility="invisible">
 
+        <!-- 上一集图标按钮 -->
+        <ImageView
+            android:id="@+id/prev_episode"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginEnd="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="4dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_skip_previous" />
+
+        <!-- 播放 / 暂停按钮 -->
+        <ImageView
+            android:id="@+id/start"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginEnd="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="4dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/video_click_play_selector" />
+
+        <!-- 下一集图标按钮 -->
+        <ImageView
+            android:id="@+id/next_episode"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginEnd="12dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="4dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_skip_next" />
+
         <TextView
             android:id="@+id/current"
             android:layout_width="wrap_content"
@@ -233,9 +268,9 @@
             android:typeface="monospace"
             tools:text="00:00" />
 
-        <!-- 播放倍速 (胶囊样式) -->
+        <!-- 字幕按钮 (胶囊样式) -->
         <TextView
-            android:id="@+id/switchSpeed"
+            android:id="@+id/switchSubtitle"
             android:layout_width="wrap_content"
             android:layout_height="28dp"
             android:layout_marginEnd="12dp"
@@ -243,7 +278,22 @@
             android:gravity="center"
             android:minWidth="44dp"
             android:paddingHorizontal="10dp"
-            android:text="倍速"
+            android:text="字幕"
+            android:textColor="@android:color/white"
+            android:textSize="12sp" />
+
+
+        <!-- 选集按钮 (胶囊样式) -->
+        <TextView
+            android:id="@+id/switchEpisode"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/bg_control_pill"
+            android:gravity="center"
+            android:minWidth="44dp"
+            android:paddingHorizontal="10dp"
+            android:text="选集"
             android:textColor="@android:color/white"
             android:textSize="12sp" />
 
@@ -267,5 +317,446 @@
         android:layout_alignParentBottom="true"
         android:max="100"
         android:progressDrawable="@drawable/video_progress" />
+
+    <!-- 右侧通用抽屉面板 (320dp)，合并了选集、倍速、画面比例、字幕抽屉 -->
+    <LinearLayout
+        android:id="@+id/layout_drawer"
+        android:layout_width="320dp"
+        android:layout_height="match_parent"
+        android:layout_alignParentEnd="true"
+        android:background="#E6000000"
+        android:clickable="true"
+        android:focusable="true"
+        android:orientation="vertical"
+        android:paddingHorizontal="12dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:visibility="gone">
+
+        <!-- 抽屉头部标题及关闭按钮 -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="4dp"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:id="@+id/tv_drawer_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="8dp"
+                android:layout_toStartOf="@+id/close_drawer"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                tools:text="抽屉标题" />
+
+            <ImageView
+                android:id="@+id/close_drawer"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="4dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/video_small_close" />
+        </RelativeLayout>
+
+        <!-- 字幕专用的头部操作面板（包含自定义搜索、时间偏移微调、样式设置、移除字幕） -->
+        <ScrollView
+            android:id="@+id/layout_subtitle_panel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxHeight="220dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- 1. 自定义搜索框栏 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
+                    android:layout_marginBottom="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/et_subtitle_search"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_control_pill"
+                        android:hint="输入关健字搜索字幕"
+                        android:imeOptions="actionSearch"
+                        android:inputType="text"
+                        android:paddingHorizontal="10dp"
+                        android:singleLine="true"
+                        android:textColor="@android:color/white"
+                        android:textColorHint="#80FFFFFF"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/btn_subtitle_search"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/bg_control_pill"
+                        android:gravity="center"
+                        android:paddingHorizontal="12dp"
+                        android:text="搜索"
+                        android:textColor="#42A5F5"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- 2. 时间偏移量微调栏 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tv_subtitle_offset_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="#D0FFFFFF"
+                        android:textSize="12sp"
+                        tools:text="偏移: 0ms" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="26dp"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:gravity="end"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/btn_offset_minus_1s"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:layout_marginEnd="4dp"
+                            android:background="@drawable/bg_control_pill"
+                            android:gravity="center"
+                            android:paddingHorizontal="6dp"
+                            android:text="-1s"
+                            android:textColor="@android:color/white"
+                            android:textSize="10sp" />
+
+                        <TextView
+                            android:id="@+id/btn_offset_minus_100ms"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:layout_marginEnd="4dp"
+                            android:background="@drawable/bg_control_pill"
+                            android:gravity="center"
+                            android:paddingHorizontal="6dp"
+                            android:text="-100ms"
+                            android:textColor="@android:color/white"
+                            android:textSize="10sp" />
+
+                        <TextView
+                            android:id="@+id/btn_offset_reset"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:layout_marginEnd="4dp"
+                            android:background="@drawable/bg_control_pill"
+                            android:gravity="center"
+                            android:paddingHorizontal="6dp"
+                            android:text="重置"
+                            android:textColor="#42A5F5"
+                            android:textSize="10sp" />
+
+                        <TextView
+                            android:id="@+id/btn_offset_plus_100ms"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:layout_marginEnd="4dp"
+                            android:background="@drawable/bg_control_pill"
+                            android:gravity="center"
+                            android:paddingHorizontal="6dp"
+                            android:text="+100ms"
+                            android:textColor="@android:color/white"
+                            android:textSize="10sp" />
+
+                        <TextView
+                            android:id="@+id/btn_offset_plus_1s"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:background="@drawable/bg_control_pill"
+                            android:gravity="center"
+                            android:paddingHorizontal="6dp"
+                            android:text="+1s"
+                            android:textColor="@android:color/white"
+                            android:textSize="10sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- 3. 字幕样式设置栏 (字号、颜色) -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="字号:"
+                        android:textColor="#80FFFFFF"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:id="@+id/btn_style_size_small"
+                        android:layout_width="wrap_content"
+                        android:layout_height="24dp"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/bg_control_pill"
+                        android:gravity="center"
+                        android:paddingHorizontal="6dp"
+                        android:text="小"
+                        android:textColor="@android:color/white"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:id="@+id/btn_style_size_medium"
+                        android:layout_width="wrap_content"
+                        android:layout_height="24dp"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/bg_control_pill"
+                        android:gravity="center"
+                        android:paddingHorizontal="6dp"
+                        android:text="中"
+                        android:textColor="#42A5F5"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:id="@+id/btn_style_size_large"
+                        android:layout_width="wrap_content"
+                        android:layout_height="24dp"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/bg_control_pill"
+                        android:gravity="center"
+                        android:paddingHorizontal="6dp"
+                        android:text="大"
+                        android:textColor="@android:color/white"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:text="颜色:"
+                        android:textColor="#80FFFFFF"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:id="@+id/btn_style_color_white"
+                        android:layout_width="wrap_content"
+                        android:layout_height="24dp"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/bg_control_pill"
+                        android:gravity="center"
+                        android:paddingHorizontal="6dp"
+                        android:text="白"
+                        android:textColor="#FFFFFF"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:id="@+id/btn_style_color_yellow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="24dp"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/bg_control_pill"
+                        android:gravity="center"
+                        android:paddingHorizontal="6dp"
+                        android:text="黄"
+                        android:textColor="#FFEB3B"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:id="@+id/btn_style_color_green"
+                        android:layout_width="wrap_content"
+                        android:layout_height="24dp"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/bg_control_pill"
+                        android:gravity="center"
+                        android:paddingHorizontal="6dp"
+                        android:text="绿"
+                        android:textColor="#4CAF50"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:id="@+id/btn_style_color_cyan"
+                        android:layout_width="wrap_content"
+                        android:layout_height="24dp"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/bg_control_pill"
+                        android:gravity="center"
+                        android:paddingHorizontal="6dp"
+                        android:text="青"
+                        android:textColor="#00BCD4"
+                        android:textSize="10sp" />
+                </LinearLayout>
+
+                <!-- 4. 字幕样式设置栏 (字体、加粗、底色) -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="字体:"
+                        android:textColor="#80FFFFFF"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:id="@+id/btn_style_font_default"
+                        android:layout_width="wrap_content"
+                        android:layout_height="24dp"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/bg_control_pill"
+                        android:gravity="center"
+                        android:paddingHorizontal="5dp"
+                        android:text="默认"
+                        android:textColor="#42A5F5"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:id="@+id/btn_style_font_sans"
+                        android:layout_width="wrap_content"
+                        android:layout_height="24dp"
+                        android:layout_marginStart="3dp"
+                        android:background="@drawable/bg_control_pill"
+                        android:gravity="center"
+                        android:paddingHorizontal="5dp"
+                        android:text="无衬线"
+                        android:textColor="@android:color/white"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:id="@+id/btn_style_font_serif"
+                        android:layout_width="wrap_content"
+                        android:layout_height="24dp"
+                        android:layout_marginStart="3dp"
+                        android:background="@drawable/bg_control_pill"
+                        android:gravity="center"
+                        android:paddingHorizontal="5dp"
+                        android:text="衬线"
+                        android:textColor="@android:color/white"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:id="@+id/btn_style_font_mono"
+                        android:layout_width="wrap_content"
+                        android:layout_height="24dp"
+                        android:layout_marginStart="3dp"
+                        android:background="@drawable/bg_control_pill"
+                        android:gravity="center"
+                        android:paddingHorizontal="5dp"
+                        android:text="等宽"
+                        android:textColor="@android:color/white"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:id="@+id/btn_style_bold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="24dp"
+                        android:layout_marginStart="8dp"
+                        android:background="@drawable/bg_control_pill"
+                        android:gravity="center"
+                        android:paddingHorizontal="6dp"
+                        android:text="加粗"
+                        android:textColor="@android:color/white"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:id="@+id/btn_style_bg_translucent"
+                        android:layout_width="wrap_content"
+                        android:layout_height="24dp"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/bg_control_pill"
+                        android:gravity="center"
+                        android:paddingHorizontal="6dp"
+                        android:text="半透底"
+                        android:textColor="@android:color/white"
+                        android:textSize="10sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/btn_save_subtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="28dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="@drawable/bg_control_pill"
+                    android:gravity="center"
+                    android:text="保存当前字幕"
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp" />
+
+                <!-- 5. 移除当前字幕按钮 -->
+                <TextView
+                    android:id="@+id/btn_remove_subtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="28dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="@drawable/bg_control_pill"
+                    android:gravity="center"
+                    android:text="移除当前字幕"
+                    android:textColor="#FF5252"
+                    android:textSize="12sp" />
+
+                <!-- 分割线 -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="#33FFFFFF" />
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- 列表容器：利用 FrameLayout 权重填充剩余空间 -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <!-- 字幕为空或加载状态提示文本 -->
+            <TextView
+                android:id="@+id/tv_subtitle_empty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:padding="20dp"
+                android:textColor="#80FFFFFF"
+                android:textSize="13sp"
+                android:visibility="gone"
+                tools:text="未找到匹配字幕，请输入关键字重新搜索" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rv_drawer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:overScrollMode="never"
+                android:scrollbars="vertical" />
+        </FrameLayout>
+    </LinearLayout>
 
 </RelativeLayout>

@@ -5,6 +5,7 @@ import com.google.gson.annotations.SerializedName
 
 data class Base115Response<T>(
     val state: Boolean = false,
+    val message: String = "",
     val data: T? = null
 )
 

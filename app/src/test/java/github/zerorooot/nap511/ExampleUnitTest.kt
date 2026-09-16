@@ -11,9 +11,7 @@ import org.junit.Test
 class ExampleUnitTest {
     @Test
     fun addition_isCorrect() {
-        val simpleClassName = "ImageCellItem.ImageCellItem\$lambda\$8\$0\$0\$0\$0"
-        val removeSuffix = simpleClassName.substringBefore('$').removeSuffix("Kt")
-
-        println(removeSuffix)
+        val a = "123 - ni@hao"
+        println(a.substringBeforeLast(".").takeIf { true }!!.substringAfterLast(" ").substringAfterLast("@"))
     }
 }

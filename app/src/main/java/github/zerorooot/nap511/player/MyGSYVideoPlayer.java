@@ -3,16 +3,18 @@ package github.zerorooot.nap511.player;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Typeface;
 import android.os.BatteryManager;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
-import android.view.MenuItem;
 import android.view.MotionEvent;
+import android.view.View;
 import android.widget.TextView;
 
 import com.elvishew.xlog.XLog;
+import com.shuyu.gsyvideoplayer.subtitle.GSYSubtitleStyle;
 import com.shuyu.gsyvideoplayer.utils.CommonUtil;
 import com.shuyu.gsyvideoplayer.utils.GSYVideoType;
 import com.shuyu.gsyvideoplayer.video.StandardGSYVideoPlayer;
@@ -23,10 +25,32 @@ import java.util.Locale;
 import java.util.Objects;
 
 import github.zerorooot.nap511.R;
+import github.zerorooot.nap511.bean.SubtitleStyleBean;
 
 public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     private TextView mMoreScale;
     private TextView switchSpeed;
+
+    // 统一的合并抽屉面板组件
+    private View layoutDrawer;
+    private TextView tvDrawerTitle;
+    private DrawerType mCurrentDrawerType = null;
+    private OnDrawerOpenListener mOnDrawerOpenListener;
+
+    /**
+     * 抽屉类型枚举：选集、倍速、画面比例、字幕
+     */
+    public enum DrawerType {
+        EPISODE, SPEED, SCALE, SUBTITLE
+    }
+
+    /**
+     * 抽屉打开监听接口，用于 Activity/Fragment 动态切换 RecyclerView 适配器
+     */
+    public interface OnDrawerOpenListener {
+        void onDrawerOpen(DrawerType type);
+    }
+
     private int mType = 0;
 
     long forwardRewindIncrementMs = 15000;
@@ -72,50 +96,52 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         }
     }
 
+    /**
+     * 设置抽屉打开监听器
+     */
+    public void setOnDrawerOpenListener(OnDrawerOpenListener listener) {
+        this.mOnDrawerOpenListener = listener;
+    }
+
+    /**
+     * 获取当前打开的抽屉类型
+     */
+    public DrawerType getCurrentDrawerType() {
+        return mCurrentDrawerType;
+    }
+
     private void initView() {
         batteryTextView = findViewById(R.id.batteryTextView);
         timeTextView = findViewById(R.id.timeTextView);
 
         mMoreScale = findViewById(R.id.moreScale);
         switchSpeed = findViewById(R.id.switchSpeed);
+        TextView switchEpisode = findViewById(R.id.switchEpisode);
+        TextView switchSubtitle = findViewById(R.id.switchSubtitle);
 
-        // 切换画面比例
-        mMoreScale.setOnClickListener(v -> {
-            if (!mHadPlay) return;
-            mType = (mType + 1) % 5;
-            resolveTypeUI();
-        });
+        // 绑定统一的右侧抽屉面板及其组件
+        layoutDrawer = findViewById(R.id.layout_drawer);
+        tvDrawerTitle = findViewById(R.id.tv_drawer_title);
+        View closeDrawer = findViewById(R.id.close_drawer);
 
-        // 切换倍速
-        switchSpeed.setOnClickListener(v -> {
-            v.setOnCreateContextMenuListener((menu, v1, menuInfo) -> {
-                MenuItem speed5 = menu.add("× 0.5");
-                speed5.setOnMenuItemClickListener(e -> {
-                    getCurrentPlayer().setSpeed(0.5f, true);
-                    switchSpeed.setText("0.5X");
-                    return true;
-                });
-                MenuItem speed1 = menu.add("× 1.0");
-                speed1.setOnMenuItemClickListener(e -> {
-                    getCurrentPlayer().setSpeed(1f, true);
-                    switchSpeed.setText("倍速");
-                    return true;
-                });
-                MenuItem speed15 = menu.add("× 1.5");
-                speed15.setOnMenuItemClickListener(e -> {
-                    getCurrentPlayer().setSpeed(1.5f, true);
-                    switchSpeed.setText("1.5X");
-                    return true;
-                });
-                MenuItem speed2 = menu.add("× 2.0");
-                speed2.setOnMenuItemClickListener(e -> {
-                    getCurrentPlayer().setSpeed(2f, true);
-                    switchSpeed.setText("2.0X");
-                    return true;
-                });
-            });
-            v.showContextMenu(v.getX(), v.getY());
-        });
+        // 底部各按钮绑定点击事件，打开对应类型的抽屉
+        if (switchEpisode != null) {
+            switchEpisode.setOnClickListener(v -> openDrawer(DrawerType.EPISODE, "选集"));
+        }
+        if (switchSpeed != null) {
+            switchSpeed.setOnClickListener(v -> openDrawer(DrawerType.SPEED, "播放倍速"));
+        }
+        if (mMoreScale != null) {
+            mMoreScale.setOnClickListener(v -> openDrawer(DrawerType.SCALE, "画面比例"));
+        }
+        if (switchSubtitle != null) {
+            switchSubtitle.setOnClickListener(v -> openDrawer(DrawerType.SUBTITLE, mTitleTextView.getText() + " " + CommonUtil.stringForTime(getDuration())));
+        }
+
+        // 抽屉关闭按钮事件
+        if (closeDrawer != null) {
+            closeDrawer.setOnClickListener(v -> hideAllDrawers());
+        }
     }
 
     /**
@@ -218,6 +244,24 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
     }
 
     @Override
+    protected void changeUiToPreparingShow() {
+        super.changeUiToPreparingShow();
+        setViewShowState(mStartButton, VISIBLE);
+    }
+
+    @Override
+    protected void changeUiToPlayingBufferingShow() {
+        super.changeUiToPlayingBufferingShow();
+        setViewShowState(mStartButton, VISIBLE);
+    }
+
+    @Override
+    protected void changeUiToPlayingBufferingClear() {
+        super.changeUiToPlayingBufferingClear();
+        setViewShowState(mStartButton, VISIBLE);
+    }
+
+    @Override
     public void touchDoubleUp(MotionEvent event) {
         float x = event.getX();
         DisplayMetrics displayMetrics = mContext.getResources().getDisplayMetrics();
@@ -232,4 +276,84 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
             forwardOrRewind(forwardRewindIncrementMs);
         }
     }
+
+    /**
+     * 打开指定类型的抽屉并更新标题
+     *
+     * @param type  抽屉类型 (选集/倍速/画面比例)
+     * @param title 抽屉标题文本
+     */
+    public void openDrawer(DrawerType type, String title) {
+        if (layoutDrawer != null) {
+            // 如果当前点击的抽屉已经处于显示状态，再次点击时则进行关抽屉切换
+            if (layoutDrawer.getVisibility() == VISIBLE && mCurrentDrawerType == type) {
+                hideAllDrawers();
+                return;
+            }
+            if (tvDrawerTitle != null) {
+                tvDrawerTitle.setText(title);
+            }
+            mCurrentDrawerType = type;
+            layoutDrawer.setVisibility(VISIBLE);
+            if (mOnDrawerOpenListener != null) {
+                mOnDrawerOpenListener.onDrawerOpen(type);
+            }
+        }
+    }
+
+    /**
+     * 隐藏抽屉面板
+     */
+    public void hideAllDrawers() {
+        if (layoutDrawer != null) {
+            layoutDrawer.setVisibility(GONE);
+        }
+        mCurrentDrawerType = null;
+    }
+
+    /**
+     * 判断当前抽屉面板是否正在显示
+     */
+    public boolean isAnyDrawerShowing() {
+        return layoutDrawer != null && layoutDrawer.getVisibility() == VISIBLE;
+    }
+
+    @Override
+    protected void onClickUiToggle(MotionEvent e) {
+        if (isAnyDrawerShowing()) {
+            hideAllDrawers();
+            return;
+        }
+        super.onClickUiToggle(e);
+    }
+
+    public void setAspectScale(int type) {
+        mType = type;
+        resolveTypeUI();
+    }
+
+    public void setSpeedText(String text) {
+        if (switchSpeed != null) {
+            switchSpeed.setText(text);
+        }
+    }
+
+    /**
+     * 应用字幕样式设置 (字号、颜色、背景色、字体、加粗)
+     */
+    public void applySubtitleStyle(SubtitleStyleBean styleBean) {
+        if (styleBean == null) return;
+        GSYSubtitleStyle style = new GSYSubtitleStyle.Builder()
+                .setTextSizeSp(styleBean.getTextSizeSp())
+                .setTextColor(styleBean.getTextColor())
+                .setBackgroundColor(styleBean.getBackgroundColor())
+                .build();
+        setSubtitleStyle(style);
+
+        if (mSubtitleView != null) {
+            int styleFlags = styleBean.isBold() ? Typeface.BOLD : Typeface.NORMAL;
+            mSubtitleView.setTypeface(styleBean.getFontFamily().getTypeface(), styleFlags);
+        }
+    }
+
 }

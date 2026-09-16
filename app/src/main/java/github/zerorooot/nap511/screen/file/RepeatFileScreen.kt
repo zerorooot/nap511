@@ -1,0 +1,417 @@
+package github.zerorooot.nap511.screen.file
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.elvishew.xlog.XLog
+import github.zerorooot.nap511.bean.CategoryDetailResponse
+import github.zerorooot.nap511.screen.components.AppBarAction
+import github.zerorooot.nap511.screen.components.AppTopBarRepeatFile
+import github.zerorooot.nap511.screen.components.MenuItemAction
+import github.zerorooot.nap511.screen.components.MiddleEllipsisText
+import github.zerorooot.nap511.screen.components.TopBarAction
+import github.zerorooot.nap511.screenitem.RepeatFileCardItem
+import github.zerorooot.nap511.viewmodel.RepeatFileViewModel
+import my.nanihadesuka.compose.LazyColumnScrollbar
+import my.nanihadesuka.compose.LazyVerticalGridScrollbar
+import my.nanihadesuka.compose.ScrollbarSettings
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlin.math.log10
+import kotlin.math.pow
+import androidx.compose.foundation.lazy.grid.items as gridItems
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RepeatFileScreen(
+    viewModel: RepeatFileViewModel,
+    isExpandedScreen: Boolean,
+    gridCellMinSize: Dp,
+    onClick: () -> Unit,
+    jumpClick: (String) -> Unit
+) {
+    LaunchedEffect(Unit) {
+        viewModel.loadData()
+    }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    val count = uiState.statusData?.fileCount ?: "0"
+    val formattedSize = formatBytes(uiState.statusData?.fileSize?.toLongOrNull() ?: 0L)
+
+    // 1. 创建并监听 ListState 与 GridState
+    val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
+
+    val onDeleteStrategySelect = { field: String, order: String ->
+        viewModel.executeDelete(
+            field,
+            order
+        )
+    }
+    val onPathClick = { cid: String ->
+        viewModel.fetchCategoryDetail(cid)
+    }
+
+    // 2. 校验触底逻辑：当滑动到倒数第 3 项以内且未在加载中时，触发 loadNextPage
+    val shouldLoadMore by remember(isExpandedScreen) {
+        derivedStateOf {
+            val totalItems: Int
+            val lastVisibleItem: Int
+            if (isExpandedScreen) {
+                val layoutInfo = gridState.layoutInfo
+                totalItems = layoutInfo.totalItemsCount
+                lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            } else {
+                val layoutInfo = listState.layoutInfo
+                totalItems = layoutInfo.totalItemsCount
+                lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            }
+            totalItems > 0 && lastVisibleItem >= totalItems - 3
+        }
+    }
+
+    // 3. 触底事件监听器
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore && !uiState.isLoadingList && !uiState.isListEndReached) {
+            viewModel.loadNextPage()
+        }
+    }
+    val appBarOnClick = { action: AppBarAction ->
+        when (action) {
+            MenuItemAction.ONE_KEY_DEDUP -> {
+                showDeleteDialog = true
+            }
+
+            MenuItemAction.START_DEDUP -> {
+                viewModel.triggerForceRefresh()
+            }
+
+            MenuItemAction.DELETE_EMPTY_FILES -> {
+                viewModel.clearEmptyFile()
+            }
+
+            TopBarAction.DRAWER_MENU -> {
+                onClick.invoke()
+            }
+
+            else -> {}
+        }
+    }
+
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+    ) {
+        AppTopBarRepeatFile("文件去重", appBarOnClick)
+        MiddleEllipsisText(
+            text = "共${count}个重复文件，占用空间${formattedSize}",
+            modifier = Modifier.padding(8.dp, 4.dp)
+        )
+
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = { viewModel.refreshList() }) {
+            if (uiState.totalCount == 0) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "暂无重复文件，点击右上角进行查重")
+                }
+            } else if (isExpandedScreen) {
+                LazyVerticalGridScrollbar(
+                    state = gridState,
+                    settings = ScrollbarSettings.Default.copy(
+                        thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
+                    )
+                ) {
+                    LazyVerticalGrid(
+                        state = gridState,
+                        columns = GridCells.Adaptive(minSize = gridCellMinSize),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        gridItems(uiState.fileList, key = { it.fileId }) { item ->
+                            RepeatFileCardItem(
+                                item = item,
+                                onPathClick = { onPathClick(item.parentId) }
+                            )
+                        }
+                    }
+                }
+            } else {
+                LazyColumnScrollbar(
+                    state = listState, settings = ScrollbarSettings.Default.copy(
+                        thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
+                    )
+                ) {
+                    LazyColumn(
+                        state = listState, modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(uiState.fileList, key = { it.fileId }) { item ->
+                            RepeatFileCardItem(
+                                item = item,
+                                onPathClick = { onPathClick(item.parentId) }
+                            )
+                        }
+                    }
+                }
+            }
+
+        }
+    }
+
+    // 3. 文件详情弹窗与去重策略弹窗绑定
+    uiState.categoryDetail?.let { detail ->
+        FileDetailDialog(
+            detail = detail,
+            onDismiss = { viewModel.dismissCategoryDetail() },
+            jumpClick = {
+                viewModel.dismissCategoryDetail()
+                jumpClick.invoke(it)
+            }
+        )
+    }
+
+    if (showDeleteDialog) {
+        DeduplicateStrategyDialog(
+            onDismiss = { showDeleteDialog = false },
+            onSelectStrategy = { field, order ->
+                showDeleteDialog = false
+                onDeleteStrategySelect(field, order)
+            }
+        )
+    }
+}
+
+
+// 文件详情对话框（含路径面包屑点击）
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FileDetailDialog(
+    detail: CategoryDetailResponse,
+    onDismiss: () -> Unit,
+    jumpClick: (String) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = detail.fileName,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                DetailRow(
+                    label = "类型",
+                    value = if (detail.fileCategory == "1") "文件" else "目录"
+                )
+                DetailRow(label = "大小", value = detail.size)
+                DetailRow(label = "创建时间", value = formatTimestamp(detail.ctime))
+                DetailRow(label = "修改时间", value = formatTimestamp(detail.utime))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "位置：",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    // 面包屑层级路径展示：根目录 > test > ...
+                    FlowRow(
+                        horizontalArrangement = Arrangement.Start,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        detail.paths.forEachIndexed { index, pathItem ->
+                            Text(
+                                text = pathItem.fileName,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.clickable {
+                                    XLog.d("PathClick 点击路径: ${pathItem.fileName}, file_id: ${pathItem.fileId}")
+                                    jumpClick.invoke(pathItem.fileId)
+                                }
+                            )
+                            if (index < detail.paths.size - 1) {
+                                Text(
+                                    text = " > ",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("关闭")
+            }
+        }
+    )
+}
+
+@Composable
+private fun DetailRow(label: String, value: String) {
+    Row {
+        Text(
+            text = "$label：",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+// 一键去重保留条件对话框
+@Composable
+private fun DeduplicateStrategyDialog(
+    onDismiss: () -> Unit,
+    onSelectStrategy: (field: String, order: String) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "请选择保留条件", fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                // 带有加粗“保留条件”的提示文本
+                val annotatedText = buildAnnotatedString {
+                    append("系统将批量删除")
+                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append("保留条件")
+                    }
+                    append("外的其他重复文件，文件删除不进回收站，请谨慎操作。")
+                }
+
+                Text(
+                    text = annotatedText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 8 个按钮策略列表
+                val strategies = remember {
+                    listOf(
+                        StrategyOption("所在文件夹最长路径", "parents", "desc"),
+                        StrategyOption("所在文件夹最短路径", "parents", "asc"),
+                        StrategyOption("最后操作时间", "user_utime", "desc"),
+                        StrategyOption("最早操作时间", "user_utime", "asc"),
+                        StrategyOption("最后上传时间", "user_ptime", "desc"),
+                        StrategyOption("最早上传时间", "user_ptime", "asc"),
+                        StrategyOption("文件名最长", "file_name", "desc"),
+                        StrategyOption("文件名最短", "file_name", "asc")
+                    )
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    strategies.chunked(2).forEach { row ->
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            row.forEach { item ->
+                                OutlinedButton(
+                                    onClick = { onSelectStrategy(item.field, item.order) },
+                                    modifier = Modifier.weight(1f),
+                                    contentPadding = PaddingValues(8.dp)
+                                ) {
+                                    Text(
+                                        text = item.name,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {}
+    )
+}
+
+private data class StrategyOption(
+    val name: String,
+    val field: String,
+    val order: String
+)
+
+// 工具函数：字节转换
+fun formatBytes(bytes: Long): String {
+    if (bytes <= 0) return "0 B"
+    val units = arrayOf("B", "KB", "MB", "GB", "TB")
+    val digitGroups = (log10(bytes.toDouble()) / log10(1024.0)).toInt()
+    return String.format(
+        Locale.getDefault(),
+        "%.2f %s",
+        bytes / 1024.0.pow(digitGroups.toDouble()),
+        units[digitGroups]
+    )
+}
+
+// 工具函数：时间戳格式化
+private fun formatTimestamp(timestampStr: String): String {
+    val time = timestampStr.toLongOrNull() ?: return timestampStr
+    val date = Date(time * 1000)
+    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+    return sdf.format(date)
+}

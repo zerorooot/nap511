@@ -23,6 +23,9 @@ import com.elvishew.xlog.printer.AndroidPrinter
 import com.elvishew.xlog.printer.file.FilePrinter
 import com.elvishew.xlog.printer.file.clean.FileLastModifiedCleanStrategy
 import github.zerorooot.nap511.repository.SettingsRepository
+import github.zerorooot.nap511.util.network.NetworkClient
+import github.zerorooot.nap511.util.network.OneOneFiveImageExpirationInterceptor
+import github.zerorooot.nap511.util.network.UserSessionManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -136,7 +139,13 @@ class App : Application(), ImageLoaderFactory {
 
 
     override fun newImageLoader(): ImageLoader {
+        // 为 Coil 配置带有过期拦截器的 OkHttpClient
+        val okHttpClient = NetworkClient.sharedOkHttpClient.newBuilder()
+            .addInterceptor(OneOneFiveImageExpirationInterceptor())
+            .build()
+
         return ImageLoader.Builder(this)
+            .okHttpClient(okHttpClient) // 传入配置后的 OkHttpClient
             .components {
                 // 注册 GIF 解码器
                 if (Build.VERSION.SDK_INT >= 28) {

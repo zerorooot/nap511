@@ -4,7 +4,7 @@ import androidx.lifecycle.viewModelScope
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.UserSessionManager
+import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.launch
 

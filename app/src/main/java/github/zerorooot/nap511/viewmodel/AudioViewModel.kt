@@ -3,7 +3,6 @@ package github.zerorooot.nap511.viewmodel
 import android.app.Application
 import android.content.Intent
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -11,66 +10,93 @@ import androidx.lifecycle.viewModelScope
 import com.shuyu.gsyvideoplayer.listener.GSYMediaPlayerListener
 import com.shuyu.gsyvideoplayer.player.PlayerFactory
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.SubtitleItem
+import github.zerorooot.nap511.bean.SubtitleUiState
 import github.zerorooot.nap511.player.AudioGSYManager
 import github.zerorooot.nap511.repository.FileRepository
+import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.service.AudioService
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.AudioEvent
-import github.zerorooot.nap511.util.AudioEventBus
-import github.zerorooot.nap511.util.UserSessionManager
+import github.zerorooot.nap511.util.subtitle.SubtitleEntry
+import github.zerorooot.nap511.util.bus.AudioEvent
+import github.zerorooot.nap511.util.bus.AudioEventBus
+import github.zerorooot.nap511.util.bus.DialogEvent
+import github.zerorooot.nap511.util.bus.DialogEventBus
+import github.zerorooot.nap511.util.network.UserSessionManager
+import github.zerorooot.nap511.util.subtitle.SubtitleDelegate
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
+import java.io.File
 import kotlin.time.Duration.Companion.milliseconds
+
+data class AudioPlaybackUiState(
+    val currentMusic: FileBean? = null,
+    val isPlaying: Boolean = false,
+    val isLoading: Boolean = false,
+    val progress: Float = 0f,
+    val currentPositionText: String = "00:00",
+    val playbackSpeed: Float = 1.0f,
+    val volume: Float = 1.0f,
+    val isUserSeeking: Boolean = false,
+    val userSeekProgress: Float = 0f
+) {
+    val displayProgress: Float
+        get() = if (isUserSeeking) userSeekProgress else progress
+}
+
+data class AudioUiState(
+    val playback: AudioPlaybackUiState = AudioPlaybackUiState(),
+    val subtitle: SubtitleUiState = SubtitleUiState()
+)
 
 class AudioViewModel(application: Application) : AndroidViewModel(application) {
     private val SEEK_STEP_MS = 15000L
     private val context = getApplication<Application>()
 
-    // 假设你有 Repository 或 Api 实例，也可以通过 Hilt/Koin 注入
     val fileRepository: FileRepository by lazy {
         FileRepository.getInstance()
     }
 
-    var currentMusic by mutableStateOf<FileBean?>(null)
+    val subtitleRepository: SubtitleRepository by lazy {
+        SubtitleRepository.getInstance()
+    }
+
+    private val subtitleDelegate = SubtitleDelegate(subtitleRepository) { newSubtitleState ->
+        uiState = uiState.copy(subtitle = newSubtitleState)
+    }
+
+    var uiState by mutableStateOf(AudioUiState())
         private set
 
-    var isPlaying by mutableStateOf(false)
-        private set
+    // 常用属性重定向（兼容与内部便捷访问）
+    val currentMusic: FileBean? get() = uiState.playback.currentMusic
+    val isPlaying: Boolean get() = uiState.playback.isPlaying
+    val isLoading: Boolean get() = uiState.playback.isLoading
+    val progress: Float get() = uiState.playback.progress
+    val currentPositionText: String get() = uiState.playback.currentPositionText
+    val playbackSpeed: Float get() = uiState.playback.playbackSpeed
+    val isUserSeeking: Boolean get() = uiState.playback.isUserSeeking
+    val userSeekProgress: Float get() = uiState.playback.userSeekProgress
 
-    var isLoading by mutableStateOf(false)
-        private set
-
-    var progress by mutableFloatStateOf(0f)
-        private set
-
-    var currentPositionText by mutableStateOf("00:00")
-        private set
-
-    var playbackSpeed by mutableFloatStateOf(1.0f)
-        private set
-
-    var volume by mutableFloatStateOf(1.0f)
-        private set
+    val subtitleOffsetMs: Long get() = uiState.subtitle.offsetMs
+    val currentLocalSubtitles: List<SubtitleItem> get() = uiState.subtitle.currentLocalSubtitles
 
     private var progressJob: Job? = null
-
-    // 记录用户是否正在拖动进度条
-    var isUserSeeking by mutableStateOf(false)
-        private set
-
-    // 用户拖拽过程中的临时进度
-    var userSeekProgress by mutableFloatStateOf(0f)
-        private set
-
     private val videoManger: AudioGSYManager = AudioGSYManager.instance()
+
+    val durationMs: Long
+        get() = videoManger.duration.coerceAtLeast(0L)
+
+    private fun updatePlayback(update: AudioPlaybackUiState.() -> AudioPlaybackUiState) {
+        uiState = uiState.copy(playback = uiState.playback.update())
+    }
 
     private val listener = object : GSYMediaPlayerListener {
         override fun onPrepared() {
             viewModelScope.launch {
-                isLoading = false
-                isPlaying = true
+                updatePlayback { copy(isLoading = false, isPlaying = true) }
                 videoManger.start() // 真正的启动播放
                 startProgressTracker()
                 startAudioService(currentMusic?.name ?: "")
@@ -79,8 +105,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
         override fun onAutoCompletion() {
             viewModelScope.launch {
-                isPlaying = false
-                progress = 1f
+                updatePlayback { copy(isPlaying = false, progress = 1f) }
                 stopProgressTracker()
             }
         }
@@ -105,30 +130,42 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
     // 1. 开始拖动
     fun onSeekStart() {
-        isUserSeeking = true
+        updatePlayback { copy(isUserSeeking = true) }
         pause()
     }
 
     // 2. 拖动中改变数值
     fun onSeekChange(newProgress: Float) {
-        userSeekProgress = newProgress
         val duration = videoManger.duration
-        if (duration > 0) {
+        val posText = if (duration > 0) {
             val targetMs = (newProgress * duration).toLong()
-            currentPositionText = "${formatTime(targetMs)}/${formatTime(duration)}"
+            updateSubtitleForPosition(targetMs)
+            "${formatTime(targetMs)}/${formatTime(duration)}"
+        } else {
+            currentPositionText
         }
+        updatePlayback { copy(userSeekProgress = newProgress, currentPositionText = posText) }
     }
 
     // 3. 松开手指，执行 Seek 操作
     fun onSeekEnd() {
         val duration = videoManger.duration
+        var targetProgress = progress
+        var posText = currentPositionText
         if (duration > 0) {
             val targetMs = (userSeekProgress * duration).toLong()
             videoManger.seekTo(targetMs)
-            progress = userSeekProgress
-            currentPositionText = "${formatTime(targetMs)}/${formatTime(duration)}"
+            targetProgress = userSeekProgress
+            posText = "${formatTime(targetMs)}/${formatTime(duration)}"
+            updateSubtitleForPosition(targetMs)
         }
-        isUserSeeking = false
+        updatePlayback {
+            copy(
+                isUserSeeking = false,
+                progress = targetProgress,
+                currentPositionText = posText
+            )
+        }
         togglePlayPause()
     }
 
@@ -153,23 +190,29 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
      * 从单例播放器拉取最新状态，更新 ViewModel Compose State
      */
     private fun syncFromManager() {
-        isPlaying = videoManger.isPlaying
-        if (isPlaying) {
+        val playing = videoManger.isPlaying
+        updatePlayback { copy(isPlaying = playing) }
+        if (playing) {
             startProgressTracker()
         } else {
             stopProgressTracker()
         }
     }
 
-    fun playAudio(fileBean: FileBean) {
+    fun playAudio(fileBean: FileBean, localSubtitles: List<SubtitleItem>) {
         // 防止在同一个文件加载中重复点击
         if (isLoading || currentMusic?.fileId == fileBean.fileId) return
 
-        currentMusic = fileBean
-        isLoading = true
-        isPlaying = false
-        progress = 0f
-        currentPositionText = "00:00"
+        removeSubtitle()
+        updatePlayback {
+            copy(
+                currentMusic = fileBean,
+                isLoading = true,
+                isPlaying = false,
+                progress = 0f,
+                currentPositionText = "00:00"
+            )
+        }
 
         viewModelScope.launch {
             try {
@@ -184,23 +227,25 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                         null,           // cachePath (缓存路径，传 null 为默认)
                         fileBean.name   // title
                     )
+                    // 自动加载/搜集字幕候选
+                    loadSubtitles(localSubtitles = localSubtitles)
                 } else {
                     App.instance.toast("无法获取音频播放地址")
-                    currentMusic = null
+                    updatePlayback { copy(currentMusic = null) }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
                 App.instance.toast("加载失败: ${e.message}")
-                currentMusic = null
+                updatePlayback { copy(currentMusic = null) }
             } finally {
-                isLoading = false
+                updatePlayback { copy(isLoading = false) }
             }
         }
     }
 
     fun pause() {
         videoManger.pause()
-        isPlaying = false
+        updatePlayback { copy(isPlaying = false) }
         stopProgressTracker()
     }
 
@@ -210,7 +255,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             pause()
         } else {
             videoManger.start()
-            isPlaying = true
+            updatePlayback { copy(isPlaying = true) }
             startProgressTracker()
         }
         startAudioService(currentMusic?.name ?: "")
@@ -233,17 +278,21 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     fun stopAudioAndService() {
         stop()
         stopAudioService()
-        playbackSpeed = 1.0f
-        volume = 1.0f
+        updatePlayback { copy(playbackSpeed = 1.0f, volume = 1.0f) }
     }
 
     private fun stop() {
         stopProgressTracker()
-        currentMusic = null
-        isPlaying = false
-        isLoading = false
-        progress = 0f
-        currentPositionText = "00:00"
+        removeSubtitle()
+        updatePlayback {
+            copy(
+                currentMusic = null,
+                isPlaying = false,
+                isLoading = false,
+                progress = 0f,
+                currentPositionText = "00:00"
+            )
+        }
         videoManger.releaseMediaPlayer()
     }
 
@@ -251,8 +300,10 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         val duration = videoManger.duration
         val current = videoManger.currentPosition
         if (duration > 0 && !isUserSeeking) {
-            progress = current.toFloat() / duration.toFloat()
-            currentPositionText = "${formatTime(current)}/${formatTime(duration)}"
+            val newProgress = current.toFloat() / duration.toFloat()
+            val newPosText = "${formatTime(current)}/${formatTime(duration)}"
+            updatePlayback { copy(progress = newProgress, currentPositionText = newPosText) }
+            updateSubtitleForPosition(current)
         }
     }
 
@@ -268,24 +319,113 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun changeSpeed(speed: Float) {
-        playbackSpeed = speed
+        updatePlayback { copy(playbackSpeed = speed) }
         videoManger.setSpeed(speed, true)
     }
 
     fun changeVolume(v: Float) {
-        volume = v
+        updatePlayback { copy(volume = v) }
         videoManger.setVolume(v)
     }
 
-    // 修改轮询进度逻辑：用户拖拽时跳过自动赋值
+    // --- 字幕业务代理函数 ---
+
+    /**
+     * 搜集/检索字幕（结合迅雷 API 与 115 同目录字幕）
+     */
+    fun loadSubtitles(
+        searchKeyword: String = "",
+        localSubtitles: List<SubtitleItem> = currentLocalSubtitles
+    ) {
+        subtitleDelegate.loadSubtitles(
+            scope = viewModelScope,
+            mediaName = currentMusic?.name ?: "",
+            searchKeyword = searchKeyword,
+            localSubtitles = localSubtitles,
+            mediaDurationMs = videoManger.duration
+        )
+    }
+
+    /**
+     * 选择并下载准备字幕
+     */
+    fun selectSubtitle(cacheDirFile: File, item: SubtitleItem) {
+        subtitleDelegate.selectSubtitle(
+            scope = viewModelScope,
+            cacheDirFile = cacheDirFile,
+            item = item,
+            currentPositionMs = videoManger.currentPosition
+        )
+    }
+
+    /**
+     * 移除当前选中的字幕
+     */
+    fun removeSubtitle() {
+        subtitleDelegate.removeSubtitle()
+    }
+
+    /**
+     * 设置时间偏移量 (ms)
+     */
+    fun setSubtitleOffset(offsetMs: Long) {
+        subtitleDelegate.setSubtitleOffset(offsetMs, videoManger.currentPosition)
+    }
+
+    /**
+     * 微调时间偏移量 (ms)
+     */
+    fun addSubtitleOffset(deltaMs: Long) {
+        subtitleDelegate.addSubtitleOffset(deltaMs, videoManger.currentPosition)
+    }
+
+    /**
+     * 保存并上传当前字幕（连同本地时间偏移修正）至当前音乐所在的 115 目录
+     */
+    fun saveAndUploadCurrentSubtitle(cacheDirFile: File, targetCid: String) {
+        val musicName = currentMusic?.name ?: ""
+        subtitleDelegate.saveAndUploadCurrentSubtitle(
+            scope = viewModelScope,
+            cacheDirFile = cacheDirFile,
+            videoFileName = musicName,
+            targetCid = targetCid,
+            onSuccess = {
+                viewModelScope.launch {
+                    DialogEventBus.getInstance().emit(DialogEvent.RefreshFileList(targetCid))
+                }
+            }
+        )
+    }
+
+    /**
+     * 点击某一字幕行跳转播放
+     */
+    fun seekToSubtitleEntry(entry: SubtitleEntry) {
+        val targetMs = (entry.startMs - subtitleOffsetMs).coerceAtLeast(0L)
+        videoManger.seekTo(targetMs)
+        updateAudioTime()
+    }
+
+    /**
+     * 根据当前播放时刻与偏移量，匹配当前显示的字幕文本与行号
+     */
+    fun updateSubtitleForPosition(currentMs: Long = videoManger.currentPosition) {
+        subtitleDelegate.updateSubtitleForPosition(currentMs)
+    }
+
+    // 修改轮询进度逻辑：高频轮询同步字幕与进度
     private fun startProgressTracker() {
         stopProgressTracker()
+        var lastNotifyTime = 0L
         progressJob = viewModelScope.launch {
             while (isPlaying) {
                 updateAudioTime()
-                // 保持系统通知栏的 MediaSession 状态与真实播放进度一致
-                notifyServiceUpdateState()
-                delay(1000.milliseconds)
+                val now = System.currentTimeMillis()
+                if (now - lastNotifyTime >= 300L) {
+                    notifyServiceUpdateState()
+                    lastNotifyTime = now
+                }
+                delay(150.milliseconds)
             }
         }
     }

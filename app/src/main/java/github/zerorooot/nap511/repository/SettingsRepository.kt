@@ -16,7 +16,7 @@ import com.google.gson.JsonObject
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.UserSessionManager
+import github.zerorooot.nap511.util.network.UserSessionManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

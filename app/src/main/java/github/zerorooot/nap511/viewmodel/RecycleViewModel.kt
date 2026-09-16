@@ -6,13 +6,13 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
-import github.zerorooot.nap511.screen.RecycleUiState
+import github.zerorooot.nap511.screen.file.RecycleUiState
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DialogEvent
-import github.zerorooot.nap511.util.DialogEventBus
+import github.zerorooot.nap511.util.bus.DialogEvent
+import github.zerorooot.nap511.util.bus.DialogEventBus
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted

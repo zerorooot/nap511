@@ -9,6 +9,37 @@ data class MusicBean(
     val audioUrl: String = ""
 )
 
+data class VideoBean(
+    val currentDuration: Int = -1,
+//    val fileBeanIndex: Int = -1,
+    val pickCode: String,
+    val fileId: String = "",
+    //playNextVideo中需要用到
+    val name: String = ""
+)
+
+/**
+ * 启动视频播放的事件包装类
+ * @param videoInfo 视频基础信息
+ * @param videoAttribute 视频属性配置
+ * @param videoList 视频列表
+ */
+data class LaunchVideoParams(
+    val videoInfo: VideoInfoBean,
+    val videoAttribute: VideoAttributeBean,
+    val localSubtitleItem: List<SubtitleItem>,
+    val videoList: List<VideoBean>,
+    val categoryId: String
+)
+
+data class VideoAttributeBean(
+    val isAutoRotate: Boolean = false,
+    val videoLinkMode: Boolean = false,
+    val autoJumpRetry: Boolean = true,
+    val hideLoading: Boolean = false,
+    val positionAfterAt: Boolean = false
+)
+
 data class VideoInfoBean(
     @SerializedName("thumb_url") var thumbUrl: String = "",
     @SerializedName("height") var height: Int = 0,
@@ -27,10 +58,6 @@ data class VideoInfoBean(
     @SerializedName("user_turn") var userTurn: Int = 0,
     @SerializedName("origin_file_url") var originFileUrl: String = "",
     val index: Int = -1,
-    val isAutoRotate: Boolean = false,
-    val videoLinkMode: Boolean = false,
-    val autoJumpRetry: Boolean = true,
-    val hideLoading: Boolean = false,
 
     @SerializedName("download_url")
     private val rawDownloadUrl: Any? = null
@@ -55,4 +82,16 @@ data class ImageBean(
     @SerializedName("file_name") var fileName: String = "",
     @SerializedName("file_sha1") var fileSha1: String = "",
     @SerializedName("pick_code") var pickCode: String = "",
+)
+
+data class UploadBean(
+    @SerializedName("aid") val areaId: String = "",
+    @SerializedName("cid") val categoryId: String = "",
+    @SerializedName("file_name") val name: String = "",
+    @SerializedName("file_ptime") val createTime: String = "",
+    @SerializedName("file_id") val fileId: String = "",
+    @SerializedName("file_size") val size: String = "0",
+    @SerializedName("pick_code") val pickCode: String = "",
+    @SerializedName("sha1") val sha1: String = "",
+    @SerializedName("is_video") val isVideo: Int = 0,
 )

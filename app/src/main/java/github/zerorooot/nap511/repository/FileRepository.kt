@@ -4,19 +4,23 @@ import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.bean.Base115Response
 import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.CreateFolderMessage
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileInfo
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.ImageDate
+import github.zerorooot.nap511.bean.InitUploadBean
 import github.zerorooot.nap511.bean.OfflineInfo
 import github.zerorooot.nap511.bean.OfflineListCount
 import github.zerorooot.nap511.bean.OfflineTaskType
 import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.bean.SignBean
 import github.zerorooot.nap511.bean.TorrentFileBean
+import github.zerorooot.nap511.bean.UploadBean
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.bean.ZipStatus
@@ -24,14 +28,21 @@ import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.OfflineService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.NetworkClient
-import github.zerorooot.nap511.util.Sha1Util
-import github.zerorooot.nap511.util.UserSessionManager
+import github.zerorooot.nap511.util.crypto.Sha1Util
+import github.zerorooot.nap511.util.network.NetworkClient
+import github.zerorooot.nap511.util.network.UserSessionManager
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import okhttp3.FormBody
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.Request
 import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -496,5 +507,98 @@ class FileRepository {
 
     suspend fun music(pickCode: String): String {
         return fileService.music(pickCode, "weixin", "json").url
+    }
+
+    /**
+     * 上传本地文件到 115 目录
+     * @param file 要上传的本地文件
+     * @param targetCid 115 目标目录 CID
+     * @param uploadFileName 自定义上传文件名（默认使用 file.name）
+     * @param mimeType 文件的 MIME 类型
+     */
+    suspend fun uploadFile(
+        file: File,
+        targetCid: String,
+        uploadFileName: String = file.name,
+        mimeType: String = "application/octet-stream"
+    ): Base115Response<UploadBean> = withContext(Dispatchers.IO) {
+        val uid = UserSessionManager.uid
+        val cookie = UserSessionManager.cookie
+        val gson = Gson()
+
+        val initUrl = "https://uplb.115.com/3.0/sampleinitupload.php"
+        val postBody =
+            "userid=$uid&filename=$uploadFileName&filesize=${file.length()}&target=U_1_$targetCid"
+                .toRequestBody("application/x-www-form-urlencoded; charset=UTF-8".toMediaType())
+
+        val initRequest = Request.Builder()
+            .url(initUrl)
+            .addHeader("cookie", cookie)
+            .addHeader("User-Agent", ConfigKeyUtil.USER_AGENT)
+            .post(postBody)
+            .build()
+
+        val response = NetworkClient.sharedOkHttpClient.newCall(initRequest).execute()
+        if (!response.isSuccessful) {
+            XLog.e("FileRepository.uploadFile: 初始化上传失败, Code: ${response.code}")
+            return@withContext Base115Response(
+                state = false,
+                message = "初始化上传失败 (HTTP ${response.code})"
+            )
+        }
+
+        val bodyString = response.body.string()
+        val initUploadBean = runCatching {
+            gson.fromJson(bodyString, InitUploadBean::class.java)
+        }.getOrNull()
+
+        if (initUploadBean == null || initUploadBean.host.isBlank()) {
+            XLog.e("FileRepository.uploadFile: 解析初始化上传响应失败: $bodyString")
+            return@withContext Base115Response(state = false, message = "解析初始化上传结果失败")
+        }
+
+        val requestBody: RequestBody = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("name", uploadFileName)
+            .addFormDataPart("key", initUploadBean.key)
+            .addFormDataPart("policy", initUploadBean.policy)
+            .addFormDataPart("OSSAccessKeyId", initUploadBean.oSSAccessKeyId)
+            .addFormDataPart("success_action_status", "200")
+            .addFormDataPart("callback", initUploadBean.callback)
+            .addFormDataPart("signature", initUploadBean.signature)
+            .addFormDataPart(
+                "file",
+                uploadFileName,
+                file.asRequestBody(mimeType.toMediaType())
+            )
+            .build()
+
+        val uploadRequest = Request.Builder()
+            .url(initUploadBean.host)
+            .addHeader("origin", "https://115.com")
+            .addHeader("referer", "https://115.com")
+            .addHeader("cookie", cookie)
+            .addHeader("User-Agent", ConfigKeyUtil.USER_AGENT)
+            .post(requestBody)
+            .build()
+
+        val uploadResponse = NetworkClient.sharedOkHttpClient.newCall(uploadRequest).execute()
+        if (!uploadResponse.isSuccessful) {
+            XLog.e("FileRepository.uploadFile: 上传文件至 OSS 失败, Code: ${uploadResponse.code}")
+            return@withContext Base115Response(
+                state = false,
+                message = "上传文件失败 (HTTP ${uploadResponse.code})"
+            )
+        }
+
+        val uploadBody = uploadResponse.body.string()
+
+        val type = object : TypeToken<Base115Response<UploadBean>>() {}.type
+        val result = gson.fromJson<Base115Response<UploadBean>>(uploadBody, type)
+
+        runCatching {
+            result
+        }.getOrElse {
+            Base115Response(state = false, message = "解析上传响应失败")
+        }
     }
 }

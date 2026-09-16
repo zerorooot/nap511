@@ -30,8 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.OfflineTask
-import github.zerorooot.nap511.screen.MenuItemAction
-import github.zerorooot.nap511.screen.OfflineFileMoreMenu
+import github.zerorooot.nap511.screen.components.MenuItemAction
+import github.zerorooot.nap511.screen.components.OfflineFileMoreMenu
 
 
 @OptIn(ExperimentalFoundationApi::class)

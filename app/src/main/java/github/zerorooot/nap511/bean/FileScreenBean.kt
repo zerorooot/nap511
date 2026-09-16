@@ -6,7 +6,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.material3.FabPosition
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.unit.Dp
-import github.zerorooot.nap511.screen.AppBarAction
+import github.zerorooot.nap511.screen.components.AppBarAction
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 
 
