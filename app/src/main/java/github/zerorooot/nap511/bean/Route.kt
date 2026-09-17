@@ -1,12 +1,13 @@
 package github.zerorooot.nap511.bean
 
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 
 // 导航配置项辅助类
 data class DrawerMenuItem(val iconVector: ImageVector, val label: String, val route: Route)
 
-sealed interface Route {
+sealed interface Route : NavKey {
     // 抽屉导航页面
     @Serializable
     data object Login : Route

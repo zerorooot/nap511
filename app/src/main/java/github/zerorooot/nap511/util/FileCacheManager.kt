@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.util.cache
+package github.zerorooot.nap511.util
 
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson

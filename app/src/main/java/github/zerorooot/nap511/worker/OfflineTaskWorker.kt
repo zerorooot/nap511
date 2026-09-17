@@ -25,8 +25,8 @@ import github.zerorooot.nap511.activity.OfflineTaskActivity
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.bus.DialogEvent
-import github.zerorooot.nap511.util.bus.DialogEventBus
+import github.zerorooot.nap511.util.DialogEvent
+import github.zerorooot.nap511.util.DialogEventBus
 import java.util.StringJoiner
 
 class OfflineTaskWorker(

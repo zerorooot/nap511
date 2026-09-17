@@ -167,11 +167,10 @@ class ConfigKeyUtil {
          * 是否启用大屏/宽屏模式 (ExpandedScreen)
          */
         const val EXPANDED_SCREEN = "expandedScreen"
-
         /**
-         * 大屏/宽屏模式触发宽度阈值（dp）
+         * 是否启用多列网格模式
          */
-        const val EXPANDED_SCREEN_THRESHOLD = "expandedScreenThreshold"
+        const val GRID_SCREEN = "gridScreen"
 
         /**
          * 网格布局最小单元格宽度（dp）

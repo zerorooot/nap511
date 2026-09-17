@@ -88,8 +88,9 @@ data class SettingUiState(
     /** 是否启用大屏扩展模式（在平板或大屏设备上启用大屏展开布局） */
     @SerializedName(ConfigKeyUtil.EXPANDED_SCREEN) val expandedScreenEnabled: Boolean = true,
 
-    /** 大屏宽度阈值（单位：dp，屏幕宽度达到该值时触发大屏布局） */
-    @SerializedName(ConfigKeyUtil.EXPANDED_SCREEN_THRESHOLD) val expandedScreenThreshold: String = "600",
+    /** 是否启用多列网格模式（在平板或大屏设备上列表多行排列） */
+    @SerializedName(ConfigKeyUtil.GRID_SCREEN) val gridScreenEnabled: Boolean = true,
+
 
     /** 网格布局单列最小宽度（单位：dp） */
     @SerializedName(ConfigKeyUtil.GRID_CELL_MIN_SIZE) val gridCellMinSize: String = "340",

@@ -57,7 +57,7 @@ import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 @Composable
 fun OfflineFileScreen(
     offlineFileViewModel: OfflineFileViewModel,
-    isExpandedScreen: Boolean,
+    isGirdScreen: Boolean,
     gridCellMinSize: Dp,
     getFiles: (String) -> Unit,
     onClick: (String) -> Unit,
@@ -67,7 +67,7 @@ fun OfflineFileScreen(
     OfflineFileContent(
         uiState = uiState,
         gridCellMinSize = gridCellMinSize,
-        isExpandedScreen = isExpandedScreen,
+        isGridScreen = isGirdScreen,
         onRefresh = { offlineFileViewModel.refresh() },
         onClearFinish = { offlineFileViewModel.clearFinish() },
         onClearError = { offlineFileViewModel.clearError() },
@@ -89,7 +89,7 @@ fun OfflineFileScreen(
 fun OfflineFileContent(
     uiState: OfflineFileUiState,
     gridCellMinSize: Dp,
-    isExpandedScreen: Boolean,
+    isGridScreen: Boolean,
     onRefresh: () -> Unit,
     onClearFinish: () -> Unit,
     onClearError: () -> Unit,
@@ -188,11 +188,11 @@ fun OfflineFileContent(
             val listState = key(page) { rememberLazyListState() }
             val gridState = key(page) { rememberLazyGridState() }
 
-            val shouldLoadMore = remember(isExpandedScreen) {
+            val shouldLoadMore = remember(isGridScreen) {
                 derivedStateOf {
                     val totalItems: Int
                     val lastVisibleIndex: Int
-                    if (isExpandedScreen) {
+                    if (isGridScreen) {
                         val layoutInfo = gridState.layoutInfo
                         totalItems = layoutInfo.totalItemsCount
                         lastVisibleIndex =
@@ -243,7 +243,7 @@ fun OfflineFileContent(
                     ) {
                         Text("暂无记录")
                     }
-                } else if (isExpandedScreen) {
+                } else if (isGridScreen) {
                     LazyVerticalGridScrollbar(
                         state = gridState,
                         settings = ScrollbarSettings.Default.copy(

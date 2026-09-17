@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.ui.navigation
+package github.zerorooot.nap511.screenitem
 
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -16,13 +16,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavDestination
-import androidx.navigation.NavDestination.Companion.hasRoute
 import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.bean.DrawerMenuItem
 import github.zerorooot.nap511.bean.RemainingSpaceBean
 import github.zerorooot.nap511.bean.Route
-import github.zerorooot.nap511.screenitem.Avatar
 
 @Composable
 fun AppDrawer(
@@ -31,7 +28,7 @@ fun AppDrawer(
     remainingSpaceBean: RemainingSpaceBean,
     avatarBean: AvatarBean,
     menuItems: List<DrawerMenuItem>,
-    currentDestination: NavDestination?,
+    currentRoute: Route?,
     onMenuItemClick: (Route) -> Unit,
     content: @Composable () -> Unit
 ) {
@@ -49,7 +46,7 @@ fun AppDrawer(
                 Spacer(Modifier.height(6.dp))
 
                 menuItems.forEach { item ->
-                    val isSelected = currentDestination?.hasRoute(item.route::class) == true
+                    val isSelected = currentRoute == item.route
 
                     NavigationDrawerItem(
                         icon = {

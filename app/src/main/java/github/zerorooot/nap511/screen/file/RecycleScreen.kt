@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -147,8 +149,10 @@ fun RecycleContent(
         enter = onPasswordEntered
     )
 
-    Column {
-        AppTopBarRecycle(ConfigKeyUtil.RECYCLE_BIN, appBarOnClick)
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+
+    Column(modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)) {
+        AppTopBarRecycle(ConfigKeyUtil.RECYCLE_BIN, appBarOnClick, scrollBehavior = scrollBehavior)
         MiddleEllipsisText(
             text = "当前文件数：${uiState.recycleFileList.size}",
             modifier = Modifier.padding(8.dp, 4.dp)

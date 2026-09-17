@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.util.bus
+package github.zerorooot.nap511.util
 
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow

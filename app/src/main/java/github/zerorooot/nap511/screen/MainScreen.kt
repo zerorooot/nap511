@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen.system
+package github.zerorooot.nap511.screen
 
 import android.content.Intent
 import androidx.activity.ComponentActivity
@@ -15,14 +15,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.core.util.Consumer
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.rememberNavBackStack
 import com.google.gson.Gson
 import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.bean.NavEvent
@@ -32,7 +31,7 @@ import github.zerorooot.nap511.navigation.AppNavHost
 import github.zerorooot.nap511.navigation.DrawerMenuItems
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.screen.file.CreateDialogs
-import github.zerorooot.nap511.ui.navigation.AppDrawer
+import github.zerorooot.nap511.screenitem.AppDrawer
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.AudioViewModel
@@ -59,7 +58,6 @@ fun MainScreen(
     val settingViewModel: SettingViewModel = viewModel()
     val loginViewModel: LoginViewModel = viewModel()
 
-    val navController = rememberNavController()
     val context = LocalContext.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -78,19 +76,68 @@ fun MainScreen(
         }
     }
 
-    val isExpandedConfig = settingUiState.expandedScreenEnabled
-    val expandedScreenThreshold =
-        settingUiState.expandedScreenThreshold.toIntOrNull()?.takeIf { i -> i > 0 } ?: 600
-    val isExpandedScreen =
-        (LocalConfiguration.current.screenWidthDp >= expandedScreenThreshold) && isExpandedConfig
-    val gridCellMinSize =
-        (settingUiState.gridCellMinSize.toIntOrNull()?.takeIf { i -> i > 0 } ?: 340).dp
+    // ==========================================
+    // 导航与路由管理 (Jetpack Navigation 3)
+    // ==========================================
+    // 1. 初始化 Nav3 返回栈，默认以 Route.MyFile（我的文件）为栈底起始路由
+    val backStack: NavBackStack<NavKey> = rememberNavBackStack(Route.MyFile)
+    val currentRoute = backStack.lastOrNull() as? Route ?: Route.MyFile
 
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentDestination = navBackStackEntry?.destination
 
     val menuItems = remember(settingUiState.logEnabled) {
         DrawerMenuItems.buildMenuItems(settingUiState.logEnabled)
+    }
+
+    /**
+     * 通用路由导航跳转
+     */
+    fun navigateTo(route: Route) {
+        // 登录页需要清空其余栈，确保未授权状态下无法退回已授权页面
+        if (route == Route.Login) {
+            backStack.clear()
+            backStack.add(Route.Login)
+            return
+        }
+        // 从登录成功返回首页时，清除登录路由
+        if (route == Route.MyFile && backStack.contains(Route.Login)) {
+            backStack.clear()
+            backStack.add(Route.MyFile)
+            return
+        }
+        backStack.add(route)
+    }
+
+    /**
+     * 路由返回出栈
+     * @return true 表示成功出栈，false 表示当前已处于栈底
+     */
+    fun popBack(): Boolean {
+        return if (backStack.size > 1) {
+            backStack.removeLastOrNull()
+            true
+        } else {
+            false
+        }
+    }
+
+    /**
+     * 顶层主功能（文件/传输/设置/抽屉项目）点击切换逻辑
+     * 针对顶层核心页面进行栈整理，防止频繁点击导致路由栈无限叠加
+     */
+    fun onTopLevelNavClick(route: Route) {
+        navGesturesEnabled = true
+        scope.launch { drawerState.close() }
+
+        if (backStack.lastOrNull() == route) return
+        val index = backStack.indexOf(route)
+        if (index >= 0) {
+            // 若目标路由已在栈中，弹出其上层所有页面并回退到该路由
+            while (backStack.size > index + 1) {
+                backStack.removeLastOrNull()
+            }
+        } else {
+            backStack.add(route)
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -102,15 +149,7 @@ fun MainScreen(
         fileViewModel.navigationEvent.collect { event ->
             when (event) {
                 is NavEvent.NavigateToScreen -> {
-                    if (event.route == Route.Login) {
-                        navController.navigate(Route.Login) {
-                            popUpTo<Route.MyFile> {
-                                inclusive = true
-                            }
-                        }
-                        return@collect
-                    }
-                    navController.navigate(event.route)
+                    navigateTo(event.route)
                 }
             }
         }
@@ -133,7 +172,11 @@ fun MainScreen(
         scope.launch { drawerState.close() }
     }
 
-    BackHandler(drawerState.isClosed && fileViewModel.pathList.size == 1) {
+    BackHandler(drawerState.isClosed && backStack.size > 1) {
+        popBack()
+    }
+
+    BackHandler(drawerState.isClosed && backStack.size == 1 && fileViewModel.pathList.size == 1) {
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastBackPressTime < 1500L) {
             fileViewModel.deleteIndividualFile()
@@ -150,25 +193,15 @@ fun MainScreen(
         remainingSpaceBean = remainingSpaceBean,
         avatarBean = avatarBean,
         menuItems = menuItems,
-        currentDestination = currentDestination,
+        currentRoute = currentRoute,
         onMenuItemClick = { route ->
-            navGesturesEnabled = true
-            scope.launch { drawerState.close() }
-
-            val isPopped = navController.popBackStack(route, inclusive = false)
-            if (!isPopped) {
-                navController.navigate(route) {
-                    popUpTo(navController.graph.startDestinationId) {
-                        saveState = true
-                    }
-                    launchSingleTop = true
-                    restoreState = true
-                }
-            }
+            onTopLevelNavClick(route)
         }
     ) {
         AppNavHost(
-            navController = navController,
+            backStack = backStack,
+            onNavigate = { navigateTo(it) },
+            onPopBack = { popBack() },
             fileViewModel = fileViewModel,
             offlineFileViewModel = offlineFileViewModel,
             recycleViewModel = recycleViewModel,
@@ -177,8 +210,6 @@ fun MainScreen(
             settingViewModel = settingViewModel,
             loginViewModel = loginViewModel,
             uiState = settingUiState,
-            isExpandedScreen = isExpandedScreen,
-            gridCellMinSize = gridCellMinSize,
             isDrawerOpen = { drawerState.isOpen },
             onOpenDrawer = { scope.launch { drawerState.open() } },
             onCloseDrawer = { scope.launch { drawerState.close() } },
@@ -187,6 +218,6 @@ fun MainScreen(
     }
 
     CreateDialogs(fileViewModel, settingUiState) {
-        navController.navigate(it)
+        navigateTo(it)
     }
 }

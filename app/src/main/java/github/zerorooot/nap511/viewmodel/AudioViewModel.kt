@@ -18,10 +18,10 @@ import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.service.AudioService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.subtitle.SubtitleEntry
-import github.zerorooot.nap511.util.bus.AudioEvent
-import github.zerorooot.nap511.util.bus.AudioEventBus
-import github.zerorooot.nap511.util.bus.DialogEvent
-import github.zerorooot.nap511.util.bus.DialogEventBus
+import github.zerorooot.nap511.util.AudioEvent
+import github.zerorooot.nap511.util.AudioEventBus
+import github.zerorooot.nap511.util.DialogEvent
+import github.zerorooot.nap511.util.DialogEventBus
 import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.subtitle.SubtitleDelegate
 import kotlinx.coroutines.Job

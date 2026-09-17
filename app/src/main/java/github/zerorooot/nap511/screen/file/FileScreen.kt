@@ -98,7 +98,7 @@ fun FileScreen(
     fileViewModel: FileViewModel,
     settingUiState: SettingUiState,
     audioViewModel: AudioViewModel,
-    isExpandedScreen: Boolean,
+    isGridScreen: Boolean,
     gridCellMinSize: Dp,
     onNav: (Route) -> Unit,
     drawerState: () -> Boolean
@@ -269,7 +269,7 @@ fun FileScreen(
         audioViewModel,
         settingUiState,
         isPreviewActive,
-        isExpandedScreen,
+        isGridScreen,
         staggeredGrid,
         gridState,
         listState
@@ -280,7 +280,7 @@ fun FileScreen(
             settingUiState = settingUiState,
             onNav = onNav,
             isPreviewActive = isPreviewActive,
-            isExpandedScreen = isExpandedScreen,
+            isExpandedScreen = isGridScreen,
             staggeredGrid = staggeredGrid,
             gridState = gridState,
             listState = listState,
@@ -318,7 +318,7 @@ fun FileScreen(
     fun scrollToTop() {
         when {
             isPreviewActive -> staggeredGrid.requestScrollToItem(0, 0)
-            isExpandedScreen -> gridState.requestScrollToItem(0, 0)
+            isGridScreen -> gridState.requestScrollToItem(0, 0)
             else -> listState.requestScrollToItem(0, 0)
         }
     }
@@ -341,7 +341,7 @@ fun FileScreen(
         if (path != "/根目录" && !fileViewModel.isLongClickState) {
             when {
                 isPreviewActive -> fileViewModel.setListLocation(path, staggeredGrid)
-                isExpandedScreen -> fileViewModel.setListLocation(path, gridState)
+                isGridScreen -> fileViewModel.setListLocation(path, gridState)
                 else -> fileViewModel.setListLocation(path, listState)
             }
         }
@@ -518,7 +518,7 @@ fun FileScreen(
 
     val contentActions = remember(
         path,
-        isExpandedScreen,
+        isGridScreen,
         isPreviewActive,
         staggeredGrid,
         gridState,
@@ -534,7 +534,7 @@ fun FileScreen(
     val scaffoldState = FileScaffoldState(
         isLongClickState = fileViewModel.isLongClickState,
         appBarTitle = fileViewModel.appBarTitle,
-        isExpandedScreen = isExpandedScreen,
+        isExpandedScreen = isGridScreen,
         isBottomBarShow = isBottomBarShow,
         isTopBarShow = isTopBarShow,
         hasCurrentMusic = audioViewModel.uiState.playback.currentMusic != null,
@@ -571,7 +571,7 @@ fun FileScreen(
     )
 
     val displayConfig = FileDisplayConfig(
-        isExpandedScreen = isExpandedScreen,
+        isExpandedScreen = isGridScreen,
         isPreviewActive = isPreviewActive,
         isImageHdPreview = settingUiState.imageHdPreview,
         gridCellMinSize = gridCellMinSize

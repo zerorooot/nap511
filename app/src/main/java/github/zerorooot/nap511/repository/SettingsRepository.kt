@@ -111,7 +111,6 @@ class SettingsRepository {
         getDataFlow(ConfigKeyUtil.MOVE_FAIL_FILE, ""),
         getDataFlow(ConfigKeyUtil.MAX_TXT_SIZE, "200"),
         getDataFlow(ConfigKeyUtil.THEME_MODE, "跟随系统"),
-        getDataFlow(ConfigKeyUtil.EXPANDED_SCREEN_THRESHOLD, "600"),
         getDataFlow(ConfigKeyUtil.GRID_CELL_MIN_SIZE, "340"),
         getDataFlow(ConfigKeyUtil.AUTO_IMAGE_PREVIEW_COUNT, "1150")
     ) { values: Array<String> ->
@@ -121,9 +120,8 @@ class SettingsRepository {
             moveFail = values[2],
             txtSize = values[3],
             themeMode = values[4],
-            expandedThreshold = values[5],
-            gridCellMinSize = values[6],
-            autoImagePreviewCount = values[7]
+            gridCellMinSize = values[5],
+            autoImagePreviewCount = values[6],
         )
     }
 
@@ -143,7 +141,8 @@ class SettingsRepository {
         getDataFlow(ConfigKeyUtil.SAVE_REQUEST_CACHE, true),
         getDataFlow(ConfigKeyUtil.POSITION_AFTER_AT, false),
         getDataFlow(ConfigKeyUtil.IMAGE_HD_PREVIEW, false),
-        getDataFlow(ConfigKeyUtil.HIDE_BATTERY_BANNER, false)
+        getDataFlow(ConfigKeyUtil.HIDE_BATTERY_BANNER, false),
+        getDataFlow(ConfigKeyUtil.GRID_SCREEN, true)
     ) { values: Array<Boolean> ->
         SwitchGroup(
             torrentSort = values[0],
@@ -159,7 +158,8 @@ class SettingsRepository {
             saveCache = values[10],
             positionAfterAt = values[11],
             imageHdPreview = values[12],
-            hideBatteryBanner = values[13]
+            hideBatteryBanner = values[13],
+            gridScreen = values[14]
         )
     }
 
@@ -188,10 +188,11 @@ class SettingsRepository {
             moveFailFile = uiPref.moveFail,
             txtSize = uiPref.txtSize,
             themeMode = uiPref.themeMode,
-            expandedScreenThreshold = uiPref.expandedThreshold,
+
             gridCellMinSize = uiPref.gridCellMinSize,
             autoImagePreviewCount = uiPref.autoImagePreviewCount,
             // 开关
+            gridScreenEnabled = s2.gridScreen,
             autoRotateEnabled = s2.autoRotate,
             hideLoadingView = s2.hideLoading,
             earlyLoading = s2.earlyLoading,
@@ -333,7 +334,6 @@ class SettingsRepository {
         val moveFail: String,
         val txtSize: String,
         val themeMode: String,
-        val expandedThreshold: String,
         val gridCellMinSize: String,
         val autoImagePreviewCount: String
     )
@@ -352,6 +352,7 @@ class SettingsRepository {
         val saveCache: Boolean,
         val positionAfterAt: Boolean,
         val imageHdPreview: Boolean,
-        val hideBatteryBanner: Boolean
+        val hideBatteryBanner: Boolean,
+        val gridScreen: Boolean
     )
 }

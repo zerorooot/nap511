@@ -42,6 +42,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -58,12 +59,14 @@ fun BaseTopAppBar(
     modifier: Modifier = Modifier,
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
+    scrollBehavior: TopAppBarScrollBehavior? = null
 ) {
     TopAppBar(
         title = title,
         modifier = modifier,
         navigationIcon = navigationIcon,
         actions = actions,
+        scrollBehavior = scrollBehavior,
         windowInsets = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top),
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -92,10 +95,16 @@ enum class TopBarAction(
     CLEAR_ALL_RECYCLE("清空所有文件", Icons.Default.DeleteForever)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppTopBarNormal(title: String, onClick: (AppBarAction) -> Unit) {
+fun AppTopBarNormal(
+    title: String,
+    onClick: (AppBarAction) -> Unit,
+    scrollBehavior: TopAppBarScrollBehavior? = null
+) {
     BaseTopAppBar(
         title = { Text(text = title) },
+        scrollBehavior = scrollBehavior,
         navigationIcon = {
             TopAppBarActionButton(
                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
@@ -118,14 +127,17 @@ fun AppTopBarNormal(title: String, onClick: (AppBarAction) -> Unit) {
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppTopBarMultiple(
     title: String,
     isExpandedScreen: Boolean = false,
-    onClick: (AppBarAction) -> Unit
+    onClick: (AppBarAction) -> Unit,
+    scrollBehavior: TopAppBarScrollBehavior? = null
 ) {
     BaseTopAppBar(
         title = { Text(text = title) },
+        scrollBehavior = scrollBehavior,
         navigationIcon = {
             IconButton(onClick = { onClick.invoke(TopBarAction.BACK) }) {
                 Icon(
@@ -237,10 +249,16 @@ private fun TopAppBarActionTextButton(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppTopBarOfflineFile(title: String, onClick: (AppBarAction) -> Unit) {
+fun AppTopBarOfflineFile(
+    title: String,
+    onClick: (AppBarAction) -> Unit,
+    scrollBehavior: TopAppBarScrollBehavior? = null
+) {
     BaseTopAppBar(
         title = { Text(text = title) },
+        scrollBehavior = scrollBehavior,
         navigationIcon = {
             TopAppBarActionButton(
                 imageVector = Icons.Rounded.Menu,
@@ -257,10 +275,16 @@ fun AppTopBarOfflineFile(title: String, onClick: (AppBarAction) -> Unit) {
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppTopBarLogScreen(title: String, onClick: (AppBarAction) -> Unit) {
+fun AppTopBarLogScreen(
+    title: String,
+    onClick: (AppBarAction) -> Unit,
+    scrollBehavior: TopAppBarScrollBehavior? = null
+) {
     BaseTopAppBar(
         title = { Text(text = title) },
+        scrollBehavior = scrollBehavior,
         navigationIcon = {
             TopAppBarActionButton(
                 imageVector = Icons.Rounded.Menu,
@@ -283,10 +307,16 @@ fun AppTopBarLogScreen(title: String, onClick: (AppBarAction) -> Unit) {
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppTopBarRepeatFile(title: String, onClick: (AppBarAction) -> Unit) {
+fun AppTopBarRepeatFile(
+    title: String,
+    onClick: (AppBarAction) -> Unit,
+    scrollBehavior: TopAppBarScrollBehavior? = null
+) {
     BaseTopAppBar(
         title = { Text(text = title) },
+        scrollBehavior = scrollBehavior,
         navigationIcon = {
             TopAppBarActionButton(
                 imageVector = Icons.Rounded.Menu,
@@ -303,10 +333,16 @@ fun AppTopBarRepeatFile(title: String, onClick: (AppBarAction) -> Unit) {
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppTopBarRecycle(title: String, onClick: (AppBarAction) -> Unit) {
+fun AppTopBarRecycle(
+    title: String,
+    onClick: (AppBarAction) -> Unit,
+    scrollBehavior: TopAppBarScrollBehavior? = null
+) {
     BaseTopAppBar(
         title = { Text(text = title) },
+        scrollBehavior = scrollBehavior,
         navigationIcon = {
             TopAppBarActionButton(
                 imageVector = Icons.Rounded.Menu,
@@ -345,6 +381,7 @@ fun TopAppBarActionButton(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopAppBarTxtReaderNormal(
     title: String,
@@ -398,6 +435,7 @@ fun TopAppBarTxtReaderNormal(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopAppBarSearch(
     searchQuery: String,

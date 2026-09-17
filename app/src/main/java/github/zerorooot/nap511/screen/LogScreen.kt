@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen.system
+package github.zerorooot.nap511.screen
 
 import github.zerorooot.nap511.screen.components.AppBarAction
 import github.zerorooot.nap511.screen.components.AppTopBarLogScreen

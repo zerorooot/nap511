@@ -2,6 +2,9 @@ package github.zerorooot.nap511.viewmodel
 
 import android.content.Context
 import android.net.Uri
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.GsonBuilder
@@ -25,6 +28,7 @@ class SettingViewModel(
     private val gson = GsonBuilder().setPrettyPrinting().create()
     internal val _currentLocation = MutableStateFlow(LocationBean(0, 0))
     var currentLocation = _currentLocation.asStateFlow()
+    var selectedCategoryIndex by mutableIntStateOf(0)
 
     fun setLocation(i: Int, i1: Int) {
         _currentLocation.value = LocationBean(i, i1)
