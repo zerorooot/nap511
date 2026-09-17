@@ -83,6 +83,7 @@
         android:id="@+id/total"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginEnd="12dp"
         android:textColor="#80FFFFFF"
         android:textSize="12sp"
         android:typeface="monospace"

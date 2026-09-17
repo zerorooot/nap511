@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 播放器底部控制栏 (高度 68dp，包含进度条与播放控制组件) -->
+<!-- 播放器底部控制栏 (包含进度条与播放控制组件) -->
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/layout_bottom"
     android:layout_width="match_parent"
-    android:layout_height="68dp"
+    android:layout_height="72dp"
     android:layout_alignParentBottom="true"
     android:background="@drawable/bg_bottom_gradient"
     android:paddingHorizontal="12dp"
-    android:paddingBottom="4dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp"
     android:visibility="invisible"
     tools:showIn="@layout/video_layout_preview">
 
@@ -18,6 +19,7 @@
         android:id="@+id/current"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
         android:textColor="#E6FFFFFF"
         android:textSize="12sp"
         android:typeface="monospace"
@@ -32,7 +34,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_gravity="center_vertical"
-        android:layout_marginHorizontal="4dp"
+        android:layout_marginHorizontal="6dp"
         android:background="@null"
         android:max="100"
         android:maxHeight="3dp"
@@ -50,6 +52,7 @@
         android:id="@+id/total"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginEnd="4dp"
         android:textColor="#80FFFFFF"
         android:textSize="12sp"
         android:typeface="monospace"

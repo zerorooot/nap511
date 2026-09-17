@@ -22,6 +22,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -61,7 +65,9 @@ fun FileCellItem(
     itemActions: FileItemActions,
 ) {
     val image = fileBean.fileIco
-    val name = fileBean.name
+    var name by remember {
+        mutableStateOf(fileBean.name)
+    }
     val size = fileBean.sizeString
     val time = fileBean.createTimeString
     Surface(
@@ -117,11 +123,14 @@ fun FileCellItem(
                                 .diskCacheKey(fileBean.fileId)
                                 .scale(coil.size.Scale.FILL)
                                 .placeholder(image)
-                                .error(image) // 加载失败时也显示占位图
+                                .error(R.drawable.ic_image_broken) // 加载失败时也显示占位图
                                 .crossfade(true)
                                 .build(),
                             onSuccess = { successState ->
                                 XLog.d("FileCellItem [图片加载成功] index=$index, name=${fileBean.name}, imageData=$imageData, source=${successState.result.dataSource}")
+                            },
+                            onError = {
+                                name = "图片已过期，请刷新"
                             },
                             contentDescription = "File Thumbnail",
                             modifier = Modifier.size(60.dp), // 用 size 替代 height + width

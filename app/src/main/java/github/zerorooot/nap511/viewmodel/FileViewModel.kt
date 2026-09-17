@@ -481,9 +481,6 @@ class FileViewModel(
             }
             imageBeanCache.remove(cid)
         }
-
-        // 图片缓存清理
-
     }
 
     @OptIn(ExperimentalCoilApi::class)

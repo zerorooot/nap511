@@ -180,10 +180,12 @@ class FileRepository {
         showDir: Int = 1,
         aid: Int = 1,
         asc: Int = 1,
+        naturalSort: Int = 1,
         order: String = "file_name",
-        limit: Int = UserSessionManager.requestLimitCount
+        limit: Int = UserSessionManager.requestLimitCount,
+        format: String = "json",
     ): FilesBean {
-        return fileService.getFiles(cid, showDir, aid, asc, order, limit)
+        return fileService.getFiles(cid, showDir, aid, asc, order, limit, naturalSort, format)
     }
 
     suspend fun remainingSpace(countSpaceNum: Int = 1): JsonObject {

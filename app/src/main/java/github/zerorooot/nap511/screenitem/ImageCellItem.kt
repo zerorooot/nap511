@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -27,7 +28,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.imageLoader
@@ -57,7 +57,9 @@ fun ImageCellItem(
     itemActions: FileItemActions,
 ) {
     val image = fileBean.fileIco
-    val name = fileBean.name
+    var name by remember {
+        mutableStateOf(fileBean.name)
+    }
     val hdUrl = imageBean?.url
     val isHdLoaded = isImageHdPreview && !hdUrl.isNullOrEmpty()
     val cacheKey = fileBean.fileId.ifEmpty { fileBean.pickCode.ifEmpty { name } }
@@ -133,7 +135,7 @@ fun ImageCellItem(
                         .data(imageData)
                         .memoryCacheKey(coilCacheKey)
                         .diskCacheKey(coilCacheKey)
-                        .error(image)
+                        .error(R.drawable.ic_image_broken)
                         .crossfade(false) // 关闭淡入淡出动画，避免快速滑动时图片闪烁
 
                     // 当 isHdLoaded 为 true 时，优先使用内存缓存中 key 为 fileBean.fileId 的缩略图作为占位符
@@ -159,6 +161,7 @@ fun ImageCellItem(
                             }
                         },
                         onError = { errorState ->
+                            name = "图片已过期，请刷新"
                             XLog.e(
                                 "ImageCellItem [图片加载失败] index=$index, name=${fileBean.name}, isLoaded=$isHdLoaded, url=$imageData, error=${errorState.result.throwable.message}"
                             )
