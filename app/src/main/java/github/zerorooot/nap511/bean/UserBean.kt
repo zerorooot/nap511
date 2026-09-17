@@ -16,7 +16,7 @@ data class AvatarBean(
 data class RemainingSpaceBean(
     @SerializedName("all_remain") val remain: SpaceDetails = SpaceDetails(),
     @SerializedName("all_total") val total: SpaceDetails = SpaceDetails(),
-    @SerializedName("all_use") val use: SpaceDetails = SpaceDetails()
+    @SerializedName("all_use") val use: SpaceDetails = SpaceDetails(0)
 ) {
     data class SpaceDetails(
         val size: Long = 1L,

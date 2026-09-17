@@ -89,10 +89,10 @@ fun MiddleEllipsisText(
 
             val placeable = subcompose("MiddleEllipsisText_apply") {
                 val combinedText = remember(text, ellipsisText, textLayoutResult) {
-                    if (textLayoutResult!!.getBoundingBox(text.lastIndex).right <= constraints.maxWidth) {
+                    if (textLayoutResult.getBoundingBox(text.lastIndex).right <= constraints.maxWidth) {
                         text
                     } else {
-                        val ellipsisCharWidth = textLayoutResult!!.getBoundingBox(text.lastIndex + 1).width
+                        val ellipsisCharWidth = textLayoutResult.getBoundingBox(text.lastIndex + 1).width
                         val ellipsisTextWidth: Float = ellipsisCharWidth * ellipsisCharCount
                         val remainingWidth = constraints.maxWidth - ellipsisTextWidth
                         var leftPoint = 0
@@ -111,8 +111,8 @@ fun MiddleEllipsisText(
                                     return@run
                                 }
 
-                                val leftTextBoundingBox = textLayoutResult!!.getBoundingBox(leftPoint)
-                                val rightTextBoundingBox = textLayoutResult!!.getBoundingBox(rightPoint)
+                                val leftTextBoundingBox = textLayoutResult.getBoundingBox(leftPoint)
+                                val rightTextBoundingBox = textLayoutResult.getBoundingBox(rightPoint)
 
                                 // For multibyte string handling
                                 if (leftTextWidth <= rightTextWidth && leftTextWidth + leftTextBoundingBox.width + rightTextWidth <= remainingWidth) {
@@ -127,7 +127,7 @@ fun MiddleEllipsisText(
                                         kotlin.runCatching {
                                             targetText.add(text[leftPoint])
                                             val leftTextBoundingBoxWidth =
-                                                textLayoutResult!!.getBoundingBox(leftPoint).width
+                                                textLayoutResult.getBoundingBox(leftPoint).width
                                             leftTextWidth += leftTextBoundingBoxWidth
                                             leftPoint += 1
                                         }.onFailure {
@@ -147,7 +147,7 @@ fun MiddleEllipsisText(
                                         kotlin.runCatching {
                                             targetText.add(0, text[rightPoint])
                                             val rightTextBoundingBoxWidth =
-                                                textLayoutResult!!.getBoundingBox(rightPoint).width
+                                                textLayoutResult.getBoundingBox(rightPoint).width
                                             rightTextWidth += rightTextBoundingBoxWidth
                                             rightPoint -= 1
                                         }.onFailure {

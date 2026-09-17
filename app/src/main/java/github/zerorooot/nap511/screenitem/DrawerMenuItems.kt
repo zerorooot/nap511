@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.navigation
+package github.zerorooot.nap511.screenitem
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp

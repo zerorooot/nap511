@@ -27,8 +27,7 @@ import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
-import github.zerorooot.nap511.navigation.AppNavHost
-import github.zerorooot.nap511.navigation.DrawerMenuItems
+import github.zerorooot.nap511.screenitem.DrawerMenuItems
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.screen.file.CreateDialogs
 import github.zerorooot.nap511.screenitem.AppDrawer

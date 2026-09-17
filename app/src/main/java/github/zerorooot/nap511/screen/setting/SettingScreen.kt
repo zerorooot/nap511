@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.screen.setting
 
 import android.net.Uri
+import android.os.Process
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -58,6 +59,7 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import com.jakewharton.processphoenix.ProcessPhoenix
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.screen.components.BaseTopAppBar
@@ -195,7 +197,8 @@ fun SettingScreen(
     val onRestartApp = {
         if (!lastClick) {
             lastClick = true
-            App.instance.toast("配置与数据已同步生效！")
+            ProcessPhoenix.triggerRebirth(context)
+            App.instance.toast("重启中...")
         }
     }
 

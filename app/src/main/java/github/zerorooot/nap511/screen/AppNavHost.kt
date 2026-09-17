@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.navigation
+package github.zerorooot.nap511.screen
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -13,7 +13,6 @@ import androidx.navigation3.ui.NavDisplay
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.dialog.ExitApp
-import github.zerorooot.nap511.screen.LogScreen
 import github.zerorooot.nap511.screen.auth.LoginScreen
 import github.zerorooot.nap511.screen.file.AdaptiveOfflineScreen
 import github.zerorooot.nap511.screen.file.FileScreen
