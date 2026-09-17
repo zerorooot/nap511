@@ -2,8 +2,6 @@ package github.zerorooot.nap511.viewmodel
 
 import android.annotation.SuppressLint
 import android.app.Application
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Intent
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -15,7 +13,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.concurrent.futures.await
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.Constraints
@@ -54,8 +51,9 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DialogEvent
 import github.zerorooot.nap511.util.DialogEventBus
 import github.zerorooot.nap511.util.FileCacheManager
-import github.zerorooot.nap511.util.network.UserSessionManager
+import github.zerorooot.nap511.util.copy
 import github.zerorooot.nap511.util.deleteCoilCache
+import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.worker.OfflineTaskWorker
 import kotlinx.coroutines.Dispatchers
@@ -236,20 +234,13 @@ class FileViewModel(
 
                 // adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/copy?param=copy_test" github.zerorooot.nap511
                 "copy" -> {
-                    val clipboard =
-                        ContextCompat.getSystemService(context, ClipboardManager::class.java)
-                    val clip = ClipData.newPlainText("label", param)
-                    clipboard?.setPrimaryClip(clip)
-
+                    param.copy(context)
                     XLog.d("handleIntent copy $param")
                     App.instance.toast("复制磁力链接成功!")
                 }
 
                 "unzipError" -> {
-                    val clipboard =
-                        ContextCompat.getSystemService(context, ClipboardManager::class.java)
-                    val clip = ClipData.newPlainText("unzipError", param)
-                    clipboard?.setPrimaryClip(clip)
+                    param.copy(context)
                     XLog.d("handleIntent unzipError $intent $param")
                     App.instance.toast("解压失败信息已复制到剪切板!")
                 }

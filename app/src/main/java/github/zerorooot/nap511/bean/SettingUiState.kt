@@ -11,7 +11,7 @@ data class SettingUiState(
     @SerializedName(ConfigKeyUtil.UID) val uid: String = "",
 
     /** 账号 Cookie（登录凭证） */
-    @SerializedName(ConfigKeyUtil.COOKIE) val cookie: String = "cookie",
+    @SerializedName(ConfigKeyUtil.COOKIE) val cookie: String = "",
 
     /** 安全操作密钥（清空回收站时输入的数字密码） */
     @SerializedName(ConfigKeyUtil.PASSWORD) val password: String = "",

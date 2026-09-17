@@ -271,7 +271,7 @@ private fun AdaptiveSettingContent(
     NavDisplay(
         backStack = backStack,
         onBack = { backStack.removeLastOrNull() },
-        sceneStrategy = listDetailStrategy,
+        sceneStrategies = listOf(listDetailStrategy),
         entryProvider = entryProvider {
             // 左侧列表面板：注册 listPane 元数据
             entry<SettingNavKey.CategoryList>(

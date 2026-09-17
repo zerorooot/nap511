@@ -205,7 +205,7 @@ fun LazyListScope.expandedScreenPreferenceItems(
     item {
         SwitchPreferenceItem(
             title = "大屏扩展模式",
-            summary = "把部分页面修改适配自适应 (Adaptive)页面",
+            summary = "开启后，部分页面将变为自适应 (Adaptive)页面",
             checked = uiState.expandedScreenEnabled,
             onCheckedChange = { onSaveConfig(ConfigKeyUtil.EXPANDED_SCREEN, it) }
         )

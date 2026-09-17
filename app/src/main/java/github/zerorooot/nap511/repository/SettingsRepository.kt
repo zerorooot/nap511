@@ -76,6 +76,8 @@ class SettingsRepository {
         return DataStoreUtil.getDataSuspend(key, defaultValue)
     }
 
+    private val defaultSettingUiState = SettingUiState()
+
     // 1. 账号与安全分组 Flow
     private val accountFlow = combine(
         getDataFlow(ConfigKeyUtil.UID, ""),
@@ -90,7 +92,7 @@ class SettingsRepository {
         getDataFlow(ConfigKeyUtil.ARIA2_URL, ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE),
         getDataFlow(ConfigKeyUtil.ARIA2_TOKEN, ""),
         getDataFlow(ConfigKeyUtil.DEFAULT_OFFLINE_CID, ""),
-        getDataFlow(ConfigKeyUtil.DEFAULT_OFFLINE_TIME, "5"),
+        getDataFlow(ConfigKeyUtil.DEFAULT_OFFLINE_TIME, defaultSettingUiState.defaultOfflineTime),
         getDataFlow(ConfigKeyUtil.CURRENT_OFFLINE_TASK, ""),
         getDataFlow(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, "")
     ) { values: Array<String> ->
@@ -106,13 +108,19 @@ class SettingsRepository {
 
     // 3. 界面偏好分组 Flow
     private val uiPrefFlow: Flow<PrefGroup> = combine(
-        getDataFlow(ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION, "End"),
-        getDataFlow(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200"),
+        getDataFlow(
+            ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION,
+            defaultSettingUiState.fabPosition
+        ),
+        getDataFlow(ConfigKeyUtil.REQUEST_LIMIT_COUNT, defaultSettingUiState.requestLimitCount),
         getDataFlow(ConfigKeyUtil.MOVE_FAIL_FILE, ""),
-        getDataFlow(ConfigKeyUtil.MAX_TXT_SIZE, "200"),
-        getDataFlow(ConfigKeyUtil.THEME_MODE, "跟随系统"),
-        getDataFlow(ConfigKeyUtil.GRID_CELL_MIN_SIZE, "340"),
-        getDataFlow(ConfigKeyUtil.AUTO_IMAGE_PREVIEW_COUNT, "1150")
+        getDataFlow(ConfigKeyUtil.MAX_TXT_SIZE, defaultSettingUiState.txtSize),
+        getDataFlow(ConfigKeyUtil.THEME_MODE, defaultSettingUiState.themeMode),
+        getDataFlow(ConfigKeyUtil.GRID_CELL_MIN_SIZE, defaultSettingUiState.gridCellMinSize),
+        getDataFlow(
+            ConfigKeyUtil.AUTO_IMAGE_PREVIEW_COUNT,
+            defaultSettingUiState.autoImagePreviewCount
+        )
     ) { values: Array<String> ->
         PrefGroup(
             fabPos = values[0],
@@ -127,22 +135,22 @@ class SettingsRepository {
 
     // 4. 开关配置分组 Flow
     private val switchFlow: Flow<SwitchGroup> = combine(
-        getDataFlow(ConfigKeyUtil.TORRENT_SORT, false),
-        getDataFlow(ConfigKeyUtil.LOG, false),
-        getDataFlow(ConfigKeyUtil.FORCE_LOAD_CACHE, false),
-        getDataFlow(ConfigKeyUtil.VIDEO_LINK_MODE, false),
-        getDataFlow(ConfigKeyUtil.DYNAMIC_COLOR, true),
-        getDataFlow(ConfigKeyUtil.AUTO_JUMP_RETRY, true),
-        getDataFlow(ConfigKeyUtil.EXPANDED_SCREEN, true),
+        getDataFlow(ConfigKeyUtil.TORRENT_SORT, defaultSettingUiState.torrentSort),
+        getDataFlow(ConfigKeyUtil.LOG, defaultSettingUiState.logEnabled),
+        getDataFlow(ConfigKeyUtil.FORCE_LOAD_CACHE, defaultSettingUiState.forceLoadCache),
+        getDataFlow(ConfigKeyUtil.VIDEO_LINK_MODE, defaultSettingUiState.videoLinkMode),
+        getDataFlow(ConfigKeyUtil.DYNAMIC_COLOR, defaultSettingUiState.dynamicColorEnabled),
+        getDataFlow(ConfigKeyUtil.AUTO_JUMP_RETRY, defaultSettingUiState.autoJumpRetry),
+        getDataFlow(ConfigKeyUtil.EXPANDED_SCREEN, defaultSettingUiState.expandedScreenEnabled),
 
-        getDataFlow(ConfigKeyUtil.AUTO_ROTATE, false),
-        getDataFlow(ConfigKeyUtil.HIDE_LOADING_VIEW, false),
-        getDataFlow(ConfigKeyUtil.EARLY_LOADING, false),
-        getDataFlow(ConfigKeyUtil.SAVE_REQUEST_CACHE, true),
-        getDataFlow(ConfigKeyUtil.POSITION_AFTER_AT, false),
-        getDataFlow(ConfigKeyUtil.IMAGE_HD_PREVIEW, false),
-        getDataFlow(ConfigKeyUtil.HIDE_BATTERY_BANNER, false),
-        getDataFlow(ConfigKeyUtil.GRID_SCREEN, true)
+        getDataFlow(ConfigKeyUtil.AUTO_ROTATE, defaultSettingUiState.autoRotateEnabled),
+        getDataFlow(ConfigKeyUtil.HIDE_LOADING_VIEW, defaultSettingUiState.hideLoadingView),
+        getDataFlow(ConfigKeyUtil.EARLY_LOADING, defaultSettingUiState.earlyLoading),
+        getDataFlow(ConfigKeyUtil.SAVE_REQUEST_CACHE, defaultSettingUiState.saveRequestCache),
+        getDataFlow(ConfigKeyUtil.POSITION_AFTER_AT, defaultSettingUiState.positionAfterAt),
+        getDataFlow(ConfigKeyUtil.IMAGE_HD_PREVIEW, defaultSettingUiState.imageHdPreview),
+        getDataFlow(ConfigKeyUtil.HIDE_BATTERY_BANNER, defaultSettingUiState.hideBatteryBanner),
+        getDataFlow(ConfigKeyUtil.GRID_SCREEN, defaultSettingUiState.gridScreenEnabled)
     ) { values: Array<Boolean> ->
         SwitchGroup(
             torrentSort = values[0],

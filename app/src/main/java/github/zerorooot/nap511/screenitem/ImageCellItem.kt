@@ -57,7 +57,7 @@ fun ImageCellItem(
     itemActions: FileItemActions,
 ) {
     val image = fileBean.fileIco
-    var name by remember {
+    var name by remember(fileBean.name) {
         mutableStateOf(fileBean.name)
     }
     val hdUrl = imageBean?.url

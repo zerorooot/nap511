@@ -160,7 +160,6 @@ internal fun FileViewModel.rename(name: String) {
     viewModelScope.launch {
         val cid = currentCid
         val fileBean = fileBeanList[selectIndex]
-        val beforeList = fileBeanList
         val beforeFileListCache = fileListCache[cid]
         //提前重命名，提升相应速度
         fileBeanList[selectIndex] = fileBean.copy(name = name)
@@ -172,7 +171,7 @@ internal fun FileViewModel.rename(name: String) {
             if (rename.state) {
                 "重命名成功"
             } else {
-                fileBeanList = beforeList
+                fileBeanList[selectIndex] = fileBean
                 fileListCache[cid] = beforeFileListCache!!
                 "重命名失败"
             }
@@ -260,7 +259,7 @@ internal fun FileViewModel.formatFileBeanList(fileBeanList: List<FileBean>): Arr
             dateFormat.format(it * 1000)
         } ?: ""
 
-        var createTimeString = fileBean.createTime.toLongOrNull()?.let {
+        val createTimeString = fileBean.createTime.toLongOrNull()?.let {
             dateFormat.format(it * 1000)
         } ?: ""
         var playLongRatio = ""

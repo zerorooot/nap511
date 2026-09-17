@@ -38,17 +38,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
-import github.zerorooot.nap511.util.isDualPane
-import github.zerorooot.nap511.util.rememberListDetailDirective
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,6 +58,9 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import github.zerorooot.nap511.bean.OfflineTask
+import github.zerorooot.nap511.screen.components.BaseTopAppBar
+import github.zerorooot.nap511.util.isDualPane
+import github.zerorooot.nap511.util.rememberListDetailDirective
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import kotlinx.serialization.Serializable
 
@@ -76,9 +73,9 @@ sealed interface OfflineNavKey : NavKey {
     @Serializable
     data object TaskList : OfflineNavKey
 
-    /** 任务详情路由，携带特定任务的 infoHash */
+    /** 任务详情路由，携带特定任务的 offlineTask */
     @Serializable
-    data class TaskDetail(val infoHash: String) : OfflineNavKey
+    data class TaskDetail(val offlineTask: OfflineTask) : OfflineNavKey
 }
 
 /**
@@ -101,7 +98,6 @@ fun AdaptiveOfflineScreen(
     gridCellMinSize: Dp,
     getFiles: (String) -> Unit,
     onDrawerClick: () -> Unit,
-    onBackToFiles: () -> Unit,
     onNavigateToNewTask: () -> Unit = {}
 ) {
     val uiState by offlineFileViewModel.uiState.collectAsStateWithLifecycle()
@@ -111,29 +107,17 @@ fun AdaptiveOfflineScreen(
     val isDualPane = directive.isDualPane
 
     // 2. 当前选中的离线任务对象与 Nav3 返回栈
-    var selectedTask by remember { mutableStateOf<OfflineTask?>(null) }
+    var selectedTask by offlineFileViewModel.selectedTask
     val backStack: NavBackStack<NavKey> = rememberNavBackStack(OfflineNavKey.TaskList)
     val listDetailStrategy = rememberListDetailSceneStrategy<NavKey>(directive = directive)
 
-    // 3. 辅助函数：根据 infoHash 查找对应的离线任务
-    fun findTask(infoHash: String?): OfflineTask? {
-        if (infoHash == null) return null
-        if (selectedTask?.infoHash == infoHash) return selectedTask
-        return uiState.completedList.find { it.infoHash == infoHash }
-            ?: uiState.downloadingList.find { it.infoHash == infoHash }
-            ?: uiState.failedList.find { it.infoHash == infoHash }
-    }
-
-    // 4. 宽屏初始状态下自动选取第一条任务
-    LaunchedEffect(uiState.completedList, uiState.downloadingList, uiState.failedList, isDualPane) {
-        if (selectedTask == null && isDualPane) {
-            val first = uiState.completedList.firstOrNull()
-                ?: uiState.downloadingList.firstOrNull()
-                ?: uiState.failedList.firstOrNull()
-            selectedTask = first
+    val onOpenTaskDialog: (OfflineTask) -> Unit = { task ->
+        selectedTask = task
+        // 手机单栏模式下点击进入详情路由；双栏模式下仅刷新选中的任务
+        if (!isDualPane) {
+            backStack.add(OfflineNavKey.TaskDetail(task))
         }
     }
-
     // 5. 详情面板公共渲染方法（统一复用，避免在 placeholder 与 entry 间冗余重复）
     val renderTaskDetail: @Composable (task: OfflineTask, showBackButton: Boolean, onDeleted: () -> Unit) -> Unit =
         { targetTask, showBack, onDeleted ->
@@ -146,7 +130,6 @@ fun AdaptiveOfflineScreen(
                     onDeleted()
                 },
                 onOpenFile = { targetCid ->
-                    onBackToFiles()
                     getFiles(targetCid)
                 }
             )
@@ -156,47 +139,28 @@ fun AdaptiveOfflineScreen(
     NavDisplay(
         backStack = backStack,
         onBack = { backStack.removeLastOrNull() },
-        sceneStrategy = listDetailStrategy,
-        entryProvider = entryProvider<NavKey> {
+        sceneStrategies = listOf(listDetailStrategy),
+        entryProvider = entryProvider {
             // 左侧任务列表面板
             entry<OfflineNavKey.TaskList>(
                 metadata = ListDetailSceneStrategy.listPane(
                     detailPlaceholder = {
-                        val current = selectedTask
-                        if (current != null) {
-                            renderTaskDetail(current, false) { selectedTask = null }
+                        if (selectedTask != null) {
+                            renderTaskDetail(selectedTask!!, false) { selectedTask = null }
                         } else {
                             OfflineTaskEmptyPlaceholder(onNavigateToNewTask)
                         }
                     }
                 )
             ) {
-                OfflineFileContent(
+                OfflineFileContainer(
+                    offlineFileViewModel = offlineFileViewModel,
                     uiState = uiState,
                     gridCellMinSize = gridCellMinSize,
                     isGridScreen = isGridScreen,
-                    onRefresh = { offlineFileViewModel.refresh() },
-                    onClearFinish = { offlineFileViewModel.clearFinish() },
-                    onClearError = { offlineFileViewModel.clearError() },
-                    onDeleteTask = { offlineFileViewModel.delete(it) },
-                    onOpenTaskDialog = { task ->
-                        selectedTask = task
-                        // 手机单栏模式下点击进入详情路由；双栏模式下仅刷新选中的任务
-                        if (!isDualPane) {
-                            backStack.add(OfflineNavKey.TaskDetail(task.infoHash))
-                        }
-                    },
-                    onCloseTaskDialog = { offlineFileViewModel.closeOfflineDialog() },
-                    onLoadMoreCompleted = { offlineFileViewModel.loadMoreCompletedTasks() },
-                    onLoadMoreDownloading = { offlineFileViewModel.loadMoreDownloadingTasks() },
-                    onLoadMoreFailed = { offlineFileViewModel.loadMoreFailedTasks() },
-                    getFiles = getFiles,
-                    onClick = { action ->
-                        when (action) {
-                            "ModalNavigationDrawerMenu" -> onDrawerClick()
-                            "MyFile" -> onBackToFiles()
-                        }
-                    }
+                    onOpenTaskDialog = onOpenTaskDialog,
+                    itemOnClick = onOpenTaskDialog,
+                    onClick = onDrawerClick
                 )
             }
 
@@ -204,13 +168,8 @@ fun AdaptiveOfflineScreen(
             entry<OfflineNavKey.TaskDetail>(
                 metadata = ListDetailSceneStrategy.detailPane()
             ) { detailKey ->
-                val task = findTask(detailKey.infoHash)
-                if (task != null) {
-                    renderTaskDetail(task, !isDualPane) {
-                        backStack.removeLastOrNull()
-                    }
-                } else {
-                    TaskNotFoundPane()
+                renderTaskDetail(detailKey.offlineTask, !isDualPane) {
+                    backStack.removeLastOrNull()
                 }
             }
         }
@@ -254,18 +213,6 @@ private fun OfflineTaskEmptyPlaceholder(onNavigateToNewTask: () -> Unit) {
     }
 }
 
-/**
- * 任务未找到占位面板
- */
-@Composable
-private fun TaskNotFoundPane() {
-    Surface(modifier = Modifier.fillMaxSize()) {
-        Box(contentAlignment = Alignment.Center) {
-            Text("未找到该任务")
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TaskDetailPane(
@@ -277,7 +224,7 @@ private fun TaskDetailPane(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
+            BaseTopAppBar(
                 title = { Text("任务详情") },
                 navigationIcon = {
                     if (showBackButton) {
@@ -340,8 +287,16 @@ private fun TaskDetailPane(
             Spacer(modifier = Modifier.height(16.dp))
 
             // 属性列表
-            TaskDetailInfoItem(icon = Icons.Default.Storage, label = "文件总大小", value = task.sizeString)
-            TaskDetailInfoItem(icon = Icons.Default.Schedule, label = "创建时间", value = task.timeString)
+            TaskDetailInfoItem(
+                icon = Icons.Default.Storage,
+                label = "文件总大小",
+                value = task.sizeString
+            )
+            TaskDetailInfoItem(
+                icon = Icons.Default.Schedule,
+                label = "创建时间",
+                value = task.timeString
+            )
             TaskDetailInfoItem(icon = Icons.Default.Info, label = "任务哈希", value = task.infoHash)
             if (task.url.isNotEmpty()) {
                 TaskDetailInfoItem(icon = Icons.Default.Link, label = "下载链接", value = task.url)
@@ -354,7 +309,7 @@ private fun TaskDetailPane(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                val targetCid = if (task.fileId.isEmpty()) task.wpPathId else task.fileId
+                val targetCid = task.fileId.ifEmpty { task.wpPathId }
                 if (targetCid.isNotEmpty()) {
                     Button(
                         onClick = { onOpenFile(targetCid) },

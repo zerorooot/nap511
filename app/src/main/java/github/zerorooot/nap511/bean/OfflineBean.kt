@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.bean
 
 import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.Serializable
 
 data class OfflineListCount(
     @SerializedName("total_count") val totalCount: Int = 0,
@@ -36,6 +37,7 @@ enum class OfflineTaskType(val stat: Int) {
     CompletedList(11)
 }
 
+@Serializable
 data class OfflineTask(
     @SerializedName("info_hash") var infoHash: String = "",
     @SerializedName("add_time") var addTime: Long = -1,

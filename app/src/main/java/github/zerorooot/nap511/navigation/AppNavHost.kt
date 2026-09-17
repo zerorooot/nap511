@@ -13,6 +13,7 @@ import androidx.navigation3.ui.NavDisplay
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.dialog.ExitApp
+import github.zerorooot.nap511.screen.LogScreen
 import github.zerorooot.nap511.screen.auth.LoginScreen
 import github.zerorooot.nap511.screen.file.AdaptiveOfflineScreen
 import github.zerorooot.nap511.screen.file.FileScreen
@@ -21,7 +22,6 @@ import github.zerorooot.nap511.screen.file.OfflineFileScreen
 import github.zerorooot.nap511.screen.file.RecycleScreen
 import github.zerorooot.nap511.screen.file.RepeatFileScreen
 import github.zerorooot.nap511.screen.setting.SettingScreen
-import github.zerorooot.nap511.screen.LogScreen
 import github.zerorooot.nap511.screen.viewer.MusicDetailScreen
 import github.zerorooot.nap511.screen.viewer.MyPhotoScreen
 import github.zerorooot.nap511.screen.viewer.TxtReaderScreen
@@ -133,21 +133,23 @@ fun AppNavHost(
                         offlineFileViewModel = offlineFileViewModel,
                         isGridScreen = isGridScreen,
                         gridCellMinSize = gridCellMinSize,
-                        getFiles = { fileViewModel.getFiles(it) },
+                        getFiles = {
+                            fileViewModel.getFiles(it)
+                            onNavigate(Route.MyFile)
+                        },
                         onDrawerClick = onOpenDrawer,
-                        onBackToFiles = { onNavigate(Route.MyFile) },
                         onNavigateToNewTask = { onNavigate(Route.OfflineDownload) }
                     )
                 } else {
                     OfflineFileScreen(
-                        offlineFileViewModel,
-                        isGridScreen,
-                        gridCellMinSize,
-                        { fileViewModel.getFiles(it) }) { action ->
-                        when (action) {
-                            "ModalNavigationDrawerMenu" -> onOpenDrawer()
-                            "MyFile" -> onNavigate(Route.MyFile)
-                        }
+                        offlineFileViewModel = offlineFileViewModel,
+                        isGridScreen = isGridScreen,
+                        gridCellMinSize = gridCellMinSize,
+                        itemOnClick = { offlineTask ->
+                            fileViewModel.getFiles(offlineTask.fileId.ifEmpty { offlineTask.wpPathId })
+                            onNavigate(Route.MyFile)
+                        }) {
+                        onOpenDrawer()
                     }
                 }
 

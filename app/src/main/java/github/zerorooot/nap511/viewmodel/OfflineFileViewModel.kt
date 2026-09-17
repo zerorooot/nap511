@@ -1,10 +1,14 @@
 package github.zerorooot.nap511.viewmodel
 
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import github.zerorooot.nap511.bean.LocationBean
 import github.zerorooot.nap511.bean.OfflineInfo
 import github.zerorooot.nap511.bean.OfflineListCount
 import github.zerorooot.nap511.bean.OfflineTask
@@ -61,6 +65,22 @@ class OfflineFileViewModel : ViewModel() {
     private val _isOpenOfflineDialog = MutableStateFlow(false)
     private val _selectedOfflineTask = MutableStateFlow<OfflineTask?>(null)
     val urlText = mutableStateOf("")
+    var selectedTask = mutableStateOf<OfflineTask?>(null)
+
+    private var currentLocation = hashMapOf<Int, LocationBean>()
+
+    fun setListLocation(page: Int, state: Any) {
+        val (index, offset) = when (state) {
+            is LazyListState -> state.firstVisibleItemIndex to state.firstVisibleItemScrollOffset
+            is LazyGridState -> state.firstVisibleItemIndex to state.firstVisibleItemScrollOffset
+            else -> return
+        }
+        currentLocation[page] = LocationBean(index, offset)
+    }
+
+    fun getListLocation(page: Int): LocationBean {
+        return currentLocation[page] ?: LocationBean(0, 0)
+    }
 
     private val fileRepository: FileRepository by lazy {
         FileRepository.getInstance()
@@ -77,10 +97,13 @@ class OfflineFileViewModel : ViewModel() {
     ) { values: Array<Any?> ->
         val offlineInfo = values[0] as OfflineListCount
         val refreshing = values[1] as Boolean
+
         @Suppress("UNCHECKED_CAST")
         val downloadingList = values[2] as List<OfflineTask>
+
         @Suppress("UNCHECKED_CAST")
         val failedList = values[3] as List<OfflineTask>
+
         @Suppress("UNCHECKED_CAST")
         val completedList = values[4] as List<OfflineTask>
         val isOpenDialog = values[5] as Boolean
@@ -129,7 +152,13 @@ class OfflineFileViewModel : ViewModel() {
                     // 1. 并行发起网络请求并直接在内部处理格式化，减少 refresh 函数内的重置逻辑
                     val infoDeferred = async { fileRepository.getOfflineTaskCount() }
                     val downloadingDeferred =
-                        async { fetchTaskListAndProcess(uid, sign, OfflineTaskType.DownloadingList) }
+                        async {
+                            fetchTaskListAndProcess(
+                                uid,
+                                sign,
+                                OfflineTaskType.DownloadingList
+                            )
+                        }
                     val failedDeferred =
                         async { fetchTaskListAndProcess(uid, sign, OfflineTaskType.FailedList) }
                     val completedDeferred =

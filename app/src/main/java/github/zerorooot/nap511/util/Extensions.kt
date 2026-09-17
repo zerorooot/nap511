@@ -1,10 +1,13 @@
 package github.zerorooot.nap511.util
 
 import android.app.ActivityManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
 import android.os.PowerManager
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat.getSystemService
 import coil.ImageLoader
 import coil.annotation.ExperimentalCoilApi
 import coil.memory.MemoryCache
@@ -183,6 +186,12 @@ fun String.handleText(): Set<String> {
             "ftp", true
         ) || i.startsWith("magnet", true) || i.startsWith("ed2k", true)
     }.toSet()
+}
+
+fun String.copy(context: Context) {
+    val clipboard = getSystemService(context, ClipboardManager::class.java)
+    val clip = ClipData.newPlainText("", this)
+    clipboard?.setPrimaryClip(clip)
 }
 
 /**
