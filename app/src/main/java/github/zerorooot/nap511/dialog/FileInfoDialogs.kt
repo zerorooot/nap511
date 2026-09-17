@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -139,7 +140,11 @@ private fun BreadcrumbPath(
 fun BaseDetailDialog(
     title: String, icon: Int, sections: List<InfoSection>, onDismissRequest: () -> Unit
 ) {
-    AlertDialog(onDismissRequest = onDismissRequest, title = {
+    //约束 CommonDialogs.kt、FileInfoDialogs.kt 与 TorrentDialogs.kt 在宽屏下的最大宽度 widthIn(max = 560.dp)
+    AlertDialog(
+        modifier = Modifier.widthIn(max = 560.dp),
+        onDismissRequest = onDismissRequest,
+        title = {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Image(
                 painter = painterResource(icon),

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -91,9 +92,12 @@ fun BaseDialog(
     LaunchedEffect(context, selection) {
         text = TextFieldValue(text = context, selection = selection)
     }
-
+//约束 CommonDialogs.kt、FileInfoDialogs.kt 与 TorrentDialogs.kt
+// 在宽屏下的最大宽度 widthIn(max = 560.dp)
     AlertDialog(
-        modifier = Modifier.width(IntrinsicSize.Max),
+        modifier = Modifier
+            .widthIn(max = 560.dp)
+            .width(IntrinsicSize.Max),
         onDismissRequest = {
             enter.invoke(null)
         }, confirmButton = {

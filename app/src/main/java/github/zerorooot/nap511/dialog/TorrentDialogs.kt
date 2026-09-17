@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -155,6 +156,8 @@ private fun SelectTorrentFileDialog(
         with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() * 0.65f }
 
     AlertDialog(
+        //约束 CommonDialogs.kt、FileInfoDialogs.kt 与 TorrentDialogs.kt 在宽屏下的最大宽度 widthIn(max = 560.dp)
+        modifier = Modifier.widthIn(max = 560.dp),
         onDismissRequest = ::cancel,
         confirmButton = {
             Button(
