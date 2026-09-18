@@ -41,13 +41,7 @@ fun SettingContent(
     uiState: SettingUiState,
     currentLocation: LocationBean,
     onSaveScrollPosition: (Int, Int) -> Unit,
-    onSaveConfig: (String, Any) -> Unit,
-    onDrawerClick: () -> Unit = {},
-    onActionClick: (String) -> Unit,
-    onExportConfig: () -> Unit,
-    onImportConfig: () -> Unit,
-    onResetConfig: () -> Unit,
-    onRestartApp: () -> Unit
+    actions: SettingActions,
 ) {
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = currentLocation.firstVisibleItemIndex,
@@ -81,8 +75,7 @@ fun SettingContent(
                     imageVector = Icons.Rounded.Menu,
                     description = "navigationIcon",
                     onClick = {
-                        onDrawerClick()
-                        onActionClick("topAppBarActionButtonOnClick")
+                        actions.onDrawerClick()
                     }
                 )
             }
@@ -104,33 +97,31 @@ fun SettingContent(
                 // --- 1. 账号与安全 ---
                 accountSecurityPreferenceItems(
                     uiState = uiState,
-                    onSaveConfig = onSaveConfig,
-                    onActionClick = onActionClick
+                    actions = actions
                 )
 
                 // --- 2. 下载与 Aria2 ---
                 downloadAria2PreferenceItems(
                     uiState = uiState,
-                    onSaveConfig = onSaveConfig,
-                    onActionClick = onActionClick
+                    actions = actions
                 )
 
                 // --- 3. 播放与媒体 ---
                 mediaPlaybackPreferenceItems(
                     uiState = uiState,
-                    onSaveConfig = onSaveConfig
+                    actions = actions
                 )
 
                 // --- 4. 大屏与扩展 ---
                 expandedScreenPreferenceItems(
                     uiState = uiState,
-                    onSaveConfig = onSaveConfig
+                    actions = actions
                 )
 
                 // --- 5. 文件与缓存 ---
                 fileCachePreferenceItems(
                     uiState = uiState,
-                    onSaveConfig = onSaveConfig
+                    actions = actions
                 )
 
                 // --- 6. 界面与体验 ---
@@ -138,16 +129,12 @@ fun SettingContent(
                     uiState = uiState,
                     fabArray = fabArray,
                     themeArray = themeArray,
-                    onSaveConfig = onSaveConfig
+                    actions = actions
                 )
 
                 // --- 7. 维护与备份 ---
                 maintenanceBackupPreferenceItems(
-                    onExportConfig = onExportConfig,
-                    onImportConfig = onImportConfig,
-                    onActionClick = onActionClick,
-                    onResetConfig = onResetConfig,
-                    onRestartApp = onRestartApp
+                    actions = actions
                 )
             }
         }

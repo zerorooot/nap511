@@ -2,6 +2,7 @@ package github.zerorooot.nap511.util
 
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.layout.PaneScaffoldDirective
 import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.runtime.Composable
@@ -31,10 +32,9 @@ val PaneScaffoldDirective.isDualPane: Boolean
  * @return 响应窗口宽度规格变化的 PaneScaffoldDirective
  */
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
-@Suppress("DEPRECATION")
 @Composable
 fun rememberListDetailDirective(horizontalSpacer: Dp = 0.dp): PaneScaffoldDirective {
-    val windowAdaptiveInfo = currentWindowAdaptiveInfo(supportLargeAndXLargeWidth = true)
+    val windowAdaptiveInfo = currentWindowAdaptiveInfoV2()
     return remember(windowAdaptiveInfo, horizontalSpacer) {
         calculatePaneScaffoldDirective(windowAdaptiveInfo)
             .copy(horizontalPartitionSpacerSize = horizontalSpacer)

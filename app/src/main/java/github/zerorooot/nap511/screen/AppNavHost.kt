@@ -1,8 +1,8 @@
 package github.zerorooot.nap511.screen
 
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -10,6 +10,7 @@ import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
+import androidx.window.core.layout.WindowSizeClass
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.dialog.ExitApp
@@ -62,7 +63,9 @@ fun AppNavHost(
     onCloseDrawer: () -> Unit,
     onSetGesturesEnabled: (Boolean) -> Unit
 ) {
-    val isExpandedScreen = uiState.expandedScreenEnabled
+    val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
+    val isExpandedScreen =
+        uiState.expandedScreenEnabled && windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
     val gridCellMinSize =
         (uiState.gridCellMinSize.toIntOrNull()?.takeIf { i -> i > 0 } ?: 340).dp
     val isGridScreen = uiState.gridScreenEnabled
@@ -106,7 +109,7 @@ fun AppNavHost(
                 }
 
                 val fileUiState by fileViewModel.uiState.collectAsStateWithLifecycle()
-                val quotaBean by offlineFileViewModel.quotaBean.collectAsState()
+                val quotaBean by offlineFileViewModel.quotaBean.collectAsStateWithLifecycle()
                 val urlText by offlineFileViewModel.urlText
 
                 OfflineDownloadScreen(
@@ -175,13 +178,14 @@ fun AppNavHost(
                             "handleOfflineTask" -> fileViewModel.handleOfflineTask(true)
                             "RepeatFile" -> onNavigate(Route.RepeatFile)
                             "Login" -> onNavigate(Route.Login)
+                            "Web" -> onNavigate(Route.WebScreen)
                         }
                     }
                 )
             }
 
             entry<Route.RecycleBin> {
-                RecycleScreen(recycleViewModel, isExpandedScreen, gridCellMinSize) {
+                RecycleScreen(recycleViewModel, isGridScreen, gridCellMinSize) {
                     onOpenDrawer()
                 }
             }

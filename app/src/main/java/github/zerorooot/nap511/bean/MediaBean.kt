@@ -15,7 +15,8 @@ data class VideoBean(
     val pickCode: String,
     val fileId: String = "",
     //playNextVideo中需要用到
-    val name: String = ""
+    val name: String = "",
+    //val time: String
 )
 
 /**

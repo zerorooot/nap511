@@ -28,7 +28,6 @@ class SubtitlePanelController(
     private val viewModel: VideoViewModel
 ) {
     private val ACTIVE_COLOR = "#42A5F5".toColorInt()
-    private val ACTIVE_BG = "#3342A5F5".toColorInt()
 
     val subtitleAdapter: SubtitleAdapter
 

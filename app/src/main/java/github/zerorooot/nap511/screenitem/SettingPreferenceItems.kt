@@ -2,6 +2,7 @@ package github.zerorooot.nap511.screenitem
 
 import androidx.compose.foundation.lazy.LazyListScope
 import github.zerorooot.nap511.bean.SettingUiState
+import github.zerorooot.nap511.screen.setting.SettingActions
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.network.UserSessionManager
 
@@ -48,6 +49,13 @@ fun LazyListScope.accountSecurityPreferenceItems(
             title = "应用登录页面",
             summary = "进入应用登录页面，重新登录",
             onClick = { onActionClick("Login") }
+        )
+    }
+    item {
+        PreferenceItem(
+            title = "网页Web页面",
+            summary = "进入网页版115客户端",
+            onClick = { onActionClick("Web") }
         )
     }
 }
@@ -181,7 +189,7 @@ fun LazyListScope.expandedScreenPreferenceItems(
             summary = "自适应网格排布时，单列最小单元目标宽度为 ${uiState.gridCellMinSize} dp",
             value = uiState.gridCellMinSize,
             isNumber = true,
-            enabled = uiState.expandedScreenEnabled,
+            enabled = uiState.gridScreenEnabled,
             onValueSave = { onSaveConfig(ConfigKeyUtil.GRID_CELL_MIN_SIZE, it) }
         )
     }
@@ -196,6 +204,14 @@ fun LazyListScope.expandedScreenPreferenceItems(
     }
     item {
         SwitchPreferenceItem(
+            title = "高清瀑布视图",
+            summary = "开启后，瀑布流视图下将自动请求高清原图",
+            checked = uiState.imageHdPreview,
+            onCheckedChange = { onSaveConfig(ConfigKeyUtil.IMAGE_HD_PREVIEW, it) }
+        )
+    }
+    item {
+        SwitchPreferenceItem(
             title = "多列网格模式",
             summary = "开启时由系统根据屏幕宽度原生自适应排布为多列网格；关闭时无论屏幕多宽强制保持经典单列",
             checked = uiState.gridScreenEnabled,
@@ -205,17 +221,9 @@ fun LazyListScope.expandedScreenPreferenceItems(
     item {
         SwitchPreferenceItem(
             title = "大屏扩展模式",
-            summary = "开启后，部分页面将变为自适应 (Adaptive)页面",
+            summary = "开启后，根据窗口大小来决定是否将部分页面变为自适应 (Adaptive)页面",
             checked = uiState.expandedScreenEnabled,
             onCheckedChange = { onSaveConfig(ConfigKeyUtil.EXPANDED_SCREEN, it) }
-        )
-    }
-    item {
-        SwitchPreferenceItem(
-            title = "高清瀑布视图",
-            summary = "开启后，瀑布流视图下将自动请求高清原图",
-            checked = uiState.imageHdPreview,
-            onCheckedChange = { onSaveConfig(ConfigKeyUtil.IMAGE_HD_PREVIEW, it) }
         )
     }
 }
@@ -410,3 +418,68 @@ fun LazyListScope.maintenanceBackupPreferenceItems(
         )
     }
 }
+
+fun LazyListScope.accountSecurityPreferenceItems(
+    uiState: SettingUiState,
+    actions: SettingActions
+) = accountSecurityPreferenceItems(
+    uiState = uiState,
+    onSaveConfig = actions.onSaveConfig,
+    onActionClick = actions.onActionClick
+)
+
+fun LazyListScope.downloadAria2PreferenceItems(
+    uiState: SettingUiState,
+    actions: SettingActions
+) = downloadAria2PreferenceItems(
+    uiState = uiState,
+    onSaveConfig = actions.onSaveConfig,
+    onActionClick = actions.onActionClick
+)
+
+fun LazyListScope.mediaPlaybackPreferenceItems(
+    uiState: SettingUiState,
+    actions: SettingActions
+) = mediaPlaybackPreferenceItems(
+    uiState = uiState,
+    onSaveConfig = actions.onSaveConfig
+)
+
+fun LazyListScope.expandedScreenPreferenceItems(
+    uiState: SettingUiState,
+    actions: SettingActions
+) = expandedScreenPreferenceItems(
+    uiState = uiState,
+    onSaveConfig = actions.onSaveConfig
+)
+
+fun LazyListScope.fileCachePreferenceItems(
+    uiState: SettingUiState,
+    actions: SettingActions
+) = fileCachePreferenceItems(
+    uiState = uiState,
+    onSaveConfig = actions.onSaveConfig
+)
+
+fun LazyListScope.uiExperiencePreferenceItems(
+    uiState: SettingUiState,
+    fabArray: Array<String>,
+    themeArray: Array<String>,
+    actions: SettingActions
+) = uiExperiencePreferenceItems(
+    uiState = uiState,
+    fabArray = fabArray,
+    themeArray = themeArray,
+    onSaveConfig = actions.onSaveConfig
+)
+
+fun LazyListScope.maintenanceBackupPreferenceItems(
+    actions: SettingActions
+) = maintenanceBackupPreferenceItems(
+    onExportConfig = actions.onExportConfig,
+    onImportConfig = actions.onImportConfig,
+    onActionClick = actions.onActionClick,
+    onResetConfig = actions.onResetConfig,
+    onRestartApp = actions.onRestartApp
+)
+

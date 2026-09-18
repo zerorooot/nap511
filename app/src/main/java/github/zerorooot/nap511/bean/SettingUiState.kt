@@ -86,7 +86,7 @@ data class SettingUiState(
     @SerializedName(ConfigKeyUtil.MAX_TXT_SIZE) val txtSize: String = "200",
 
     /** 是否启用大屏扩展模式（在平板或大屏设备上启用大屏展开布局） */
-    @SerializedName(ConfigKeyUtil.EXPANDED_SCREEN) val expandedScreenEnabled: Boolean = true,
+    @SerializedName(ConfigKeyUtil.EXPANDED_SCREEN) val expandedScreenEnabled: Boolean = false,
 
     /** 是否启用多列网格模式（在平板或大屏设备上列表多行排列） */
     @SerializedName(ConfigKeyUtil.GRID_SCREEN) val gridScreenEnabled: Boolean = true,

@@ -63,7 +63,7 @@ data class RecycleUiState(
 @Composable
 fun RecycleScreen(
     recycleViewModel: RecycleViewModel,
-    isExpandedScreen: Boolean,
+    isGridScreen: Boolean,
     gridCellMinSize: Dp,
     onClick: () -> Unit
 ) {
@@ -81,7 +81,7 @@ fun RecycleScreen(
     RecycleContent(
         uiState = uiState,
         gridCellMinSize = gridCellMinSize,
-        isExpandedScreen = isExpandedScreen,
+        isGridScreen = isGridScreen,
         onRefresh = { recycleViewModel.refresh() },
         onRevert = { index -> recycleViewModel.revert(index) },
         onDelete = { index ->
@@ -120,7 +120,7 @@ fun RecycleScreen(
 fun RecycleContent(
     uiState: RecycleUiState,
     gridCellMinSize: Dp,
-    isExpandedScreen: Boolean,
+    isGridScreen: Boolean,
     onRefresh: () -> Unit,
     onRevert: (index: Int) -> Unit,
     onDelete: (index: Int) -> Unit,
@@ -152,11 +152,7 @@ fun RecycleContent(
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
     Column(modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)) {
-        AppTopBarRecycle(ConfigKeyUtil.RECYCLE_BIN, appBarOnClick, scrollBehavior = scrollBehavior)
-        MiddleEllipsisText(
-            text = "当前文件数：${uiState.recycleFileList.size}",
-            modifier = Modifier.padding(8.dp, 4.dp)
-        )
+        AppTopBarRecycle(ConfigKeyUtil.RECYCLE_BIN+" (当前文件数:${uiState.recycleFileList.size})", appBarOnClick, scrollBehavior = scrollBehavior)
         PullToRefreshBox(
             isRefreshing = uiState.isRefreshing,
             onRefresh = onRefresh
@@ -170,7 +166,7 @@ fun RecycleContent(
                 ) {
                     Text("暂无文件")
                 }
-            } else if (isExpandedScreen) {
+            } else if (isGridScreen) {
                 val gridState = rememberLazyGridState()
                 LazyVerticalGridScrollbar(
                     state = gridState,

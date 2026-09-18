@@ -8,7 +8,6 @@ import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Web
 import github.zerorooot.nap511.bean.DrawerMenuItem
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -25,7 +24,7 @@ object DrawerMenuItems {
             DrawerMenuItem(
                 Icons.Default.CloudDone, ConfigKeyUtil.OFFLINE_LIST, Route.OfflineList
             ),
-            DrawerMenuItem(Icons.Default.Web, ConfigKeyUtil.WEB, Route.WebScreen),
+            // DrawerMenuItem(Icons.Default.Web, ConfigKeyUtil.WEB, Route.WebScreen),
             DrawerMenuItem(
                 Icons.Default.Delete, ConfigKeyUtil.RECYCLE_BIN, Route.RecycleBin
             ),

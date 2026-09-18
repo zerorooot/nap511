@@ -1,7 +1,6 @@
 package github.zerorooot.nap511.screen.setting
 
 import android.net.Uri
-import android.os.Process
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -41,6 +40,7 @@ import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,11 +71,25 @@ import github.zerorooot.nap511.screenitem.fileCachePreferenceItems
 import github.zerorooot.nap511.screenitem.maintenanceBackupPreferenceItems
 import github.zerorooot.nap511.screenitem.mediaPlaybackPreferenceItems
 import github.zerorooot.nap511.screenitem.uiExperiencePreferenceItems
+import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.isDualPane
 import github.zerorooot.nap511.util.rememberListDetailDirective
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.viewmodel.SettingViewModel
 import kotlinx.serialization.Serializable
+
+/**
+ * 设置页面的公共交互事件集合
+ */
+@Immutable
+data class SettingActions(
+    val onSaveConfig: (key: String, value: Any) -> Unit,
+    val onDrawerClick: () -> Unit,
+    val onActionClick: (String) -> Unit,
+    val onExportConfig: () -> Unit,
+    val onImportConfig: () -> Unit,
+    val onResetConfig: () -> Unit,
+    val onRestartApp: () -> Unit
+)
 
 data class SettingCategoryData(
     val title: String,
@@ -185,21 +199,36 @@ fun SettingScreen(
         )
     }
 
-    val onExportConfig = {
-        exportLauncher.launch(
-            "nap511_${System.currentTimeMillis().toString().takeLast(13)}.json"
+    // 缓存所有通用的交互操作，避免层层透传大量 lambda
+    val actions = remember(
+        viewModel,
+        onDrawerClick,
+        onActionClick,
+        exportLauncher,
+        importLauncher,
+        context
+    ) {
+        SettingActions(
+            onSaveConfig = { key, value -> viewModel.saveData(key, value) },
+            onDrawerClick = onDrawerClick,
+            onActionClick = onActionClick,
+            onExportConfig = {
+                exportLauncher.launch(
+                    "nap511_${System.currentTimeMillis().toString().takeLast(13)}.json"
+                )
+            },
+            onImportConfig = {
+                importLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+            },
+            onResetConfig = { showResetDialog = true },
+            onRestartApp = {
+                if (!lastClick) {
+                    lastClick = true
+                    ProcessPhoenix.triggerRebirth(context)
+                    App.instance.toast("重启中...")
+                }
+            }
         )
-    }
-    val onImportConfig = {
-        importLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
-    }
-    val onResetConfig = { showResetDialog = true }
-    val onRestartApp = {
-        if (!lastClick) {
-            lastClick = true
-            ProcessPhoenix.triggerRebirth(context)
-            App.instance.toast("重启中...")
-        }
     }
 
     if (isExpandedScreen) {
@@ -207,26 +236,14 @@ fun SettingScreen(
             uiState = uiState,
             selectedCategoryIndex = viewModel.selectedCategoryIndex,
             onSelectCategory = { index -> viewModel.selectedCategoryIndex = index },
-            onDrawerClick = onDrawerClick,
-            onActionClick = onActionClick,
-            onSaveConfig = { key, value -> viewModel.saveData(key, value) },
-            onExportConfig = onExportConfig,
-            onImportConfig = onImportConfig,
-            onResetConfig = onResetConfig,
-            onRestartApp = onRestartApp
+            actions = actions
         )
     } else {
         SettingContent(
             uiState = uiState,
             currentLocation = currentLocation,
             onSaveScrollPosition = { index, offset -> viewModel.setLocation(index, offset) },
-            onSaveConfig = { key, value -> viewModel.saveData(key, value) },
-            onDrawerClick = onDrawerClick,
-            onActionClick = onActionClick,
-            onExportConfig = onExportConfig,
-            onImportConfig = onImportConfig,
-            onResetConfig = onResetConfig,
-            onRestartApp = onRestartApp
+            actions = actions
         )
     }
 }
@@ -237,13 +254,7 @@ private fun AdaptiveSettingContent(
     uiState: SettingUiState,
     selectedCategoryIndex: Int,
     onSelectCategory: (Int) -> Unit,
-    onDrawerClick: () -> Unit,
-    onActionClick: (String) -> Unit,
-    onSaveConfig: (String, Any) -> Unit,
-    onExportConfig: () -> Unit,
-    onImportConfig: () -> Unit,
-    onResetConfig: () -> Unit,
-    onRestartApp: () -> Unit
+    actions: SettingActions,
 ) {
     // 1. 自适应分栏指令：计算当前视口是否支持双栏并排 (isDualPane)
     val directive = rememberListDetailDirective()
@@ -261,12 +272,7 @@ private fun AdaptiveSettingContent(
                 uiState = uiState,
                 showBackButton = showBack,
                 onBack = { backStack.removeLastOrNull() },
-                onSaveConfig = onSaveConfig,
-                onActionClick = onActionClick,
-                onExportConfig = onExportConfig,
-                onImportConfig = onImportConfig,
-                onResetConfig = onResetConfig,
-                onRestartApp = onRestartApp
+                actions = actions
             )
         }
 
@@ -289,7 +295,7 @@ private fun AdaptiveSettingContent(
                     categories = SETTING_CATEGORIES,
                     selectedIndex = selectedCategoryIndex,
                     isDualPane = isDualPane,
-                    onDrawerClick = onDrawerClick,
+                    onDrawerClick = actions.onDrawerClick,
                     onSelectCategory = { index ->
                         onSelectCategory(index)
                         // 单栏手机模式下，点击分类推入详情路由；双栏模式下仅切换选中索引
@@ -410,12 +416,7 @@ private fun CategoryDetailPane(
     uiState: SettingUiState,
     showBackButton: Boolean,
     onBack: () -> Unit = {},
-    onSaveConfig: (String, Any) -> Unit,
-    onActionClick: (String) -> Unit,
-    onExportConfig: () -> Unit,
-    onImportConfig: () -> Unit,
-    onResetConfig: () -> Unit,
-    onRestartApp: () -> Unit
+    actions: SettingActions,
 ) {
     val category = SETTING_CATEGORIES.getOrNull(categoryIndex) ?: SETTING_CATEGORIES[0]
     val fabArray = stringArrayResource(R.array.floatingActionButtonPosition)
@@ -448,8 +449,7 @@ private fun CategoryDetailPane(
                     // --- 1. 账号与安全 ---
                     accountSecurityPreferenceItems(
                         uiState = uiState,
-                        onSaveConfig = onSaveConfig,
-                        onActionClick = onActionClick
+                        actions = actions
                     )
                 }
 
@@ -457,8 +457,7 @@ private fun CategoryDetailPane(
                     // --- 2. 下载与 Aria2 ---
                     downloadAria2PreferenceItems(
                         uiState = uiState,
-                        onSaveConfig = onSaveConfig,
-                        onActionClick = onActionClick
+                        actions = actions
                     )
                 }
 
@@ -466,7 +465,7 @@ private fun CategoryDetailPane(
                     // --- 3. 播放与媒体 ---
                     mediaPlaybackPreferenceItems(
                         uiState = uiState,
-                        onSaveConfig = onSaveConfig
+                        actions = actions
                     )
                 }
 
@@ -474,7 +473,7 @@ private fun CategoryDetailPane(
                     // --- 4. 大屏与扩展 ---
                     expandedScreenPreferenceItems(
                         uiState = uiState,
-                        onSaveConfig = onSaveConfig
+                        actions = actions
                     )
                 }
 
@@ -482,7 +481,7 @@ private fun CategoryDetailPane(
                     // --- 5. 文件与缓存 ---
                     fileCachePreferenceItems(
                         uiState = uiState,
-                        onSaveConfig = onSaveConfig
+                        actions = actions
                     )
                 }
 
@@ -492,18 +491,14 @@ private fun CategoryDetailPane(
                         uiState = uiState,
                         fabArray = fabArray,
                         themeArray = themeArray,
-                        onSaveConfig = onSaveConfig
+                        actions = actions
                     )
                 }
 
                 6 -> {
                     // --- 7. 维护与备份 ---
                     maintenanceBackupPreferenceItems(
-                        onExportConfig = onExportConfig,
-                        onImportConfig = onImportConfig,
-                        onActionClick = onActionClick,
-                        onResetConfig = onResetConfig,
-                        onRestartApp = onRestartApp
+                        actions = actions
                     )
                 }
             }

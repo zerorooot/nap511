@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen
+package github.zerorooot.nap511
 
 import android.content.Intent
 import androidx.activity.ComponentActivity
@@ -27,10 +27,11 @@ import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
-import github.zerorooot.nap511.screenitem.DrawerMenuItems
 import github.zerorooot.nap511.repository.SettingsRepository
+import github.zerorooot.nap511.screen.AppNavHost
 import github.zerorooot.nap511.screen.file.CreateDialogs
 import github.zerorooot.nap511.screenitem.AppDrawer
+import github.zerorooot.nap511.screenitem.DrawerMenuItems
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.AudioViewModel
@@ -88,22 +89,42 @@ fun MainScreen(
     }
 
     /**
-     * 通用路由导航跳转
+     * 统一路由导航跳转
+     * 自动处理抽屉状态、登录鉴权栈重置以及已有路由的回退复用
      */
     fun navigateTo(route: Route) {
-        // 登录页需要清空其余栈，确保未授权状态下无法退回已授权页面
-        if (route == Route.Login) {
+        // 1. 若侧边栏打开，自动收起抽屉并恢复手势
+        if (drawerState.isOpen) {
+            scope.launch { drawerState.close() }
+        }
+        navGesturesEnabled = true
+
+        // 2. 如果目标页面就是当前栈顶页面，不进行重复跳转
+        if (backStack.lastOrNull() == route) return
+
+        // 3. 登录页特殊处理：清空返回栈，确保未授权状态下无法退回已授权页面；如果是从设置页面进来的，则不用管
+        if (route == Route.Login && !backStack.contains(Route.AdvancedSettings)) {
             backStack.clear()
             backStack.add(Route.Login)
             return
         }
-        // 从登录成功返回首页时，清除登录路由
-        if (route == Route.MyFile && backStack.contains(Route.Login)) {
+
+        // 4. 从登录页登录成功并跳转其他页面时，清除登录路由
+        if (backStack.contains(Route.Login)) {
             backStack.clear()
-            backStack.add(Route.MyFile)
+            backStack.add(route)
             return
         }
-        backStack.add(route)
+
+        // 5. 核心逻辑：若目标路由已在栈中（如 MyFile 在栈底），弹出其上方所有页面；若不在则压入栈顶
+        val index = backStack.indexOf(route)
+        if (index >= 0) {
+            while (backStack.size > index + 1) {
+                backStack.removeLastOrNull()
+            }
+        } else {
+            backStack.add(route)
+        }
     }
 
     /**
@@ -120,22 +141,16 @@ fun MainScreen(
     }
 
     /**
-     * 顶层主功能（文件/传输/设置/抽屉项目）点击切换逻辑
-     * 针对顶层核心页面进行栈整理，防止频繁点击导致路由栈无限叠加
+     * 滑动两次返回桌面
      */
-    fun onTopLevelNavClick(route: Route) {
-        navGesturesEnabled = true
-        scope.launch { drawerState.close() }
-
-        if (backStack.lastOrNull() == route) return
-        val index = backStack.indexOf(route)
-        if (index >= 0) {
-            // 若目标路由已在栈中，弹出其上层所有页面并回退到该路由
-            while (backStack.size > index + 1) {
-                backStack.removeLastOrNull()
-            }
+    fun slideTwoBackHome(fileViewModel: FileViewModel?) {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastBackPressTime < 1500L) {
+            fileViewModel?.deleteIndividualFile()
+            onMoveTaskToBack(true)
         } else {
-            backStack.add(route)
+            lastBackPressTime = currentTime
+            App.instance.toast("再滑一次返回桌面")
         }
     }
 
@@ -174,16 +189,13 @@ fun MainScreen(
     BackHandler(drawerState.isClosed && backStack.size > 1) {
         popBack()
     }
-
+    //登陆页面的再滑一次返回桌面
+    BackHandler(backStack.size == 1 && backStack[0] == Route.Login) {
+        slideTwoBackHome(null)
+    }
+    //MyFile页面的再滑一次返回桌面
     BackHandler(drawerState.isClosed && backStack.size == 1 && fileViewModel.pathList.size == 1) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastBackPressTime < 1500L) {
-            fileViewModel.deleteIndividualFile()
-            onMoveTaskToBack(true)
-        } else {
-            lastBackPressTime = currentTime
-            App.instance.toast("再滑一次返回桌面")
-        }
+        slideTwoBackHome(fileViewModel)
     }
 
     AppDrawer(
@@ -194,7 +206,7 @@ fun MainScreen(
         menuItems = menuItems,
         currentRoute = currentRoute,
         onMenuItemClick = { route ->
-            onTopLevelNavClick(route)
+            navigateTo(route)
         }
     ) {
         AppNavHost(
