@@ -249,7 +249,9 @@ fun AppNavHost(
                 }
 
                 if (byteArray != null) {
+                    onSetGesturesEnabled(false)
                     TxtReaderScreen(byteArray, title = fileBean?.name ?: "文本阅读") {
+                        onSetGesturesEnabled(true)
                         onPopBack()
                     }
                 }

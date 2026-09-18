@@ -217,28 +217,76 @@ object LogParser {
     private val xlogPattern =
         Regex("""^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)\s+([VDIWEFA])/([^:]+):\s*(.*)$""")
 
-    /** 将原始多行日志文本解析为结构化实体列表 */
+    /**
+     * 将原始多行日志文本解析为结构化实体列表
+     *
+     * 【多行日志聚合支持】：
+     * 当日志内容中包含换行符（如通过 XLog.e("msg", error) 打印的异常堆栈信息）时，
+     * 异常堆栈的每一行（如 at com.xxx... 或 Caused by:...）并非新日志的起始行。
+     * 本解析器采用状态机累加方式：遇到符合 xlogPattern 的行作为新日志条目的 Header；
+     * 后续所有不符合 Header 的换行行均视为当前日志的内容延续（Body），自动拼接进上一条日志中。
+     * 从而避免将一次完整的异常拆分成数十个无 Tag、无时间、级别为 UNKNOWN 的碎卡片。
+     */
     fun parse(rawLog: String): List<LogEntry> {
         if (rawLog.isBlank()) return emptyList()
-        return rawLog.lineSequence()
-            .filter { it.isNotBlank() }
-            .map { line ->
-                val trimmed = line.trim()
-                val xlogMatch = xlogPattern.find(trimmed)
-                if (xlogMatch != null) {
-                    val (time, levelStr, tagStr, msg) = xlogMatch.destructured
-                    LogEntry(
-                        raw = line,
-                        timestamp = time,
-                        tag = tagStr.replace("-XLOG", ""),
-                        level = LogLevel.fromCode(levelStr),
-                        message = msg
+
+        val entries = mutableListOf<LogEntry>()
+        var currentEntry: LogEntry? = null
+        val rawBuilder = StringBuilder()
+        val msgBuilder = StringBuilder()
+
+        for (line in rawLog.lineSequence()) {
+            if (line.isBlank()) continue
+            val trimmed = line.trim()
+            val xlogMatch = xlogPattern.find(trimmed)
+
+            if (xlogMatch != null) {
+                // 1. 遇到新日志起始行：先将上一条已累加完整的日志归档保存
+                if (currentEntry != null) {
+                    entries.add(
+                        currentEntry.copy(
+                            raw = rawBuilder.toString(),
+                            message = msgBuilder.toString()
+                        )
                     )
-                } else {
-                    // 非标准格式时回退为普通条目
-                    LogEntry(raw = line, message = line)
+                    rawBuilder.setLength(0)
+                    msgBuilder.setLength(0)
                 }
-            }.toList()
+
+                // 2. 初始化新条目并记录首行内容
+                val (time, levelStr, tagStr, msg) = xlogMatch.destructured
+                rawBuilder.append(line)
+                msgBuilder.append(msg)
+                currentEntry = LogEntry(
+                    raw = "",
+                    timestamp = time,
+                    tag = tagStr.replace("-XLOG", ""),
+                    level = LogLevel.fromCode(levelStr),
+                    message = ""
+                )
+            } else {
+                // 3. 非标准起始行：属于上一条日志的后续换行内容（如异常堆栈 at xxx、Caused by 等）
+                if (currentEntry != null) {
+                    rawBuilder.append("\n").append(line)
+                    msgBuilder.append("\n").append(line)
+                } else {
+                    // 文件开头若存在未匹配到格式的孤立非标准行，作为兜底独立条目
+                    entries.add(LogEntry(raw = line, message = line))
+                }
+            }
+        }
+
+        // 4. 循环结束后，保存最后一条处于构建中的日志条目
+        if (currentEntry != null) {
+            entries.add(
+                currentEntry.copy(
+                    raw = rawBuilder.toString(),
+                    message = msgBuilder.toString()
+                )
+            )
+        }
+
+        return entries
     }
 }
 
@@ -495,8 +543,6 @@ fun LogDetailPane(
     selectedLog: LogEntry?,
     modifier: Modifier = Modifier
 ) {
-    val clipboardManager = LocalClipboard.current
-
     if (selectedLog == null) {
         // 未选中任何条目时的友好引导视图
         Box(
@@ -615,7 +661,7 @@ fun LogItemRow(
         currentMatchIndex
     ) {
         val msgStartInRaw =
-            if (logEntry.timestamp.isEmpty()) 0 else logEntry.raw.lastIndexOf(logEntry.message)
+            if (logEntry.timestamp.isEmpty()) 0 else logEntry.raw.lastIndexOf(logEntry.message).coerceAtLeast(0)
         buildSearchHighlightedText(
             text = logEntry.message,
             searchQuery = searchQuery,
@@ -693,12 +739,14 @@ fun LogItemRow(
 
                 Spacer(modifier = Modifier.height(5.dp))
 
-                // 日志消息正文
+                // 日志消息正文（列表项最多展示 4 行，超长时显示省略号以保持卡片紧凑整洁；点击卡片可查看完整堆栈与调用详情）
                 Text(
                     text = annotatedMessage,
                     fontSize = 12.5.sp,
                     fontFamily = FontFamily.Monospace,
                     lineHeight = 17.sp,
+//                    maxLines = 4,
+//                    overflow = TextOverflow.Ellipsis,
                     color = if (logEntry.level == LogLevel.ERROR) logEntry.level.color
                     else MaterialTheme.colorScheme.onSurface
                 )

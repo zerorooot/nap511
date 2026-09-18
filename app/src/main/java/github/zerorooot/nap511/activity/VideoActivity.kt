@@ -1,18 +1,28 @@
 package github.zerorooot.nap511.activity
 
 import android.annotation.SuppressLint
+import android.app.Dialog
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -22,7 +32,10 @@ import androidx.core.view.updatePadding
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.shuyu.gsyvideoplayer.GSYVideoManager
@@ -34,12 +47,14 @@ import github.zerorooot.nap511.activity.helper.SubtitlePanelController
 import github.zerorooot.nap511.activity.helper.VideoDrawerController
 import github.zerorooot.nap511.bean.LaunchVideoParams
 import github.zerorooot.nap511.player.MyGSYVideoPlayer
+import github.zerorooot.nap511.screen.web.CaptchaVideoContent
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.network.VideoErrorMapper
 import github.zerorooot.nap511.util.network.isHandledException
 import github.zerorooot.nap511.viewmodel.VideoUiEvent
 import github.zerorooot.nap511.viewmodel.VideoViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
 
@@ -66,6 +81,11 @@ class VideoActivity : AppCompatActivity() {
 
     /** 侧边抽屉面板控制器（负责选集列表、画面设置、字幕面板等抽屉交互） */
     private lateinit var videoDrawerController: VideoDrawerController
+
+    /** 115 账号安全验证码 WebView 弹窗实例 */
+    private var captchaDialog: Dialog? = null
+
+    private var captchaComposeView: ComposeView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // 启用 Edge-to-Edge 边缘到边缘全面屏设计
@@ -270,6 +290,11 @@ class VideoActivity : AppCompatActivity() {
                                 rotateScreen()
                             }
 
+                            // 弹出 115 账号安全验证码弹窗
+                            is VideoUiEvent.ShowCaptchaDialog -> {
+                                showCaptchaDialog()
+                            }
+
                             // 携带播放历史及结果返回上个界面
                             is VideoUiEvent.FinishWithResult -> {
                                 val returnIntent = Intent().apply {
@@ -286,6 +311,84 @@ class VideoActivity : AppCompatActivity() {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * 弹出 115 视频验证码 WebView 弹窗
+     *
+     * 1. 切换至主线程，暂停视频播放；
+     * 2. 构建包含 [CaptchaVideoContent] 的 Compose 原生 Dialog 弹窗；
+     * 3. 验证成功：关闭弹窗，获取当前视频播放地址与标题，调用 [videoPlayer.playNext] 重新播放；
+     * 4. 验证取消/失败：关闭弹窗，调用 [performBack] 退出 Activity。
+     *
+     */
+    private fun showCaptchaDialog() {
+        lifecycleScope.launch(Dispatchers.Main) {
+            // 暂停视频播放
+            videoPlayer.onVideoPause()
+
+            if (captchaDialog?.isShowing == true) return@launch
+
+            val dialog = Dialog(this@VideoActivity, android.R.style.Theme_Translucent_NoTitleBar)
+            captchaDialog = dialog
+
+            val composeView = ComposeView(this@VideoActivity).apply {
+                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+                // 显式为 ComposeView 绑定 ViewTreeOwner，规避 Dialog 独立 Window 查找 ViewTree 失败导致的 IllegalStateException
+                setViewTreeLifecycleOwner(this@VideoActivity)
+                setViewTreeViewModelStoreOwner(this@VideoActivity)
+                setViewTreeSavedStateRegistryOwner(this@VideoActivity)
+
+                setContent {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.5f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CaptchaVideoContent(
+                            onDismiss = {
+                                lifecycleScope.launch(Dispatchers.Main) {
+                                    captchaDialog?.dismiss()
+                                    captchaDialog = null
+                                    performBack(toast = "验证取消", resultCode = RESULT_CANCELED)
+                                }
+                            },
+                            onSuccess = {
+                                lifecycleScope.launch(Dispatchers.Main) {
+                                    captchaDialog?.dismiss()
+                                    captchaDialog = null
+                                    val currentInfo = viewModel.uiState.value.videoInfo
+                                    val address =
+                                        currentInfo?.videoUrl?.ifEmpty { currentInfo.downloadUrl }
+                                            ?: ""
+                                    val title = currentInfo?.fileName ?: ""
+                                    if (address.isNotEmpty()) {
+                                        videoPlayer.playNext(address, title)
+                                    } else {
+                                        viewModel.rePlayNewVideo()
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+            dialog.setContentView(composeView)
+            dialog.window?.apply {
+                setLayout(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                decorView.setViewTreeLifecycleOwner(this@VideoActivity)
+                decorView.setViewTreeViewModelStoreOwner(this@VideoActivity)
+                decorView.setViewTreeSavedStateRegistryOwner(this@VideoActivity)
+            }
+            dialog.setOnCancelListener {
+                performBack(toast = "验证取消", resultCode = RESULT_CANCELED)
+            }
+            dialog.show()
         }
     }
 
@@ -311,7 +414,8 @@ class VideoActivity : AppCompatActivity() {
      * @param isNext true 表示下一集，false 表示上一集
      */
     private fun playNextVideo(isNext: Boolean) {
-        val isPortrait = resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+        val isPortrait =
+            resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
         viewModel.playNextVideo(isNext, isPortrait, videoPlayer.currentPositionWhenPlaying)
     }
 
@@ -363,6 +467,8 @@ class VideoActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        captchaDialog?.dismiss()
+        captchaDialog = null
         GSYVideoManager.releaseAllVideos()
         super.onDestroy()
     }

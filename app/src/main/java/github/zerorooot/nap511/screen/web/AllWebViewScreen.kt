@@ -82,6 +82,7 @@ fun WebView.applyDefaultSettings() {
 @Composable
 fun BaseWebViewScreen(
     topAppBarActionButtonOnClick: () -> Unit,
+    showTopBarButton: Boolean = true,
     webViewClient: (WebView) -> WebViewClient,
     loadUrl: String
 ) {
@@ -150,24 +151,26 @@ fun BaseWebViewScreen(
                     webViewInstance = webView
                 })
 
-                IconButton(
-                    onClick = {
-                        topAppBarActionButtonOnClick.invoke()
-                    },
-                    modifier = Modifier
-                        .padding(start = 12.dp, top = 8.dp)
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.65f)),
-                    colors = IconButtonDefaults.iconButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onSurface
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = "打开侧边栏菜单",
-                        modifier = Modifier.size(22.dp)
-                    )
+                if (showTopBarButton) {
+                    IconButton(
+                        onClick = {
+                            topAppBarActionButtonOnClick.invoke()
+                        },
+                        modifier = Modifier
+                            .padding(start = 12.dp, top = 8.dp)
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.65f)),
+                        colors = IconButtonDefaults.iconButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "打开侧边栏菜单",
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
             }
         }
@@ -453,6 +456,7 @@ fun CaptchaWebViewScreen(
 
 @Composable
 fun CaptchaVideoWebViewScreen(
+    showTopBarButton: Boolean = true,
     onNav: (String) -> Unit
 ) {
     LaunchedEffect(Unit) {
@@ -465,6 +469,7 @@ fun CaptchaVideoWebViewScreen(
     }
 
     BaseWebViewScreen(
+        showTopBarButton = showTopBarButton,
         topAppBarActionButtonOnClick = {
             onNav.invoke("topAppBarActionButtonOnClick")
         },

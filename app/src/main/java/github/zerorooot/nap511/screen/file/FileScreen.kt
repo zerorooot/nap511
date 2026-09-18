@@ -229,10 +229,11 @@ fun FileScreen(
             val pickCode = data?.getStringExtra("pickCode") ?: ""
 
             //跳转到最后一个视频
-            val index = fileBeanList.indexOfFirst { it.pickCode == pickCode }
+            var index = fileBeanList.indexOfFirst { it.pickCode == pickCode }
             if (index >= 0) {
                 fileViewModel.clickMap[path] = index
-                // 根据当前页面视图模式滚动到指定 Index
+                // 根据当前页面视图模式滚动，将当前行提前 x 行显示，使位置接近中央
+                index = (index - 4).coerceAtLeast(0)
                 when {
                     isPreviewActive -> staggeredGrid.requestScrollToItem(index, 0)
                     isGridScreen -> gridState.requestScrollToItem(index, 0)

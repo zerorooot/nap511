@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
+<?xml version="1.0" encoding="utf-8"?><!--
   SplashScreen 专属动态矢量图标 (对齐 方案 A 视觉语言)：
   - 动态流光轮廓：从电光紫到天青蓝的高饱和科技渐变，无限追逐流动；
   - 纯净全透明底座：彻底消除多边形或八边形裁切伪影；
@@ -12,7 +11,7 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- 
+    <!--
       云朵轮廓组：
       底层为优雅半透明渐变底轨；顶层为高亮流光段，通过 trimPathOffset 驱动无限循环追逐流动。
     -->
@@ -24,21 +23,21 @@
         <!-- 静态淡色底层轮廓（提供运动底轨） -->
         <path
             android:pathData="M33,68 C26.37,68 21,62.63 21,56 C21,49.8 25.7,44.7 31.8,44.1 C33.4,35 41.4,28 51,28 C60.2,28 67.8,34.4 69.8,43.1 C71.1,42.7 72.4,42.5 73.7,42.5 C80.5,42.5 86,48 86,54.8 C86,61.4 80.8,66.8 74.2,67 L33,68 Z"
+            android:strokeWidth="4"
             android:strokeColor="#207C4DFF"
             android:strokeLineCap="round"
-            android:strokeLineJoin="round"
-            android:strokeWidth="4" />
+            android:strokeLineJoin="round" />
 
-        <!-- 
+        <!--
           动态流光轮廓：
           高亮紫蓝流光（从 #7C4DFF 渐变至 #00B0FF），首尾 100% 无缝相接循环
         -->
         <path
             android:name="cloud_flow_path"
             android:pathData="M33,68 C26.37,68 21,62.63 21,56 C21,49.8 25.7,44.7 31.8,44.1 C33.4,35 41.4,28 51,28 C60.2,28 67.8,34.4 69.8,43.1 C71.1,42.7 72.4,42.5 73.7,42.5 C80.5,42.5 86,48 86,54.8 C86,61.4 80.8,66.8 74.2,67 L33,68 Z"
+            android:strokeWidth="4.5"
             android:strokeLineCap="round"
             android:strokeLineJoin="round"
-            android:strokeWidth="4.5"
             android:trimPathStart="0.0"
             android:trimPathEnd="0.65"
             android:trimPathOffset="0.0">
@@ -52,7 +51,7 @@
         </path>
     </group>
 
-    <!-- 
+    <!--
       中心离线下载箭头组：
       微幅上下悬浮漂浮，呼应方案 A 的几何下沉箭头设计。
     -->
@@ -65,24 +64,24 @@
         <path
             android:name="arrow_stem"
             android:pathData="M54,39 L54,58"
+            android:strokeWidth="3.8"
             android:strokeColor="#7C4DFF"
-            android:strokeLineCap="round"
-            android:strokeWidth="3.8" />
+            android:strokeLineCap="round" />
 
         <!-- 下沉箭翼 (渐变青蓝) -->
         <path
             android:name="arrow_head"
             android:pathData="M45,51 L54,59 L63,51"
+            android:strokeWidth="3.8"
             android:strokeColor="#00B0FF"
             android:strokeLineCap="round"
-            android:strokeLineJoin="round"
-            android:strokeWidth="3.8" />
+            android:strokeLineJoin="round" />
 
         <!-- 底部平稳数据托盘底座 -->
         <path
             android:pathData="M42,65 L66,65"
+            android:strokeWidth="3"
             android:strokeColor="#7C4DFF"
-            android:strokeLineCap="round"
-            android:strokeWidth="3" />
+            android:strokeLineCap="round" />
     </group>
 </vector>

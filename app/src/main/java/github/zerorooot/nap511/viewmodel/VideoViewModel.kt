@@ -56,6 +56,9 @@ sealed class VideoUiEvent {
          */
         val pickCode: String
     ) : VideoUiEvent()
+
+    /** 触发 115 视频账号验证码弹窗事件 */
+    object ShowCaptchaDialog : VideoUiEvent()
 }
 
 /**
@@ -334,13 +337,9 @@ class VideoViewModel : ViewModel() {
 
         runCatching { Gson().fromJson(errorBody, JsonObject::class.java) }.onSuccess { fromJson ->
             if (fromJson.has("error")) {
-                val message = fromJson.get("error").asString
-                back(
-                    currentPositionMs = currentPositionMs,
-                    nav = "VerifyVideoAccount",
-                    toast = message,
-                    resultCode = Activity.RESULT_CANCELED
-                )
+                viewModelScope.launch {
+                    _uiEvent.emit(VideoUiEvent.ShowCaptchaDialog)
+                }
                 return true
             }
         }
