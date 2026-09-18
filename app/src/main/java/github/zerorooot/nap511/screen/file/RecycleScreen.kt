@@ -152,7 +152,7 @@ fun RecycleContent(
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
     Column(modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)) {
-        AppTopBarRecycle(ConfigKeyUtil.RECYCLE_BIN+" (当前文件数:${uiState.recycleFileList.size})", appBarOnClick, scrollBehavior = scrollBehavior)
+        AppTopBarRecycle(ConfigKeyUtil.RECYCLE_BIN+" ${uiState.recycleFileList.size} 个文件", appBarOnClick, scrollBehavior = scrollBehavior)
         PullToRefreshBox(
             isRefreshing = uiState.isRefreshing,
             onRefresh = onRefresh

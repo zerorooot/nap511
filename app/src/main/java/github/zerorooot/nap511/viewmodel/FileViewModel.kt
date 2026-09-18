@@ -95,7 +95,7 @@ class FileViewModel(
 
     var appBarTitle by mutableStateOf(context.getString(R.string.app_name))
 
-    private val _currentPath = MutableStateFlow("")
+    internal val _currentPath = MutableStateFlow("")
 
     var currentCid by mutableStateOf("0")
 

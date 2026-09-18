@@ -215,7 +215,7 @@ fun AppNavHost(
             }
 
             entry<Route.LogScreen> {
-                LogScreen {
+                LogScreen(isExpandedScreen) {
                     onOpenDrawer()
                 }
             }

@@ -196,7 +196,14 @@ internal fun FileViewModel.getVideoInfo(fileBean: FileBean) {
     val pickCode = fileBean.pickCode
     val fileName = fileBean.name
     val videoList = fileBeanList.filter { it.isVideo == 1 && it.playLong != 0.0 }
-        .map { VideoBean(name = it.name, pickCode = it.pickCode, fileId = fileBean.fileId) }
+        .map {
+            VideoBean(
+                name = it.name,
+                pickCode = it.pickCode,
+                fileId = fileBean.fileId,
+                time = fileBean.playLongString
+            )
+        }
     val fileBeanIndex = videoList.indexOfFirst { it.pickCode == pickCode }
 
     val localSubtitleList = getLocalSubtitleList()

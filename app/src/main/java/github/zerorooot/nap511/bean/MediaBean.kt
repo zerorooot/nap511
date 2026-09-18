@@ -16,7 +16,7 @@ data class VideoBean(
     val fileId: String = "",
     //playNextVideo中需要用到
     val name: String = "",
-    //val time: String
+    val time: String = ""
 )
 
 /**

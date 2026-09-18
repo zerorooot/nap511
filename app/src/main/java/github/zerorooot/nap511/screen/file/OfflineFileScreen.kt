@@ -54,7 +54,6 @@ import java.util.StringJoiner
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 
 
-
 /**
  * OfflineFileContent 的状态管理包装层，统一托管 ViewModel 的动作分发。
  */
@@ -151,7 +150,7 @@ fun OfflineFileContent(
     // 菜单操作逻辑：直接接收选中的 OfflineTask 对象
     val menuOnClick = { action: MenuItemAction, item: OfflineTask ->
         when (action) {
-            MenuItemAction.COPY_LINK -> copyDownloadUrl(context, item.url, 1)
+            MenuItemAction.COPY_LINK -> copyDownloadUrl(context, item.url, 1, item.name)
             MenuItemAction.DELETE_FILE -> onDeleteTask(item)
             MenuItemAction.FILE_INFO -> onOpenTaskDialog(item)
             else -> {}
@@ -344,7 +343,8 @@ fun OfflineFileContent(
     }
 }
 
-fun copyDownloadUrl(context: Context, text: String, count: Int) {
+fun copyDownloadUrl(context: Context, text: String, count: Int, name: String? = null) {
     text.copy(context)
-    Toast.makeText(context, "$count 个下载链接复制成功~", Toast.LENGTH_SHORT).show()
+    val toast = "${name?.plus(" ") ?: "$count 个"}下载链接复制成功"
+    Toast.makeText(context, toast, Toast.LENGTH_SHORT).show()
 }

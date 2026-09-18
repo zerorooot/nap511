@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.screen.file
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +16,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Delete
@@ -31,7 +31,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -47,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
@@ -59,7 +59,8 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.screen.components.BaseTopAppBar
-import github.zerorooot.nap511.util.isDualPane
+import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.copy
 import github.zerorooot.nap511.util.rememberListDetailDirective
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import kotlinx.serialization.Serializable
@@ -104,7 +105,6 @@ fun AdaptiveOfflineScreen(
 
     // 1. 依据屏幕宽度规格计算分栏指令与双栏激活状态
     val directive = rememberListDetailDirective()
-    val isDualPane = directive.isDualPane
 
     // 2. 当前选中的离线任务对象与 Nav3 返回栈
     var selectedTask by offlineFileViewModel.selectedTask
@@ -114,17 +114,15 @@ fun AdaptiveOfflineScreen(
     val onOpenTaskDialog: (OfflineTask) -> Unit = { task ->
         selectedTask = task
         // 手机单栏模式下点击进入详情路由；双栏模式下仅刷新选中的任务
-        if (!isDualPane) {
-            backStack.add(OfflineNavKey.TaskDetail(task))
-        }
+//        if (!isDualPane) {
+//            backStack.add(OfflineNavKey.TaskDetail(task))
+//        }
     }
     // 5. 详情面板公共渲染方法（统一复用，避免在 placeholder 与 entry 间冗余重复）
-    val renderTaskDetail: @Composable (task: OfflineTask, showBackButton: Boolean, onDeleted: () -> Unit) -> Unit =
-        { targetTask, showBack, onDeleted ->
+    val renderTaskDetail: @Composable (task: OfflineTask, onDeleted: () -> Unit) -> Unit =
+        { targetTask, onDeleted ->
             TaskDetailPane(
                 task = targetTask,
-                showBackButton = showBack,
-                onBack = { backStack.removeLastOrNull() },
                 onDeleteTask = {
                     offlineFileViewModel.delete(it)
                     onDeleted()
@@ -146,7 +144,7 @@ fun AdaptiveOfflineScreen(
                 metadata = ListDetailSceneStrategy.listPane(
                     detailPlaceholder = {
                         if (selectedTask != null) {
-                            renderTaskDetail(selectedTask!!, false) { selectedTask = null }
+                            renderTaskDetail(selectedTask!!) { selectedTask = null }
                         } else {
                             OfflineTaskEmptyPlaceholder(onNavigateToNewTask)
                         }
@@ -168,7 +166,7 @@ fun AdaptiveOfflineScreen(
             entry<OfflineNavKey.TaskDetail>(
                 metadata = ListDetailSceneStrategy.detailPane()
             ) { detailKey ->
-                renderTaskDetail(detailKey.offlineTask, !isDualPane) {
+                renderTaskDetail(detailKey.offlineTask) {
                     backStack.removeLastOrNull()
                 }
             }
@@ -217,8 +215,6 @@ private fun OfflineTaskEmptyPlaceholder(onNavigateToNewTask: () -> Unit) {
 @Composable
 private fun TaskDetailPane(
     task: OfflineTask,
-    showBackButton: Boolean,
-    onBack: () -> Unit = {},
     onDeleteTask: (OfflineTask) -> Unit,
     onOpenFile: (String) -> Unit
 ) {
@@ -226,16 +222,6 @@ private fun TaskDetailPane(
         topBar = {
             BaseTopAppBar(
                 title = { Text("任务详情") },
-                navigationIcon = {
-                    if (showBackButton) {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "返回"
-                            )
-                        }
-                    }
-                }
             )
         }
     ) { padding ->
@@ -299,7 +285,15 @@ private fun TaskDetailPane(
             )
             TaskDetailInfoItem(icon = Icons.Default.Info, label = "任务哈希", value = task.infoHash)
             if (task.url.isNotEmpty()) {
-                TaskDetailInfoItem(icon = Icons.Default.Link, label = "下载链接", value = task.url)
+                val current = LocalContext.current
+                TaskDetailInfoItem(
+                    icon = Icons.Default.Link,
+                    label = "下载链接",
+                    value = task.url
+                ) {
+                    task.url.copy(current)
+                    App.instance.toast("${task.name} 下载链接复制成功")
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -341,7 +335,8 @@ private fun TaskDetailPane(
 private fun TaskDetailInfoItem(
     icon: ImageVector,
     label: String,
-    value: String
+    value: String,
+    onClick: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -356,7 +351,12 @@ private fun TaskDetailInfoItem(
             modifier = Modifier.size(24.dp)
         )
         Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .clickable(onClick != null) {
+                    onClick!!.invoke()
+                }) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
@@ -392,8 +392,8 @@ private fun TaskDetailPanePreview() {
                 timeString = "2026-09-17 12:00:00",
                 fileId = "sample_file_id"
             ),
-            showBackButton = false,
-            onBack = {},
+//            showBackButton = false,
+//            onBack = {},
             onDeleteTask = {},
             onOpenFile = {}
         )

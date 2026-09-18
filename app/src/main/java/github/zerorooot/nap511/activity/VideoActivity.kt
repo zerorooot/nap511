@@ -276,6 +276,7 @@ class VideoActivity : AppCompatActivity() {
                                     putExtra("videoHistory", event.videoHistoryJson)
                                     putExtra("nav", event.nav)
                                     putExtra("toast", event.toast)
+                                    putExtra("pickCode", event.pickCode)
                                 }
                                 setResult(event.resultCode, returnIntent)
                                 videoPlayer.setVideoAllCallBack(null)

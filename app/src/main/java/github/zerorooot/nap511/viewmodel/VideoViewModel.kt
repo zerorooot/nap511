@@ -50,7 +50,11 @@ sealed class VideoUiEvent {
         val resultCode: Int,
         val videoHistoryJson: String,
         val nav: String = "",
-        val toast: String = ""
+        val toast: String = "",
+        /**
+         * 最后一个视频的pickCode，方便selectIndex定位到视频
+         */
+        val pickCode: String
     ) : VideoUiEvent()
 }
 
@@ -73,6 +77,7 @@ class VideoViewModel : ViewModel() {
         private set
 
     private val _uiState = MutableStateFlow(VideoUiState())
+
     /** 视频播放页面的 UI 状态流 */
     val uiState: StateFlow<VideoUiState> = _uiState.asStateFlow()
 
@@ -81,17 +86,22 @@ class VideoViewModel : ViewModel() {
         get() = if (::launchVideoParams.isInitialized) launchVideoParams.videoList else emptyList()
 
     private val _uiEvent = MutableSharedFlow<VideoUiEvent>()
+
     /** 视频播放页面的一次性 UI 事件流 */
     val uiEvent: SharedFlow<VideoUiEvent> = _uiEvent.asSharedFlow()
 
     /** 视频配置属性 */
     val videoAttribute by lazy { launchVideoParams.videoAttribute }
+
     /** 是否根据视频宽高比自动旋转屏幕 */
     val isAutoRotate by lazy { videoAttribute.isAutoRotate }
+
     /** 视频链接模式（true 为解析模式，false 为直接拼接 m3u8 模式） */
     val videoLinkMode by lazy { videoAttribute.videoLinkMode }
+
     /** 播放失败时是否自动重试跳转获取新链接 */
     val autoJumpRetry by lazy { videoAttribute.autoJumpRetry }
+
     /** 是否隐藏加载框 */
     val hideLoading by lazy { videoAttribute.hideLoading }
 
@@ -274,6 +284,7 @@ class VideoViewModel : ViewModel() {
         resultCode: Int = Activity.RESULT_OK
     ) {
         viewModelScope.launch {
+            val currentInfo = _uiState.value.videoInfo ?: VideoInfoBean()
             updateVideoHistory(currentPositionMs)
             val videoHistoryMapJson = Gson().toJson(videoHistoryMap)
             _uiEvent.emit(
@@ -281,7 +292,8 @@ class VideoViewModel : ViewModel() {
                     resultCode = resultCode,
                     videoHistoryJson = videoHistoryMapJson,
                     nav = nav,
-                    toast = toast
+                    toast = toast,
+                    pickCode = currentInfo.pickCode
                 )
             )
         }

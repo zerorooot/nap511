@@ -6,7 +6,6 @@ import android.view.Gravity
 import android.view.View
 import android.widget.EditText
 import android.widget.FrameLayout
-import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import github.zerorooot.nap511.R
@@ -34,7 +33,7 @@ class VideoDrawerController(
         val episodeTitles = viewModel.videoList.mapIndexed { index, item ->
             val displayIndex = index + 1
             if (item.name.isNotEmpty()) {
-                "P$displayIndex  ${item.name}"
+                "P$displayIndex ${item.time} ${item.name}"
             } else {
                 "第 $displayIndex 集"
             }

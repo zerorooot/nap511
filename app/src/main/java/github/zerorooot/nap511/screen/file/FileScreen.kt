@@ -230,6 +230,19 @@ fun FileScreen(
             val type: Type = object : TypeToken<MutableMap<String, VideoBean>>() {}.type
             val videoHistoryMap: MutableMap<String, VideoBean> =
                 Gson().fromJson(videoHistoryJson, type) ?: mutableMapOf()
+            val pickCode = data?.getStringExtra("pickCode") ?: ""
+
+            //跳转到最后一个视频
+            val index = fileBeanList.indexOfFirst { it.pickCode == pickCode }
+            if (index >= 0) {
+                fileViewModel.clickMap[path] = index
+                // 根据当前页面视图模式滚动到指定 Index
+                when {
+                    isPreviewActive -> staggeredGrid.requestScrollToItem(index, 0)
+                    isGridScreen -> gridState.requestScrollToItem(index, 0)
+                    else -> listState.requestScrollToItem(index, 0)
+                }
+            }
 
             if (videoHistoryMap.isNotEmpty()) {
                 fileViewModel.updateVideoFileBeans(

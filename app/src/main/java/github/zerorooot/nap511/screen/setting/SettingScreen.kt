@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.CloudDownload
@@ -31,7 +30,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -72,7 +70,6 @@ import github.zerorooot.nap511.screenitem.maintenanceBackupPreferenceItems
 import github.zerorooot.nap511.screenitem.mediaPlaybackPreferenceItems
 import github.zerorooot.nap511.screenitem.uiExperiencePreferenceItems
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.isDualPane
 import github.zerorooot.nap511.util.rememberListDetailDirective
 import github.zerorooot.nap511.viewmodel.SettingViewModel
 import kotlinx.serialization.Serializable
@@ -258,20 +255,18 @@ private fun AdaptiveSettingContent(
 ) {
     // 1. 自适应分栏指令：计算当前视口是否支持双栏并排 (isDualPane)
     val directive = rememberListDetailDirective()
-    val isDualPane = directive.isDualPane
+//    val isDualPane = directive.isDualPane
 
     // 2. Nav3 返回栈：以分类列表作为起始页
     val backStack: NavBackStack<NavKey> = rememberNavBackStack(SettingNavKey.CategoryList)
     val listDetailStrategy = rememberListDetailSceneStrategy<NavKey>(directive = directive)
 
     // 3. 抽取详情面板的渲染逻辑
-    val renderDetailPane: @Composable (categoryIndex: Int, showBackButton: Boolean) -> Unit =
-        { catIndex, showBack ->
+    val renderDetailPane: @Composable (categoryIndex: Int) -> Unit =
+        { catIndex ->
             CategoryDetailPane(
                 categoryIndex = catIndex,
                 uiState = uiState,
-                showBackButton = showBack,
-                onBack = { backStack.removeLastOrNull() },
                 actions = actions
             )
         }
@@ -287,21 +282,20 @@ private fun AdaptiveSettingContent(
                 metadata = ListDetailSceneStrategy.listPane(
                     detailPlaceholder = {
                         // 大屏双栏模式下，当详情栈未显式推入路由时，直接展示当前选中分类的详情
-                        renderDetailPane(selectedCategoryIndex, false)
+                        renderDetailPane(selectedCategoryIndex)
                     }
                 )
             ) {
                 CategoryListPane(
                     categories = SETTING_CATEGORIES,
                     selectedIndex = selectedCategoryIndex,
-                    isDualPane = isDualPane,
                     onDrawerClick = actions.onDrawerClick,
                     onSelectCategory = { index ->
                         onSelectCategory(index)
                         // 单栏手机模式下，点击分类推入详情路由；双栏模式下仅切换选中索引
-                        if (!isDualPane) {
-                            backStack.add(SettingNavKey.CategoryDetail(index))
-                        }
+//                        if (!isDualPane) {
+//                            backStack.add(SettingNavKey.CategoryDetail(index))
+//                        }
                     }
                 )
             }
@@ -310,7 +304,7 @@ private fun AdaptiveSettingContent(
             entry<SettingNavKey.CategoryDetail>(
                 metadata = ListDetailSceneStrategy.detailPane()
             ) { detailKey ->
-                renderDetailPane(detailKey.categoryIndex, !isDualPane)
+                renderDetailPane(detailKey.categoryIndex)
             }
         }
     )
@@ -321,7 +315,6 @@ private fun AdaptiveSettingContent(
 private fun CategoryListPane(
     categories: List<SettingCategoryData>,
     selectedIndex: Int,
-    isDualPane: Boolean,
     onDrawerClick: () -> Unit,
     onSelectCategory: (Int) -> Unit
 ) {
@@ -347,7 +340,7 @@ private fun CategoryListPane(
                 .padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
             itemsIndexed(categories) { index, item ->
-                val isSelected = isDualPane && (index == selectedIndex)
+                val isSelected = (index == selectedIndex)
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -414,8 +407,6 @@ private fun CategoryListPane(
 private fun CategoryDetailPane(
     categoryIndex: Int,
     uiState: SettingUiState,
-    showBackButton: Boolean,
-    onBack: () -> Unit = {},
     actions: SettingActions,
 ) {
     val category = SETTING_CATEGORIES.getOrNull(categoryIndex) ?: SETTING_CATEGORIES[0]
@@ -426,16 +417,16 @@ private fun CategoryDetailPane(
         topBar = {
             BaseTopAppBar(
                 title = { Text(category.title) },
-                navigationIcon = {
-                    if (showBackButton) {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "返回"
-                            )
-                        }
-                    }
-                }
+//                navigationIcon = {
+//                    if (showBackButton) {
+//                        IconButton(onClick = onBack) {
+//                            Icon(
+//                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+//                                contentDescription = "返回"
+//                            )
+//                        }
+//                    }
+//                }
             )
         }
     ) { padding ->
@@ -516,7 +507,7 @@ private fun CategoryListPanePreview() {
         CategoryListPane(
             categories = SETTING_CATEGORIES,
             selectedIndex = 0,
-            isDualPane = true,
+//            isDualPane = true,
             onDrawerClick = {},
             onSelectCategory = {}
         )

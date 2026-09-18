@@ -6,6 +6,14 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
 import android.os.PowerManager
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
+import androidx.compose.material3.adaptive.layout.PaneScaffoldDirective
+import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat.getSystemService
 import coil.ImageLoader
@@ -240,3 +248,18 @@ private fun Context.getBatteryRestrictionLevel(): BatteryRestrictionLevel {
     return BatteryRestrictionLevel.OPTIMIZED
 }
 
+/**
+ * 记住并计算列表-详情布局的分栏脚手架指令（PaneScaffoldDirective）。
+ *
+ * @param horizontalSpacer 分栏之间的水平间距，默认为 0.dp（根据设计需求紧凑排列）
+ * @return 响应窗口宽度规格变化的 PaneScaffoldDirective
+ */
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
+@Composable
+fun rememberListDetailDirective(horizontalSpacer: Dp = 0.dp): PaneScaffoldDirective {
+    val windowAdaptiveInfo = currentWindowAdaptiveInfoV2()
+    return remember(windowAdaptiveInfo, horizontalSpacer) {
+        calculatePaneScaffoldDirective(windowAdaptiveInfo)
+            .copy(horizontalPartitionSpacerSize = horizontalSpacer)
+    }
+}
