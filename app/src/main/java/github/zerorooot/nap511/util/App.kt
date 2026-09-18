@@ -22,6 +22,7 @@ import com.elvishew.xlog.interceptor.Interceptor
 import com.elvishew.xlog.printer.AndroidPrinter
 import com.elvishew.xlog.printer.file.FilePrinter
 import com.elvishew.xlog.printer.file.clean.FileLastModifiedCleanStrategy
+import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.network.NetworkClient
 import github.zerorooot.nap511.util.network.OneOneFiveImageExpirationInterceptor
@@ -89,9 +90,10 @@ class App : Application(), ImageLoaderFactory {
             val initialCookie = SettingsRepository.getDataSuspend(ConfigKeyUtil.COOKIE, "")
             val initialUid = SettingsRepository.getDataSuspend(ConfigKeyUtil.UID, "")
             val initialLimit =
-                SettingsRepository.getDataSuspend(ConfigKeyUtil.REQUEST_LIMIT_COUNT, "200")
-                    .toIntOrNull()
-                    ?: 200
+                SettingsRepository.getDataSuspend(
+                    ConfigKeyUtil.REQUEST_LIMIT_COUNT,
+                    SettingUiState().requestLimitCount
+                ).toIntOrNull() ?: 200
             UserSessionManager.init(initialCookie, initialUid, initialLimit)
         }
 
@@ -100,7 +102,11 @@ class App : Application(), ImageLoaderFactory {
             SettingsRepository.getDataFlow(ConfigKeyUtil.LOG, false)
                 .distinctUntilChanged()
                 .collect { enabled ->
+                    val wasDisabled = !isLogEnabled
                     isLogEnabled = enabled
+                    if (enabled && wasDisabled) {
+                        XLog.i("-----------------------init-----------------------------------")
+                    }
                 }
         }
     }
@@ -121,7 +127,6 @@ class App : Application(), ImageLoaderFactory {
             .flattener(ClassicFlattener())
             .build()
         XLog.init(build, AndroidPrinter(true), print);
-        XLog.i("-----------------------init-----------------------------------")
     }
 
     private val toastScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)

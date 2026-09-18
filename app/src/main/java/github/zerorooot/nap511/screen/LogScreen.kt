@@ -6,6 +6,7 @@ import android.content.ContentValues
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -38,14 +39,12 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Article
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SmallFloatingActionButton
@@ -375,7 +374,6 @@ fun LogLevelBadge(
 @Composable
 fun LogDetailContent(
     logEntry: LogEntry,
-    onCopy: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
@@ -471,8 +469,7 @@ fun LogDetailDialog(
         onDismissRequest = onDismiss,
         text = {
             LogDetailContent(
-                logEntry = selectedLog,
-                onCopy = { copyLogToClipboard(clipboardManager, selectedLog) }
+                logEntry = selectedLog
             )
         },
         confirmButton = {
@@ -546,7 +543,6 @@ fun LogDetailPane(
         ) {
             LogDetailContent(
                 logEntry = selectedLog,
-                onCopy = { copyLogToClipboard(clipboardManager, selectedLog) },
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -936,7 +932,7 @@ private fun LogListView(
     }
 
     // 悬浮“回到底部”小按钮
-    androidx.compose.animation.AnimatedVisibility(
+    AnimatedVisibility(
         visible = !isAtBottom && filteredLogs.isNotEmpty(),
         enter = fadeIn() + slideInVertically { it / 2 },
         exit = fadeOut() + slideOutVertically { it / 2 },

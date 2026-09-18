@@ -66,7 +66,6 @@ import github.zerorooot.nap511.screen.components.MenuItemAction
 import github.zerorooot.nap511.screen.components.TopBarAction
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.isIgnoringBatteryOptimizations
 import github.zerorooot.nap511.util.isNotificationEnabled
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
@@ -152,16 +151,13 @@ fun FileScreen(
         isNotificationEnabled = context.isNotificationEnabled()
     }
 
-    var isIgnoringBatteryOptimizations by rememberSaveable {
-        mutableStateOf(context.isIgnoringBatteryOptimizations())
-    }
-
+    val isIgnoringBatteryOptimizations = fileViewModel.isIgnoringBatteryOptimizations
     val isBatteryBannerDismissed = settingUiState.hideBatteryBanner
 
     val batterySettingLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) {
-        isIgnoringBatteryOptimizations = context.isIgnoringBatteryOptimizations()
+        fileViewModel.refreshBatteryOptimizations()
     }
 
     val listLocation = fileViewModel.getListLocation(path)

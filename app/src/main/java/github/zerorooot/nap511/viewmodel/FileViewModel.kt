@@ -53,6 +53,7 @@ import github.zerorooot.nap511.util.DialogEventBus
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.copy
 import github.zerorooot.nap511.util.deleteCoilCache
+import github.zerorooot.nap511.util.isIgnoringBatteryOptimizations
 import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.worker.OfflineTaskWorker
@@ -147,7 +148,20 @@ class FileViewModel(
     }
 
 
+    /**
+     * 电池优化状态（整个应用生命周期内只在初始化时检测一次）
+     */
+    var isIgnoringBatteryOptimizations by mutableStateOf(false)
+        private set
+
+    fun refreshBatteryOptimizations() {
+        isIgnoringBatteryOptimizations = context.isIgnoringBatteryOptimizations()
+    }
+
     init {
+        // 仅在进程启动/ViewModel 初始化时执行唯一一次检测
+        isIgnoringBatteryOptimizations = context.isIgnoringBatteryOptimizations()
+
         viewModelScope.launch {
             settingUiStateFlow.collect { settings ->
                 saveRequestCache = settings.saveRequestCache
