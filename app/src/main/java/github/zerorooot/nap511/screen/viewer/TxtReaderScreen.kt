@@ -77,18 +77,12 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import github.zerorooot.nap511.util.SearchMatch
+import github.zerorooot.nap511.util.buildSearchHighlightedText
+import github.zerorooot.nap511.util.findSearchMatches
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 import java.nio.charset.Charset
-
-/**
- * 搜索匹配项位置信息
- */
-private data class SearchMatch(
-    val paragraphIndex: Int,
-    val startChar: Int,
-    val length: Int
-)
 
 val PRESET_CHARSETS = listOf(
     "GBK",
@@ -156,20 +150,7 @@ fun TxtReaderScreen(
 
     // 计算所有匹配项的位置列表
     val searchMatches = remember(paragraphs, searchQuery) {
-        if (searchQuery.isBlank()) emptyList()
-        else {
-            val list = mutableListOf<SearchMatch>()
-            paragraphs.forEachIndexed { pIdx, text ->
-                var startIndex = 0
-                while (startIndex < text.length) {
-                    val foundIndex = text.indexOf(searchQuery, startIndex, ignoreCase = true)
-                    if (foundIndex == -1) break
-                    list.add(SearchMatch(pIdx, foundIndex, searchQuery.length))
-                    startIndex = foundIndex + searchQuery.length
-                }
-            }
-            list
-        }
+        findSearchMatches(paragraphs, searchQuery)
     }
 
 // 搜索匹配项改变时重置当前焦点索引
@@ -391,33 +372,17 @@ fun TxtReaderScreen(
                                     searchMatches,
                                     currentMatchIndex
                                 ) {
-                                    if (searchQuery.isBlank()) {
-                                        AnnotatedString(paragraph.ifBlank { " " })
-                                    } else {
-                                        buildAnnotatedString {
-                                            val textToDraw = paragraph.ifBlank { " " }
-                                            append(textToDraw)
-
-                                            // 找出属于当前段落的所有匹配项
-                                            searchMatches.forEachIndexed { globalMatchIdx, match ->
-                                                if (match.paragraphIndex == index) {
-                                                    val isActive =
-                                                        (globalMatchIdx == currentMatchIndex)
-                                                    addStyle(
-                                                        style = SpanStyle(
-                                                            // 当前选中的项用亮橙色背景，其他项用浅黄色背景
-                                                            background = if (isActive) Color(
-                                                                0xFFFF9800
-                                                            ) else Color(0xFFFFE082),
-                                                            color = Color.Black
-                                                        ),
-                                                        start = match.startChar,
-                                                        end = match.startChar + match.length
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
+                                    val textToDraw = paragraph.ifBlank { " " }
+                                    val matchesForThisParagraph =
+                                        if (searchQuery.isBlank()) emptyList()
+                                        else searchMatches.filter { it.itemIndex == index }
+                                    buildSearchHighlightedText(
+                                        text = textToDraw,
+                                        searchQuery = searchQuery,
+                                        matches = matchesForThisParagraph,
+                                        textStartInRaw = 0,
+                                        currentMatchIndex = currentMatchIndex
+                                    )
                                 }
 
                                 Row(
