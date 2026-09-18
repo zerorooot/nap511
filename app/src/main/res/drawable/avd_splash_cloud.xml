@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  启动屏动态矢量图标 (AnimatedVectorDrawable)：
+  将 ic_splash_cloud_logo 中的矢量元素与属性动画器绑定。
+  
+  - 靶向 cloud_flow_path：驱动云朵闭合轮廓首尾无缝相连的流动循环
+  - 靶向 arrow_group：驱动中心离线下载箭头平滑悬浮呼吸
+-->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/ic_splash_cloud_logo">
+
+    <!-- 云朵外圈流光首尾相连循环流动 -->
+    <target
+        android:name="cloud_flow_path"
+        android:animation="@animator/cloud_trim_flow" />
+
+    <!-- 中心下载箭头微悬浮往返漂浮 -->
+    <target
+        android:name="arrow_group"
+        android:animation="@animator/arrow_hover" />
+
+</animated-vector>

@@ -6,38 +6,47 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.ui.theme.Nap511Theme
+import github.zerorooot.nap511.util.SplashScreenManager
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        val settingsRepository = SettingsRepository.getInstance()
+
+        // 统一通过 SplashScreenManager 管理动态启动屏的安装、挂起判断与渐隐退场
+        // 确保必须在 super.onCreate 之前调用，且在 DataStore 磁盘数据加载完成前保持动画不中断
+        SplashScreenManager.setup(this) {
+            !settingsRepository.settingUiStateFlow.value.isLoaded
+        }
+
         super.onCreate(savedInstanceState)
         //不设置会报错：No NavigationEventDispatcher was provided via LocalNavigationEventDispatcherOwner
         initializeViewTreeOwners()
         enableEdgeToEdge()
+
         setContent {
-            val settingsRepository = SettingsRepository.getInstance()
-            val initialUiState = remember { settingsRepository.settingUiStateFlow.value }
             val settingUiState by settingsRepository.settingUiStateFlow
-                .collectAsStateWithLifecycle(initialValue = initialUiState)
+                .collectAsStateWithLifecycle()
+
+            // 3. 计算最终的主题配色模式
             val dynamicColor = settingUiState.dynamicColorEnabled
             val themeMode = settingUiState.themeMode
-
             val darkTheme = when (themeMode) {
                 "亮色模式" -> false
                 "暗色模式" -> true
-                else -> androidx.compose.foundation.isSystemInDarkTheme()
+                else -> isSystemInDarkTheme()
             }
 
-            // 实时更新状态栏和导航栏颜色，确保主题切换立即生效
+            // 4. 实时更新系统状态栏与导航栏
             DisposableEffect(darkTheme) {
                 enableEdgeToEdge(
                     statusBarStyle = if (darkTheme) {
@@ -60,6 +69,7 @@ class MainActivity : AppCompatActivity() {
                 onDispose {}
             }
 
+            // 5. 渲染应用核心内容
             Nap511Theme(dynamicColor = dynamicColor, darkTheme = darkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),

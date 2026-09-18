@@ -179,6 +179,7 @@ class SettingsRepository {
         accountFlow, aria2Flow, uiPrefFlow, switchFlow
     ) { account, aria2, uiPref, s2 ->
         SettingUiState(
+            isLoaded = true, // 核心：磁盘各 Flow 产生第一组真实数据后，标记为已就绪
             // 账号
             uid = account.first,
             cookie = account.second,
@@ -220,7 +221,7 @@ class SettingsRepository {
         scope = repositoryScope,
         // 只要单例创建，立即开始在后台读取加载
         started = SharingStarted.Eagerly,
-        initialValue = SettingUiState()
+        initialValue =  SettingUiState(isLoaded = false) // 默认初值为未就绪
     )
 
     /**

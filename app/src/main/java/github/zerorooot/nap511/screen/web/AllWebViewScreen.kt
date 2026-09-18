@@ -415,8 +415,8 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
             }
             // 登录页面也注入诊断，防止登录也白屏
             view?.evaluateJavascript(
-                "(function() { return {url: window.location.href, title: document.title, elements: document.getElementsByTagName('*').length}; })();",
-                { result -> XLog.v("LOGIN_DIAG_DATA: $result") })
+                "(function() { return {url: window.location.href, title: document.title, elements: document.getElementsByTagName('*').length}; })();"
+            ) { result -> XLog.v("LOGIN_DIAG_DATA: $result") }
         }
     }
 

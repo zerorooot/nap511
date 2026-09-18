@@ -382,7 +382,7 @@ class UnzipAllFileWorker(
                 .setContentTitle(titleString)
                 .setContentText(detailedText) // 具体内容
                 .setAutoCancel(false)
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setSmallIcon(R.drawable.ic_splash_cloud_logo)
                 .setOnlyAlertOnce(true)
                 .setShortCriticalText(shortCritical)
                 // [修改] 明确设置为进度类型，这有助于系统正确渲染进度条样式 CATEGORY_SERVICE CATEGORY_PROGRESS
@@ -457,7 +457,7 @@ class UnzipAllFileWorker(
             NotificationCompat.Builder(applicationContext, "unzip_completion_channel")
                 .setContentTitle(if (success) "解压完成" else "解压失败")
                 .setContentText(message)
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setSmallIcon(R.drawable.ic_splash_cloud_logo)
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true)
                 .setPriority(NotificationCompat.PRIORITY_MAX)

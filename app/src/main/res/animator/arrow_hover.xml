@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  中心下载箭头悬浮呼吸动画 (ObjectAnimator)：
+  使箭头在垂直 Y 轴上进行微幅的上下浮动，象征数据正源源不断同步/写入云端。
+  
+  【运动特性】：
+  - 范围：从 0dp 到 -4dp（微幅向上吸入/漂浮）
+  - repeatMode="reverse"：平缓上升后平缓降落
+  - repeatCount="infinite"：无限往返
+  - 插值器：accelerate_decelerate_interpolator（两头平缓，中间加速，呼吸感更自然）
+-->
+<objectAnimator xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="900"
+    android:interpolator="@android:anim/accelerate_decelerate_interpolator"
+    android:propertyName="translateY"
+    android:repeatCount="infinite"
+    android:repeatMode="reverse"
+    android:valueFrom="0"
+    android:valueTo="-4"
+    android:valueType="floatType" />

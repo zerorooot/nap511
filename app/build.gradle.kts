@@ -84,7 +84,7 @@ dependencies {
     implementation(libs.gsyvideoplayer.java)
     implementation(libs.gsyvideoplayer.exo2)
 //    implementation(libs.gsyvideoplayer.arm64)
-
+    implementation(libs.core.splashscreen)
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)
     implementation(libs.retrofit)

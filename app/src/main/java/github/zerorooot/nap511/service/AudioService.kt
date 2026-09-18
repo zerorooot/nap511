@@ -154,7 +154,7 @@ class AudioService : Service() {
 
     private fun buildNotification(title: String): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_splash_cloud_logo)
             .setContentTitle(title)
             .setContentText("nap511 音乐播放器")
             .setOngoing(true)

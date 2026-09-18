@@ -7,6 +7,8 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
  * 设置界面的 UI 状态数据类
  */
 data class SettingUiState(
+    /** 是否已完成从 DataStore 磁盘的首次读取 */
+    val isLoaded: Boolean = false,
     /** 用户 ID */
     @SerializedName(ConfigKeyUtil.UID) val uid: String = "",
 

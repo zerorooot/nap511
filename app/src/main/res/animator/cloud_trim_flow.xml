@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  云朵流光轮廓循环动画 (ObjectAnimator)：
+  通过连续改变 trimPathOffset（0.0f 到 1.0f），使截取的路径段沿着闭合的云朵轮廓无限流动循环。
+  
+  【首尾无缝衔接设计】：
+  - 属性值从 0.0 到 1.0 刚好对应路径闭合的一个完整周期（1.0 等价于 0.0）。
+  - 插值器采用 @android:anim/linear_interpolator（匀速线性），保证循环点无减速或卡顿，形成平滑的持续追逐流光。
+-->
+<objectAnimator xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="1800"
+    android:interpolator="@android:anim/linear_interpolator"
+    android:propertyName="trimPathOffset"
+    android:repeatCount="infinite"
+    android:repeatMode="restart"
+    android:valueFrom="0.0"
+    android:valueTo="1.0"
+    android:valueType="floatType" />
