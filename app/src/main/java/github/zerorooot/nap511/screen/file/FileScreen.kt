@@ -1,7 +1,6 @@
 package github.zerorooot.nap511.screen.file
 
 import android.app.Activity
-import android.content.ClipData
 import android.content.Intent
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
@@ -29,7 +28,6 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.platform.nativeClipboardManager
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
@@ -66,6 +64,7 @@ import github.zerorooot.nap511.screen.components.MenuItemAction
 import github.zerorooot.nap511.screen.components.TopBarAction
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.copy
 import github.zerorooot.nap511.util.isNotificationEnabled
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
@@ -102,7 +101,6 @@ fun FileScreen(
     onNav: (Route) -> Unit,
     drawerState: () -> Boolean
 ) {
-    val fileUiState by fileViewModel.uiState.collectAsStateWithLifecycle()
 
     val fabPosition = when (settingUiState.fabPosition) {
         "Start" -> FabPosition.Start
@@ -113,8 +111,7 @@ fun FileScreen(
     }
 
     val fileBeanList = fileViewModel.fileBeanList
-    val path = fileUiState.path
-    val refreshing = fileUiState.isRefreshing
+    val refreshing by fileViewModel.isRefreshing.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showForceOpenDialog by rememberSaveable { mutableIntStateOf(-1) }
 
@@ -126,7 +123,12 @@ fun FileScreen(
      */
     var isImagePreviewMode by rememberSaveable { mutableStateOf<Boolean?>(null) }
     var isAutoImagePreview by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(path, refreshing, fileBeanList.toList(), settingUiState.autoImagePreviewCount) {
+    LaunchedEffect(
+        fileViewModel.pathList,
+        refreshing,
+        fileBeanList.toList(),
+        settingUiState.autoImagePreviewCount
+    ) {
         val threshold = settingUiState.autoImagePreviewCount.toIntOrNull() ?: 0
         if (threshold > 0 && !refreshing) {
             val imageCount = fileBeanList.count { it.photoThumb.isNotEmpty() }
@@ -134,7 +136,7 @@ fun FileScreen(
         }
     }
 
-    LaunchedEffect(path) {
+    LaunchedEffect(fileViewModel.pathList) {
         isImagePreviewMode = null
     }
 
@@ -160,20 +162,20 @@ fun FileScreen(
         fileViewModel.refreshBatteryOptimizations()
     }
 
-    val listLocation = fileViewModel.getListLocation(path)
-    val listState = key(path) {
+    val listLocation = fileViewModel.getListLocation(fileViewModel.currentCid)
+    val listState = key(fileViewModel.currentCid) {
         rememberLazyListState(
             listLocation.firstVisibleItemIndex,
             listLocation.firstVisibleItemScrollOffset
         )
     }
-    val gridState = key(path) {
+    val gridState = key(fileViewModel.currentCid) {
         rememberLazyGridState(
             listLocation.firstVisibleItemIndex,
             listLocation.firstVisibleItemScrollOffset
         )
     }
-    val staggeredGrid = key(path) {
+    val staggeredGrid = key(fileViewModel.currentCid) {
         rememberLazyStaggeredGridState(
             listLocation.firstVisibleItemIndex,
             listLocation.firstVisibleItemScrollOffset
@@ -231,7 +233,7 @@ fun FileScreen(
             //跳转到最后一个视频
             var index = fileBeanList.indexOfFirst { it.pickCode == pickCode }
             if (index >= 0) {
-                fileViewModel.clickMap[path] = index
+                fileViewModel.clickMap[fileViewModel.currentCid] = index
                 // 根据当前页面视图模式滚动，将当前行提前 x 行显示，使位置接近中央
                 index = (index - 4).coerceAtLeast(0)
                 when {
@@ -348,11 +350,12 @@ fun FileScreen(
         if (drawerState.invoke()) {
             return
         }
-        if (path != "/根目录" && !fileViewModel.isLongClickState) {
+        if (fileViewModel.currentCid != "0" && !fileViewModel.isLongClickState) {
+            val currentCid = fileViewModel.currentCid
             when {
-                isPreviewActive -> fileViewModel.setListLocation(path, staggeredGrid)
-                isGridScreen -> fileViewModel.setListLocation(path, gridState)
-                else -> fileViewModel.setListLocation(path, listState)
+                isPreviewActive -> fileViewModel.setListLocation(currentCid, staggeredGrid)
+                isGridScreen -> fileViewModel.setListLocation(currentCid, gridState)
+                else -> fileViewModel.setListLocation(currentCid, listState)
             }
         }
         isBottomBarShow = true
@@ -362,7 +365,7 @@ fun FileScreen(
     }
 
     BackHandler(
-        path != "/根目录" || fileViewModel.isLongClickState || fileViewModel.isSearchState,
+        fileViewModel.currentCid != "0" || fileViewModel.isLongClickState || fileViewModel.isSearchState,
         ::onBack
     )
 
@@ -451,10 +454,9 @@ fun FileScreen(
 
         val pathActions = FilePathActions(
             onPathClick = {
-                clipboardManager.nativeClipboardManager.setPrimaryClip(
-                    ClipData.newPlainText("path", path)
-                )
-                App.instance.toast("$path 已复制到剪切板")
+                val pathString = fileViewModel.pathList.joinToString("/") { it.name }
+                pathString.copy(context)
+                App.instance.toast("$pathString 已复制到剪切板")
             },
             onPathDoubleClick = {
                 scope.launch {
@@ -527,7 +529,6 @@ fun FileScreen(
     }
 
     val contentActions = remember(
-        path,
         isGridScreen,
         isPreviewActive,
         staggeredGrid,
@@ -565,11 +566,11 @@ fun FileScreen(
     }
 
     val contentDataState = FileListDataState(
-        path = path,
+        currentCid = fileViewModel.currentCid,
         pathList = fileViewModel.pathList,
         fileBeanList = fileBeanList,
         refreshing = refreshing,
-        clickIndex = fileViewModel.clickMap.getOrDefault(path, -1),
+        clickIndex = fileViewModel.clickMap.getOrDefault(fileViewModel.currentCid, -1),
         imageCache = fileViewModel.imageBeanCache[fileViewModel.currentCid]
     )
 

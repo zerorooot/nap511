@@ -61,12 +61,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 import java.io.File
@@ -96,8 +94,6 @@ class FileViewModel(
 
     var appBarTitle by mutableStateOf(context.getString(R.string.app_name))
 
-    internal val _currentPath = MutableStateFlow("")
-
     var currentCid by mutableStateOf("0")
 
 
@@ -116,20 +112,7 @@ class FileViewModel(
 
 
     internal val _isRefreshing = MutableStateFlow(false)
-
-    val uiState: StateFlow<FileUiState> = combine(
-        _currentPath,
-        _isRefreshing
-    ) { path, refreshing ->
-        FileUiState(
-            path = path,
-            isRefreshing = refreshing
-        )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = FileUiState()
-    )
+    var isRefreshing = _isRefreshing.asStateFlow()
 
 
     var torrentBean by mutableStateOf(TorrentFileBean())
@@ -343,13 +326,12 @@ class FileViewModel(
     }
 
     fun setListLocationAndClickCache(index: Int, state: Any) {
-        val currentPath = _currentPath.value
-        setListLocation(currentPath, state)
-        clickMap[currentPath] = index
+        setListLocation(currentCid, state)
+        clickMap[currentCid] = index
     }
 
-    fun getListLocation(path: String): LocationBean {
-        return currentLocation[path] ?: run {
+    fun getListLocation(currentCid: String): LocationBean {
+        return currentLocation[currentCid] ?: run {
             LocationBean(0, 0)
         }
     }
@@ -593,13 +575,8 @@ class FileViewModel(
     private fun setFiles(files: FilesBean) {
         fileBeanList.clear()
         fileBeanList.addAll(files.fileBeanList)
-
         currentCid = files.cid
-
         pathList = files.path
-
-        _currentPath.value = "/" + pathList.joinToString("/") { it.name }
-
         viewModelScope.launch { fileListCache[currentCid] = files }
     }
 

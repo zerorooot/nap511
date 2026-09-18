@@ -41,7 +41,7 @@ data class FileScaffoldActions(
  * 文件列表/网格数据状态封装
  */
 data class FileListDataState(
-    val path: String,
+    val currentCid: String,
     val pathList: List<PathBean>,
     val fileBeanList: List<FileBean>,
     val refreshing: Boolean,

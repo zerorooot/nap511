@@ -108,12 +108,12 @@ fun AppNavHost(
                     offlineFileViewModel.quota()
                 }
 
-                val fileUiState by fileViewModel.uiState.collectAsStateWithLifecycle()
+                val path = "/" + fileViewModel.pathList.joinToString("/") { it.name }
                 val quotaBean by offlineFileViewModel.quotaBean.collectAsStateWithLifecycle()
                 val urlText by offlineFileViewModel.urlText
 
                 OfflineDownloadScreen(
-                    path = fileUiState.path,
+                    path = path,
                     quotaBean = quotaBean,
                     url = urlText,
                     onClick = { onOpenDrawer() }
