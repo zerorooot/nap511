@@ -201,8 +201,8 @@ internal fun FileViewModel.getVideoInfo(fileBean: FileBean) {
             VideoBean(
                 name = it.name,
                 pickCode = it.pickCode,
-                fileId = fileBean.fileId,
-                time = fileBean.playLongString
+                fileId = it.fileId,
+                time = it.playLongString
             )
         }
     val fileBeanIndex = videoList.indexOfFirst { it.pickCode == pickCode }

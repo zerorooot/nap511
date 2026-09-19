@@ -3,9 +3,10 @@ package github.zerorooot.nap511.util
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import github.zerorooot.nap511.bean.FilesBean
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -30,6 +31,9 @@ object FileCacheManager {
     private val mutex = Mutex()
     private val wrapperType = CacheWrapper::class.java
 
+    // 独立后台协程作用域，用于不阻塞启动流程的后台加载任务
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
     // 内存 LRU 缓存：只要 App 运行，始终存在且有效
     private val memoryCache = ConcurrentHashMap<String, CacheWrapper>(30)
 
@@ -51,24 +55,26 @@ object FileCacheManager {
             return@withContext
         }
 
-        // 开启磁盘保存时，在后台检查清理过期的硬盘缓存
-        cleanExpiredDiskCache()
-
-
         if (!::cacheDir.isInitialized) return@withContext
-        // 立即异步启动加载 "0"
-        async { getDiskCache("0") }.await()?.let {
+
+        // 1. 优先只加载 key="0"（根目录/首页）的缓存，确保主界面快速获得数据
+        getDiskCache("0")?.let {
             memoryCache["0"] = it
         }
-        // 并发加载其他文件
-        cacheDir.listFiles()?.map { file ->
-            async {
+
+        // 2. 在后台异步加载其余文件及清理过期缓存，不阻塞启动流程/SplashScreen
+        scope.launch {
+            //cleanExpiredDiskCache()
+
+            cacheDir.listFiles()?.forEach { file ->
                 val key = file.name.substringBeforeLast(".")
-                getDiskCache(key)?.let {
-                    memoryCache[key] = it
+                if (key != "0") {
+                    getDiskCache(key)?.let {
+                        memoryCache[key] = it
+                    }
                 }
             }
-        }?.awaitAll()
+        }
     }
 
     fun deleteIndividualFile() {

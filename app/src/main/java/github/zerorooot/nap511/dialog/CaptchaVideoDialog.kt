@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -88,7 +89,9 @@ fun CaptchaVideoContent(
 
             // 嵌入验证码 WebView 页面（隐藏原 TopBar 抽屉图标）
             CaptchaVideoWebViewScreen(
-                showTopBarButton = false
+                showTopBarButton = false,
+                //弹窗嵌入时不吸收系统 safeInsets
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
             ) { action ->
                 when (action) {
                     "select" -> onSuccess()

@@ -745,8 +745,8 @@ fun LogItemRow(
                     fontSize = 12.5.sp,
                     fontFamily = FontFamily.Monospace,
                     lineHeight = 17.sp,
-//                    maxLines = 4,
-//                    overflow = TextOverflow.Ellipsis,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
                     color = if (logEntry.level == LogLevel.ERROR) logEntry.level.color
                     else MaterialTheme.colorScheme.onSurface
                 )

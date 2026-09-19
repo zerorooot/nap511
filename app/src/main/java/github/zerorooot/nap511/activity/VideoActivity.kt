@@ -292,6 +292,7 @@ class VideoActivity : AppCompatActivity() {
 
                             // 弹出 115 账号安全验证码弹窗
                             is VideoUiEvent.ShowCaptchaDialog -> {
+                                XLog.i("Video Activity ShowCaptchaDialog")
                                 showCaptchaDialog()
                             }
 
@@ -325,10 +326,10 @@ class VideoActivity : AppCompatActivity() {
      */
     private fun showCaptchaDialog() {
         lifecycleScope.launch(Dispatchers.Main) {
-            // 暂停视频播放
-            videoPlayer.onVideoPause()
-
             if (captchaDialog?.isShowing == true) return@launch
+
+            // 释放视频播放器，停止 ExoPlayer 在后台重复重试请求
+            GSYVideoManager.releaseAllVideos()
 
             val dialog = Dialog(this@VideoActivity, android.R.style.Theme_Translucent_NoTitleBar)
             captchaDialog = dialog
@@ -431,6 +432,11 @@ class VideoActivity : AppCompatActivity() {
      */
     private val gSYErrorCallBack = object : GSYSampleCallBack() {
         override fun onPlayError(url: String?, vararg objects: Any?) {
+            // 如果验证码弹窗正在显示，忽略播放错误回调，避免在验证码处理过程中退出 Activity
+            if (captchaDialog?.isShowing == true) {
+                return
+            }
+
             // 尝试获取底层 ExoPlayer 实例及其错误对象
             val playerManager = videoPlayer.gsyVideoManager.player as? Exo2PlayerManager
             val exoPlayer = playerManager?.mediaPlayer as? ExoPlayer

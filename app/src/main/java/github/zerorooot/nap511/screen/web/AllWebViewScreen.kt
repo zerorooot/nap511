@@ -13,6 +13,7 @@ import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,6 +29,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -83,6 +85,8 @@ fun WebView.applyDefaultSettings() {
 fun BaseWebViewScreen(
     topAppBarActionButtonOnClick: () -> Unit,
     showTopBarButton: Boolean = true,
+    //全局默认窗口边距，能避开系统状态栏、手势操作条、横屏时的屏幕刘海/挖孔避让区（Display Cutout）或侧边导航栏宽度
+    contentWindowInsets: WindowInsets = ScaffoldDefaults.contentWindowInsets,
     webViewClient: (WebView) -> WebViewClient,
     loadUrl: String
 ) {
@@ -95,6 +99,7 @@ fun BaseWebViewScreen(
         modifier = Modifier
             .fillMaxSize()
             .nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = contentWindowInsets,
         topBar = {
             if (progress < 1f && progress > 0f) {
                 LinearProgressIndicator(
@@ -457,6 +462,7 @@ fun CaptchaWebViewScreen(
 @Composable
 fun CaptchaVideoWebViewScreen(
     showTopBarButton: Boolean = true,
+    contentWindowInsets: WindowInsets = ScaffoldDefaults.contentWindowInsets,
     onNav: (String) -> Unit
 ) {
     LaunchedEffect(Unit) {
@@ -470,6 +476,7 @@ fun CaptchaVideoWebViewScreen(
 
     BaseWebViewScreen(
         showTopBarButton = showTopBarButton,
+        contentWindowInsets = contentWindowInsets,
         topAppBarActionButtonOnClick = {
             onNav.invoke("topAppBarActionButtonOnClick")
         },

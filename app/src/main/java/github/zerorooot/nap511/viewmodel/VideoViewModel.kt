@@ -235,6 +235,7 @@ class VideoViewModel : ViewModel() {
                 XLog.i("playNewVideo $video")
                 _uiEvent.emit(VideoUiEvent.PlayNext(video.downloadUrl, video.fileName))
             } catch (_: Exception) {
+            } finally {
                 isReloadingVideo = false
             }
         }
