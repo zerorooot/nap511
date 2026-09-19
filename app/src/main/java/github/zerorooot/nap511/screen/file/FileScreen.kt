@@ -2,6 +2,7 @@ package github.zerorooot.nap511.screen.file
 
 import android.app.Activity
 import android.content.Intent
+import android.content.res.Configuration
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -25,6 +26,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -545,7 +547,8 @@ fun FileScreen(
     val scaffoldState = FileScaffoldState(
         isLongClickState = fileViewModel.isLongClickState,
         appBarTitle = fileViewModel.appBarTitle,
-        isExpandedScreen = isGridScreen,
+        isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE,
+        isGridScreen = isGridScreen,
         isBottomBarShow = isBottomBarShow,
         isTopBarShow = isTopBarShow,
         hasCurrentMusic = audioViewModel.uiState.playback.currentMusic != null,

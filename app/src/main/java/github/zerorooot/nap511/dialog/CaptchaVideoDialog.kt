@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen.web
+package github.zerorooot.nap511.dialog
 
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
@@ -28,8 +28,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import github.zerorooot.nap511.screen.web.CaptchaVideoWebViewScreen
 
 /**
  * 视频 115 账号安全验证码内容视图

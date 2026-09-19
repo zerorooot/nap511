@@ -47,7 +47,7 @@ import github.zerorooot.nap511.activity.helper.SubtitlePanelController
 import github.zerorooot.nap511.activity.helper.VideoDrawerController
 import github.zerorooot.nap511.bean.LaunchVideoParams
 import github.zerorooot.nap511.player.MyGSYVideoPlayer
-import github.zerorooot.nap511.screen.web.CaptchaVideoContent
+import github.zerorooot.nap511.dialog.CaptchaVideoContent
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.network.VideoErrorMapper

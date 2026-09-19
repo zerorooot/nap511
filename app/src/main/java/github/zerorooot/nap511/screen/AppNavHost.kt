@@ -73,7 +73,7 @@ fun AppNavHost(
     NavDisplay(
         backStack = backStack,
         onBack = onPopBack,
-        entryProvider = entryProvider<NavKey> {
+        entryProvider = entryProvider {
             entry<Route.Login> {
                 onSetGesturesEnabled(false)
                 LoginScreen { credential ->
@@ -229,7 +229,7 @@ fun AppNavHost(
             entry<Route.RepeatFile> {
                 RepeatFileScreen(
                     viewModel = repeatViewModel,
-                    isExpandedScreen = isExpandedScreen,
+                    isGridScreen = isGridScreen,
                     gridCellMinSize = gridCellMinSize,
                     onClick = { onOpenDrawer() }
                 ) { targetCid ->

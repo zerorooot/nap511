@@ -131,7 +131,7 @@ fun AppTopBarNormal(
 @Composable
 fun AppTopBarMultiple(
     title: String,
-    isExpandedScreen: Boolean = false,
+    isLandscape: Boolean = false,
     onClick: (AppBarAction) -> Unit,
     scrollBehavior: TopAppBarScrollBehavior? = null
 ) {
@@ -147,7 +147,7 @@ fun AppTopBarMultiple(
             }
         },
         actions = {
-            if (isExpandedScreen) {
+            if (isLandscape) {
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState())
                 ) {

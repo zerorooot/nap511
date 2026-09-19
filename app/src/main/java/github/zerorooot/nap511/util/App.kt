@@ -1,6 +1,5 @@
 package github.zerorooot.nap511.util
 
-
 import android.app.Application
 import android.os.Build
 import android.widget.Toast
@@ -22,15 +21,14 @@ import com.elvishew.xlog.interceptor.Interceptor
 import com.elvishew.xlog.printer.AndroidPrinter
 import com.elvishew.xlog.printer.file.FilePrinter
 import com.elvishew.xlog.printer.file.clean.FileLastModifiedCleanStrategy
-import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.network.NetworkClient
 import github.zerorooot.nap511.util.network.OneOneFiveImageExpirationInterceptor
-import github.zerorooot.nap511.util.network.UserSessionManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -58,9 +56,6 @@ class App : Application(), ImageLoaderFactory {
     companion object {
         lateinit var instance: App
             private set
-
-        //缓存fileListCache文件
-        lateinit var cacheFile: File
     }
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -74,10 +69,12 @@ class App : Application(), ImageLoaderFactory {
         ComposeFoundationFlags.isNewContextMenuEnabled = false
         super.onCreate()
         instance = this
-        cacheFile = File(this.cacheDir, "fileListCache.json")
+
+        // 初始化 FileCacheManager 单例目录
+        FileCacheManager.init(File(this.cacheDir, "file_list_cache"))
 
         // 预热 SettingsRepository，在应用进程启动时即触发后台异步预读 DataStore
-        SettingsRepository.getInstance()
+        val settingsRepository = SettingsRepository.getInstance()
 
         // 同步初始化 XLog 日志框架，确保在冷启动或独立 Activity 启动时 XLog 已就绪
         initLog()
@@ -86,15 +83,15 @@ class App : Application(), ImageLoaderFactory {
         appScope.launch {
             cleanExpiredCoilDiskCache(this@App)
         }
+
+        // 持续同步 DataStore 中 saveRequestCache 设置至 FileCacheManager 单例
         appScope.launch {
-            val initialCookie = SettingsRepository.getDataSuspend(ConfigKeyUtil.COOKIE, "")
-            val initialUid = SettingsRepository.getDataSuspend(ConfigKeyUtil.UID, "")
-            val initialLimit =
-                SettingsRepository.getDataSuspend(
-                    ConfigKeyUtil.REQUEST_LIMIT_COUNT,
-                    SettingUiState().requestLimitCount
-                ).toIntOrNull() ?: 200
-            UserSessionManager.init(initialCookie, initialUid, initialLimit)
+            settingsRepository.settingUiStateFlow
+                .map { it.saveRequestCache }
+                .distinctUntilChanged()
+                .collect { saveCache ->
+                    FileCacheManager.saveRequestCache = saveCache
+                }
         }
 
         // 实时监听 SettingUiState 中的 LOG 开关状态更新 isLogEnabled

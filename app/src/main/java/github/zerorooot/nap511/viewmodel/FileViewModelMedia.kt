@@ -18,6 +18,7 @@ import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.getCoilCacheUrl
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.Dispatchers
@@ -135,7 +136,7 @@ internal fun FileViewModel.updateVideoFileBeans(
 
         //本地列表全部修改完成后，仅同步一次缓存，避免频繁拷贝与多次刷新
         if (isAnyUpdated && !isSearchState) {
-            fileListCache[cid]?.fileBeanList = ArrayList(fileBeanList.toList())
+            FileCacheManager[cid]?.fileBeanList = ArrayList(fileBeanList.toList())
         }
 
 //        // 并发发起所有网络请求（async + awaitAll）

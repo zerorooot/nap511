@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.ConfigKeyUtil
 
@@ -14,7 +15,7 @@ object UserSessionManager {
     var uid: String by mutableStateOf("")
         private set
 
-    var requestLimitCount: Int by mutableIntStateOf(200)
+    var requestLimitCount: Int by mutableIntStateOf(SettingUiState().requestLimitCount.toInt())
         private set
 
     fun init(cookie: String, uid: String, requestLimitCount: Int) {

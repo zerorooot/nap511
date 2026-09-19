@@ -330,7 +330,7 @@ class FileRepository {
     suspend fun tryToExtract(pickCode: String): Boolean {
         //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
         val checkDecryptZip = fileService.getDecryptZipProcess(pickCode)
-        val asInt = checkDecryptZip.data.extractStatus.unzipStatus
+        val asInt = checkDecryptZip.data?.extractStatus?.unzipStatus
         XLog.v("Get files/push_extract tryToExtract.checkDecryptZip $checkDecryptZip")
         //之前解压过，密码在115缓存中
         if (asInt == 1) {
@@ -344,7 +344,7 @@ class FileRepository {
         //等待解压中
         for (i in 1..100) {
             val json = fileService.getDecryptZipProcess(pickCode)
-            val process = json.data.extractStatus.progress
+            val process = json.data?.extractStatus?.progress
             XLog.v("tryToExtract zip $i $json")
             if (process == 100) {
                 return true
@@ -424,7 +424,7 @@ class FileRepository {
             if (!response.state) {
                 ZipStatus.UnsupportedOrError(response.message)
             } else {
-                val status = response.data.extractStatus
+                val status = response.data!!.extractStatus
                 var unzipStatus = status.unzipStatus
 
                 // 2. 特殊状态码二次校验

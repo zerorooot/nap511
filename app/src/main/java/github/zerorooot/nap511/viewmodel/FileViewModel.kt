@@ -67,7 +67,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
-import java.io.File
 
 data class FileUiState(
     val path: String = "",
@@ -96,15 +95,8 @@ class FileViewModel(
 
     var currentCid by mutableStateOf("0")
 
-
     internal var saveRequestCache by mutableStateOf(true)
 
-    internal val fileListCache by lazy {
-        FileCacheManager(
-            cacheDir = File(context.cacheDir, "file_list_cache"),
-            saveRequestCache
-        )
-    }
     var pathList by mutableStateOf<List<PathBean>>(emptyList())
         private set
 
@@ -224,7 +216,7 @@ class FileViewModel(
                 //adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/jump?param=0" github.zerorooot.nap511
                 "jump" -> {
                     viewModelScope.launch {
-                        fileListCache.remove(currentCid)
+                        FileCacheManager.remove(currentCid)
                         getFiles(param)
                     }
                 }
@@ -260,14 +252,7 @@ class FileViewModel(
                 return@launch
             }
 
-            if (!saveRequestCache) {
-                // 不保存磁盘缓存时，仅清理硬盘旧文件，保留内存缓存
-                fileListCache.clearDiskOnly()
-            } else {
-                // 开启磁盘保存时，在后台检查清理过期的硬盘缓存
-                fileListCache.cleanExpiredDiskCache()
-            }
-            fileListCache.loadAllCache()
+            // FileCacheManager.loadAllCache() 已在 SplashScreenManager 加载阶段完成预加载
             getFiles("0")
         }
     }
@@ -277,14 +262,14 @@ class FileViewModel(
      */
     fun updateFileCache(cid: String) {
         viewModelScope.launch {
-            if (fileListCache.containsKey(cid)) {
+            if (FileCacheManager.containsKey(cid)) {
                 return@launch
             }
             runCatching {
                 val files =
                     fileRepository.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
                 files.fileBeanList = formatFileBeanList(files.fileBeanList)
-                fileListCache[cid] = files
+                FileCacheManager[cid] = files
             }.onFailureToastAndLog()
         }
     }
@@ -298,7 +283,7 @@ class FileViewModel(
 
         if (isSearchState) {
             fileBeanList.clear()
-            setFiles(fileListCache.getDate(currentCid)!!)
+            setFiles(FileCacheManager.getDate(currentCid)!!)
             appBarTitle = context.getString(R.string.app_name)
             isSearchState = false
             return
@@ -363,9 +348,8 @@ class FileViewModel(
         viewModelScope.launch {
             _isRefreshing.value = true
             // 1. 尝试读取缓存
-            // saveRequestCache 只传给 readDisk 参数。如果内存中有，不用读磁盘，依然能命中内存！
-            if (fileListCache.containsKey(cid)) {
-                setFiles(fileListCache[cid]!!)
+            if (FileCacheManager.containsKey(cid)) {
+                setFiles(FileCacheManager[cid]!!)
                 _isRefreshing.value = false
                 return@launch
             }
@@ -387,7 +371,7 @@ class FileViewModel(
                     else -> null
                 }
                 if (expiredTip != null) {
-                    fileListCache.clearAll()
+                    FileCacheManager.clearAll()
                     UserSessionManager.clearSession()
                     _navigationEvent.send(NavEvent.NavigateToScreen(Route.Login))
                 } else {
@@ -444,7 +428,7 @@ class FileViewModel(
     }
 
     fun deleteIndividualFile() {
-        fileListCache.deleteIndividualFile()
+        FileCacheManager.deleteIndividualFile()
     }
 
     fun refresh(forceCache: Boolean = false) {
@@ -459,7 +443,7 @@ class FileViewModel(
             if (settingUiState.forceLoadCache || forceCache) {
                 removeFolderCacheRecursively(cid)
             }
-            fileListCache.remove(cid)
+            FileCacheManager.remove(cid)
             if (refreshCurrent) {
                 getFiles(currentCid)
             } else {
@@ -473,7 +457,7 @@ class FileViewModel(
     suspend fun removeFolderCacheRecursively(categoryId: String) {
         suspend fun walk(cid: String) {
 //            XLog.d("DebugWalk delete 真实 cid 值: $cid")
-            val fileBeanList = fileListCache[cid]?.fileBeanList ?: emptyList()
+            val fileBeanList = FileCacheManager[cid]?.fileBeanList ?: emptyList()
 
             fileBeanList.forEach {
                 if (it.isFolder) {
@@ -488,7 +472,7 @@ class FileViewModel(
             }
 
             // 所有子级处理完后，再清理当前节点的缓存
-            fileListCache.remove(cid)
+            FileCacheManager.remove(cid)
         }
         // 执行递归清理（内部已包含对根文件夹 fileBean.categoryId 的 remove）
         walk(categoryId)
@@ -577,7 +561,7 @@ class FileViewModel(
         fileBeanList.addAll(files.fileBeanList)
         currentCid = files.cid
         pathList = files.path
-        viewModelScope.launch { fileListCache[currentCid] = files }
+        viewModelScope.launch { FileCacheManager[currentCid] = files }
     }
 
 

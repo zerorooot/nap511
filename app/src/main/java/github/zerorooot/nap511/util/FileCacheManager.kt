@@ -18,11 +18,14 @@ data class CacheWrapper(
     val timestamp: Long = System.currentTimeMillis()
 )
 
-class FileCacheManager(
-    private val cacheDir: File,
-    private val saveRequestCache: Boolean,
-    private val ttlMillis: Long = 7 * 24 * 3600 * 1000L // 7 天过期
-) {
+object FileCacheManager {
+    private lateinit var cacheDir: File
+
+    @Volatile
+    var saveRequestCache: Boolean = true
+
+    private const val ttlMillis: Long = 7 * 24 * 3600 * 1000L // 7 天过期
+
     private val gson = Gson()
     private val mutex = Mutex()
     private val wrapperType = CacheWrapper::class.java
@@ -30,7 +33,8 @@ class FileCacheManager(
     // 内存 LRU 缓存：只要 App 运行，始终存在且有效
     private val memoryCache = ConcurrentHashMap<String, CacheWrapper>(30)
 
-    init {
+    fun init(cacheDir: File) {
+        this.cacheDir = cacheDir
         if (!cacheDir.exists()) {
             cacheDir.mkdirs()
         }
@@ -41,6 +45,17 @@ class FileCacheManager(
     fun getDate(key: String): FilesBean? = memoryCache[key]?.data
 
     suspend fun loadAllCache() = withContext(Dispatchers.IO) {
+        // 不保存磁盘缓存时，仅清理硬盘旧文件，保留内存缓存
+        if (!saveRequestCache) {
+            clearDiskOnly()
+            return@withContext
+        }
+
+        // 开启磁盘保存时，在后台检查清理过期的硬盘缓存
+        cleanExpiredDiskCache()
+
+
+        if (!::cacheDir.isInitialized) return@withContext
         // 立即异步启动加载 "0"
         async { getDiskCache("0") }.await()?.let {
             memoryCache["0"] = it
@@ -56,7 +71,8 @@ class FileCacheManager(
         }?.awaitAll()
     }
 
-     fun deleteIndividualFile() {
+    fun deleteIndividualFile() {
+        if (!::cacheDir.isInitialized) return
         val diskCache = memoryCache["0"] ?: return
 
         val fileList =
@@ -125,9 +141,9 @@ class FileCacheManager(
         }
     }
 
-
     suspend fun getDiskCache(key: String, now: Long = System.currentTimeMillis()): CacheWrapper? =
         withContext(Dispatchers.IO) {
+            if (!::cacheDir.isInitialized) return@withContext null
             val diskFile = getDiskFile(key)
             if (!diskFile.exists()) {
                 return@withContext null
@@ -168,7 +184,7 @@ class FileCacheManager(
                 memoryCache[key] = entry
 
                 // 2. 根据开关控制是否落盘
-                if (saveRequestCache) {
+                if (saveRequestCache && ::cacheDir.isInitialized) {
                     try {
                         val diskFile = getDiskFile(key)
                         val json = gson.toJson(entry, wrapperType)
@@ -196,7 +212,9 @@ class FileCacheManager(
      */
     suspend fun clearDiskOnly() = withContext(Dispatchers.IO) {
         mutex.withLock {
-            cacheDir.listFiles()?.forEach { it.delete() }
+            if (::cacheDir.isInitialized) {
+                cacheDir.listFiles()?.forEach { it.delete() }
+            }
         }
     }
 
@@ -206,7 +224,9 @@ class FileCacheManager(
     suspend fun clearAll() = withContext(Dispatchers.IO) {
         mutex.withLock {
             memoryCache.clear()
-            cacheDir.listFiles()?.forEach { it.delete() }
+            if (::cacheDir.isInitialized) {
+                cacheDir.listFiles()?.forEach { it.delete() }
+            }
         }
     }
 
@@ -215,9 +235,9 @@ class FileCacheManager(
      */
     suspend fun cleanExpiredDiskCache() = withContext(Dispatchers.IO) {
         mutex.withLock {
+            if (!::cacheDir.isInitialized) return@withContext
             val files = cacheDir.listFiles() ?: return@withContext
             val now = System.currentTimeMillis()
-
 
             for (file in files) {
                 try {
@@ -236,6 +256,7 @@ class FileCacheManager(
     private fun getDiskFile(key: String): File = File(cacheDir, "${key}.json")
 
     private fun deleteDiskFile(key: String) {
+        if (!::cacheDir.isInitialized) return
         val file = getDiskFile(key)
         if (file.exists()) file.delete()
     }

@@ -1,4 +1,4 @@
-package github.zerorooot.nap511.screen.web
+package github.zerorooot.nap511.dialog
 
 
 import android.widget.Toast

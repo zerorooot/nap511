@@ -70,7 +70,7 @@ import androidx.compose.foundation.lazy.grid.items as gridItems
 @Composable
 fun RepeatFileScreen(
     viewModel: RepeatFileViewModel,
-    isExpandedScreen: Boolean,
+    isGridScreen: Boolean,
     gridCellMinSize: Dp,
     onClick: () -> Unit,
     jumpClick: (String) -> Unit
@@ -98,11 +98,11 @@ fun RepeatFileScreen(
     }
 
     // 2. 校验触底逻辑：当滑动到倒数第 3 项以内且未在加载中时，触发 loadNextPage
-    val shouldLoadMore by remember(isExpandedScreen) {
+    val shouldLoadMore by remember(isGridScreen) {
         derivedStateOf {
             val totalItems: Int
             val lastVisibleItem: Int
-            if (isExpandedScreen) {
+            if (isGridScreen) {
                 val layoutInfo = gridState.layoutInfo
                 totalItems = layoutInfo.totalItemsCount
                 lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -169,7 +169,7 @@ fun RepeatFileScreen(
                 ) {
                     Text(text = "暂无重复文件，点击右上角进行查重")
                 }
-            } else if (isExpandedScreen) {
+            } else if (isGridScreen) {
                 LazyVerticalGridScrollbar(
                     state = gridState,
                     settings = ScrollbarSettings.Default.copy(

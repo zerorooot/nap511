@@ -10,6 +10,7 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.RenameBean
 import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.deleteCoilCache
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.launch
@@ -59,11 +60,11 @@ internal fun FileViewModel.removeFile() {
             if (move.state) {
                 cutFileList = cutFileList.map { it.copy(isSelect = false) }
                 //移除之前目录下剪切的文件
-                fileListCache[cid]?.fileBeanList?.removeAll(cutFileList.toSet())
+                FileCacheManager[cid]?.fileBeanList?.removeAll(cutFileList.toSet())
                 //移除被剪切文件夹的缓存，防止路径未更改
                 cutFileList.forEach { i ->
                     if (i.isFolder) {
-                        fileListCache.remove(i.categoryId)
+                        FileCacheManager.remove(i.categoryId)
                     }
                 }
                 refresh(tempCid)
@@ -115,13 +116,13 @@ internal fun FileViewModel.getFileInfo(fileBean: FileBean) {
 internal fun FileViewModel.delete(fileBean: FileBean) {
     viewModelScope.launch {
         val beforeList = fileBeanList
-        val beforeFileListCache = fileListCache[currentCid]
+        val beforeFileListCache = FileCacheManager[currentCid]
         val beforeClickMap = clickMap.getOrDefault(currentCid, 0)
         val beforeImageBeanCache = imageBeanCache.getOrDefault(currentCid, hashMapOf())
 
         //提前删除，优化速度
         fileBeanList.remove(fileBean)
-        fileListCache[currentCid]!!.fileBeanList.remove(fileBean)
+        FileCacheManager[currentCid]!!.fileBeanList.remove(fileBean)
         clickMap[currentCid] = clickMap.getOrDefault(currentCid, 0) - 1
 
         //删除文件夹内的文件夹
@@ -145,7 +146,7 @@ internal fun FileViewModel.delete(fileBean: FileBean) {
                 "删除 ${fileBean.name} 成功"
             } else {
                 fileBeanList = beforeList
-                fileListCache[currentCid] = beforeFileListCache!!
+                FileCacheManager[currentCid] = beforeFileListCache!!
                 clickMap[currentCid] = beforeClickMap
                 imageBeanCache[currentCid] = beforeImageBeanCache
                 "删除 ${fileBean.name} 失败~${delete.errorMsg}"
@@ -160,11 +161,11 @@ internal fun FileViewModel.rename(name: String) {
     viewModelScope.launch {
         val cid = currentCid
         val fileBean = fileBeanList[selectIndex]
-        val beforeFileListCache = fileListCache[cid]
+        val beforeFileListCache = FileCacheManager[cid]
         //提前重命名，提升相应速度
         fileBeanList[selectIndex] = fileBean.copy(name = name)
-        fileListCache[cid]!!.fileBeanList[selectIndex] = fileBean.copy(name = name)
-        fileListCache[fileBean.categoryId]?.let { it.path.last().name = name }
+        FileCacheManager[cid]!!.fileBeanList[selectIndex] = fileBean.copy(name = name)
+        FileCacheManager[fileBean.categoryId]?.let { it.path.last().name = name }
 
         runCatching {
             val rename = fileRepository.rename(RenameBean(fileBean.fileId, name).toRequestBody())
@@ -172,7 +173,7 @@ internal fun FileViewModel.rename(name: String) {
                 "重命名成功"
             } else {
                 fileBeanList[selectIndex] = fileBean
-                fileListCache[cid] = beforeFileListCache!!
+                FileCacheManager[cid] = beforeFileListCache!!
                 "重命名失败"
             }
         }.onSuccess { message ->
@@ -185,7 +186,7 @@ internal fun FileViewModel.deleteMultiple() {
     viewModelScope.launch {
         val cid = currentCid
         val beforeList = fileBeanList
-        val beforeFileListCache = fileListCache[cid]
+        val beforeFileListCache = FileCacheManager[cid]
         val beforeClickMap = clickMap.getOrDefault(currentCid, 0)
 
         val mapOf = hashMapOf<String, String>()
@@ -202,7 +203,7 @@ internal fun FileViewModel.deleteMultiple() {
         }
         //提前删除，优化速度
         fileBeanList.removeAll(filter)
-        fileListCache[cid]!!.fileBeanList = ArrayList(fileBeanList)
+        FileCacheManager[cid]!!.fileBeanList = ArrayList(fileBeanList)
         clickMap[currentCid] = clickMap.getOrDefault(currentCid, 0) - filter.size
 
         recoverFromLongPress()
@@ -213,7 +214,7 @@ internal fun FileViewModel.deleteMultiple() {
                 "成功删除 ${filter.size} 个文件"
             } else {
                 fileBeanList = beforeList
-                fileListCache[cid] = beforeFileListCache!!
+                FileCacheManager[cid] = beforeFileListCache!!
                 clickMap[currentCid] = beforeClickMap
                 "删除 ${filter.size} 个文件失败~"
             }

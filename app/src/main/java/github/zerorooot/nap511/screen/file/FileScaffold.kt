@@ -69,9 +69,11 @@ fun FileScaffold(
                     label = ""
                 ) { isLongClick ->
                     if (isLongClick) {
+                       // getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
+
                         AppTopBarMultiple(
                             title = state.appBarTitle,
-                            isExpandedScreen = state.isExpandedScreen,
+                            isLandscape = state.isLandscape,
                             onClick = actions.onAppBarClick
                         )
                     } else {

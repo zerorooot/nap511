@@ -263,7 +263,11 @@ interface FileService {
     ): EncryptionDataResponse
 
     /**
+     * 正常状态：
      * {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
+     * 异常状态：
+     * {"state":false,"message":"暂不支持解压预览20GB以上的压缩包","code":51002,"data":[]}
+     *
      */
     @GET("files/push_extract")
     suspend fun getDecryptZipProcess(

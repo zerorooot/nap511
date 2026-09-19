@@ -16,7 +16,8 @@ import github.zerorooot.nap511.viewmodel.AudioViewModel
 data class FileScaffoldState(
     val isLongClickState: Boolean,
     val appBarTitle: String,
-    val isExpandedScreen: Boolean,
+    val isLandscape: Boolean,
+    val isGridScreen: Boolean,
     val isBottomBarShow: Boolean,
     val isTopBarShow: Boolean,
     val hasCurrentMusic: Boolean,

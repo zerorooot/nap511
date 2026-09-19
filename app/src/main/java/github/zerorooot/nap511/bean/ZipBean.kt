@@ -1,7 +1,12 @@
 package github.zerorooot.nap511.bean
 
+import com.google.gson.JsonDeserializationContext
+import com.google.gson.JsonDeserializer
+import com.google.gson.JsonElement
+import com.google.gson.annotations.JsonAdapter
 import com.google.gson.annotations.SerializedName
 import github.zerorooot.nap511.R
+import java.lang.reflect.Type
 
 sealed interface ZipStatus {
     /** 正常未加密的压缩包，可以直接预览 */
@@ -16,7 +21,19 @@ sealed interface ZipStatus {
     /** 不支持预览（如文件超大）或接口、网络等其它错误 */
     data class UnsupportedOrError(val message: String) : ZipStatus
 }
-
+class ExtractDataDeserializer : JsonDeserializer<ExtractData?> {
+    override fun deserialize(
+        json: JsonElement,
+        typeOfT: Type,
+        context: JsonDeserializationContext
+    ): ExtractData? {
+        return if (json.isJsonObject) {
+            context.deserialize(json, ExtractData::class.java)
+        } else {
+            null // 如果是 [] 空数组或其他非法类型，直接返回 null
+        }
+    }
+}
 /**
  * 异常，正在进行云解压
  */
@@ -27,7 +44,8 @@ class DecompressionLoadingException(
 
 data class ExtractResponse(
     @SerializedName("data")
-    val data: ExtractData
+    @JsonAdapter(ExtractDataDeserializer::class)
+    val data: ExtractData? = null
 ) : BaseResponse()
 
 data class ExtractData(
