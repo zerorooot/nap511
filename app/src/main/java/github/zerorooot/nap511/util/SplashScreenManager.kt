@@ -14,7 +14,6 @@ import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.network.UserSessionManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -30,8 +29,8 @@ import kotlinx.coroutines.withContext
  */
 object SplashScreenManager {
 
-    /** 启动屏退出时的淡出动画时长（毫秒） */
-    private const val EXIT_ANIMATION_DURATION = 350L
+    /** 启动屏退出时的淡出动画时长（毫秒）优化：缩短至 200ms 以加速首屏视觉感知 */
+    private const val EXIT_ANIMATION_DURATION = 200L
 
     var isReady: Boolean by mutableStateOf(false)
         private set
@@ -40,10 +39,11 @@ object SplashScreenManager {
      * 为指定的 Activity 配置启动屏生命周期与平滑退出逻辑
      *
      * @param activity 目标宿主 Activity（必须在 super.onCreate() 之前调用）
-     * @param scope      * 在 SplashScreen 展示期间执行异步预加载：
-     *      * 1. 等待 SettingsRepository 的 DataStore 配置加载完成；
-     *      * 2. 并发一并加载 UserSessionManager.init(...) 与 FileCacheManager.loadAllCache()；
-     *      * 3. 标记 isReady = true，允许 SplashScreen 平滑淡出。
+     * @param scope 在 SplashScreen 展示期间执行异步预加载：
+     *      1. 等待 SettingsRepository 的 DataStore 配置加载完成；
+     *      2. 快速初始化 UserSessionManager 基础凭证；
+     *      3. 将耗时的磁盘缓存加载（loadAllCache）放在后台异步进行，不阻塞 SplashScreen 退场；
+     *      4. 标记 isReady = true，促使 SplashScreen 平滑淡出。
      * @return 官方的 [SplashScreen] 实例，便于有额外定制需求时继续扩展
      */
     fun setup(
@@ -55,24 +55,24 @@ object SplashScreenManager {
         val splashScreen = activity.installSplashScreen()
 
         scope.launch(Dispatchers.IO) {
+            // 等待 DataStore 基础配置载入完成
             val settings = settingsRepository.settingUiStateFlow.first { it.isLoaded }
-            //协程中的 coroutineScope 具有结构化并发特性，它会**挂起（Suspend）**当前父协程，
-            // 直至它内部派生的两个 launch 子协程全部结束。
-            coroutineScope {
-                launch {
-                    val limit = settings.requestLimitCount.toIntOrNull() ?: 200
-                    UserSessionManager.init(
-                        cookie = settings.cookie,
-                        uid = settings.uid,
-                        requestLimitCount = limit
-                    )
-                }
-                launch {
-                    FileCacheManager.saveRequestCache = settings.saveRequestCache
-                    FileCacheManager.loadAllCache()
-                }
+
+            // 1. 同步快速完成会话网络凭证初始化
+            val limit = settings.requestLimitCount.toIntOrNull() ?: 200
+            UserSessionManager.init(
+                cookie = settings.cookie,
+                uid = settings.uid,
+                requestLimitCount = limit
+            )
+
+            // 2. 【冷启动性能优化】磁盘文件缓存（如 0.json 等）在后台异步加载，不阻塞 SplashScreen 淡出退场
+            launch {
+                FileCacheManager.saveRequestCache = settings.saveRequestCache
+                FileCacheManager.loadAllCache()
             }
 
+            // 3. 核心账号凭证就绪后，立即通知 UI 线程将 isReady 设为 true，触发 SplashScreen 退场
             withContext(Dispatchers.Main) {
                 isReady = true
             }

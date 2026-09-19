@@ -23,7 +23,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -78,151 +77,53 @@ class SettingsRepository {
 
     private val defaultSettingUiState = SettingUiState()
 
-    // 1. 账号与安全分组 Flow
-    private val accountFlow = combine(
-        getDataFlow(ConfigKeyUtil.UID, ""),
-        getDataFlow(ConfigKeyUtil.COOKIE, ""),
-        getDataFlow(ConfigKeyUtil.PASSWORD, "")
-    ) { uid, cookie, password ->
-        Triple(uid, cookie, password)
-    }
-
-    // 2. Aria2 与下载分组 Flow
-    private val aria2Flow: Flow<Aria2Group> = combine(
-        getDataFlow(ConfigKeyUtil.ARIA2_URL, ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE),
-        getDataFlow(ConfigKeyUtil.ARIA2_TOKEN, ""),
-        getDataFlow(ConfigKeyUtil.DEFAULT_OFFLINE_CID, ""),
-        getDataFlow(ConfigKeyUtil.DEFAULT_OFFLINE_TIME, defaultSettingUiState.defaultOfflineTime),
-        getDataFlow(ConfigKeyUtil.CURRENT_OFFLINE_TASK, ""),
-        getDataFlow(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, "")
-    ) { values: Array<String> ->
-        Aria2Group(
-            url = values[0],
-            token = values[1],
-            cid = values[2],
-            time = values[3],
-            task = values[4],
-            cidPath = values[5]
-        )
-    }
-
-    // 3. 界面偏好分组 Flow
-    private val uiPrefFlow: Flow<PrefGroup> = combine(
-        getDataFlow(
-            ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION,
-            defaultSettingUiState.fabPosition
-        ),
-        getDataFlow(ConfigKeyUtil.REQUEST_LIMIT_COUNT, defaultSettingUiState.requestLimitCount),
-        getDataFlow(ConfigKeyUtil.MOVE_FAIL_FILE, ""),
-        getDataFlow(ConfigKeyUtil.MAX_TXT_SIZE, defaultSettingUiState.txtSize),
-        getDataFlow(ConfigKeyUtil.THEME_MODE, defaultSettingUiState.themeMode),
-        getDataFlow(ConfigKeyUtil.GRID_CELL_MIN_SIZE, defaultSettingUiState.gridCellMinSize),
-        getDataFlow(
-            ConfigKeyUtil.AUTO_IMAGE_PREVIEW_COUNT,
-            defaultSettingUiState.autoImagePreviewCount
-        )
-    ) { values: Array<String> ->
-        PrefGroup(
-            fabPos = values[0],
-            limit = values[1],
-            moveFail = values[2],
-            txtSize = values[3],
-            themeMode = values[4],
-            gridCellMinSize = values[5],
-            autoImagePreviewCount = values[6],
-        )
-    }
-
-    // 4. 开关配置分组 Flow
-    private val switchFlow: Flow<SwitchGroup> = combine(
-        getDataFlow(ConfigKeyUtil.TORRENT_SORT, defaultSettingUiState.torrentSort),
-        getDataFlow(ConfigKeyUtil.LOG, defaultSettingUiState.logEnabled),
-        getDataFlow(ConfigKeyUtil.FORCE_LOAD_CACHE, defaultSettingUiState.forceLoadCache),
-        getDataFlow(ConfigKeyUtil.VIDEO_LINK_MODE, defaultSettingUiState.videoLinkMode),
-        getDataFlow(ConfigKeyUtil.DYNAMIC_COLOR, defaultSettingUiState.dynamicColorEnabled),
-        getDataFlow(ConfigKeyUtil.AUTO_JUMP_RETRY, defaultSettingUiState.autoJumpRetry),
-        getDataFlow(ConfigKeyUtil.EXPANDED_SCREEN, defaultSettingUiState.expandedScreenEnabled),
-
-        getDataFlow(ConfigKeyUtil.AUTO_ROTATE, defaultSettingUiState.autoRotateEnabled),
-        getDataFlow(ConfigKeyUtil.HIDE_LOADING_VIEW, defaultSettingUiState.hideLoadingView),
-        getDataFlow(ConfigKeyUtil.EARLY_LOADING, defaultSettingUiState.earlyLoading),
-        getDataFlow(ConfigKeyUtil.SAVE_REQUEST_CACHE, defaultSettingUiState.saveRequestCache),
-        getDataFlow(ConfigKeyUtil.POSITION_AFTER_AT, defaultSettingUiState.positionAfterAt),
-        getDataFlow(ConfigKeyUtil.IMAGE_HD_PREVIEW, defaultSettingUiState.imageHdPreview),
-        getDataFlow(ConfigKeyUtil.HIDE_BATTERY_BANNER, defaultSettingUiState.hideBatteryBanner),
-        getDataFlow(ConfigKeyUtil.GRID_SCREEN, defaultSettingUiState.gridScreenEnabled)
-    ) { values: Array<Boolean> ->
-        SwitchGroup(
-            torrentSort = values[0],
-            logEnabled = values[1],
-            forceCache = values[2],
-            videoLinkMode = values[3],
-            dynamicColor = values[4],
-            autoJumpRetry = values[5],
-            expandedScreen = values[6],
-            autoRotate = values[7],
-            hideLoading = values[8],
-            earlyLoading = values[9],
-            saveCache = values[10],
-            positionAfterAt = values[11],
-            imageHdPreview = values[12],
-            hideBatteryBanner = values[13],
-            gridScreen = values[14]
-        )
-    }
-
     /**
      * 统一暴露设置状态的 StateFlow (支持预热与状态复用)
-     * 将 Flow 提升为预热的 StateFlow（Eagerly 立即启动）
+     * 【冷启动性能优化】：对 DataStore 磁盘流进行单次映射，
+     * 避免了原先 31 个独立 Flow 及多层 combine 产生的协同与微任务调度开销，显著加速冷启动首帧就绪速度。
      */
-    val settingUiStateFlow: StateFlow<SettingUiState> = combine(
-        accountFlow, aria2Flow, uiPrefFlow, switchFlow
-    ) { account, aria2, uiPref, s2 ->
-        SettingUiState(
-            isLoaded = true, // 核心：磁盘各 Flow 产生第一组真实数据后，标记为已就绪
-            // 账号
-            uid = account.first,
-            cookie = account.second,
-            password = account.third,
-            // Aria2
-            aria2Url = aria2.url,
-            aria2Token = aria2.token,
-            defaultOfflineCid = aria2.cid,
-            defaultOfflinePath = aria2.cidPath,
-            defaultOfflineTime = aria2.time,
-            currentOfflineTask = aria2.task,
-            // 界面
-            fabPosition = uiPref.fabPos,
-            requestLimitCount = uiPref.limit,
-            moveFailFile = uiPref.moveFail,
-            txtSize = uiPref.txtSize,
-            themeMode = uiPref.themeMode,
-
-            gridCellMinSize = uiPref.gridCellMinSize,
-            autoImagePreviewCount = uiPref.autoImagePreviewCount,
-            // 开关
-            gridScreenEnabled = s2.gridScreen,
-            autoRotateEnabled = s2.autoRotate,
-            hideLoadingView = s2.hideLoading,
-            earlyLoading = s2.earlyLoading,
-            saveRequestCache = s2.saveCache,
-            positionAfterAt = s2.positionAfterAt,
-            torrentSort = s2.torrentSort,
-            logEnabled = s2.logEnabled,
-            forceLoadCache = s2.forceCache,
-            videoLinkMode = s2.videoLinkMode,
-            dynamicColorEnabled = s2.dynamicColor,
-            autoJumpRetry = s2.autoJumpRetry,
-            expandedScreenEnabled = s2.expandedScreen,
-            imageHdPreview = s2.imageHdPreview,
-            hideBatteryBanner = s2.hideBatteryBanner
+    val settingUiStateFlow: StateFlow<SettingUiState> = DataStoreUtil.dataStoreFlow
+        .map { pref ->
+            val default = defaultSettingUiState
+            SettingUiState(
+                isLoaded = true, // 核心：磁盘 DataStore 产生第一组真实数据后标记为就绪
+                uid = pref[stringPreferencesKey(ConfigKeyUtil.UID)] ?: default.uid,
+                cookie = pref[stringPreferencesKey(ConfigKeyUtil.COOKIE)] ?: default.cookie,
+                password = pref[stringPreferencesKey(ConfigKeyUtil.PASSWORD)] ?: default.password,
+                aria2Url = pref[stringPreferencesKey(ConfigKeyUtil.ARIA2_URL)] ?: ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE,
+                aria2Token = pref[stringPreferencesKey(ConfigKeyUtil.ARIA2_TOKEN)] ?: default.aria2Token,
+                autoRotateEnabled = pref[booleanPreferencesKey(ConfigKeyUtil.AUTO_ROTATE)] ?: default.autoRotateEnabled,
+                hideLoadingView = pref[booleanPreferencesKey(ConfigKeyUtil.HIDE_LOADING_VIEW)] ?: default.hideLoadingView,
+                earlyLoading = pref[booleanPreferencesKey(ConfigKeyUtil.EARLY_LOADING)] ?: default.earlyLoading,
+                saveRequestCache = pref[booleanPreferencesKey(ConfigKeyUtil.SAVE_REQUEST_CACHE)] ?: default.saveRequestCache,
+                imageHdPreview = pref[booleanPreferencesKey(ConfigKeyUtil.IMAGE_HD_PREVIEW)] ?: default.imageHdPreview,
+                positionAfterAt = pref[booleanPreferencesKey(ConfigKeyUtil.POSITION_AFTER_AT)] ?: default.positionAfterAt,
+                forceLoadCache = pref[booleanPreferencesKey(ConfigKeyUtil.FORCE_LOAD_CACHE)] ?: default.forceLoadCache,
+                videoLinkMode = pref[booleanPreferencesKey(ConfigKeyUtil.VIDEO_LINK_MODE)] ?: default.videoLinkMode,
+                autoJumpRetry = pref[booleanPreferencesKey(ConfigKeyUtil.AUTO_JUMP_RETRY)] ?: default.autoJumpRetry,
+                dynamicColorEnabled = pref[booleanPreferencesKey(ConfigKeyUtil.DYNAMIC_COLOR)] ?: default.dynamicColorEnabled,
+                themeMode = pref[stringPreferencesKey(ConfigKeyUtil.THEME_MODE)] ?: default.themeMode,
+                torrentSort = pref[booleanPreferencesKey(ConfigKeyUtil.TORRENT_SORT)] ?: default.torrentSort,
+                logEnabled = pref[booleanPreferencesKey(ConfigKeyUtil.LOG)] ?: default.logEnabled,
+                currentOfflineTask = pref[stringPreferencesKey(ConfigKeyUtil.CURRENT_OFFLINE_TASK)] ?: default.currentOfflineTask,
+                requestLimitCount = pref[stringPreferencesKey(ConfigKeyUtil.REQUEST_LIMIT_COUNT)] ?: default.requestLimitCount,
+                defaultOfflineCid = pref[stringPreferencesKey(ConfigKeyUtil.DEFAULT_OFFLINE_CID)] ?: default.defaultOfflineCid,
+                defaultOfflinePath = pref[stringPreferencesKey(ConfigKeyUtil.DEFAULT_OFFLINE_PATH)] ?: default.defaultOfflinePath,
+                fabPosition = pref[stringPreferencesKey(ConfigKeyUtil.FLOATING_ACTION_BUTTON_POSITION)] ?: default.fabPosition,
+                moveFailFile = pref[stringPreferencesKey(ConfigKeyUtil.MOVE_FAIL_FILE)] ?: default.moveFailFile,
+                defaultOfflineTime = pref[stringPreferencesKey(ConfigKeyUtil.DEFAULT_OFFLINE_TIME)] ?: default.defaultOfflineTime,
+                txtSize = pref[stringPreferencesKey(ConfigKeyUtil.MAX_TXT_SIZE)] ?: default.txtSize,
+                expandedScreenEnabled = pref[booleanPreferencesKey(ConfigKeyUtil.EXPANDED_SCREEN)] ?: default.expandedScreenEnabled,
+                gridScreenEnabled = pref[booleanPreferencesKey(ConfigKeyUtil.GRID_SCREEN)] ?: default.gridScreenEnabled,
+                gridCellMinSize = pref[stringPreferencesKey(ConfigKeyUtil.GRID_CELL_MIN_SIZE)] ?: default.gridCellMinSize,
+                autoImagePreviewCount = pref[stringPreferencesKey(ConfigKeyUtil.AUTO_IMAGE_PREVIEW_COUNT)] ?: default.autoImagePreviewCount,
+                hideBatteryBanner = pref[booleanPreferencesKey(ConfigKeyUtil.HIDE_BATTERY_BANNER)] ?: default.hideBatteryBanner
+            )
+        }.stateIn(
+            scope = repositoryScope,
+            started = SharingStarted.Eagerly,
+            initialValue = SettingUiState(isLoaded = false)
         )
-    }.stateIn(
-        scope = repositoryScope,
-        // 只要单例创建，立即开始在后台读取加载
-        started = SharingStarted.Eagerly,
-        initialValue =  SettingUiState(isLoaded = false) // 默认初值为未就绪
-    )
 
     /**
      * 保存单个配置项
@@ -290,6 +191,9 @@ class SettingsRepository {
         private val dataStore: DataStore<Preferences>
             get() = App.instance.applicationContext.dataStore
 
+        val dataStoreFlow: Flow<Preferences>
+            get() = dataStore.data
+
         @Suppress("UNCHECKED_CAST")
         private fun <T> getValueKey(key: String, defaultValue: T): Preferences.Key<T> {
             return when (defaultValue) {
@@ -326,42 +230,4 @@ class SettingsRepository {
             dataStore.edit { it.clear() }
         }
     }
-
-    // 内部数据传输模型
-    private data class Aria2Group(
-        val url: String,
-        val token: String,
-        val cid: String,
-        val cidPath: String,
-        val time: String,
-        val task: String
-    )
-
-    private data class PrefGroup(
-        val fabPos: String,
-        val limit: String,
-        val moveFail: String,
-        val txtSize: String,
-        val themeMode: String,
-        val gridCellMinSize: String,
-        val autoImagePreviewCount: String
-    )
-
-    private data class SwitchGroup(
-        val torrentSort: Boolean,
-        val logEnabled: Boolean,
-        val forceCache: Boolean,
-        val videoLinkMode: Boolean,
-        val dynamicColor: Boolean,
-        val autoJumpRetry: Boolean,
-        val expandedScreen: Boolean,
-        val autoRotate: Boolean,
-        val hideLoading: Boolean,
-        val earlyLoading: Boolean,
-        val saveCache: Boolean,
-        val positionAfterAt: Boolean,
-        val imageHdPreview: Boolean,
-        val hideBatteryBanner: Boolean,
-        val gridScreen: Boolean
-    )
 }
