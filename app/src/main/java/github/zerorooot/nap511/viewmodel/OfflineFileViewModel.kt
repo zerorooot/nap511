@@ -4,6 +4,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -66,6 +67,7 @@ class OfflineFileViewModel : ViewModel() {
     private val _selectedOfflineTask = MutableStateFlow<OfflineTask?>(null)
     val urlText = mutableStateOf("")
     var selectedTask = mutableStateOf<OfflineTask?>(null)
+    var selectedPage = mutableIntStateOf(0)
 
     private var currentLocation = hashMapOf<Int, LocationBean>()
 

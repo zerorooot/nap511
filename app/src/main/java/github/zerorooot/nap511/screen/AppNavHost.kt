@@ -15,7 +15,6 @@ import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.dialog.ExitApp
 import github.zerorooot.nap511.screen.auth.LoginScreen
-import github.zerorooot.nap511.screen.file.AdaptiveOfflineScreen
 import github.zerorooot.nap511.screen.file.FileScreen
 import github.zerorooot.nap511.screen.file.OfflineDownloadScreen
 import github.zerorooot.nap511.screen.file.OfflineFileScreen
@@ -130,32 +129,18 @@ fun AppNavHost(
                 LaunchedEffect(Unit) {
                     offlineFileViewModel.getOfflineFileList()
                 }
-                if (isExpandedScreen) {
-                    AdaptiveOfflineScreen(
-                        offlineFileViewModel = offlineFileViewModel,
-                        isGridScreen = isGridScreen,
-                        gridCellMinSize = gridCellMinSize,
-                        getFiles = {
-                            fileViewModel.getFiles(it)
-                            onNavigate(Route.MyFile)
-                        },
-                        onDrawerClick = onOpenDrawer,
-                        onNavigateToNewTask = { onNavigate(Route.OfflineDownload) }
-                    )
-                } else {
-                    OfflineFileScreen(
-                        offlineFileViewModel = offlineFileViewModel,
-                        isGridScreen = isGridScreen,
-                        gridCellMinSize = gridCellMinSize,
-                        itemOnClick = { offlineTask ->
-                            fileViewModel.getFiles(offlineTask.fileId.ifEmpty { offlineTask.wpPathId })
-                            onNavigate(Route.MyFile)
-                        }) {
-                        onOpenDrawer()
-                    }
-                }
-
-
+                OfflineFileScreen(
+                    offlineFileViewModel = offlineFileViewModel,
+                    isExpandedScreen = isExpandedScreen,
+                    isGridScreen = isGridScreen,
+                    gridCellMinSize = gridCellMinSize,
+                    getFiles = {
+                        fileViewModel.getFiles(it)
+                        onNavigate(Route.MyFile)
+                    },
+                    onNavigateToNewTask = { onNavigate(Route.OfflineDownload) },
+                    onClick = onOpenDrawer
+                )
             }
 
             entry<Route.WebScreen> {

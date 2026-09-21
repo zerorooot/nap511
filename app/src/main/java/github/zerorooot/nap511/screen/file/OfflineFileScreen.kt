@@ -19,21 +19,33 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
+import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableIntState
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.ui.NavDisplay
 import github.zerorooot.nap511.bean.LocationBean
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.dialog.OfflineFileInfoDialog
@@ -44,6 +56,7 @@ import github.zerorooot.nap511.screen.components.TopBarAction
 import github.zerorooot.nap511.screenitem.OfflineCellItem
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.copy
+import github.zerorooot.nap511.util.rememberListDetailDirective
 import github.zerorooot.nap511.viewmodel.OfflineFileUiState
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import kotlinx.coroutines.launch
@@ -55,55 +68,161 @@ import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 
 
 /**
- * OfflineFileContent 的状态管理包装层，统一托管 ViewModel 的动作分发。
+ * 离线下载页面的公共交互事件集合
  */
-@Composable
-fun OfflineFileContainer(
-    offlineFileViewModel: OfflineFileViewModel,
-    uiState: OfflineFileUiState,
-    gridCellMinSize: Dp,
-    isGridScreen: Boolean,
-    itemOnClick: (OfflineTask) -> Unit,
-    onClick: () -> Unit,
-    onOpenTaskDialog: (OfflineTask) -> Unit = offlineFileViewModel::openOfflineDialog,
-) {
-    OfflineFileContent(
-        uiState = uiState,
-        gridCellMinSize = gridCellMinSize,
-        isGridScreen = isGridScreen,
-        getListLocation = offlineFileViewModel::getListLocation,
-        onSaveScrollPosition = offlineFileViewModel::setListLocation,
-        onRefresh = offlineFileViewModel::refresh,
-        onClearFinish = offlineFileViewModel::clearFinish,
-        onClearError = offlineFileViewModel::clearError,
-        onDeleteTask = offlineFileViewModel::delete,
-        onOpenTaskDialog = onOpenTaskDialog,
-        onCloseTaskDialog = offlineFileViewModel::closeOfflineDialog,
-        onLoadMoreCompleted = offlineFileViewModel::loadMoreCompletedTasks,
-        onLoadMoreDownloading = offlineFileViewModel::loadMoreDownloadingTasks,
-        onLoadMoreFailed = offlineFileViewModel::loadMoreFailedTasks,
-        itemOnClick = itemOnClick,
-        onClick = onClick,
-    )
-}
+@Immutable
+data class OfflineFileActions(
+    val getListLocation: (Int) -> LocationBean,
+    val onSaveScrollPosition: (page: Int, state: Any) -> Unit,
+    val onRefresh: () -> Unit,
+    val onClearFinish: () -> Unit,
+    val onClearError: () -> Unit,
+    val onDeleteTask: (OfflineTask) -> Unit,
+    val onOpenTaskDialog: (OfflineTask) -> Unit,
+    val onCloseTaskDialog: () -> Unit,
+    val onLoadMoreCompleted: () -> Unit,
+    val onLoadMoreDownloading: () -> Unit,
+    val onLoadMoreFailed: () -> Unit,
+    val getFiles: (String) -> Unit,
+    val onClick: () -> Unit,
+    val onNavigateToNewTask: () -> Unit = {},
+    val selectedPage: MutableIntState,
+)
+
 
 @Composable
 fun OfflineFileScreen(
     offlineFileViewModel: OfflineFileViewModel,
+    isExpandedScreen: Boolean,
     isGridScreen: Boolean,
     gridCellMinSize: Dp,
-    itemOnClick: (OfflineTask) -> Unit,
+    getFiles: (String) -> Unit,
     onClick: () -> Unit,
+    onNavigateToNewTask: () -> Unit = {}
 ) {
     val uiState by offlineFileViewModel.uiState.collectAsStateWithLifecycle()
+    val actions = remember(
+        offlineFileViewModel,
+        getFiles,
+        onClick,
+        onNavigateToNewTask
+    ) {
+        OfflineFileActions(
+            getListLocation = offlineFileViewModel::getListLocation,
+            onSaveScrollPosition = offlineFileViewModel::setListLocation,
+            onRefresh = offlineFileViewModel::refresh,
+            onClearFinish = offlineFileViewModel::clearFinish,
+            onClearError = offlineFileViewModel::clearError,
+            onDeleteTask = offlineFileViewModel::delete,
+            onOpenTaskDialog = offlineFileViewModel::openOfflineDialog,
+            onCloseTaskDialog = offlineFileViewModel::closeOfflineDialog,
+            onLoadMoreCompleted = offlineFileViewModel::loadMoreCompletedTasks,
+            onLoadMoreDownloading = offlineFileViewModel::loadMoreDownloadingTasks,
+            onLoadMoreFailed = offlineFileViewModel::loadMoreFailedTasks,
+            getFiles = getFiles,
+            onClick = onClick,
+            onNavigateToNewTask = onNavigateToNewTask,
+            selectedPage = offlineFileViewModel.selectedPage
+        )
+    }
+    if (isExpandedScreen) {
+        AdaptiveOfflineScreen(
+            uiState = uiState,
+            selectedTaskState = offlineFileViewModel.selectedTask,
+            isGridScreen = isGridScreen,
+            gridCellMinSize = gridCellMinSize,
+            actions = actions
+        )
+    } else {
+        OfflineFileContent(
+            uiState = uiState,
+            gridCellMinSize = gridCellMinSize,
+            isGridScreen = isGridScreen,
+            actions = actions,
+        )
+    }
 
-    OfflineFileContainer(
-        offlineFileViewModel = offlineFileViewModel,
-        uiState = uiState,
-        gridCellMinSize = gridCellMinSize,
-        isGridScreen = isGridScreen,
-        itemOnClick = itemOnClick,
-        onClick = onClick
+}
+
+/**
+ * 自适应离线下载中心主界面
+ *
+ * 核心设计：
+ * 1. 采用 Nav3 [ListDetailSceneStrategy] 与 [NavDisplay] 驱动；
+ * 2. 多设备自适应：
+ *    - 手机端：左侧任务列表独占屏幕，点击某任务进入全屏详情页，左上角提供返回箭头；
+ *    - 平板/折叠屏/桌面：双栏并排，左侧为任务列表与操作栏，右侧常驻展示任务详情；
+ * 3. 智能选择与占位：
+ *    - 宽屏进入时，若未选中任何任务，自动选择首条任务展开；
+ *    - 若当前没有任何离线任务，右侧显示视觉友好的“新建下载”引导卡片。
+ */
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
+@Composable
+fun AdaptiveOfflineScreen(
+    uiState: OfflineFileUiState,
+    selectedTaskState: MutableState<OfflineTask?>,
+    isGridScreen: Boolean,
+    gridCellMinSize: Dp,
+    actions: OfflineFileActions,
+) {
+    // 1. 依据屏幕宽度规格计算分栏指令与双栏激活状态
+    val directive = rememberListDetailDirective()
+
+    // 2. 当前选中的离线任务对象与 Nav3 返回栈
+    var selectedTask by selectedTaskState
+    val backStack: NavBackStack<NavKey> = rememberNavBackStack(OfflineNavKey.TaskList)
+    val listDetailStrategy = rememberListDetailSceneStrategy<NavKey>(directive = directive)
+
+    // 5. 详情面板公共渲染方法（统一复用，避免在 placeholder 与 entry 间冗余重复）
+    val renderTaskDetail: @Composable (task: OfflineTask, onDeleted: () -> Unit) -> Unit =
+        { targetTask, onDeleted ->
+            TaskDetailPane(
+                task = targetTask,
+                onDeleteTask = {
+                    actions.onDeleteTask(it)
+                    onDeleted()
+                },
+                onOpenFile = { targetCid ->
+                    actions.getFiles(targetCid)
+                }
+            )
+        }
+
+    // 6. Nav3 驱动的自适应展示容器
+    NavDisplay(
+        backStack = backStack,
+        onBack = { backStack.removeLastOrNull() },
+        sceneStrategies = listOf(listDetailStrategy),
+        entryProvider = entryProvider {
+            // 左侧任务列表面板
+            entry<OfflineNavKey.TaskList>(
+                metadata = ListDetailSceneStrategy.listPane(
+                    detailPlaceholder = {
+                        if (selectedTask != null) {
+                            renderTaskDetail(selectedTask!!) { selectedTask = null }
+                        } else {
+                            OfflineTaskEmptyPlaceholder(actions.onNavigateToNewTask)
+                        }
+                    }
+                )
+            ) {
+                OfflineFileContent(
+                    uiState = uiState,
+                    gridCellMinSize = gridCellMinSize,
+                    isGridScreen = isGridScreen,
+                    actions = actions
+                )
+            }
+
+            // 右侧任务详情面板
+            entry<OfflineNavKey.TaskDetail>(
+                metadata = ListDetailSceneStrategy.detailPane()
+            ) { detailKey ->
+                renderTaskDetail(detailKey.offlineTask) {
+                    backStack.removeLastOrNull()
+                }
+            }
+        }
     )
 }
 
@@ -115,19 +234,7 @@ fun OfflineFileContent(
     uiState: OfflineFileUiState,
     gridCellMinSize: Dp,
     isGridScreen: Boolean,
-    getListLocation: (Int) -> LocationBean,
-    onSaveScrollPosition: (page: Int, state: Any) -> Unit,
-    onRefresh: () -> Unit,
-    onClearFinish: () -> Unit,
-    onClearError: () -> Unit,
-    onDeleteTask: (OfflineTask) -> Unit,
-    onOpenTaskDialog: (OfflineTask) -> Unit,
-    onCloseTaskDialog: () -> Unit,
-    onLoadMoreCompleted: () -> Unit,
-    onLoadMoreDownloading: () -> Unit,
-    onLoadMoreFailed: () -> Unit,
-    itemOnClick: (OfflineTask) -> Unit,
-    onClick: () -> Unit,
+    actions: OfflineFileActions,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -138,12 +245,22 @@ fun OfflineFileContent(
         "正在下载 (${uiState.offlineInfo.downloadingCount})",
         "下载失败 (${uiState.offlineInfo.failedCount})",
     )
-    val pagerState = rememberPagerState(pageCount = { tabs.size })
+    val pagerState = rememberPagerState(
+        initialPage = actions.selectedPage.intValue,
+        pageCount = { tabs.size }
+    )
+
+    // 监听滑动或点击，实时同步当前 settledPage 到 ViewModel 中
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }.collect { page ->
+            actions.selectedPage.intValue = page
+        }
+    }
 
     OfflineFileInfoDialog(
         isOpen = uiState.isOpenOfflineDialog,
         task = uiState.selectedOfflineTask,
-        onDismissRequest = onCloseTaskDialog
+        onDismissRequest = actions.onCloseTaskDialog
     )
 
 
@@ -151,17 +268,17 @@ fun OfflineFileContent(
     val menuOnClick = { action: MenuItemAction, item: OfflineTask ->
         when (action) {
             MenuItemAction.COPY_LINK -> copyDownloadUrl(context, item.url, 1, item.name)
-            MenuItemAction.DELETE_FILE -> onDeleteTask(item)
-            MenuItemAction.FILE_INFO -> onOpenTaskDialog(item)
+            MenuItemAction.DELETE_FILE -> actions.onDeleteTask(item)
+            MenuItemAction.FILE_INFO -> actions.onOpenTaskDialog(item)
             else -> {}
         }
     }
 
     val appBarOnClick = { action: AppBarAction ->
         when (action) {
-            MenuItemAction.REFRESH_FILES -> onRefresh()
-            MenuItemAction.CLEAR_COMPLETED -> onClearFinish()
-            MenuItemAction.CLEAR_FAILED -> onClearError()
+            MenuItemAction.REFRESH_FILES -> actions.onRefresh()
+            MenuItemAction.CLEAR_COMPLETED -> actions.onClearFinish()
+            MenuItemAction.CLEAR_FAILED -> actions.onClearError()
             MenuItemAction.COPY_PAGE_LINK -> {
                 val stringJoiner = StringJoiner("\n")
                 val allTasks = when (pagerState.currentPage) {
@@ -178,7 +295,7 @@ fun OfflineFileContent(
                 copyDownloadUrl(context, stringJoiner.toString(), allTasks.size)
             }
 
-            TopBarAction.DRAWER_MENU -> onClick()
+            TopBarAction.DRAWER_MENU -> actions.onClick()
             else -> {}
         }
     }
@@ -206,7 +323,7 @@ fun OfflineFileContent(
             state = pagerState,
             modifier = Modifier.weight(1f)
         ) { page ->
-            val listLocation = getListLocation(page)
+            val listLocation = actions.getListLocation(page)
             val listState = key(page) {
                 rememberLazyListState(
                     initialFirstVisibleItemIndex = listLocation.firstVisibleItemIndex,
@@ -222,7 +339,7 @@ fun OfflineFileContent(
 
             DisposableEffect(page, listState, gridState, isGridScreen) {
                 onDispose {
-                    onSaveScrollPosition(
+                    actions.onSaveScrollPosition(
                         page,
                         if (isGridScreen) gridState else listState
                     )
@@ -256,9 +373,9 @@ fun OfflineFileContent(
                             return@collect
                         }
                         when (page) {
-                            0 -> onLoadMoreCompleted()
-                            1 -> onLoadMoreDownloading()
-                            2 -> onLoadMoreFailed()
+                            0 -> actions.onLoadMoreCompleted()
+                            1 -> actions.onLoadMoreDownloading()
+                            2 -> actions.onLoadMoreFailed()
                         }
                     }
             }
@@ -272,7 +389,7 @@ fun OfflineFileContent(
 
             PullToRefreshBox(
                 isRefreshing = uiState.isRefreshing,
-                onRefresh = onRefresh,
+                onRefresh = actions.onRefresh,
                 modifier = Modifier.fillMaxSize()
             ) {
                 if (currentSubList.isEmpty()) {
@@ -304,7 +421,7 @@ fun OfflineFileContent(
                                     offlineTask = item,
                                     index = index,
                                     itemOnClick = { _ ->
-                                        itemOnClick(item)
+                                        actions.getFiles(item.fileId.ifEmpty { item.wpPathId })
                                     },
                                     menuOnClick = { menuName, _ -> menuOnClick(menuName, item) }
                                 )
@@ -330,7 +447,7 @@ fun OfflineFileContent(
                                     offlineTask = item,
                                     index = index,
                                     itemOnClick = { _ ->
-                                        itemOnClick(item)
+                                        actions.getFiles(item.fileId.ifEmpty { item.wpPathId })
                                     },
                                     menuOnClick = { menuName, _ -> menuOnClick(menuName, item) }
                                 )

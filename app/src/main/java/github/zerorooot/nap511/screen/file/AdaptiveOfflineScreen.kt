@@ -37,32 +37,19 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
-import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
-import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
-import androidx.navigation3.runtime.entryProvider
-import androidx.navigation3.runtime.rememberNavBackStack
-import androidx.navigation3.ui.NavDisplay
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.screen.components.BaseTopAppBar
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.copy
-import github.zerorooot.nap511.util.rememberListDetailDirective
-import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import kotlinx.serialization.Serializable
 
 /**
@@ -79,106 +66,12 @@ sealed interface OfflineNavKey : NavKey {
     data class TaskDetail(val offlineTask: OfflineTask) : OfflineNavKey
 }
 
-/**
- * 自适应离线下载中心主界面
- *
- * 核心设计：
- * 1. 采用 Nav3 [ListDetailSceneStrategy] 与 [NavDisplay] 驱动；
- * 2. 多设备自适应：
- *    - 手机端：左侧任务列表独占屏幕，点击某任务进入全屏详情页，左上角提供返回箭头；
- *    - 平板/折叠屏/桌面：双栏并排，左侧为任务列表与操作栏，右侧常驻展示任务详情；
- * 3. 智能选择与占位：
- *    - 宽屏进入时，若未选中任何任务，自动选择首条任务展开；
- *    - 若当前没有任何离线任务，右侧显示视觉友好的“新建下载”引导卡片。
- */
-@OptIn(ExperimentalMaterial3AdaptiveApi::class)
-@Composable
-fun AdaptiveOfflineScreen(
-    offlineFileViewModel: OfflineFileViewModel,
-    isGridScreen: Boolean,
-    gridCellMinSize: Dp,
-    getFiles: (String) -> Unit,
-    onDrawerClick: () -> Unit,
-    onNavigateToNewTask: () -> Unit = {}
-) {
-    val uiState by offlineFileViewModel.uiState.collectAsStateWithLifecycle()
-
-    // 1. 依据屏幕宽度规格计算分栏指令与双栏激活状态
-    val directive = rememberListDetailDirective()
-
-    // 2. 当前选中的离线任务对象与 Nav3 返回栈
-    var selectedTask by offlineFileViewModel.selectedTask
-    val backStack: NavBackStack<NavKey> = rememberNavBackStack(OfflineNavKey.TaskList)
-    val listDetailStrategy = rememberListDetailSceneStrategy<NavKey>(directive = directive)
-
-    val onOpenTaskDialog: (OfflineTask) -> Unit = { task ->
-        selectedTask = task
-        // 手机单栏模式下点击进入详情路由；双栏模式下仅刷新选中的任务
-//        if (!isDualPane) {
-//            backStack.add(OfflineNavKey.TaskDetail(task))
-//        }
-    }
-    // 5. 详情面板公共渲染方法（统一复用，避免在 placeholder 与 entry 间冗余重复）
-    val renderTaskDetail: @Composable (task: OfflineTask, onDeleted: () -> Unit) -> Unit =
-        { targetTask, onDeleted ->
-            TaskDetailPane(
-                task = targetTask,
-                onDeleteTask = {
-                    offlineFileViewModel.delete(it)
-                    onDeleted()
-                },
-                onOpenFile = { targetCid ->
-                    getFiles(targetCid)
-                }
-            )
-        }
-
-    // 6. Nav3 驱动的自适应展示容器
-    NavDisplay(
-        backStack = backStack,
-        onBack = { backStack.removeLastOrNull() },
-        sceneStrategies = listOf(listDetailStrategy),
-        entryProvider = entryProvider {
-            // 左侧任务列表面板
-            entry<OfflineNavKey.TaskList>(
-                metadata = ListDetailSceneStrategy.listPane(
-                    detailPlaceholder = {
-                        if (selectedTask != null) {
-                            renderTaskDetail(selectedTask!!) { selectedTask = null }
-                        } else {
-                            OfflineTaskEmptyPlaceholder(onNavigateToNewTask)
-                        }
-                    }
-                )
-            ) {
-                OfflineFileContainer(
-                    offlineFileViewModel = offlineFileViewModel,
-                    uiState = uiState,
-                    gridCellMinSize = gridCellMinSize,
-                    isGridScreen = isGridScreen,
-                    onOpenTaskDialog = onOpenTaskDialog,
-                    itemOnClick = onOpenTaskDialog,
-                    onClick = onDrawerClick
-                )
-            }
-
-            // 右侧任务详情面板
-            entry<OfflineNavKey.TaskDetail>(
-                metadata = ListDetailSceneStrategy.detailPane()
-            ) { detailKey ->
-                renderTaskDetail(detailKey.offlineTask) {
-                    backStack.removeLastOrNull()
-                }
-            }
-        }
-    )
-}
 
 /**
  * 离线任务空状态占位面板（大屏未选中或列表为空时展示）
  */
 @Composable
-private fun OfflineTaskEmptyPlaceholder(onNavigateToNewTask: () -> Unit) {
+fun OfflineTaskEmptyPlaceholder(onNavigateToNewTask: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -213,7 +106,7 @@ private fun OfflineTaskEmptyPlaceholder(onNavigateToNewTask: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TaskDetailPane(
+fun TaskDetailPane(
     task: OfflineTask,
     onDeleteTask: (OfflineTask) -> Unit,
     onOpenFile: (String) -> Unit
