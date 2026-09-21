@@ -46,6 +46,7 @@ import github.zerorooot.nap511.activity.helper.ExoPlayerInitializer
 import github.zerorooot.nap511.activity.helper.SubtitlePanelController
 import github.zerorooot.nap511.activity.helper.VideoDrawerController
 import github.zerorooot.nap511.bean.LaunchVideoParams
+import github.zerorooot.nap511.bean.VideoUiState
 import github.zerorooot.nap511.player.MyGSYVideoPlayer
 import github.zerorooot.nap511.dialog.CaptchaVideoContent
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -85,7 +86,25 @@ class VideoActivity : AppCompatActivity() {
     /** 115 账号安全验证码 WebView 弹窗实例 */
     private var captchaDialog: Dialog? = null
 
-    private var captchaComposeView: ComposeView? = null
+
+    /** 标记视频是否正在加载中（用于上一集/下一集按钮防止重复点击） */
+    private var isEpisodeLoading = false
+
+    /**
+     * 更新"上/下一集"按钮的启用状态与透明度
+     */
+    private fun updatePrevNextButtons(state: VideoUiState = viewModel.uiState.value) {
+        val prevEnabled = state.hasPrev && !isEpisodeLoading
+        videoPlayer.findViewById<View>(R.id.prev_episode)?.apply {
+            isEnabled = prevEnabled
+            alpha = if (prevEnabled) 1.0f else 0.3f
+        }
+        val nextEnabled = state.hasNext && !isEpisodeLoading
+        videoPlayer.findViewById<View>(R.id.next_episode)?.apply {
+            isEnabled = nextEnabled
+            alpha = if (nextEnabled) 1.0f else 0.3f
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // 启用 Edge-to-Edge 边缘到边缘全面屏设计
@@ -252,16 +271,8 @@ class VideoActivity : AppCompatActivity() {
                         // 更新抽屉菜单中选中的剧集索引
                         videoDrawerController.updateEpisodeSelectedIndex(state.fileBeanIndex)
 
-                        // 更新"上一集"按钮的启用状态与透明度
-                        videoPlayer.findViewById<View>(R.id.prev_episode)?.apply {
-                            isEnabled = state.hasPrev
-                            alpha = if (state.hasPrev) 1.0f else 0.3f
-                        }
-                        // 更新"下一集"按钮的启用状态与透明度
-                        videoPlayer.findViewById<View>(R.id.next_episode)?.apply {
-                            isEnabled = state.hasNext
-                            alpha = if (state.hasNext) 1.0f else 0.3f
-                        }
+                        // 更新"上/下一集"按钮的启用状态与透明度
+                        updatePrevNextButtons(state)
 
                         // 将最新的状态同步更新给字幕面板控制器
                         subtitlePanelController.bindState(state)
@@ -273,11 +284,15 @@ class VideoActivity : AppCompatActivity() {
                         when (event) {
                             // 切换播放下一集/上一集视频
                             is VideoUiEvent.PlayNext -> {
+                                isEpisodeLoading = true
+                                updatePrevNextButtons()
                                 videoPlayer.playNext(event.videoUrl, event.title)
                             }
 
                             // 弹出 Toast 消息
                             is VideoUiEvent.Toast -> {
+                                isEpisodeLoading = false
+                                updatePrevNextButtons()
                                 Toast.makeText(
                                     this@VideoActivity,
                                     event.message,
@@ -415,6 +430,8 @@ class VideoActivity : AppCompatActivity() {
      * @param isNext true 表示下一集，false 表示上一集
      */
     private fun playNextVideo(isNext: Boolean) {
+        isEpisodeLoading = true
+        updatePrevNextButtons()
         val isPortrait =
             resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
         viewModel.playNextVideo(isNext, isPortrait, videoPlayer.currentPositionWhenPlaying)
@@ -431,7 +448,15 @@ class VideoActivity : AppCompatActivity() {
      * GSYVideoPlayer 播放器全局异常错误监听回调
      */
     private val gSYErrorCallBack = object : GSYSampleCallBack() {
+        override fun onPrepared(url: String?, vararg objects: Any?) {
+            super.onPrepared(url, *objects)
+            isEpisodeLoading = false
+            updatePrevNextButtons()
+        }
+
         override fun onPlayError(url: String?, vararg objects: Any?) {
+            isEpisodeLoading = false
+            updatePrevNextButtons()
             // 如果验证码弹窗正在显示，忽略播放错误回调，避免在验证码处理过程中退出 Activity
             if (captchaDialog?.isShowing == true) {
                 return
