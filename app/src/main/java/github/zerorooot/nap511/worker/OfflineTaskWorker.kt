@@ -67,9 +67,11 @@ class OfflineTaskWorker(
 
 
         val cid = SettingsRepository.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
-        val path = SettingsRepository.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, "根目录/云下载")
-            .substringAfterLast("/")
-        val addTaskReturn = fileRepository.addOfflineTask(a, cid) {}
+        val path =
+            SettingsRepository.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, "/根目录/云下载")
+                .substringAfterLast("/")
+
+        val addTaskReturn = fileRepository.addOfflineTask(a, cid, path) {}
 
         XLog.i("OfflineTaskWorker cid $cid addTaskReturn $addTaskReturn task size=${a.size} currentOfflineTask: $a")
 
@@ -93,7 +95,7 @@ class OfflineTaskWorker(
             .build()
         return if (state) {
             DialogEventBus.getInstance().emit(DialogEvent.RefreshFileList(cid))
-            Result.success(addTaskData);
+            Result.success(addTaskData)
         } else {
             Result.failure(addTaskData)
         }

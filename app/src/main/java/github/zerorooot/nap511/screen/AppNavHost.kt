@@ -117,7 +117,11 @@ fun AppNavHost(
                     url = urlText,
                     onClick = { onOpenDrawer() }
                 ) { list ->
-                    offlineFileViewModel.addTask(list, fileViewModel.currentCid) { needVerify ->
+                    offlineFileViewModel.addTask(
+                        list,
+                        fileViewModel.currentCid,
+                        path.substringAfterLast("/")
+                    ) { needVerify ->
                         if (needVerify) {
                             onNavigate(Route.VerifyMagnetLinkAccount)
                         }

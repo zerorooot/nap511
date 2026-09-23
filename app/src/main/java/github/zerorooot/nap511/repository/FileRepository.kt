@@ -110,7 +110,7 @@ class FileRepository {
     }
 
     suspend fun addOfflineTask(
-        list: List<String>, currentCid: String, handle: (Boolean) -> Unit
+        list: List<String>, currentCid: String, offlinePath: String, handle: (Boolean) -> Unit
     ): Pair<Boolean, String> {
         val downloadPath = setDownloadPath(currentCid)
         XLog.i("add task downloadPath $downloadPath")
@@ -119,11 +119,6 @@ class FileRepository {
         }
         val quota = offlineService.quota()
         val surplus = quota.surplus - list.size
-        val offlinePath = SettingsRepository.getDataSuspend(
-            ConfigKeyUtil.DEFAULT_OFFLINE_PATH,
-            "根目录/云下载"
-        ).substringAfterLast("/")
-
 
         val map = HashMap<String, String>()
         map["savepath"] = ""
@@ -139,9 +134,6 @@ class FileRepository {
         val message = if (addTask.state) {
             "成功将任务添加到‘${offlinePath}’目录，剩余配额${surplus}个"
         } else {
-            if (addTask.errorMsg.contains("请验证账号")) {
-                handle.invoke(true)
-            }
             //把失败的离线链接保存起来
             val currentOfflineTaskList =
                 SettingsRepository.getDataSuspend(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
@@ -154,6 +146,9 @@ class FileRepository {
             SettingsRepository.saveData(
                 ConfigKeyUtil.CURRENT_OFFLINE_TASK, stringJoiner.toString()
             )
+            if (addTask.errorMsg.contains("请验证账号")) {
+                handle.invoke(true)
+            }
             "任务添加失败，${addTask.errorMsg}"
         }
 

@@ -2,7 +2,6 @@ package github.zerorooot.nap511.viewmodel
 
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -349,10 +348,10 @@ class OfflineFileViewModel : ViewModel() {
         }
     }
 
-    fun addTask(list: List<String>, currentCid: String, handle: (Boolean) -> Unit) {
+    fun addTask(list: List<String>, currentCid: String, path: String, handle: (Boolean) -> Unit) {
         viewModelScope.launch {
             runCatching {
-                fileRepository.addOfflineTask(list, currentCid, handle)
+                fileRepository.addOfflineTask(list, currentCid, path, handle)
             }.onFailureToastAndLog()
         }
     }
