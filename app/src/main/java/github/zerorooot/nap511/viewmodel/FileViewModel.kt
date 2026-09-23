@@ -532,7 +532,9 @@ class FileViewModel(
 //        appBarTitle = fileBeanList.size.toString()
 //    }
     fun sortByVideoTime() {
-        fileBeanList.sortByDescending { it.playLong }
+        val sorted = fileBeanList.sortedByDescending { it.playLong }
+        fileBeanList.clear()
+        fileBeanList.addAll(sorted)
     }
 
     fun selectReverse() {

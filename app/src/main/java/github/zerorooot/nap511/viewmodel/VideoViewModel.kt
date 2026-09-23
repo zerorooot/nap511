@@ -451,18 +451,22 @@ class VideoViewModel : ViewModel() {
     }
 
     /**
-     * 保存并上传当前字幕（连同本地时间偏移修正）至当前视频所在的 115 目录
+     * 保存并上传当前字幕至当前视频所在的 115 目录
      *
      * @param cacheDirFile 字幕缓存目录文件
+     * @param customFileName 可选的自定义文件名（若为空则优先使用当前搜索关键字 defaultSearchKeyword）
      */
-    fun saveAndUploadSubtitle(cacheDirFile: File) {
+    fun saveAndUploadSubtitle(cacheDirFile: File, customFileName: String? = null) {
         val parentCid = launchVideoParams.categoryId
-        val videoFileName =
-            _uiState.value.videoInfo?.fileName ?: launchVideoParams.videoInfo.fileName
+        // 优先级：外部指定名称 -> 搜索关键字 -> 原始视频文件名兜底
+        val finalFileName = customFileName?.trim()?.takeIf { it.isNotEmpty() }
+            ?: _uiState.value.defaultSearchKeyword.ifBlank {
+                _uiState.value.videoInfo?.fileName ?: launchVideoParams.videoInfo.fileName
+            }
         subtitleDelegate.saveAndUploadCurrentSubtitle(
             scope = viewModelScope,
             cacheDirFile = cacheDirFile,
-            videoFileName = videoFileName,
+            videoFileName = finalFileName,
             targetCid = parentCid,
             onSuccess = {
                 viewModelScope.launch {

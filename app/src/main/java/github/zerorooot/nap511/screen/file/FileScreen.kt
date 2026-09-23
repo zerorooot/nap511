@@ -90,8 +90,7 @@ import kotlinx.coroutines.launch
 import java.lang.reflect.Type
 
 @OptIn(
-    ExperimentalFoundationApi::class,
-    ExperimentalMaterial3Api::class, ExperimentalCoilApi::class
+    ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalCoilApi::class
 )
 @Composable
 fun FileScreen(
@@ -167,20 +166,17 @@ fun FileScreen(
     val listLocation = fileViewModel.getListLocation(fileViewModel.currentCid)
     val listState = key(fileViewModel.currentCid) {
         rememberLazyListState(
-            listLocation.firstVisibleItemIndex,
-            listLocation.firstVisibleItemScrollOffset
+            listLocation.firstVisibleItemIndex, listLocation.firstVisibleItemScrollOffset
         )
     }
     val gridState = key(fileViewModel.currentCid) {
         rememberLazyGridState(
-            listLocation.firstVisibleItemIndex,
-            listLocation.firstVisibleItemScrollOffset
+            listLocation.firstVisibleItemIndex, listLocation.firstVisibleItemScrollOffset
         )
     }
     val staggeredGrid = key(fileViewModel.currentCid) {
         rememberLazyStaggeredGridState(
-            listLocation.firstVisibleItemIndex,
-            listLocation.firstVisibleItemScrollOffset
+            listLocation.firstVisibleItemIndex, listLocation.firstVisibleItemScrollOffset
         )
     }
 
@@ -218,8 +214,7 @@ fun FileScreen(
         isPreviewActive = isPreviewActive,
         isBottomBarShow = isBottomBarShow,
         onTopBarShowChange = { isTopBarShow = it },
-        onBottomBarShowChange = { isBottomBarShow = it }
-    )
+        onBottomBarShowChange = { isBottomBarShow = it })
 
     val videoActivityLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -247,8 +242,7 @@ fun FileScreen(
 
             if (videoHistoryMap.isNotEmpty()) {
                 fileViewModel.updateVideoFileBeans(
-                    fileViewModel.currentCid,
-                    videoHistoryMap
+                    fileViewModel.currentCid, videoHistoryMap
                 )
             }
         }
@@ -329,11 +323,11 @@ fun FileScreen(
 
     fun myItemOnClick(i: Int) = clickHandler.myItemOnClick(i)
 
-    fun scrollToTop() {
+    suspend fun scrollToTop() {
         when {
-            isPreviewActive -> staggeredGrid.requestScrollToItem(0, 0)
-            isGridScreen -> gridState.requestScrollToItem(0, 0)
-            else -> listState.requestScrollToItem(0, 0)
+            isPreviewActive -> staggeredGrid.scrollToItem(0, 0)
+            isGridScreen -> gridState.scrollToItem(0, 0)
+            else -> listState.scrollToItem(0, 0)
         }
     }
 
@@ -410,7 +404,9 @@ fun FileScreen(
 
             MenuItemAction.VIDEO_SCHEDULE -> {
                 fileViewModel.sortByVideoTime()
-                scrollToTop()
+                scope.launch {
+                    scrollToTop()
+                }
             }
 
             MenuItemAction.FILE_SORT -> fileViewModel.openFileOrderDialog()
@@ -475,7 +471,11 @@ fun FileScreen(
                 }
                 App.instance.toast("设置默认离线位置为: $name")
             },
-            onPathItemClick = { fileViewModel.getFiles(it) }
+            onPathItemClick = {
+                if (it != fileViewModel.currentCid) {
+                    fileViewModel.getFiles(it)
+                }
+            }
         )
 
         val itemActions = FileItemActions(
@@ -507,8 +507,7 @@ fun FileScreen(
             onSetOfflineCid = { fileBean ->
                 scope.launch {
                     SettingsRepository.saveData(
-                        ConfigKeyUtil.DEFAULT_OFFLINE_CID,
-                        fileBean.categoryId
+                        ConfigKeyUtil.DEFAULT_OFFLINE_CID, fileBean.categoryId
                     )
                     val pathString =
                         fileViewModel.pathList.joinToString(separator = "/") { it.name } + "/${fileBean.name}"
@@ -520,13 +519,10 @@ fun FileScreen(
             onForceOpen = { showForceOpenDialog = it },
             onLoadImage = { fileBean ->
                 fileViewModel.getImage(fileBean)
-            }
-        )
+            })
 
         return FileContentActions(
-            bannerActions = bannerActions,
-            pathActions = pathActions,
-            itemActions = itemActions
+            bannerActions = bannerActions, pathActions = pathActions, itemActions = itemActions
         )
     }
 
@@ -558,14 +554,14 @@ fun FileScreen(
         audioViewModel = audioViewModel
     )
 
+    val currentAppBarOnClick by rememberUpdatedState(::myAppBarOnClick)
     val scaffoldActions = remember {
         FileScaffoldActions(
-            onAppBarClick = ::myAppBarOnClick,
+            onAppBarClick = { currentAppBarOnClick(it) },
             onMusicDetailNav = { onNav(Route.MusicDetail) },
             onCancelCut = { fileViewModel.cancelCut() },
             onCutPaste = { fileViewModel.removeFile() },
-            onAddFolder = { fileViewModel.openCreateFolderDialog() }
-        )
+            onAddFolder = { fileViewModel.openCreateFolderDialog() })
     }
 
     val contentDataState = FileListDataState(
@@ -592,14 +588,11 @@ fun FileScreen(
     )
 
     val listScrollState = FileListScrollState(
-        listState = listState,
-        gridState = gridState,
-        staggeredGridState = staggeredGrid
+        listState = listState, gridState = gridState, staggeredGridState = staggeredGrid
     )
 
     FileScaffold(
-        state = scaffoldState,
-        actions = scaffoldActions
+        state = scaffoldState, actions = scaffoldActions
     ) { innerPadding ->
         FileScreenContent(
             innerPadding = innerPadding,
