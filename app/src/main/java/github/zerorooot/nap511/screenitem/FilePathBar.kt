@@ -81,6 +81,7 @@ fun FilePathBar(
                                 interactionSource = interactionSource,
                                 indication = null, // 彻底关闭浮层的水波纹渲染，由底层 Chip 自行展示
                                 onClick = { actions.onPathItemClick(path.cid) },
+                                onDoubleClick = actions.onPathDoubleClick,
                                 onLongClick = {
                                     actions.onPathLongClick.invoke(
                                         path.name,

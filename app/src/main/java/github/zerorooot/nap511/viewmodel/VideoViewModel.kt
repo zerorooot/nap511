@@ -233,7 +233,7 @@ class VideoViewModel : ViewModel() {
                 val currentInfo = _uiState.value.videoInfo ?: return@launch
                 val video = fileRepository.video(currentInfo.pickCode)
                 XLog.i("playNewVideo $video")
-                _uiEvent.emit(VideoUiEvent.PlayNext(video.downloadUrl, video.fileName))
+                _uiEvent.emit(VideoUiEvent.PlayNext(video.downloadUrl, video.fileName.ifBlank { "获取视频链接失败，视频可能被删除，请刷新重试" }))
             } catch (_: Exception) {
             } finally {
                 isReloadingVideo = false
@@ -336,22 +336,24 @@ class VideoViewModel : ViewModel() {
             return true
         }
 
-        runCatching { Gson().fromJson(errorBody, JsonObject::class.java) }.onSuccess { fromJson ->
-            if (fromJson.has("error")) {
-                viewModelScope.launch {
-                    _uiEvent.emit(VideoUiEvent.ShowCaptchaDialog)
+        runCatching { Gson().fromJson(errorBody, JsonObject::class.java) }
+            .onSuccess { fromJson ->
+                if (fromJson.has("error")) {
+                    viewModelScope.launch {
+                        _uiEvent.emit(VideoUiEvent.ShowCaptchaDialog)
+                    }
+                    return true
                 }
+            }
+        runCatching { parseOssErrorWithDom(errorBody).message }
+            .onSuccess { message ->
+                back(
+                    currentPositionMs = currentPositionMs,
+                    toast = message,
+                    resultCode = Activity.RESULT_CANCELED
+                )
                 return true
             }
-        }
-        runCatching { parseOssErrorWithDom(errorBody).message }.onSuccess { message ->
-            back(
-                currentPositionMs = currentPositionMs,
-                toast = message,
-                resultCode = Activity.RESULT_CANCELED
-            )
-            return true
-        }
 
         return false
     }

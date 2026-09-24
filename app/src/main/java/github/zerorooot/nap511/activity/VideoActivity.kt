@@ -47,8 +47,9 @@ import github.zerorooot.nap511.activity.helper.SubtitlePanelController
 import github.zerorooot.nap511.activity.helper.VideoDrawerController
 import github.zerorooot.nap511.bean.LaunchVideoParams
 import github.zerorooot.nap511.bean.VideoUiState
-import github.zerorooot.nap511.player.MyGSYVideoPlayer
 import github.zerorooot.nap511.dialog.CaptchaVideoContent
+import github.zerorooot.nap511.player.MyGSYVideoPlayer
+import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.network.VideoErrorMapper
@@ -287,17 +288,18 @@ class VideoActivity : AppCompatActivity() {
                                 isEpisodeLoading = true
                                 updatePrevNextButtons()
                                 videoPlayer.playNext(event.videoUrl, event.title)
+                                if (event.videoUrl.isEmpty()) {
+                                    App.instance.toast("获取视频链接失败，视频可能被删除，请刷新重试！")
+                                    isEpisodeLoading = false
+                                    updatePrevNextButtons()
+                                }
                             }
 
                             // 弹出 Toast 消息
                             is VideoUiEvent.Toast -> {
                                 isEpisodeLoading = false
                                 updatePrevNextButtons()
-                                Toast.makeText(
-                                    this@VideoActivity,
-                                    event.message,
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                App.instance.toast(event.message)
                             }
 
                             // 旋转屏幕
