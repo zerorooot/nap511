@@ -22,6 +22,10 @@ sealed interface Route : NavKey {
     data object OfflineList : Route
 
     @Serializable
+    data class OfflineFileInfoDialog(val task: OfflineTask) : Route {
+    }
+
+    @Serializable
     data object RecycleBin : Route
 
     @Serializable

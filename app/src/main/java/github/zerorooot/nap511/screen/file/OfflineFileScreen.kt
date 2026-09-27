@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
@@ -38,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -48,12 +50,13 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import github.zerorooot.nap511.bean.LocationBean
 import github.zerorooot.nap511.bean.OfflineTask
-import github.zerorooot.nap511.dialog.OfflineFileInfoDialog
+import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.screen.components.AppBarAction
 import github.zerorooot.nap511.screen.components.AppTopBarOfflineFile
 import github.zerorooot.nap511.screen.components.MenuItemAction
 import github.zerorooot.nap511.screen.components.TopBarAction
 import github.zerorooot.nap511.screenitem.OfflineCellItem
+import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.copy
 import github.zerorooot.nap511.util.rememberListDetailDirective
@@ -78,14 +81,13 @@ data class OfflineFileActions(
     val onClearFinish: () -> Unit,
     val onClearError: () -> Unit,
     val onDeleteTask: (OfflineTask) -> Unit,
-    val onOpenTaskDialog: (OfflineTask) -> Unit,
-    val onCloseTaskDialog: () -> Unit,
+    var onOpenTaskDialog: (OfflineTask) -> Unit,
     val onLoadMoreCompleted: () -> Unit,
     val onLoadMoreDownloading: () -> Unit,
     val onLoadMoreFailed: () -> Unit,
     val getFiles: (String) -> Unit,
     val onClick: () -> Unit,
-    val onNavigateToNewTask: () -> Unit = {},
+    val onNavigate: (Route) -> Unit,
     val selectedPage: MutableIntState,
 )
 
@@ -98,14 +100,14 @@ fun OfflineFileScreen(
     gridCellMinSize: Dp,
     getFiles: (String) -> Unit,
     onClick: () -> Unit,
-    onNavigateToNewTask: () -> Unit = {}
+    onNavigate: (Route) -> Unit,
 ) {
     val uiState by offlineFileViewModel.uiState.collectAsStateWithLifecycle()
     val actions = remember(
         offlineFileViewModel,
         getFiles,
         onClick,
-        onNavigateToNewTask
+        onNavigate
     ) {
         OfflineFileActions(
             getListLocation = offlineFileViewModel::getListLocation,
@@ -114,17 +116,19 @@ fun OfflineFileScreen(
             onClearFinish = offlineFileViewModel::clearFinish,
             onClearError = offlineFileViewModel::clearError,
             onDeleteTask = offlineFileViewModel::delete,
-            onOpenTaskDialog = offlineFileViewModel::openOfflineDialog,
-            onCloseTaskDialog = offlineFileViewModel::closeOfflineDialog,
+            onOpenTaskDialog = {
+                onNavigate.invoke(Route.OfflineFileInfoDialog(it))
+            },
             onLoadMoreCompleted = offlineFileViewModel::loadMoreCompletedTasks,
             onLoadMoreDownloading = offlineFileViewModel::loadMoreDownloadingTasks,
             onLoadMoreFailed = offlineFileViewModel::loadMoreFailedTasks,
             getFiles = getFiles,
             onClick = onClick,
-            onNavigateToNewTask = onNavigateToNewTask,
+            onNavigate = { onNavigate.invoke(Route.OfflineDownload) },
             selectedPage = offlineFileViewModel.selectedPage
         )
     }
+
     if (isExpandedScreen) {
         AdaptiveOfflineScreen(
             uiState = uiState,
@@ -139,6 +143,9 @@ fun OfflineFileScreen(
             gridCellMinSize = gridCellMinSize,
             isGridScreen = isGridScreen,
             actions = actions,
+            onItemClick = { item ->
+                getFiles(item.fileId.ifEmpty { item.wpPathId })
+            }
         )
     }
 
@@ -173,6 +180,10 @@ fun AdaptiveOfflineScreen(
     val backStack: NavBackStack<NavKey> = rememberNavBackStack(OfflineNavKey.TaskList)
     val listDetailStrategy = rememberListDetailSceneStrategy<NavKey>(directive = directive)
 
+    actions.onOpenTaskDialog = fun(offlineTask: OfflineTask) {
+        selectedTask = offlineTask
+    }
+
     // 5. 详情面板公共渲染方法（统一复用，避免在 placeholder 与 entry 间冗余重复）
     val renderTaskDetail: @Composable (task: OfflineTask, onDeleted: () -> Unit) -> Unit =
         { targetTask, onDeleted ->
@@ -201,7 +212,9 @@ fun AdaptiveOfflineScreen(
                         if (selectedTask != null) {
                             renderTaskDetail(selectedTask!!) { selectedTask = null }
                         } else {
-                            OfflineTaskEmptyPlaceholder(actions.onNavigateToNewTask)
+                            OfflineTaskEmptyPlaceholder {
+                                actions.onNavigate.invoke(Route.OfflineDownload)
+                            }
                         }
                     }
                 )
@@ -210,7 +223,10 @@ fun AdaptiveOfflineScreen(
                     uiState = uiState,
                     gridCellMinSize = gridCellMinSize,
                     isGridScreen = isGridScreen,
-                    actions = actions
+                    actions = actions,
+                    onItemClick = {
+                        selectedTask = it
+                    }
                 )
             }
 
@@ -235,6 +251,7 @@ fun OfflineFileContent(
     gridCellMinSize: Dp,
     isGridScreen: Boolean,
     actions: OfflineFileActions,
+    onItemClick: ((OfflineTask) -> Unit),
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -257,17 +274,11 @@ fun OfflineFileContent(
         }
     }
 
-    OfflineFileInfoDialog(
-        isOpen = uiState.isOpenOfflineDialog,
-        task = uiState.selectedOfflineTask,
-        onDismissRequest = actions.onCloseTaskDialog
-    )
-
 
     // 菜单操作逻辑：直接接收选中的 OfflineTask 对象
     val menuOnClick = { action: MenuItemAction, item: OfflineTask ->
         when (action) {
-            MenuItemAction.COPY_LINK -> copyDownloadUrl(context, item.url, 1, item.name)
+            MenuItemAction.COPY_LINK -> copyDownloadUrl(context, item.url, -1)
             MenuItemAction.DELETE_FILE -> actions.onDeleteTask(item)
             MenuItemAction.FILE_INFO -> actions.onOpenTaskDialog(item)
             else -> {}
@@ -276,7 +287,7 @@ fun OfflineFileContent(
 
     val appBarOnClick = { action: AppBarAction ->
         when (action) {
-            MenuItemAction.REFRESH_FILES -> actions.onRefresh()
+            MenuItemAction.REFRESH_OFFLINE_FILES -> actions.onRefresh()
             MenuItemAction.CLEAR_COMPLETED -> actions.onClearFinish()
             MenuItemAction.CLEAR_FAILED -> actions.onClearError()
             MenuItemAction.COPY_PAGE_LINK -> {
@@ -287,21 +298,30 @@ fun OfflineFileContent(
                     2 -> uiState.failedList
                     else -> uiState.completedList
                 }
-                allTasks.forEach { i ->
-                    stringJoiner.add(
-                        i.url.replace(Regex("&dn=.*"), "").trim()
-                    )
+                if (allTasks.isNotEmpty()) {
+                    allTasks.forEach { i ->
+                        stringJoiner.add(
+                            i.url.replace(Regex("&dn=.*"), "").trim()
+                        )
+                    }
+                    copyDownloadUrl(context, stringJoiner.toString(), allTasks.size)
+
+                } else {
+                    App.instance.toast("没有链接")
                 }
-                copyDownloadUrl(context, stringJoiner.toString(), allTasks.size)
             }
 
             TopBarAction.DRAWER_MENU -> actions.onClick()
             else -> {}
         }
     }
-
-    Column {
-        AppTopBarOfflineFile(ConfigKeyUtil.OFFLINE_LIST, appBarOnClick)
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    Column(modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)) {
+        AppTopBarOfflineFile(
+            ConfigKeyUtil.OFFLINE_LIST,
+            appBarOnClick,
+            scrollBehavior = scrollBehavior
+        )
 
         // PrimaryTabRow 顶部切换栏
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
@@ -420,9 +440,7 @@ fun OfflineFileContent(
                                 OfflineCellItem(
                                     offlineTask = item,
                                     index = index,
-                                    itemOnClick = { _ ->
-                                        actions.getFiles(item.fileId.ifEmpty { item.wpPathId })
-                                    },
+                                    itemOnClick = onItemClick,
                                     menuOnClick = { menuName, _ -> menuOnClick(menuName, item) }
                                 )
                             }
@@ -446,9 +464,7 @@ fun OfflineFileContent(
                                 OfflineCellItem(
                                     offlineTask = item,
                                     index = index,
-                                    itemOnClick = { _ ->
-                                        actions.getFiles(item.fileId.ifEmpty { item.wpPathId })
-                                    },
+                                    itemOnClick = onItemClick,
                                     menuOnClick = { menuName, _ -> menuOnClick(menuName, item) }
                                 )
                             }
@@ -460,8 +476,8 @@ fun OfflineFileContent(
     }
 }
 
-fun copyDownloadUrl(context: Context, text: String, count: Int, name: String? = null) {
+fun copyDownloadUrl(context: Context, text: String, count: Int) {
     text.copy(context)
-    val toast = "${name?.plus(" ") ?: "$count 个"}下载链接复制成功"
+    val toast = if (count == -1) "下载链接复制成功" else "$count 个下载链接复制成功"
     Toast.makeText(context, toast, Toast.LENGTH_SHORT).show()
 }

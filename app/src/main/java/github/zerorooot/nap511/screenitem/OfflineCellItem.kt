@@ -39,7 +39,7 @@ import github.zerorooot.nap511.screen.components.OfflineFileMoreMenu
 fun OfflineCellItem(
     offlineTask: OfflineTask,
     index: Int,
-    itemOnClick: (Int) -> Unit,
+    itemOnClick: (OfflineTask) -> Unit,
     menuOnClick: (MenuItemAction, Int) -> Unit
 ) {
     val image = if (offlineTask.fileId == "") R.drawable.other else R.drawable.folder
@@ -54,7 +54,7 @@ fun OfflineCellItem(
             .padding(1.dp)
             .combinedClickable(
                 onClick = {
-                    itemOnClick.invoke(index)
+                    itemOnClick.invoke(offlineTask)
                 }
             ),
     ) {

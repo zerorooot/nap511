@@ -36,6 +36,7 @@ import github.zerorooot.nap511.bean.InfoItem
 import github.zerorooot.nap511.bean.InfoSection
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.PathsBean
+import github.zerorooot.nap511.screen.file.TaskDetailPane
 
 @Composable
 fun FileInfoDialog(
@@ -145,127 +146,85 @@ fun BaseDetailDialog(
         modifier = Modifier.widthIn(max = 560.dp),
         onDismissRequest = onDismissRequest,
         title = {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Image(
-                painter = painterResource(icon),
-                modifier = Modifier.size(28.dp),
-                contentScale = ContentScale.Fit,
-                contentDescription = "",
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = MaterialTheme.typography.titleMedium.lineHeight
-            )
-        }
-    }, text = {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            sections.forEachIndexed { index, section ->
-                Text(
-                    text = section.title,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = if (index == 0) 0.dp else 8.dp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    painter = painterResource(icon),
+                    modifier = Modifier.size(28.dp),
+                    contentScale = ContentScale.Fit,
+                    contentDescription = "",
                 )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = MaterialTheme.typography.titleMedium.lineHeight
+                )
+            }
+        }, text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                sections.forEachIndexed { index, section ->
+                    Text(
+                        text = section.title,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = if (index == 0) 0.dp else 8.dp)
+                    )
 
-                section.items.forEach { item ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = item.label,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    section.items.forEach { item ->
+                        Row(
                             modifier = Modifier
-                                .weight(1f)
-                                .padding(top = 2.dp)
-                        )
-
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Box(
-                            modifier = Modifier.weight(2f),
-                            contentAlignment = Alignment.TopEnd
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            if (item.customContent != null) {
-                                item.customContent.invoke()
-                            } else {
-                                Text(
-                                    text = item.value.ifEmpty { "-" },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    textAlign = TextAlign.End,
-                                    minLines = 1,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
+                            Text(
+                                text = item.label,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(top = 2.dp)
+                            )
+
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Box(
+                                modifier = Modifier.weight(2f),
+                                contentAlignment = Alignment.TopEnd
+                            ) {
+                                if (item.customContent != null) {
+                                    item.customContent.invoke()
+                                } else {
+                                    Text(
+                                        text = item.value.ifEmpty { "-" },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        textAlign = TextAlign.End,
+                                        minLines = 1,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
                             }
                         }
                     }
-                }
 
-                if (index < sections.lastIndex) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(top = 4.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant
-                    )
+                    if (index < sections.lastIndex) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(top = 4.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    }
                 }
             }
-        }
-    }, confirmButton = {
-        TextButton(onClick = onDismissRequest) {
-            Text("关闭")
-        }
-    })
-}
-
-@Composable
-fun OfflineFileInfoDialog(
-    isOpen: Boolean,
-    task: OfflineTask?,
-    onDismissRequest: () -> Unit
-) {
-    if (isOpen && task != null) {
-        OfflineTaskDialog(task, onDismissRequest = onDismissRequest)
-    }
-}
-
-@Composable
-fun OfflineTaskDialog(
-    task: OfflineTask, onDismissRequest: () -> Unit
-) {
-    val sections = listOf(
-        InfoSection(
-            title = "任务信息", items = listOf(
-                InfoItem("状态", task.percentString),
-                InfoItem("总大小", task.sizeString),
-                InfoItem("下载进度", "${task.percentDone}%")
-            )
-        ), InfoSection(
-            title = "链接与哈希", items = listOf(
-                InfoItem("哈希值", task.infoHash),
-                InfoItem("链接", task.url)
-            )
-        ), InfoSection(
-            title = "时间信息", items = listOf(
-                InfoItem("添加时间", task.timeString)
-            )
-        )
-    )
-
-    BaseDetailDialog(
-        title = task.name,
-        icon = if (task.fileId == "") R.drawable.other else R.drawable.folder,
-        sections = sections,
-        onDismissRequest = onDismissRequest
-    )
+        }, confirmButton = {
+            TextButton(onClick = onDismissRequest) {
+                Text("关闭")
+            }
+        })
 }

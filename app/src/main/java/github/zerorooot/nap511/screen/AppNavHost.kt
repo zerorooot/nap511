@@ -20,6 +20,7 @@ import github.zerorooot.nap511.screen.file.OfflineDownloadScreen
 import github.zerorooot.nap511.screen.file.OfflineFileScreen
 import github.zerorooot.nap511.screen.file.RecycleScreen
 import github.zerorooot.nap511.screen.file.RepeatFileScreen
+import github.zerorooot.nap511.screen.file.TaskDetailPane
 import github.zerorooot.nap511.screen.setting.SettingScreen
 import github.zerorooot.nap511.screen.viewer.MusicDetailScreen
 import github.zerorooot.nap511.screen.viewer.MyPhotoScreen
@@ -142,8 +143,20 @@ fun AppNavHost(
                         fileViewModel.getFiles(it)
                         onNavigate(Route.MyFile)
                     },
-                    onNavigateToNewTask = { onNavigate(Route.OfflineDownload) },
+                    onNavigate = onNavigate,
                     onClick = onOpenDrawer
+                )
+            }
+            entry<Route.OfflineFileInfoDialog> {
+                val task = it.task
+                TaskDetailPane(
+                    task,
+                    onDeleteTask = offlineFileViewModel::delete,
+                    onOpenFile = {
+                        fileViewModel.getFiles(task.fileId.ifEmpty { task.wpPathId })
+                        onNavigate(Route.MyFile)
+                    },
+                    onBack = onPopBack
                 )
             }
 

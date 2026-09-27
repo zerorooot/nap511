@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Delete
@@ -48,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavKey
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.screen.components.BaseTopAppBar
+import github.zerorooot.nap511.screen.components.TopAppBarActionButton
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.copy
 import kotlinx.serialization.Serializable
@@ -109,12 +111,23 @@ fun OfflineTaskEmptyPlaceholder(onNavigateToNewTask: () -> Unit) {
 fun TaskDetailPane(
     task: OfflineTask,
     onDeleteTask: (OfflineTask) -> Unit,
-    onOpenFile: (String) -> Unit
+    onOpenFile: (String) -> Unit,
+    onBack: (() -> Unit)? = null
 ) {
     Scaffold(
         topBar = {
             BaseTopAppBar(
                 title = { Text("任务详情") },
+                navigationIcon = {
+                    if (onBack != null) {
+                        TopAppBarActionButton(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            description = "navigationIcon"
+                        ) {
+                            onBack.invoke()
+                        }
+                    }
+                },
             )
         }
     ) { padding ->
@@ -185,7 +198,7 @@ fun TaskDetailPane(
                     value = task.url
                 ) {
                     task.url.copy(current)
-                    App.instance.toast("${task.name} 下载链接复制成功")
+                    App.instance.toast("下载链接复制成功")
                 }
             }
 

@@ -83,8 +83,9 @@ enum class MenuItemAction(
 
     // 离线页顶栏菜单项
     COPY_PAGE_LINK("复制本页链接", Icons.Outlined.ContentCopy),
-    CLEAR_COMPLETED("清空已完成", Icons.Outlined.DoneAll),
-    CLEAR_FAILED("清空已失败", Icons.Outlined.Cancel, isDestructive = true),
+    CLEAR_COMPLETED("清空完成链接", Icons.Outlined.DoneAll),
+    CLEAR_FAILED("清空失败链接", Icons.Outlined.Cancel, isDestructive = true),
+    REFRESH_OFFLINE_FILES("强制刷新页面", Icons.Outlined.Refresh),
 
     // 日志页顶栏菜单项
     SCROLL_TOP("滚动顶部", Icons.Outlined.VerticalAlignTop),
@@ -237,7 +238,7 @@ fun FileAppTopBarDropdownMenu(onClick: (MenuItemAction, Int) -> Unit) {
 @Composable
 fun OfflineFileAppTopBarDropdownMenu(onClick: (MenuItemAction, Int) -> Unit) {
     val listOf = listOf(
-        MenuItemAction.REFRESH_FILES,
+        MenuItemAction.REFRESH_OFFLINE_FILES,
         MenuItemAction.COPY_PAGE_LINK,
         MenuItemAction.CLEAR_COMPLETED,
         MenuItemAction.CLEAR_FAILED

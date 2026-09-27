@@ -42,8 +42,6 @@ data class OfflineFileUiState(
     val downloadingList: List<OfflineTask> = emptyList(),
     val failedList: List<OfflineTask> = emptyList(),
     val completedList: List<OfflineTask> = emptyList(),
-    val isOpenOfflineDialog: Boolean = false,
-    val selectedOfflineTask: OfflineTask? = null
 )
 
 class OfflineFileViewModel : ViewModel() {
@@ -62,8 +60,6 @@ class OfflineFileViewModel : ViewModel() {
     private val _quotaBean = MutableStateFlow(QuotaBean(1500, 1500))
     var quotaBean = _quotaBean.asStateFlow()
 
-    private val _isOpenOfflineDialog = MutableStateFlow(false)
-    private val _selectedOfflineTask = MutableStateFlow<OfflineTask?>(null)
     val urlText = mutableStateOf("")
     var selectedTask = mutableStateOf<OfflineTask?>(null)
     var selectedPage = mutableIntStateOf(0)
@@ -93,8 +89,6 @@ class OfflineFileViewModel : ViewModel() {
         _downloadingList,
         _failedList,
         _completedList,
-        _isOpenOfflineDialog,
-        _selectedOfflineTask
     ) { values: Array<Any?> ->
         val offlineInfo = values[0] as OfflineListCount
         val refreshing = values[1] as Boolean
@@ -107,8 +101,6 @@ class OfflineFileViewModel : ViewModel() {
 
         @Suppress("UNCHECKED_CAST")
         val completedList = values[4] as List<OfflineTask>
-        val isOpenDialog = values[5] as Boolean
-        val selectedTask = values[6] as OfflineTask?
 
         OfflineFileUiState(
             offlineInfo = offlineInfo,
@@ -116,8 +108,6 @@ class OfflineFileViewModel : ViewModel() {
             downloadingList = downloadingList,
             failedList = failedList,
             completedList = completedList,
-            isOpenOfflineDialog = isOpenDialog,
-            selectedOfflineTask = selectedTask
         )
     }.stateIn(
         scope = viewModelScope,
@@ -356,18 +346,6 @@ class OfflineFileViewModel : ViewModel() {
         }
     }
 
-    /**
-     * 3. 支持直接传入 OfflineTask 打开详情弹窗
-     */
-    fun openOfflineDialog(task: OfflineTask) {
-        _selectedOfflineTask.value = task
-        _isOpenOfflineDialog.value = true
-    }
-
-    fun closeOfflineDialog() {
-        _isOpenOfflineDialog.value = false
-        _selectedOfflineTask.value = null
-    }
 
     fun delete(offlineTask: OfflineTask) {
         viewModelScope.launch {
