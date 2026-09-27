@@ -439,9 +439,8 @@ fun OfflineFileContent(
                             ) { index, item ->
                                 OfflineCellItem(
                                     offlineTask = item,
-                                    index = index,
                                     itemOnClick = onItemClick,
-                                    menuOnClick = { menuName, _ -> menuOnClick(menuName, item) }
+                                    menuOnClick = { menuName -> menuOnClick(menuName, item) }
                                 )
                             }
                         }
@@ -463,9 +462,8 @@ fun OfflineFileContent(
                             ) { index, item ->
                                 OfflineCellItem(
                                     offlineTask = item,
-                                    index = index,
                                     itemOnClick = onItemClick,
-                                    menuOnClick = { menuName, _ -> menuOnClick(menuName, item) }
+                                    menuOnClick = { menuName -> menuOnClick(menuName, item) }
                                 )
                             }
                         }

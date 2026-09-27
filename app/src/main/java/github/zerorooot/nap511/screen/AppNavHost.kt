@@ -11,6 +11,7 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import androidx.window.core.layout.WindowSizeClass
+import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.dialog.ExitApp
@@ -151,7 +152,10 @@ fun AppNavHost(
                 val task = it.task
                 TaskDetailPane(
                     task,
-                    onDeleteTask = offlineFileViewModel::delete,
+                    onDeleteTask = { offlineTask: OfflineTask ->
+                        offlineFileViewModel.delete(offlineTask)
+                        onPopBack()
+                    },
                     onOpenFile = {
                         fileViewModel.getFiles(task.fileId.ifEmpty { task.wpPathId })
                         onNavigate(Route.MyFile)

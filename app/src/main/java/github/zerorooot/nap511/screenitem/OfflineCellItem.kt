@@ -38,9 +38,8 @@ import github.zerorooot.nap511.screen.components.OfflineFileMoreMenu
 @Composable
 fun OfflineCellItem(
     offlineTask: OfflineTask,
-    index: Int,
     itemOnClick: (OfflineTask) -> Unit,
-    menuOnClick: (MenuItemAction, Int) -> Unit
+    menuOnClick: (MenuItemAction) -> Unit
 ) {
     val image = if (offlineTask.fileId == "") R.drawable.other else R.drawable.folder
     val name = offlineTask.name
@@ -134,7 +133,7 @@ fun OfflineCellItem(
                 }
 
                 OfflineFileMoreMenu { itemAction, _ ->
-                    menuOnClick.invoke(itemAction, index)
+                    menuOnClick.invoke(itemAction)
                 }
             }
 
@@ -154,6 +153,6 @@ fun p() {
         percentString = "43%",
         timeString = "2023-02-13 12:43"
     )
-    OfflineCellItem(offlineTask, 1, {}, { _, _ -> })
+    OfflineCellItem(offlineTask, {}, { _ -> })
 
 }
