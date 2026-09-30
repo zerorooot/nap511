@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.runtime.Composable
@@ -36,14 +38,23 @@ import github.zerorooot.nap511.screenitem.FileListContent
 import github.zerorooot.nap511.screenitem.FilePathBar
 import github.zerorooot.nap511.screenitem.FileScreenFab
 import github.zerorooot.nap511.screenitem.NotificationPermissionBanner
+import github.zerorooot.nap511.viewmodel.AudioViewModel
+
+private enum class TopBarMode { Multiple, Root, Back }
 
 @Composable
 fun FileScaffold(
     state: FileScaffoldState,
     actions: FileScaffoldActions,
+    audioViewModel: AudioViewModel,
     modifier: Modifier = Modifier,
     content: @Composable (PaddingValues) -> Unit
 ) {
+    val topBarMode = when {
+        state.isLongClickState -> TopBarMode.Multiple
+        state.currentCid == "0" -> TopBarMode.Root
+        else -> TopBarMode.Back
+    }
     Scaffold(
         //直接设置
         // contentWindowInsets = WindowInsets(0, 0, 0, 0) ,
@@ -61,24 +72,34 @@ fun FileScaffold(
             AnimatedVisibility(
                 visible = state.isTopBarShow,
                 enter = fadeIn() + slideInVertically(),
-                exit = fadeOut() + slideOutVertically()
+                exit = fadeOut() + slideOutVertically(),
+                label = "topBarVisibility"
             ) {
                 AnimatedContent(
-                    targetState = state.isLongClickState,
+                    targetState = topBarMode,
                     transitionSpec = { fadeIn() togetherWith fadeOut() },
-                    label = ""
-                ) { isLongClick ->
-                    if (isLongClick) {
-                        AppTopBarMultiple(
+                    label = "topBarMode"
+                ) { m ->
+                    when (m) {
+                        TopBarMode.Multiple -> AppTopBarMultiple(
                             title = state.appBarTitle,
                             isLandscape = state.isLandscape,
                             onClick = actions.onAppBarClick
                         )
-                    } else {
-                        AppTopBarNormal(state.appBarTitle, actions.onAppBarClick)
+                        TopBarMode.Root -> AppTopBarNormal(
+                            title = state.appBarTitle,
+                            imageVector = Icons.Rounded.Menu,
+                            onClick = actions.onAppBarClick
+                        )
+                        TopBarMode.Back -> AppTopBarNormal(
+                            title = state.appBarTitle,
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            onClick = actions.onAppBarClick
+                        )
                     }
                 }
             }
+
         },
         modifier = modifier.nestedScroll(state.nestedScrollConnection),
         bottomBar = {
@@ -87,7 +108,7 @@ fun FileScaffold(
                 enter = slideInVertically(initialOffsetY = { it }),
                 exit = slideOutVertically(targetOffsetY = { it }),
             ) {
-                MiniPlayerBar(audioViewModel = state.audioViewModel) {
+                MiniPlayerBar(audioViewModel = audioViewModel) {
                     actions.onMusicDetailNav()
                 }
             }

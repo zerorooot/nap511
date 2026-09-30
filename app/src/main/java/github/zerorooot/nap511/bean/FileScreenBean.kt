@@ -23,8 +23,8 @@ data class FileScaffoldState(
     val hasCurrentMusic: Boolean,
     val isCutState: Boolean,
     val fabPosition: FabPosition,
-    val nestedScrollConnection: NestedScrollConnection,
-    val audioViewModel: AudioViewModel
+    val currentCid: String,
+    val nestedScrollConnection: NestedScrollConnection
 )
 
 /**

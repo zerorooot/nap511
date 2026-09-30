@@ -103,4 +103,8 @@ dependencies {
     implementation(libs.androidx.transition)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.kotlinx.serialization.json)
+
+
+    testImplementation(libs.junit)
+
 }

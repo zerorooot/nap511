@@ -85,8 +85,8 @@ enum class TopBarAction(
     DRAWER_MENU("抽屉菜单", Icons.Rounded.Menu),
     SEARCH("搜索", Icons.Rounded.Search),
 
-    SELECT_UP("向上选", Icons.Default.ArrowUpward),
-    SELECT_DOWN("向下选", Icons.Default.ArrowDownward),
+    SELECT_UP("上选", Icons.Default.ArrowUpward),
+    SELECT_DOWN("下选", Icons.Default.ArrowDownward),
     CUT("剪切", Icons.Default.ContentCut),
     DELETE("删除", Icons.Default.Delete),
     SELECT_REVERSE("反选", Icons.Default.SelectAll),
@@ -99,6 +99,7 @@ enum class TopBarAction(
 @Composable
 fun AppTopBarNormal(
     title: String,
+    imageVector: ImageVector,
     onClick: (AppBarAction) -> Unit,
     scrollBehavior: TopAppBarScrollBehavior? = null
 ) {
@@ -107,7 +108,7 @@ fun AppTopBarNormal(
         scrollBehavior = scrollBehavior,
         navigationIcon = {
             TopAppBarActionButton(
-                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                imageVector = imageVector,
                 description = "navigationIcon"
             ) {
                 onClick.invoke(TopBarAction.BACK)

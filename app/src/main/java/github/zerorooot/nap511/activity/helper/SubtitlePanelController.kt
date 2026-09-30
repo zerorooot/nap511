@@ -188,6 +188,7 @@ class SubtitlePanelController(
         val etSearch = videoPlayer.findViewById<EditText>(R.id.et_subtitle_search)
         if (etSearch != null) {
             etSearch.setText(state.defaultSearchKeyword)
+            etSearch.setSelection(etSearch.text.length)
         }
     }
 

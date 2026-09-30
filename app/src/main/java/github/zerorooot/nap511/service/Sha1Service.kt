@@ -3,9 +3,7 @@ package github.zerorooot.nap511.service
 
 import android.app.Service
 import android.content.Intent
-import android.os.Build
 import android.os.IBinder
-import androidx.annotation.RequiresApi
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.JsonArray
@@ -18,13 +16,12 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.network.NetworkClient
 import github.zerorooot.nap511.util.network.UserSessionManager
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlin.concurrent.thread
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 
 
 class Sha1Service : Service() {
@@ -39,7 +36,8 @@ class Sha1Service : Service() {
     }
 
 
-    private val serviceScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO + kotlinx.coroutines.SupervisorJob())
+    private val serviceScope =
+        CoroutineScope(kotlinx.coroutines.Dispatchers.IO + kotlinx.coroutines.SupervisorJob())
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val command = intent?.getStringExtra(ConfigKeyUtil.COMMAND)
@@ -115,11 +113,16 @@ class Sha1Service : Service() {
         paramsJsonArray.add(urlJsonArray)
 
 
+        val headerArray = JsonArray()
+        headerArray.add("User-Agent: ${ConfigKeyUtil.USER_AGENT}")
+//        headerArray.add("Referer: https://115.com/")
+//        headerArray.add("Cookie: ${UserSessionManager.cookie}")
         val headersJsonObject = JsonObject()
-        headersJsonObject.addProperty(
+        headersJsonObject.add(
             "header",
-            ConfigKeyUtil.USER_AGENT
+            headerArray
         )
+
         paramsJsonArray.add(headersJsonObject)
 
         val jsonObject = JsonObject()

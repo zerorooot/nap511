@@ -80,7 +80,7 @@ fun LazyListScope.downloadAria2PreferenceItems(
     item {
         EditTextPreferenceItem(
             title = "Aria2 授权密钥",
-            summary = uiState.aria2Token.ifEmpty { "未设置（若无密码请留空）" },
+            summary = "若无密码请留空",
             value = uiState.aria2Token,
             onValueSave = { onSaveConfig(ConfigKeyUtil.ARIA2_TOKEN, it) }
         )

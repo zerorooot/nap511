@@ -94,7 +94,11 @@ fun AppNavHost(
                     audioViewModel = audioViewModel,
                     isGridScreen = isGridScreen,
                     gridCellMinSize = gridCellMinSize,
-                    onNav = { route -> onNavigate(route) }
+                    onNav = { route -> onNavigate(route) },
+                    openDrawer = {
+                        onSetGesturesEnabled(true)
+                        onOpenDrawer()
+                    }
                 ) {
                     val open = isDrawerOpen()
                     if (open) {

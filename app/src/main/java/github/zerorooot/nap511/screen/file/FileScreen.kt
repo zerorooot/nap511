@@ -100,6 +100,7 @@ fun FileScreen(
     isGridScreen: Boolean,
     gridCellMinSize: Dp,
     onNav: (Route) -> Unit,
+    openDrawer: () -> Unit,
     drawerState: () -> Boolean
 ) {
 
@@ -382,6 +383,10 @@ fun FileScreen(
     fun myAppBarOnClick(action: AppBarAction) {
         when (action) {
             TopBarAction.BACK -> {
+                if (fileViewModel.currentCid == "0" && !fileViewModel.isLongClickState) {
+                    openDrawer()
+                    return
+                }
                 onBack()
             }
 
@@ -551,7 +556,7 @@ fun FileScreen(
         isCutState = fileViewModel.isCutState,
         fabPosition = fabPosition,
         nestedScrollConnection = nestedScrollConnection,
-        audioViewModel = audioViewModel
+        currentCid = fileViewModel.currentCid
     )
 
     val currentAppBarOnClick by rememberUpdatedState(::myAppBarOnClick)
@@ -592,7 +597,7 @@ fun FileScreen(
     )
 
     FileScaffold(
-        state = scaffoldState, actions = scaffoldActions
+        state = scaffoldState, actions = scaffoldActions, audioViewModel = audioViewModel
     ) { innerPadding ->
         FileScreenContent(
             innerPadding = innerPadding,
