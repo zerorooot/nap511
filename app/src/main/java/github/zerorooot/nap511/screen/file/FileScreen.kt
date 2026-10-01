@@ -205,7 +205,9 @@ fun FileScreen(
         }
 
         onDispose {
-            insetsController?.show(WindowInsetsCompat.Type.systemBars())
+            if (!isTopBarShow) {
+                insetsController?.show(WindowInsetsCompat.Type.systemBars())
+            }
         }
     }
 

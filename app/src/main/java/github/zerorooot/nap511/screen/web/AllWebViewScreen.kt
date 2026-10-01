@@ -2,6 +2,7 @@ package github.zerorooot.nap511.screen.web
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -53,6 +54,8 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.network.NetworkClient
 import github.zerorooot.nap511.util.network.UserSessionManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -119,20 +122,21 @@ fun BaseWebViewScreen(
             color = MaterialTheme.colorScheme.background,
         ) {
             Box {
-                AndroidView(modifier = Modifier.fillMaxSize(), factory = { context ->
-                    WebView(context).apply {
-                        webViewInstance = this
-                        this.webViewClient = webViewClient.invoke(this)
-                        applyDefaultSettings()
-                        CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(), factory = { context ->
+                        WebView(context).apply {
+                            webViewInstance = this
+                            this.webViewClient = webViewClient.invoke(this)
+                            applyDefaultSettings()
+                            CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
-                        webChromeClient = object : WebChromeClient() {
-                            override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                                progress = newProgress / 100f
-                                if (newProgress > 10) {
-                                    // 1. 环境指纹伪装
-                                    view?.evaluateJavascript(
-                                        """
+                            webChromeClient = object : WebChromeClient() {
+                                override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                                    progress = newProgress / 100f
+                                    if (newProgress > 10) {
+                                        // 1. 环境指纹伪装
+                                        view?.evaluateJavascript(
+                                            """
                                         (function() {
                                             if (window._hook_fixed) return;
                                             var UA = '${ConfigKeyUtil.USER_AGENT}';
@@ -144,17 +148,53 @@ fun BaseWebViewScreen(
                                             window._hook_fixed = true;
                                         })();
                                         """.trimIndent(), null
-                                    )
+                                        )
+                                    }
+                                }
+
+                                // 2. 网页 Console 日志捕获（拦截 JS 报错，方便 Logcat 过滤排查）
+                                override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                                    val msg = consoleMessage?.message() ?: ""
+                                    val source = consoleMessage?.sourceId() ?: ""
+                                    val line = consoleMessage?.lineNumber() ?: 0
+                                    if (msg.contains("failed") || msg.contains("error") || msg.contains(
+                                            "403"
+                                        ) || msg.contains("401")
+                                    ) {
+                                        XLog.e("WebView CRITICAL ERROR: $msg -- From line $line of $source")
+                                    } else {
+                                        XLog.d("WebView Console [${consoleMessage?.messageLevel()}]: $msg -- From line $line of $source")
+                                    }
+                                    return true
+                                }
+
+                                // 3. 页面 Title 监测（监听 SPA 无刷新路由切换，触发诊断）
+                                override fun onReceivedTitle(view: WebView?, title: String?) {
+                                    super.onReceivedTitle(view, title)
+                                    XLog.d("WebView Title: $title")
+                                    if (title?.contains("全部文件") == true || title?.contains("115") == true) {
+                                        view?.evaluateJavascript(
+                                            "if(window.runDiagnostic) window.runDiagnostic('TITLE_CHANGE_' + document.title);",
+                                            null
+                                        )
+                                    }
                                 }
                             }
+                            val headers = HashMap<String, String>()
+                            headers["X-Requested-With"] = ""
+                            loadUrl(loadUrl, headers)
                         }
-                        val headers = HashMap<String, String>()
-                        headers["X-Requested-With"] = ""
-                        loadUrl(loadUrl, headers)
-                    }
-                }, update = { webView ->
-                    webViewInstance = webView
-                })
+                    }, update = { webView ->
+                        webViewInstance = webView
+                    },
+                    onRelease = { webView ->
+                        // 离开 Composition 时显式释放 WebView
+                        webView.stopLoading()
+                        webView.loadUrl("about:blank")
+                        webView.clearHistory()
+                        webView.removeAllViews()
+                        webView.destroy()
+                    })
 
                 if (showTopBarButton) {
                     IconButton(
@@ -241,19 +281,20 @@ fun setRawCookieString(rawCookieString: String) {
 
     // 只取 key=value 核心部分，彻底移除多余属性
     val cookiePairs = rawCookieString.split(";").map { it.trim() }.filter { it.contains("=") }
-
     val domains = arrayOf(".115.com", "115.com", "webapi.115.com", "cdnassets.115.com", "anxia.com")
 
-    cookiePairs.forEach { pair ->
-        domains.forEach { domain ->
-            cookieManager.setCookie("https://$domain", "$pair; Domain=.115.com; Path=/")
+    cookieManager.removeAllCookies {
+        cookiePairs.forEach { pair ->
+            domains.forEach { domain ->
+                cookieManager.setCookie("https://$domain", "$pair; Domain=.115.com; Path=/")
+            }
         }
-    }
-    // 强制注入旧版模式标记，规避 Next.js 兼容性黑洞
-    cookieManager.setCookie("https://115.com", "OO_V=2014; Domain=.115.com; Path=/")
+        // 强制注入旧版模式标记，规避 Next.js 兼容性黑洞
+        cookieManager.setCookie("https://115.com", "OO_V=2014; Domain=.115.com; Path=/")
 
-    cookieManager.flush()
-    XLog.d("setRawCookieString finished with OO_V=2014")
+        cookieManager.flush()
+        XLog.d("setRawCookieString finished with OO_V=2014")
+    }
 }
 
 fun webViewClient(onUrl: (String) -> Unit): WebViewClient {
@@ -293,6 +334,15 @@ fun webViewClient(onUrl: (String) -> Unit): WebViewClient {
             view?.url?.let { onUrl.invoke(it) }
             XLog.d("WebView Page Finished: $url")
 
+            /*
+             * 调试排查说明：可在 Logcat 中过滤以下 Tag/关键词：
+             * - "DIAG_DATA": JS 采集打印的 DOM 节点数量、视口宽高、Body 高度、子元素排版结构与文件表头位置
+             * - "POPUP_DIALOG_DETECTED": 动态监听并打印弹出的对话框（如“普通上传”、“添加云下载”）信息
+             * - "WebView Console": 网页原生 console.log 日志
+             * - "WebView CRITICAL ERROR": 网页原生 JS 运行/请求报错信息
+             * - "FULL_HTML": 查看 dump 的完整 DOM HTML 源码
+             */
+            // 核心 UI 修复逻辑（跨版本兼容与样式重置）
             view?.evaluateJavascript(
                 """
                 (function() {
@@ -306,16 +356,20 @@ fun webViewClient(onUrl: (String) -> Unit): WebViewClient {
                             document.head.appendChild(style);
                         }
                         style.textContent = `
+                            /* 1. 强撑高度：解决 vh 失效导致的白屏 */
                             html, body, #__next, [class*="h-screen"] {
                                 height: ${'$'}{pxHeight} !important;
                                 min-height: ${'$'}{pxHeight} !important;
                             }
                             body { display: block !important; overflow: auto !important; }
+                               /* 2. 强制显示：解决 overflow: hidden 导致的内容不可见 */
                             #js_mainContent, .layout-main, .layout-content {
                                 overflow: auto !important;
                                 min-height: 100% !important;
                             }
+                              /* 3. 桌面适配：防止窄屏下主分栏 UI 挤压错位 */
                             .flex.relative.min-w-\[800px\] { min-width: 800px !important; }
+                             /* 4. 遮罩清除：隐藏全屏阻挡视线的加载指示器 */
                             .v-modal, [class*="mask"], [class*="loading"] { display: none !important; pointer-events: none !important; }
                         `;
                     }
@@ -330,7 +384,147 @@ fun webViewClient(onUrl: (String) -> Unit): WebViewClient {
                 })();
                 """.trimIndent(), null
             )
+
+            // 调试诊断与日志输出逻辑（仅 DEBUG 模式下生效）
+            if (github.zerorooot.nap511.BuildConfig.DEBUG) {
+                view?.evaluateJavascript(
+                    """
+                    (function() {
+                        // 诊断函数：采集并分析当前 DOM 结构与节点排版
+                        window.runDiagnostic = function(reason) {
+                            var body = document.body;
+                            var info = {
+                                reason: reason || 'FINISH',
+                                url: window.location.href,
+                                title: document.title,
+                                wh: window.innerWidth + 'x' + window.innerHeight,
+                                body_h: body ? body.offsetHeight : -1,
+                                elems: document.getElementsByTagName('*').length,
+                                // 输出 Body 下直接一级子元素的排版结构与高度摘要（排查高度塌陷/错位）
+                                structure: body ? Array.from(body.children).map(function(c) {
+                                    return c.tagName + '.' + c.className.split(' ').join('.') + 
+                                           '(' + c.offsetHeight + 'px) -> ' + 
+                                           (c.innerText ? c.innerText.substring(0, 15).replace(/\n/g, ' ') : 'EMPTY');
+                                }) : [],
+                                // 检查文件列表标头（“文件名”/“大小”）位置与可见性
+                                list_check: (function(){
+                                    var t = Array.from(document.querySelectorAll('*')).find(function(el) { 
+                                        return el.innerText && (el.innerText === '文件名' || el.innerText === '大小') && el.children.length === 0;
+                                    });
+                                    return t ? { tag: t.tagName, rect: t.getBoundingClientRect() } : 'LIST_HEADER_NOT_FOUND';
+                                })()
+                            };
+                            console.log("DIAG_DATA: " + JSON.stringify(info));
+                        };
+
+                        // 详细分析并打印当前 DOM 中所有弹窗、对话框、遮罩层的实时计算样式与位置
+                        window.logDialogDetails = function(triggerTag) {
+                            var targets = document.querySelectorAll('.dialog-box, [id*="window_"], .upload-box, .offline-box, .window-current, [class*="dialog"], [class*="offline"], [class*="upload"], [class*="mask"], [class*="modal"]');
+                            if (!targets || targets.length === 0) {
+                                console.log("DIALOG_LOG [" + triggerTag + "]: No dialog/mask element found in DOM");
+                                return;
+                            }
+                            var logs = [];
+                            targets.forEach(function(el, idx) {
+                                var rect = el.getBoundingClientRect();
+                                var cs = window.getComputedStyle(el);
+                                var parent = el.parentElement;
+                                var pcs = parent ? window.getComputedStyle(parent) : {};
+                                logs.push({
+                                    idx: idx,
+                                    id: el.id,
+                                    cls: el.className,
+                                    rect: [Math.round(rect.left), Math.round(rect.top), Math.round(rect.width), Math.round(rect.height)],
+                                    style: {
+                                        display: cs.display,
+                                        vis: cs.visibility,
+                                        op: cs.opacity,
+                                        zIndex: cs.zIndex,
+                                        pos: cs.position,
+                                        top: cs.top,
+                                        left: cs.left,
+                                        width: cs.width,
+                                        height: cs.height,
+                                        filter: cs.filter,
+                                        bFilter: cs.backdropFilter
+                                    },
+                                    parent: parent ? {
+                                        tag: parent.tagName,
+                                        id: parent.id,
+                                        cls: parent.className,
+                                        filter: pcs.filter,
+                                        op: pcs.opacity,
+                                        display: pcs.display
+                                    } : 'NONE',
+                                    text: el.innerText ? el.innerText.substring(0, 30).replace(/\n/g, ' ') : ''
+                                });
+                            });
+                            console.log("DIALOG_LOG [" + triggerTag + "]: " + JSON.stringify(logs));
+                        };
+
+                        // 全局点击/触摸拦截：当点击页面任何按钮时，延迟多次记录弹窗节点状态
+                        document.addEventListener('click', function(e) {
+                            var t = e.target;
+                            var txt = t ? (t.innerText || t.value || t.className || t.tagName) : '';
+                            console.log("DIALOG_CLICK_EVENT: target=" + t.tagName + "." + t.className + " text=" + String(txt).substring(0, 30).replace(/\n/g, ' '));
+                            setTimeout(function() { if (window.logDialogDetails) window.logDialogDetails('AFTER_CLICK_100ms'); }, 100);
+                            setTimeout(function() { if (window.logDialogDetails) window.logDialogDetails('AFTER_CLICK_500ms'); }, 500);
+                            setTimeout(function() { if (window.logDialogDetails) window.logDialogDetails('AFTER_CLICK_1200ms'); }, 1200);
+                        }, true);
+
+                        // DOM 变动观察器：监听 DOM 节点新增/属性变更并打印日志
+                        if (!window._dialog_observer) {
+                            window._dialog_observer = new MutationObserver(function(mutations) {
+                                var shouldLog = false;
+                                mutations.forEach(function(m) {
+                                    if (m.type === 'childList') {
+                                        m.addedNodes.forEach(function(node) {
+                                            if (node.nodeType === 1) {
+                                                var str = (node.className || '') + ' ' + (node.id || '');
+                                                if (/dialog|upload|offline|window|mask|modal|overlay/i.test(str)) {
+                                                    shouldLog = true;
+                                                }
+                                            }
+                                        });
+                                    } else if (m.type === 'attributes') {
+                                        var target = m.target;
+                                        var str = (target.className || '') + ' ' + (target.id || '');
+                                        if (/dialog|upload|offline|window|mask|modal|overlay/i.test(str)) {
+                                            shouldLog = true;
+                                        }
+                                    }
+                                });
+                                if (shouldLog) {
+                                    if (window.logDialogDetails) window.logDialogDetails('MUTATION_DETECTED');
+                                }
+                            });
+                            window._dialog_observer.observe(document.documentElement, {
+                                childList: true,
+                                subtree: true,
+                                attributes: true,
+                                attributeFilter: ['style', 'class']
+                            });
+                        }
+
+                        if (window.runDiagnostic) window.runDiagnostic('INITIAL');
+
+                        // 持续轮询：定期扫描当前弹窗
+                        var count = 0;
+                        var itv = setInterval(function() {
+                            if (count % 3 === 0) {
+                                var dlg = document.querySelector('.dialog-box, [id*="window_"], .upload-box, .offline-box, .window-current');
+                                if (dlg && window.logDialogDetails) {
+                                    window.logDialogDetails('POLL_FOUND_DIALOG');
+                                }
+                            }
+                            if (++count > 60) clearInterval(itv);
+                        }, 1000);
+                    })();
+                    """.trimIndent(), null
+                )
+            }
         }
+
 
         override fun onReceivedSslError(
             view: WebView?,
@@ -404,7 +598,7 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
             }
 
             if (cookie != null) {
-                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                CoroutineScope(Dispatchers.IO).launch {
                     AuthRepository.checkLogin(cookie)
                         .onSuccess { App.instance.toast("登录成功～") }
                         .onFailure { App.instance.toast("验证失败: ${it.localizedMessage}") }

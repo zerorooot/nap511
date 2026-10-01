@@ -114,9 +114,9 @@ private fun ImageBrowserScreen(
     }
 
     val view = LocalView.current
-    DisposableEffect(controlsVisible) {
+    LaunchedEffect(controlsVisible) {
         val window = (view.context as? Activity)?.window
-        val insetsController = window?.let { WindowCompat.getInsetsController(it, view) }
+        val insetsController = window?.let { WindowCompat.getInsetsController(it, window.decorView) }
 
         // 根据 controlsVisible 动态控制系统栏显隐
         if (!controlsVisible) {
@@ -126,8 +126,12 @@ private fun ImageBrowserScreen(
         } else {
             insetsController?.show(WindowInsetsCompat.Type.systemBars())
         }
+    }
 
+    DisposableEffect(Unit) {
         onDispose {
+            val window = (view.context as? Activity)?.window
+            val insetsController = window?.let { WindowCompat.getInsetsController(it, window.decorView) }
             insetsController?.show(WindowInsetsCompat.Type.systemBars())
         }
     }
