@@ -254,12 +254,9 @@ fun WebViewScreen(onClick: () -> Unit) {
                 ConfigKeyUtil.LOG, false
             )
         )
-        // 1. 注入 Cookie
-        setRawCookieString(UserSessionManager.cookie)
-        // 2. 强制显式同步并引入物理延迟，确保 API 请求发起时 Cookie 已在磁盘就绪
-        cookieManager.flush()
-
-        isReady = true
+        setRawCookieString(UserSessionManager.cookie) {
+            isReady = true
+        }
     }
 
     if (isReady) {
@@ -274,7 +271,7 @@ fun WebViewScreen(onClick: () -> Unit) {
     }
 }
 
-fun setRawCookieString(rawCookieString: String) {
+fun setRawCookieString(rawCookieString: String, isReady: () -> Unit) {
     XLog.d("setRawCookieString start, length: ${rawCookieString.length}")
     val cookieManager = CookieManager.getInstance()
     cookieManager.setAcceptCookie(true)
@@ -294,22 +291,27 @@ fun setRawCookieString(rawCookieString: String) {
 
         cookieManager.flush()
         XLog.d("setRawCookieString finished with OO_V=2014")
+        isReady.invoke()
     }
 }
-
+private val logKeywords = listOf(
+    ".js", ".css", "/api/", "upload", "offline",
+    "files", "task", "ajax", "dialog"
+)
 fun webViewClient(onUrl: (String) -> Unit): WebViewClient {
     return object : WebViewClient() {
         override fun shouldInterceptRequest(
             view: WebView, request: WebResourceRequest
         ): WebResourceResponse? {
             val url = request.url.toString()
+            val method = request.method
             val headers = request.requestHeaders
 
-            // 追踪关键资源加载
-            if (url.contains("115.com")) {
-                if (url.contains(".js") || url.contains(".css") || url.contains("/api/")) {
-                    XLog.v("WebView Requesting: $url")
-                }
+            // 追踪关键资源加载与 API 请求（特别是上传、离线、任务、配置接口）
+            if ((url.contains("115.com") || url.contains("anxia.com")) &&
+                logKeywords.any { url.contains(it) }
+            ) {
+                XLog.d("WebView Request [$method]: $url")
             }
 
             if (headers.containsKey("X-Requested-With")) {
@@ -326,6 +328,7 @@ fun webViewClient(onUrl: (String) -> Unit): WebViewClient {
         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
             super.onPageStarted(view, url, favicon)
             url?.let { onUrl.invoke(it) }
+            XLog.d("WebView Page Started: $url")
         }
 
         // 页面加载完成时确认 URL（处理重定向后的最终地址）
@@ -336,11 +339,17 @@ fun webViewClient(onUrl: (String) -> Unit): WebViewClient {
 
             /*
              * 调试排查说明：可在 Logcat 中过滤以下 Tag/关键词：
-             * - "DIAG_DATA": JS 采集打印的 DOM 节点数量、视口宽高、Body 高度、子元素排版结构与文件表头位置
-             * - "POPUP_DIALOG_DETECTED": 动态监听并打印弹出的对话框（如“普通上传”、“添加云下载”）信息
-             * - "WebView Console": 网页原生 console.log 日志
-             * - "WebView CRITICAL ERROR": 网页原生 JS 运行/请求报错信息
-             * - "FULL_HTML": 查看 dump 的完整 DOM HTML 源码
+             * - "DIAG_SUMMARY": 诊断触发原因及元素统计汇总
+             * - "PAGE_STATE": 页面 html/body 状态
+             * - "IFRAME_ELEMENTS": 页面内所有的 iframe 信息及穿透诊断结果
+             * - "BLUR_ELEMENTS": 所有模糊滤镜（backdropFilter/filter）元素及其内部子元素解剖
+             * - "OVERLAY_ELEMENTS": 所有全屏遮罩/Modal 元素及其直接子节点
+             * - "DIALOG_ELEMENTS": 弹窗相关元素（普通上传、添加云下载等）的详细样式与祖先链
+             * - "KEYWORD_ELEMENTS": 根据界面文案（“普通上传”、“添加文件”、“添加云下载”等）地毯式搜索到的节点
+             * - "HIGH_ZINDEX_ELEMENTS": 高 z-index 元素排行榜（排查层叠上下文覆盖）
+             * - "HIT_TESTS": 屏幕中心与弹窗坐标命中测试
+             * - "RULE_MISKILL_CHECK": 检查 115-core-fix 中的 mask/modal 规则是否误杀了弹窗
+             * - "USER_CLICK": 捕获用户在页面上的点击目标
              */
             // 核心 UI 修复逻辑（跨版本兼容与样式重置）
             view?.evaluateJavascript(
@@ -362,25 +371,60 @@ fun webViewClient(onUrl: (String) -> Unit): WebViewClient {
                                 min-height: ${'$'}{pxHeight} !important;
                             }
                             body { display: block !important; overflow: auto !important; }
-                               /* 2. 强制显示：解决 overflow: hidden 导致的内容不可见 */
+                            /* 2. 强制显示：解决 overflow: hidden 导致的内容不可见 */
                             #js_mainContent, .layout-main, .layout-content {
                                 overflow: auto !important;
                                 min-height: 100% !important;
                             }
-                              /* 3. 桌面适配：防止窄屏下主分栏 UI 挤压错位 */
+                            /* 3. 桌面适配：防止窄屏下主分栏 UI 挤压错位 */
                             .flex.relative.min-w-\[800px\] { min-width: 800px !important; }
-                             /* 4. 遮罩清除：隐藏全屏阻挡视线的加载指示器 */
+                            /* 4. 遮罩清除：隐藏全屏阻挡视线的加载指示器 */
                             .v-modal, [class*="mask"], [class*="loading"] { display: none !important; pointer-events: none !important; }
+
+                            /* 5. 核心修复：解决弹窗容器高度塌陷为 0px 导致的内容全被 overflow-hidden 截断 */
+                            [class*="backdrop-blur"] > div:not([class*="border-0"]),
+                            .shadow-xl.flex.flex-col,
+                            div[class*="shadow-xl"][class*="flex-col"] {
+                                min-height: 420px !important;
+                                height: auto !important;
+                                max-height: calc(100vh - 60px) !important;
+                                overflow: visible !important;
+                                visibility: visible !important;
+                                opacity: 1 !important;
+                            }
+
+                            /* 6. 经典版弹窗层级提升与防遮挡 */
+                            .dialog-box, .upload-box, .offline-box, [id*="_warp"], [id*="window_"] {
+                                z-index: 1000000010 !important;
+                                display: block !important;
+                                visibility: visible !important;
+                                opacity: 1 !important;
+                            }
                         `;
+
+                        // 动态 DOM 检查：若检测到弹窗内容容器高度仍为 0，直接以行内样式强行展开
+                        var modals = document.querySelectorAll('[class*="backdrop-blur"] > div:not([class*="border-0"]), .shadow-xl.flex.flex-col');
+                        for (var i = 0; i < modals.length; i++) {
+                            var m = modals[i];
+                            var r = m.getBoundingClientRect();
+                            if (r.height <= 10) {
+                                m.style.setProperty('min-height', '420px', 'important');
+                                m.style.setProperty('height', 'auto', 'important');
+                                m.style.setProperty('overflow', 'visible', 'important');
+                                m.style.setProperty('opacity', '1', 'important');
+                                m.style.setProperty('visibility', 'visible', 'important');
+                            }
+                        }
                     }
                     
+                    window.__applyCoreFix = applyFix;
                     applyFix();
                     // 115 页面会多次重绘，采用轮询确保修复持久生效
                     var count = 0;
                     var itv = setInterval(function() {
                         applyFix();
-                        if(++count > 10) clearInterval(itv);
-                    }, 1000);
+                        if(++count > 15) clearInterval(itv);
+                    }, 800);
                 })();
                 """.trimIndent(), null
             )
@@ -389,138 +433,681 @@ fun webViewClient(onUrl: (String) -> Unit): WebViewClient {
             if (github.zerorooot.nap511.BuildConfig.DEBUG) {
                 view?.evaluateJavascript(
                     """
-                    (function() {
-                        // 诊断函数：采集并分析当前 DOM 结构与节点排版
-                        window.runDiagnostic = function(reason) {
-                            var body = document.body;
-                            var info = {
-                                reason: reason || 'FINISH',
-                                url: window.location.href,
-                                title: document.title,
-                                wh: window.innerWidth + 'x' + window.innerHeight,
-                                body_h: body ? body.offsetHeight : -1,
-                                elems: document.getElementsByTagName('*').length,
-                                // 输出 Body 下直接一级子元素的排版结构与高度摘要（排查高度塌陷/错位）
-                                structure: body ? Array.from(body.children).map(function(c) {
-                                    return c.tagName + '.' + c.className.split(' ').join('.') + 
-                                           '(' + c.offsetHeight + 'px) -> ' + 
-                                           (c.innerText ? c.innerText.substring(0, 15).replace(/\n/g, ' ') : 'EMPTY');
-                                }) : [],
-                                // 检查文件列表标头（“文件名”/“大小”）位置与可见性
-                                list_check: (function(){
-                                    var t = Array.from(document.querySelectorAll('*')).find(function(el) { 
-                                        return el.innerText && (el.innerText === '文件名' || el.innerText === '大小') && el.children.length === 0;
-                                    });
-                                    return t ? { tag: t.tagName, rect: t.getBoundingClientRect() } : 'LIST_HEADER_NOT_FOUND';
-                                })()
-                            };
-                            console.log("DIAG_DATA: " + JSON.stringify(info));
-                        };
+                (function() {
+                    if (window.__web_diag_installed) return;
+                    window.__web_diag_installed = true;
 
-                        // 详细分析并打印当前 DOM 中所有弹窗、对话框、遮罩层的实时计算样式与位置
-                        window.logDialogDetails = function(triggerTag) {
-                            var targets = document.querySelectorAll('.dialog-box, [id*="window_"], .upload-box, .offline-box, .window-current, [class*="dialog"], [class*="offline"], [class*="upload"], [class*="mask"], [class*="modal"]');
-                            if (!targets || targets.length === 0) {
-                                console.log("DIALOG_LOG [" + triggerTag + "]: No dialog/mask element found in DOM");
-                                return;
+                    // 统一日志发送函数
+                    function sendDiag(category, data) {
+                        var str = (typeof data === 'string') ? data : JSON.stringify(data);
+                        if (window.WebDiagBridge && window.WebDiagBridge.log) {
+                            window.WebDiagBridge.log(category, str);
+                        }
+                        console.log("[" + category + "] " + str);
+                    }
+
+                    function sendDiagError(category, err) {
+                        var str = (err && err.stack) ? (err.message + " @ " + err.stack) : String(err);
+                        if (window.WebDiagBridge && window.WebDiagBridge.error) {
+                            window.WebDiagBridge.error(category, str);
+                        }
+                        console.error("[" + category + "] " + str);
+                    }
+
+                    // 辅助：获取元素直接子节点的简要信息（解剖遮罩层内部到底有没有挂载弹窗）
+                    function getChildrenSummary(el) {
+                        var children = [];
+                        try {
+                            for (var i = 0; i < el.children.length; i++) {
+                                var c = el.children[i];
+                                var cs = window.getComputedStyle(c);
+                                var r = c.getBoundingClientRect();
+                                children.push({
+                                    tag: c.tagName,
+                                    id: c.id,
+                                    cls: c.className,
+                                    styleAttr: c.getAttribute('style') || '',
+                                    computedHeight: cs.height,
+                                    computedMinHeight: cs.minHeight,
+                                    computedMaxHeight: cs.maxHeight,
+                                    rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)],
+                                    display: cs.display,
+                                    vis: cs.visibility,
+                                    op: cs.opacity,
+                                    zIndex: cs.zIndex,
+                                    pos: cs.position,
+                                    text: (c.innerText || '').substring(0, 40).replace(/\s+/g, ' ')
+                                });
                             }
-                            var logs = [];
-                            targets.forEach(function(el, idx) {
-                                var rect = el.getBoundingClientRect();
+                        } catch(e) {}
+                        return children;
+                    }
+
+                    // 1. 全局扫描页面中所有具有模糊效果(filter / backdropFilter)或遮罩的元素，并解剖大面积遮罩的内部结构
+                    function checkBlurElements(doc) {
+                        var blurList = [];
+                        try {
+                            var all = doc.querySelectorAll('*');
+                            for (var i = 0; i < all.length; i++) {
+                                var el = all[i];
                                 var cs = window.getComputedStyle(el);
-                                var parent = el.parentElement;
-                                var pcs = parent ? window.getComputedStyle(parent) : {};
-                                logs.push({
-                                    idx: idx,
+                                var f = cs.filter || cs.webkitFilter || '';
+                                var bf = cs.backdropFilter || cs.webkitBackdropFilter || '';
+                                var styleAttr = el.getAttribute('style') || '';
+
+                                var hasBlur = f.indexOf('blur') !== -1 ||
+                                             bf.indexOf('blur') !== -1 ||
+                                             styleAttr.indexOf('blur') !== -1;
+                                var hasFilter = (f && f !== 'none') || (bf && bf !== 'none');
+
+                                if (hasBlur || hasFilter) {
+                                    var r = el.getBoundingClientRect();
+                                    var isCovering = (r.width >= window.innerWidth * 0.7 && r.height >= window.innerHeight * 0.7);
+                                    var item = {
+                                        tag: el.tagName,
+                                        id: el.id,
+                                        cls: el.className,
+                                        rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)],
+                                        filter: f,
+                                        backdropFilter: bf,
+                                        pos: cs.position,
+                                        zIndex: cs.zIndex,
+                                        op: cs.opacity,
+                                        vis: cs.visibility,
+                                        display: cs.display,
+                                        bg: cs.backgroundColor,
+                                        isCoveringScreen: isCovering,
+                                        hasBlur: hasBlur
+                                    };
+
+                                    // 如果是大面积模糊遮罩，进一步提取其直接子元素与 HTML 摘要
+                                    if (isCovering && hasBlur) {
+                                        item.childCount = el.children.length;
+                                        item.children = getChildrenSummary(el);
+                                        item.innerHTMLPreview = (el.innerHTML || '').substring(0, 200).replace(/\s+/g, ' ');
+                                    }
+
+                                    blurList.push(item);
+                                }
+                            }
+                        } catch(e) {
+                            sendDiagError('CHECK_BLUR_ERR', e);
+                        }
+                        return blurList;
+                    }
+
+                    // 2. 详细检查弹窗元素（普通上传、云下载、dialog-box、现代 Next.js 弹窗等）
+                    function checkDialogElements(doc, contextLabel) {
+                        var dialogs = [];
+                        try {
+                            var selector = '.dialog-box, .upload-box, .offline-box, .window-current, [id^="window_"], [id*="_warp"], [class*="dialog-box"], [class*="upload-box"], [class*="offline-box"], [class*="dialog-mini"], [class*="upload-contents"], [id*="plupload"], [class*="plupload"], div[class*="shadow-xl"][class*="flex-col"], [class*="backdrop-blur"] > div:not([class*="border-0"])';
+                            var targets = doc.querySelectorAll(selector);
+
+                            // 降级检查：如未匹配到指定 class，尝试在含有相关文字的容器中寻找
+                            if (targets.length === 0) {
+                                var candidates = doc.querySelectorAll('div, section');
+                                for (var j = 0; j < candidates.length; j++) {
+                                    var c = candidates[j];
+                                    if (c.children.length > 0 && c.innerText && (c.innerText.indexOf('普通上传') !== -1 || c.innerText.indexOf('添加云下载') !== -1)) {
+                                        if (c.className && /dialog|upload|offline|window/i.test(c.className)) {
+                                            targets = [c];
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            for (var i = 0; i < targets.length; i++) {
+                                var el = targets[i];
+                                var r = el.getBoundingClientRect();
+                                var cs = window.getComputedStyle(el);
+
+                                // 祖先链路遍历：排查父节点的 display/visibility/opacity/transform/filter/overflow
+                                var ancestors = [];
+                                var p = el.parentElement;
+                                var ancestorHidesOrClips = false;
+                                while (p && p !== doc.documentElement && p !== doc.body) {
+                                    var pcs = window.getComputedStyle(p);
+                                    var pr = p.getBoundingClientRect();
+                                    var isHidden = (pcs.display === 'none' || pcs.visibility === 'hidden' || pcs.opacity === '0');
+                                    var isTransformed = (pcs.transform && pcs.transform !== 'none');
+                                    var hasFilter = (pcs.filter && pcs.filter !== 'none');
+                                    var hasMaskClass = !!(p.className && /mask|modal|loading/i.test(p.className));
+
+                                    if (isHidden) ancestorHidesOrClips = true;
+
+                                    ancestors.push({
+                                        tag: p.tagName,
+                                        id: p.id,
+                                        cls: p.className,
+                                        display: pcs.display,
+                                        vis: pcs.visibility,
+                                        op: pcs.opacity,
+                                        overflow: pcs.overflow,
+                                        pos: pcs.position,
+                                        zIndex: pcs.zIndex,
+                                        transform: pcs.transform,
+                                        filter: pcs.filter,
+                                        rect: [Math.round(pr.left), Math.round(pr.top), Math.round(pr.width), Math.round(pr.height)],
+                                        isMaskClass: hasMaskClass
+                                    });
+                                    p = p.parentElement;
+                                }
+
+                                var winW = window.innerWidth;
+                                var winH = window.innerHeight;
+                                var isOffscreen = (r.right <= 0 || r.bottom <= 0 || r.left >= winW || r.top >= winH);
+                                var isWidthExceeded = (r.left + r.width > winW);
+                                var isHeightExceeded = (r.top + r.height > winH);
+
+                                // 遮挡探测 (Hit Testing)
+                                var hitTestResults = [];
+                                var testPoints = [
+                                    { name: 'center', x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) },
+                                    { name: 'topLeft', x: Math.round(r.left + 20), y: Math.round(r.top + 20) },
+                                    { name: 'screenCenter', x: Math.round(winW / 2), y: Math.round(winH / 2) }
+                                ];
+                                testPoints.forEach(function(pt) {
+                                    if (pt.x >= 0 && pt.x < winW && pt.y >= 0 && pt.y < winH) {
+                                        try {
+                                            var hitEl = doc.elementFromPoint(pt.x, pt.y);
+                                            if (hitEl) {
+                                                var isInsideDialog = el.contains(hitEl);
+                                                var hcs = window.getComputedStyle(hitEl);
+                                                hitTestResults.push({
+                                                    point: pt.name + '(' + pt.x + ',' + pt.y + ')',
+                                                    isInsideDialog: isInsideDialog,
+                                                    hitTag: hitEl.tagName,
+                                                    hitId: hitEl.id,
+                                                    hitCls: hitEl.className,
+                                                    hitZIndex: hcs.zIndex,
+                                                    hitFilter: hcs.filter,
+                                                    hitBackdropFilter: hcs.backdropFilter
+                                                });
+                                            }
+                                        } catch(he) {}
+                                    }
+                                });
+
+                                dialogs.push({
+                                    context: contextLabel || 'TOP',
+                                    tag: el.tagName,
                                     id: el.id,
                                     cls: el.className,
-                                    rect: [Math.round(rect.left), Math.round(rect.top), Math.round(rect.width), Math.round(rect.height)],
-                                    style: {
+                                    inlineStyle: el.getAttribute('style') || '',
+                                    rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)],
+                                    viewport: { winW: winW, winH: winH },
+                                    visibilityAssessment: {
+                                        isOffscreen: isOffscreen,
+                                        isWidthExceeded: isWidthExceeded,
+                                        isHeightExceeded: isHeightExceeded,
+                                        ancestorHidesOrClips: ancestorHidesOrClips
+                                    },
+                                    computedStyle: {
                                         display: cs.display,
                                         vis: cs.visibility,
                                         op: cs.opacity,
-                                        zIndex: cs.zIndex,
                                         pos: cs.position,
                                         top: cs.top,
                                         left: cs.left,
                                         width: cs.width,
                                         height: cs.height,
+                                        zIndex: cs.zIndex,
+                                        transform: cs.transform,
                                         filter: cs.filter,
-                                        bFilter: cs.backdropFilter
+                                        backdropFilter: cs.backdropFilter,
+                                        pointerEvents: cs.pointerEvents,
+                                        overflow: cs.overflow
                                     },
-                                    parent: parent ? {
-                                        tag: parent.tagName,
-                                        id: parent.id,
-                                        cls: parent.className,
-                                        filter: pcs.filter,
-                                        op: pcs.opacity,
-                                        display: pcs.display
-                                    } : 'NONE',
-                                    text: el.innerText ? el.innerText.substring(0, 30).replace(/\n/g, ' ') : ''
+                                    ancestors: ancestors,
+                                    hitTests: hitTestResults,
+                                    textPreview: el.innerText ? el.innerText.substring(0, 40).replace(/\s+/g, ' ') : ''
                                 });
-                            });
-                            console.log("DIALOG_LOG [" + triggerTag + "]: " + JSON.stringify(logs));
-                        };
-
-                        // 全局点击/触摸拦截：当点击页面任何按钮时，延迟多次记录弹窗节点状态
-                        document.addEventListener('click', function(e) {
-                            var t = e.target;
-                            var txt = t ? (t.innerText || t.value || t.className || t.tagName) : '';
-                            console.log("DIALOG_CLICK_EVENT: target=" + t.tagName + "." + t.className + " text=" + String(txt).substring(0, 30).replace(/\n/g, ' '));
-                            setTimeout(function() { if (window.logDialogDetails) window.logDialogDetails('AFTER_CLICK_100ms'); }, 100);
-                            setTimeout(function() { if (window.logDialogDetails) window.logDialogDetails('AFTER_CLICK_500ms'); }, 500);
-                            setTimeout(function() { if (window.logDialogDetails) window.logDialogDetails('AFTER_CLICK_1200ms'); }, 1200);
-                        }, true);
-
-                        // DOM 变动观察器：监听 DOM 节点新增/属性变更并打印日志
-                        if (!window._dialog_observer) {
-                            window._dialog_observer = new MutationObserver(function(mutations) {
-                                var shouldLog = false;
-                                mutations.forEach(function(m) {
-                                    if (m.type === 'childList') {
-                                        m.addedNodes.forEach(function(node) {
-                                            if (node.nodeType === 1) {
-                                                var str = (node.className || '') + ' ' + (node.id || '');
-                                                if (/dialog|upload|offline|window|mask|modal|overlay/i.test(str)) {
-                                                    shouldLog = true;
-                                                }
-                                            }
-                                        });
-                                    } else if (m.type === 'attributes') {
-                                        var target = m.target;
-                                        var str = (target.className || '') + ' ' + (target.id || '');
-                                        if (/dialog|upload|offline|window|mask|modal|overlay/i.test(str)) {
-                                            shouldLog = true;
-                                        }
-                                    }
-                                });
-                                if (shouldLog) {
-                                    if (window.logDialogDetails) window.logDialogDetails('MUTATION_DETECTED');
-                                }
-                            });
-                            window._dialog_observer.observe(document.documentElement, {
-                                childList: true,
-                                subtree: true,
-                                attributes: true,
-                                attributeFilter: ['style', 'class']
-                            });
+                            }
+                        } catch(e) {
+                            sendDiagError('CHECK_DIALOG_ERR', e);
                         }
+                        return dialogs;
+                    }
 
-                        if (window.runDiagnostic) window.runDiagnostic('INITIAL');
+                    // 3. 检查全屏遮罩层 / Modal / Mask 及其子元素
+                    function checkOverlays(doc) {
+                        var overlays = [];
+                        try {
+                            var targets = doc.querySelectorAll('[class*="mask"], [class*="modal"], [class*="overlay"], [class*="backdrop"], [class*="window-mask"]');
+                            for (var i = 0; i < targets.length; i++) {
+                                var el = targets[i];
+                                var r = el.getBoundingClientRect();
+                                var cs = window.getComputedStyle(el);
+                                overlays.push({
+                                    tag: el.tagName,
+                                    id: el.id,
+                                    cls: el.className,
+                                    rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)],
+                                    display: cs.display,
+                                    vis: cs.visibility,
+                                    op: cs.opacity,
+                                    zIndex: cs.zIndex,
+                                    pos: cs.position,
+                                    filter: cs.filter,
+                                    backdropFilter: cs.backdropFilter,
+                                    bg: cs.backgroundColor,
+                                    pointerEvents: cs.pointerEvents,
+                                    childCount: el.children.length,
+                                    children: getChildrenSummary(el),
+                                    innerHTMLPreview: (el.innerHTML || '').substring(0, 150).replace(/\s+/g, ' ')
+                                });
+                            }
+                        } catch(e) {
+                            sendDiagError('CHECK_OVERLAY_ERR', e);
+                        }
+                        return overlays;
+                    }
 
-                        // 持续轮询：定期扫描当前弹窗
-                        var count = 0;
-                        var itv = setInterval(function() {
-                            if (count % 3 === 0) {
-                                var dlg = document.querySelector('.dialog-box, [id*="window_"], .upload-box, .offline-box, .window-current');
-                                if (dlg && window.logDialogDetails) {
-                                    window.logDialogDetails('POLL_FOUND_DIALOG');
+                    // 4. 深度穿透排查 Iframe / Frame
+                    function checkIframes() {
+                        var iframeReports = [];
+                        try {
+                            var iframes = document.querySelectorAll('iframe, frame');
+                            for (var i = 0; i < iframes.length; i++) {
+                                var ifr = iframes[i];
+                                var r = ifr.getBoundingClientRect();
+                                var cs = window.getComputedStyle(ifr);
+                                var report = {
+                                    index: i,
+                                    tag: ifr.tagName,
+                                    id: ifr.id,
+                                    name: ifr.name,
+                                    src: ifr.src || ifr.getAttribute('src') || '',
+                                    rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)],
+                                    display: cs.display,
+                                    vis: cs.visibility,
+                                    op: cs.opacity,
+                                    zIndex: cs.zIndex,
+                                    pos: cs.position,
+                                    canAccessDoc: false
+                                };
+
+                                try {
+                                    var subDoc = ifr.contentDocument || ifr.contentWindow.document;
+                                    if (subDoc) {
+                                        report.canAccessDoc = true;
+                                        report.subDocTitle = subDoc.title;
+                                        report.subDocUrl = subDoc.location.href;
+                                        // 深入 iframe 内部检索弹窗、模糊及关键字
+                                        var subDialogs = checkDialogElements(subDoc, 'IFRAME_' + (ifr.id || ifr.name || i));
+                                        var subBlurs = checkBlurElements(subDoc);
+                                        var subKeywords = searchTextKeywords(subDoc, 'IFRAME_' + (ifr.id || ifr.name || i));
+                                        report.subDialogCount = subDialogs.length;
+                                        report.subDialogs = subDialogs;
+                                        report.subBlurCount = subBlurs.length;
+                                        report.subBlurs = subBlurs;
+                                        report.subKeywordMatches = subKeywords;
+
+                                        // 为 iframe 的文档也挂载监听
+                                        bindIframeEvents(ifr, subDoc, i);
+                                    }
+                                } catch(crossErr) {
+                                    report.canAccessDoc = false;
+                                    report.accessError = crossErr.message;
+                                }
+
+                                iframeReports.push(report);
+                            }
+                        } catch(e) {
+                            sendDiagError('CHECK_IFRAME_ERR', e);
+                        }
+                        return iframeReports;
+                    }
+
+                    // 5. 地毯式搜索页面中含有指定关键字（“普通上传”、“添加云下载”等）的文本节点
+                    function searchTextKeywords(doc, contextLabel) {
+                        var keywords = ['普通上传', '添加文件', '添加云下载', '支持HTTP', '开始下载', '上传文件', '添加BT任务', '拖到这里'];
+                        var matches = [];
+                        try {
+                            var walker = doc.createTreeWalker(doc.body || doc.documentElement, NodeFilter.SHOW_TEXT, null, false);
+                            var node;
+                            while ((node = walker.nextNode())) {
+                                var val = (node.nodeValue || '').trim();
+                                if (!val) continue;
+                                for (var k = 0; k < keywords.length; k++) {
+                                    var kw = keywords[k];
+                                    if (val.indexOf(kw) !== -1) {
+                                        var p = node.parentElement;
+                                        if (p) {
+                                            var cs = window.getComputedStyle(p);
+                                            var r = p.getBoundingClientRect();
+                                            matches.push({
+                                                context: contextLabel || 'TOP',
+                                                keyword: kw,
+                                                text: val.substring(0, 30).replace(/\s+/g, ' '),
+                                                tag: p.tagName,
+                                                id: p.id,
+                                                cls: p.className,
+                                                rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)],
+                                                display: cs.display,
+                                                vis: cs.visibility,
+                                                op: cs.opacity,
+                                                zIndex: cs.zIndex,
+                                                pos: cs.position
+                                            });
+                                        }
+                                        break;
+                                    }
                                 }
                             }
-                            if (++count > 60) clearInterval(itv);
-                        }, 1000);
-                    })();
-                    """.trimIndent(), null
+                        } catch(e) {}
+                        return matches;
+                    }
+
+                    // 6. 查找页面中所有高 z-index 元素（>= 999），排查层叠上下文覆盖
+                    function checkHighZIndex(doc) {
+                        var list = [];
+                        try {
+                            var all = doc.querySelectorAll('*');
+                            for (var i = 0; i < all.length; i++) {
+                                var el = all[i];
+                                var cs = window.getComputedStyle(el);
+                                var z = cs.zIndex;
+                                var zNum = parseInt(z, 10);
+                                if (!isNaN(zNum) && zNum >= 999) {
+                                    var r = el.getBoundingClientRect();
+                                    list.push({
+                                        tag: el.tagName,
+                                        id: el.id,
+                                        cls: el.className,
+                                        zIndex: zNum,
+                                        pos: cs.position,
+                                        rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)],
+                                        display: cs.display,
+                                        vis: cs.visibility,
+                                        op: cs.opacity,
+                                        filter: cs.filter,
+                                        backdropFilter: cs.backdropFilter
+                                    });
+                                }
+                            }
+                            list.sort(function(a, b) { return b.zIndex - a.zIndex; });
+                        } catch(e) {}
+                        return list.slice(0, 10);
+                    }
+
+                    // 7. 屏幕关键坐标命中测试 (Hit Tests)
+                    function checkHitTests(doc) {
+                        var winW = window.innerWidth;
+                        var winH = window.innerHeight;
+                        var points = [
+                            { name: 'screenCenter', x: Math.round(winW / 2), y: Math.round(winH / 2) },
+                            { name: 'uploadBoxPos', x: Math.min(313 + 100, winW - 20), y: Math.min(135 + 50, winH - 20) },
+                            { name: 'offlineBoxPos', x: Math.min(259 + 100, winW - 20), y: Math.min(177 + 50, winH - 20) }
+                        ];
+                        var hits = [];
+                        points.forEach(function(pt) {
+                            try {
+                                var el = doc.elementFromPoint(pt.x, pt.y);
+                                if (el) {
+                                    var cs = window.getComputedStyle(el);
+                                    hits.push({
+                                        point: pt.name + '(' + pt.x + ',' + pt.y + ')',
+                                        tag: el.tagName,
+                                        id: el.id,
+                                        cls: el.className,
+                                        zIndex: cs.zIndex,
+                                        pos: cs.position,
+                                        display: cs.display,
+                                        filter: cs.filter,
+                                        backdropFilter: cs.backdropFilter,
+                                        bg: cs.backgroundColor
+                                    });
+                                }
+                            } catch(e) {}
+                        });
+                        return hits;
+                    }
+
+                    // 8. 检查 115-core-fix 中的 mask/modal/loading 规则是否误杀了弹窗元素
+                    function checkRuleMisKill(doc) {
+                        var killed = [];
+                        try {
+                            var candidates = doc.querySelectorAll('.v-modal, [class*="mask"], [class*="loading"]');
+                            for (var i = 0; i < candidates.length; i++) {
+                                var el = candidates[i];
+                                var str = (el.className || '') + ' ' + (el.id || '');
+                                if (/dialog|upload|offline|window|warp|box/i.test(str) || (el.innerText && /上传|下载/i.test(el.innerText))) {
+                                    killed.push({
+                                        tag: el.tagName,
+                                        id: el.id,
+                                        cls: el.className,
+                                        text: (el.innerText || '').substring(0, 30).replace(/\s+/g, ' ')
+                                    });
+                                }
+                            }
+                        } catch(e) {}
+                        return killed;
+                    }
+
+                    // 9. 检查 Body / HTML 及主容器状态
+                    function checkPageState() {
+                        var state = {};
+                        try {
+                            var docEl = document.documentElement;
+                            var body = document.body;
+                            var docCs = window.getComputedStyle(docEl);
+                            var bodyCs = body ? window.getComputedStyle(body) : null;
+                            var mainContent = document.getElementById('js_mainContent') || document.querySelector('.layout-main, .layout-content, #wrap');
+                            var mainCs = mainContent ? window.getComputedStyle(mainContent) : null;
+
+                            state = {
+                                html: {
+                                    cls: docEl.className,
+                                    filter: docCs.filter,
+                                    backdropFilter: docCs.backdropFilter,
+                                    overflow: docCs.overflow,
+                                    w: docEl.clientWidth,
+                                    h: docEl.clientHeight
+                                },
+                                body: body ? {
+                                    cls: body.className,
+                                    styleAttr: body.getAttribute('style') || '',
+                                    filter: bodyCs.filter,
+                                    backdropFilter: bodyCs.backdropFilter,
+                                    overflow: bodyCs.overflow,
+                                    pos: bodyCs.position,
+                                    w: body.offsetWidth,
+                                    h: body.offsetHeight
+                                } : null,
+                                mainContainer: mainContent ? {
+                                    id: mainContent.id,
+                                    cls: mainContent.className,
+                                    filter: mainCs.filter,
+                                    backdropFilter: mainCs.backdropFilter,
+                                    overflow: mainCs.overflow
+                                } : null,
+                                coreFixStylePresent: !!document.getElementById('115-core-fix')
+                            };
+                        } catch(e) {
+                            sendDiagError('CHECK_PAGE_STATE_ERR', e);
+                        }
+                        return state;
+                    }
+
+                    // 综合诊断主入口
+                    window.__runDialogDiagnostic = function(reason) {
+                        try {
+                            var blurList = checkBlurElements(document);
+                            var dialogList = checkDialogElements(document, 'TOP');
+                            var overlayList = checkOverlays(document);
+                            var pageState = checkPageState();
+                            var iframeList = checkIframes();
+                            var keywordList = searchTextKeywords(document, 'TOP');
+                            var highZList = checkHighZIndex(document);
+                            var hitTestList = checkHitTests(document);
+                            var misKillList = checkRuleMisKill(document);
+
+                            var summary = {
+                                reason: reason,
+                                timestamp: Date.now(),
+                                url: window.location.href,
+                                blurCount: blurList.length,
+                                dialogCount: dialogList.length,
+                                overlayCount: overlayList.length,
+                                iframeCount: iframeList.length,
+                                keywordMatchCount: keywordList.length,
+                                misKillCount: misKillList.length
+                            };
+
+                            sendDiag('DIAG_SUMMARY', summary);
+                            sendDiag('PAGE_STATE', pageState);
+
+                            if (iframeList.length > 0) {
+                                sendDiag('IFRAME_ELEMENTS', iframeList);
+                            }
+
+                            if (blurList.length > 0) {
+                                sendDiag('BLUR_ELEMENTS', blurList);
+                            }
+
+                            if (overlayList.length > 0) {
+                                sendDiag('OVERLAY_ELEMENTS', overlayList);
+                            }
+
+                            if (dialogList.length > 0) {
+                                sendDiag('DIALOG_ELEMENTS', dialogList);
+                            } else {
+                                sendDiag('DIALOG_ELEMENTS', 'NO_DIALOG_FOUND_IN_TOP');
+                            }
+
+                            if (keywordList.length > 0) {
+                                sendDiag('KEYWORD_ELEMENTS', keywordList);
+                            }
+
+                            if (highZList.length > 0) {
+                                sendDiag('HIGH_ZINDEX_ELEMENTS', highZList);
+                            }
+
+                            sendDiag('HIT_TESTS', hitTestList);
+
+                            if (misKillList.length > 0) {
+                                sendDiag('RULE_MISKILL_CHECK', misKillList);
+                            }
+                        } catch(e) {
+                            sendDiagError('DIAG_RUN_ERR', e);
+                        }
+                    };
+
+                    // 10. 事件监听器：全局点击/触摸
+                    document.addEventListener('click', function(e) {
+                        try {
+                            var t = e.target;
+                            var text = (t.innerText || t.value || t.title || '').substring(0, 30).replace(/\s+/g, ' ');
+                            sendDiag('USER_CLICK', {
+                                tag: t.tagName,
+                                id: t.id,
+                                cls: t.className,
+                                text: text
+                            });
+                            // 多阶段延迟采样（应对异步接口请求及动画重绘）
+                            setTimeout(function() { window.__runDialogDiagnostic('CLICK_+100ms'); }, 100);
+                            setTimeout(function() { window.__runDialogDiagnostic('CLICK_+500ms'); }, 500);
+                            setTimeout(function() { window.__runDialogDiagnostic('CLICK_+1200ms'); }, 1200);
+                            setTimeout(function() { window.__runDialogDiagnostic('CLICK_+2500ms'); }, 2500);
+                            setTimeout(function() { window.__runDialogDiagnostic('CLICK_+4000ms'); }, 4000);
+                        } catch(err) {}
+                    }, true);
+
+                    // 11. Iframe 事件绑定辅助函数
+                    function bindIframeEvents(ifr, subDoc, idx) {
+                        try {
+                            if (subDoc.__diag_bound) return;
+                            subDoc.__diag_bound = true;
+
+                            subDoc.addEventListener('click', function(e) {
+                                var t = e.target;
+                                var text = (t.innerText || t.value || t.title || '').substring(0, 30).replace(/\s+/g, ' ');
+                                sendDiag('USER_CLICK_IN_IFRAME', {
+                                    iframeId: ifr.id || ifr.name || ('idx_' + idx),
+                                    tag: t.tagName,
+                                    id: t.id,
+                                    cls: t.className,
+                                    text: text
+                                });
+                                setTimeout(function() { window.__runDialogDiagnostic('IFRAME_CLICK_+300ms'); }, 300);
+                                setTimeout(function() { window.__runDialogDiagnostic('IFRAME_CLICK_+1500ms'); }, 1500);
+                            }, true);
+
+                            var obs = new MutationObserver(function(muts) {
+                                sendDiag('IFRAME_MUTATION', {
+                                    iframeId: ifr.id || ifr.name || ('idx_' + idx),
+                                    mutationsCount: muts.length
+                                });
+                                window.__runDialogDiagnostic('MUTATION_IN_IFRAME');
+                            });
+                            obs.observe(subDoc.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
+                        } catch(e) {}
+                    }
+
+                    // 12. DOM 变动观察器 (MutationObserver)
+                    if (!window.__diag_observer) {
+                        var debounceTimer = null;
+                        window.__diag_observer = new MutationObserver(function(mutations) {
+                            var shouldTrigger = false;
+                            var triggerDetails = [];
+                            for (var i = 0; i < mutations.length; i++) {
+                                var m = mutations[i];
+                                if (m.type === 'childList') {
+                                    for (var j = 0; j < m.addedNodes.length; j++) {
+                                        var node = m.addedNodes[j];
+                                        if (node.nodeType === 1) {
+                                            var str = (node.className || '') + ' ' + (node.id || '') + ' ' + node.tagName;
+                                            if (/dialog|upload|offline|window|warp|box|mask|modal|overlay|backdrop/i.test(str)) {
+                                                shouldTrigger = true;
+                                                triggerDetails.push('ADD:' + node.tagName + '.' + (node.className || '') + '#' + (node.id || ''));
+                                            }
+                                        }
+                                    }
+                                } else if (m.type === 'attributes') {
+                                    var target = m.target;
+                                    var tStr = (target.className || '') + ' ' + (target.id || '') + ' ' + target.tagName;
+                                    if (/dialog|upload|offline|window|body|html|warp|mask|modal|backdrop/i.test(tStr)) {
+                                        shouldTrigger = true;
+                                        triggerDetails.push('ATTR(' + m.attributeName + '):' + target.tagName + '#' + target.id);
+                                    }
+                                }
+                            }
+
+                            if (shouldTrigger) {
+                                if (window.__applyCoreFix) window.__applyCoreFix();
+                                clearTimeout(debounceTimer);
+                                debounceTimer = setTimeout(function() {
+                                    window.__runDialogDiagnostic('MUTATION: ' + triggerDetails.slice(0, 5).join('; '));
+                                }, 80);
+                            }
+                        });
+
+                        window.__diag_observer.observe(document.documentElement, {
+                            childList: true,
+                            subtree: true,
+                            attributes: true,
+                            attributeFilter: ['style', 'class', 'hidden']
+                        });
+                    }
+
+                    // 13. 定时巡检 (Heartbeat Poll)
+                    var pollCount = 0;
+                    var pollInterval = setInterval(function() {
+                        pollCount++;
+                        var hasDlg = !!document.querySelector('.dialog-box, .upload-box, .offline-box, .window-current, [id^="window_"]');
+                        var hasOverlay = !!document.querySelector('[class*="backdrop-blur"], [class*="mask"], [class*="modal"]');
+                        if (hasDlg || hasOverlay) {
+                            window.__runDialogDiagnostic('POLL_ACTIVE_DIALOG_OR_OVERLAY_#' + pollCount);
+                        }
+                        if (pollCount > 100) clearInterval(pollInterval);
+                    }, 2000);
+
+                    // 初始立即执行一次
+                    window.__runDialogDiagnostic('INJECT_INITIAL');
+                })();
+                """.trimIndent(), null
                 )
             }
         }
