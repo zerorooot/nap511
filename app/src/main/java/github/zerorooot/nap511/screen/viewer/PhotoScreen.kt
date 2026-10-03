@@ -24,7 +24,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -124,14 +123,6 @@ private fun ImageBrowserScreen(
             insetsController?.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         } else {
-            insetsController?.show(WindowInsetsCompat.Type.systemBars())
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            val window = (view.context as? Activity)?.window
-            val insetsController = window?.let { WindowCompat.getInsetsController(it, window.decorView) }
             insetsController?.show(WindowInsetsCompat.Type.systemBars())
         }
     }

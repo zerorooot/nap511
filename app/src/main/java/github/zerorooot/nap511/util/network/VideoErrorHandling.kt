@@ -172,7 +172,7 @@ object VideoErrorMapper {
 
         // 解析错误 (文件格式问题)
         ERROR_CODE_PARSING_CONTAINER_MALFORMED to "视频文件已损坏",
-        ERROR_CODE_PARSING_MANIFEST_MALFORMED to "播放列表文件已损坏，可能需要验证(高级设置->视频播放验证)",
+        ERROR_CODE_PARSING_MANIFEST_MALFORMED to "播放列表文件已损坏",
         ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED to "不支持该视频文件格式",
         ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED to "不支持该播放列表格式",
 

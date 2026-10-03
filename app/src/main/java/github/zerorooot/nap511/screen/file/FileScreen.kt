@@ -192,9 +192,9 @@ fun FileScreen(
     var isTopBarShow by rememberSaveable { mutableStateOf(true) }
 
     val view = LocalView.current
-    DisposableEffect(isTopBarShow) {
+    LaunchedEffect(isTopBarShow) {
         val window = (view.context as? Activity)?.window
-        val insetsController = window?.let { WindowCompat.getInsetsController(it, view) }
+        val insetsController = window?.let { WindowCompat.getInsetsController(it, window.decorView) }
 
         if (!isTopBarShow) {
             insetsController?.hide(WindowInsetsCompat.Type.systemBars())
@@ -202,12 +202,6 @@ fun FileScreen(
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         } else {
             insetsController?.show(WindowInsetsCompat.Type.systemBars())
-        }
-
-        onDispose {
-            if (!isTopBarShow) {
-                insetsController?.show(WindowInsetsCompat.Type.systemBars())
-            }
         }
     }
 
@@ -280,6 +274,7 @@ fun FileScreen(
         audioViewModel,
         settingUiState,
         isPreviewActive,
+        isAutoImagePreview,
         isGridScreen,
         staggeredGrid,
         gridState,
@@ -291,10 +286,12 @@ fun FileScreen(
             settingUiState = settingUiState,
             onNav = onNav,
             isPreviewActive = isPreviewActive,
+            isAutoImagePreview = isAutoImagePreview,
             isExpandedScreen = isGridScreen,
             staggeredGrid = staggeredGrid,
             gridState = gridState,
             listState = listState,
+            onTopBarShowChange = { isTopBarShow = it },
             onBottomBarShowChange = { isBottomBarShow = it },
             lastClickTime = lastClickTime
         )

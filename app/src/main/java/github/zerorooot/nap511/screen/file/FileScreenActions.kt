@@ -24,10 +24,12 @@ class FileClickHandler(
     private val settingUiState: SettingUiState,
     private val onNav: (Route) -> Unit,
     private val isPreviewActive: Boolean,
+    private val isAutoImagePreview: Boolean,
     private val isExpandedScreen: Boolean,
     private val staggeredGrid: LazyStaggeredGridState,
     private val gridState: LazyGridState,
     private val listState: LazyListState,
+    private val onTopBarShowChange: (Boolean) -> Unit,
     private val onBottomBarShowChange: (Boolean) -> Unit,
     private val lastClickTime: LongArray
 ) {
@@ -64,6 +66,12 @@ class FileClickHandler(
             fileViewModel.photoFileBeanList.addAll(photoList)
             fileViewModel.photoIndexOf = photoList.indexOf(fileBean)
             onNav(Route.Photo)
+            // 当非自动图片预览模式（isAutoImagePreview 为 false）时，点击图片进入 PhotoScreen 前重置 TopBar 和 BottomBar 为显示状态，
+            // 确保返回 FileScreen 时自动恢复显示 systemBars 和 TopBar。
+            if (!isAutoImagePreview) {
+                onTopBarShowChange(true)
+                onBottomBarShowChange(true)
+            }
         }
         fileViewModel.setRefreshingStatus(false)
     }
