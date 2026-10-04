@@ -163,8 +163,7 @@ object CloudCommands {
                         try {
                             val res = ctx.fileRepository.filterFile(
                                 cid = targetCid,
-                                type = filterType,
-                                limit = 999
+                                type = filterType
                             )
                             var list = res.fileBeanList.toList()
 
@@ -210,10 +209,7 @@ object CloudCommands {
                         try {
                             val searchResult = ctx.fileRepository.search(
                                 cid = "0",
-                                searchValue = queryKeyword,
-                                aid = 1,
-                                asc = 1,
-                                limit = 100
+                                searchValue = queryKeyword
                             )
                             val list = searchResult.fileBeanList
                             if (list.isEmpty()) {

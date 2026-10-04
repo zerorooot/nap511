@@ -10,16 +10,13 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -29,15 +26,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imeNestedScroll
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -46,7 +40,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -61,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
@@ -146,11 +140,13 @@ fun TerminalScreen(
         }
     }
 
-    // 判断用户当前是否已处于最底部（当前可见的最后一项是否为倒数前 2 项之一）
+    // 判断用户当前是否处于最底部（当前可见的最后一项是否为倒数前 2 项之一）
     val isAtBottom by remember {
         derivedStateOf {
-            val totalItems = viewModel.lines.size + 2 // lines + input + spacer
-            val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val layoutInfo = listState.layoutInfo
+            val totalItems = layoutInfo.totalItemsCount
+            if (totalItems == 0) return@derivedStateOf true
+            val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
             lastVisibleIndex >= totalItems - 2
         }
     }
@@ -319,6 +315,14 @@ fun TerminalScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color(0xFF101010))
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = {
+                            viewModel.dismissCompletionBar()
+                            bringUpKeyboard()
+                        }
+                    )
+                }
         ) {
             SelectionContainer {
                 LazyColumn(
@@ -331,7 +335,7 @@ fun TerminalScreen(
                 ) {
                     items(
                         count = viewModel.lines.size,
-                        key = { index -> "line_$index" }
+                        key = { index -> viewModel.lines[index].id }
                     ) { index ->
                         TerminalLineRow(line = viewModel.lines[index])
                     }
@@ -367,7 +371,7 @@ fun TerminalScreen(
                             onSubmit = {
                                 viewModel.submitInput()
                                 scope.launch {
-                                    listState.animateScrollToItem((viewModel.lines.size + 1).coerceAtLeast(0))
+                                    listState.scrollToItem((viewModel.lines.size + 1).coerceAtLeast(0))
                                 }
                             },
                             onTab = { viewModel.handleTabPress() },
@@ -391,48 +395,6 @@ fun TerminalScreen(
                                     viewModel.dismissCompletionBar()
                                     bringUpKeyboard()
                                 }
-                        )
-                    }
-                }
-            }
-
-            // 智能防打扰悬浮按钮：当用户向上翻阅历史时展示「回到底部」
-            AnimatedVisibility(
-                visible = !isAtBottom,
-                enter = fadeIn() + scaleIn(),
-                exit = fadeOut() + scaleOut(),
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(innerPadding)
-                    .padding(end = 16.dp, bottom = 12.dp)
-            ) {
-                Surface(
-                    onClick = {
-                        scope.launch {
-                            listState.animateScrollToItem((viewModel.lines.size + 1).coerceAtLeast(0))
-                        }
-                    },
-                    shape = RoundedCornerShape(18.dp),
-                    color = Color(0xFF263238),
-                    tonalElevation = 6.dp,
-                    shadowElevation = 6.dp
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowDown,
-                            contentDescription = "回到底部",
-                            tint = Color(0xFF69F0AE),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = "回到底部",
-                            color = Color(0xFFECEFF1),
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace
                         )
                     }
                 }

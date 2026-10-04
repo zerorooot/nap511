@@ -55,6 +55,19 @@ class TerminalContext(
         if (newPathList != null) {
             pathList.clear()
             pathList.addAll(newPathList)
+        } else {
+            val index = pathList.indexOfFirst { it.cid == cid }
+            if (index != -1) {
+                val trimmedList = pathList.take(index + 1)
+                pathList.clear()
+                pathList.addAll(trimmedList)
+            } else {
+                val cachedPath = fileCacheManager.getDate(cid)?.path
+                if (!cachedPath.isNullOrEmpty()) {
+                    pathList.clear()
+                    pathList.addAll(cachedPath)
+                }
+            }
         }
         onDirectoryChanged?.invoke(currentCid, currentPath)
     }
@@ -112,23 +125,6 @@ class TerminalContext(
 
         val hasTrailingSlash = trimmed.endsWith("/")
 
-        // 处理 .. 上一级
-        if (trimmed == ".." || trimmed == "../") {
-            if (currentCid == "0" || currentPath == "/") {
-                return@withContext ResolvedTarget.Directory("0", "/根目录")
-            }
-            if (pathList.size >= 2) {
-                val parent = pathList[pathList.size - 2]
-                val parentPath =
-                    "/" + pathList.dropLast(1).joinToString("/") { it.name }.trimStart('/')
-                return@withContext ResolvedTarget.Directory(
-                    parent.cid,
-                    parentPath.ifEmpty { "/根目录" })
-            } else {
-                return@withContext ResolvedTarget.Directory("0", "/根目录")
-            }
-        }
-
         // 分割路径段
         val isAbsolute = trimmed.startsWith("/")
         var rawSegments = trimmed.split("/").filter { it.isNotEmpty() && it != "." }
@@ -147,8 +143,12 @@ class TerminalContext(
 
         val segments = rawSegments
         var startCid = if (isAbsolute) "0" else currentCid
-        val currentSegments = if (isAbsolute) mutableListOf("根目录") else currentPath.split("/")
-            .filter { it.isNotEmpty() }.toMutableList()
+        val currentSegments = if (isAbsolute) {
+            mutableListOf("根目录")
+        } else {
+            val list = currentPath.split("/").filter { it.isNotEmpty() }.toMutableList()
+            if (list.isEmpty()) mutableListOf("根目录") else list
+        }
 
         for (i in segments.indices) {
             val segment = segments[i]
@@ -164,10 +164,8 @@ class TerminalContext(
                     findCidByPathSegments(currentSegments) ?: "0"
                 }
                 if (isLast) {
-                    val resolvedPath = "/" + currentSegments.joinToString("/")
-                    return@withContext ResolvedTarget.Directory(
-                        startCid,
-                        resolvedPath.ifEmpty { "/根目录" })
+                    val resolvedPath = if (currentSegments.isEmpty() || currentSegments == listOf("根目录")) "/根目录" else "/" + currentSegments.joinToString("/")
+                    return@withContext ResolvedTarget.Directory(startCid, resolvedPath)
                 }
             } else {
                 val files = listDirectory(startCid)
@@ -176,13 +174,13 @@ class TerminalContext(
                     val folder = files.firstOrNull { it.isFolder && it.name == segment }
                     if (folder != null) {
                         currentSegments.add(segment)
-                        val resolvedPath = "/" + currentSegments.joinToString("/")
+                        val resolvedPath = if (currentSegments.isEmpty() || currentSegments == listOf("根目录")) "/根目录" else "/" + currentSegments.joinToString("/")
                         return@withContext ResolvedTarget.Directory(folder.categoryId, resolvedPath)
                     }
                     val file = files.firstOrNull { !it.isFolder && it.name == segment }
                     if (file != null) {
                         currentSegments.add(segment)
-                        val resolvedPath = "/" + currentSegments.joinToString("/")
+                        val resolvedPath = if (currentSegments.isEmpty() || currentSegments == listOf("根目录")) "/根目录" else "/" + currentSegments.joinToString("/")
                         return@withContext ResolvedTarget.File(file, startCid, resolvedPath)
                     }
                     return@withContext null
@@ -196,7 +194,7 @@ class TerminalContext(
             }
         }
 
-        val resolvedPath = "/" + currentSegments.joinToString("/")
+        val resolvedPath = if (currentSegments.isEmpty() || currentSegments == listOf("根目录")) "/根目录" else "/" + currentSegments.joinToString("/")
         ResolvedTarget.Directory(startCid, resolvedPath)
     }
 
@@ -215,6 +213,18 @@ class TerminalContext(
     }
 
     private suspend fun findCidByPathSegments(segments: List<String>): String? {
+        if (segments.isEmpty() || segments == listOf("根目录")) {
+            return "0"
+        }
+        if (segments.size <= pathList.size) {
+            val isMatch = segments.indices.all { i ->
+                if (i == 0 && segments[i] == "根目录") true
+                else pathList[i].name == segments[i]
+            }
+            if (isMatch) {
+                return pathList[segments.size - 1].cid
+            }
+        }
         var cid = "0"
         for (seg in segments) {
             if (seg == "根目录") continue

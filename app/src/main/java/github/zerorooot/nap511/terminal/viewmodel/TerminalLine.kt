@@ -10,5 +10,6 @@ enum class TerminalLineType {
 
 data class TerminalLine(
     val text: String,
-    val type: TerminalLineType = TerminalLineType.OUTPUT
+    val type: TerminalLineType = TerminalLineType.OUTPUT,
+    val id: Long = System.nanoTime()
 )
