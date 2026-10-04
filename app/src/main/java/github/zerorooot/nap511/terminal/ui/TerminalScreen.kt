@@ -248,13 +248,16 @@ fun TerminalScreen(
             }
         },
         bottomBar = {
-            TerminalAccessoryBar(
-                onTab = {
-                    if (!viewModel.acceptGhostText()) {
-                        // 若无幽灵文本则插入制表缩进或触发提示
-                        viewModel.insertCharacter("  ")
-                    }
-                },
+            Column(modifier = Modifier.fillMaxWidth()) {
+                TerminalCompletionBar(
+                    candidates = viewModel.completionCandidates,
+                    isVisible = viewModel.isCompletionBarVisible,
+                    activeIndex = viewModel.activeCandidateIndex,
+                    onSelectCandidate = { candidate -> viewModel.selectCandidate(candidate) },
+                    onDismiss = { viewModel.dismissCompletionBar() }
+                )
+                TerminalAccessoryBar(
+                    onTab = { viewModel.handleTabPress() },
                 isCtrlActive = viewModel.isCtrlActive,
                 onCtrlToggle = { viewModel.toggleCtrl() },
                 onSlash = { viewModel.insertCharacter("/") },
@@ -285,6 +288,7 @@ fun TerminalScreen(
                 }
             )
         }
+        }
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -294,6 +298,7 @@ fun TerminalScreen(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) {
+                    viewModel.dismissCompletionBar()
                     bringUpKeyboard()
                 }
         ) {
@@ -307,6 +312,7 @@ fun TerminalScreen(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) {
+                        viewModel.dismissCompletionBar()
                         bringUpKeyboard()
                     }
                     .padding(horizontal = 10.dp)
@@ -347,7 +353,8 @@ fun TerminalScreen(
                         prompt = if (viewModel.isWaitingConfirmation) "confirm (yes/no): " else viewModel.promptText(),
                         isWaitingConfirmation = viewModel.isWaitingConfirmation,
                         onSubmit = { viewModel.submitInput() },
-                        onTabOrRight = { viewModel.acceptGhostText() },
+                        onTab = { viewModel.handleTabPress() },
+                        onAcceptGhostText = { viewModel.acceptGhostText() },
                         onArrowUp = { viewModel.navigateHistoryUp() },
                         onArrowDown = { viewModel.navigateHistoryDown() },
                         hardwareKeyActions = hardwareActions,

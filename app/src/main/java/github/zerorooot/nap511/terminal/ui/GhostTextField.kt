@@ -67,7 +67,8 @@ fun GhostTextField(
     prompt: String,
     isWaitingConfirmation: Boolean,
     onSubmit: () -> Unit,
-    onTabOrRight: () -> Unit,
+    onTab: () -> Unit = {},
+    onAcceptGhostText: () -> Unit = {},
     onArrowUp: () -> Unit,
     onArrowDown: () -> Unit,
     hardwareKeyActions: TerminalHardwareKeyActions = TerminalHardwareKeyActions(),
@@ -154,15 +155,17 @@ fun GhostTextField(
                             return@onKeyEvent true
                         }
 
-                        // 2. 常规按键处理 (Tab, End, 方向键等)
+                        // 2. 常规按键处理 (Tab, End, 方向键等) - 仅在 KeyDown 时响应，防止物理键盘单次敲击触发两次
+                        if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+
                         when (event.key) {
                             Key.Tab -> {
-                                onTabOrRight()
+                                onTab()
                                 true
                             }
                             Key.MoveEnd -> {
                                 if (value.selection.end == value.text.length && ghostText.isNotEmpty()) {
-                                    onTabOrRight()
+                                    onAcceptGhostText()
                                     true
                                 } else {
                                     false
@@ -170,7 +173,7 @@ fun GhostTextField(
                             }
                             Key.DirectionRight -> {
                                 if (value.selection.end == value.text.length && ghostText.isNotEmpty()) {
-                                    onTabOrRight()
+                                    onAcceptGhostText()
                                     true
                                 } else {
                                     false
