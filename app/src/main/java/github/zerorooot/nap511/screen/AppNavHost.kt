@@ -8,7 +8,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.SubtitleItem
+import github.zerorooot.nap511.util.AudioPlayerController
+import github.zerorooot.nap511.util.FileDialogController
 import github.zerorooot.nap511.util.FileOpener
+import github.zerorooot.nap511.util.MediaViewerStateHolder
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -43,6 +48,9 @@ import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import github.zerorooot.nap511.viewmodel.RepeatFileViewModel
 import github.zerorooot.nap511.viewmodel.SettingViewModel
+import github.zerorooot.nap511.viewmodel.getImage
+import github.zerorooot.nap511.viewmodel.getTorrentTask
+import github.zerorooot.nap511.viewmodel.getZipListFile
 
 /**
  * 应用全局根导航容器 (AppNavHost)
@@ -78,6 +86,42 @@ fun AppNavHost(
     val gridCellMinSize =
         (uiState.gridCellMinSize.toIntOrNull()?.takeIf { i -> i > 0 } ?: 340).dp
     val isGridScreen = uiState.gridScreenEnabled
+    val context = LocalContext.current
+    val mediaViewerStateHolder = remember { MediaViewerStateHolder() }
+    val audioPlayerController = remember(audioViewModel) {
+        object : AudioPlayerController {
+            override fun playAudio(fileBean: FileBean, localSubtitles: List<SubtitleItem>) {
+                audioViewModel.playAudio(fileBean, localSubtitles)
+            }
+            override fun pauseAudio() {
+                audioViewModel.pause()
+            }
+        }
+    }
+    val fileDialogController = remember(fileViewModel) {
+        object : FileDialogController {
+            override fun openTorrent(fileBean: FileBean) {
+                fileViewModel.getTorrentTask(fileBean.sha1)
+            }
+            override fun openZip(fileBean: FileBean) {
+                val index = fileViewModel.fileBeanList.indexOfFirst { it.pickCode == fileBean.pickCode }
+                if (index >= 0) {
+                    fileViewModel.selectIndex = index
+                }
+                fileViewModel.getZipListFile()
+            }
+        }
+    }
+    val fileOpener = remember(mediaViewerStateHolder, audioPlayerController, fileDialogController, uiState, onNavigate) {
+        FileOpener(
+            context = context,
+            mediaViewerStateHolder = mediaViewerStateHolder,
+            audioPlayerController = audioPlayerController,
+            fileDialogController = fileDialogController,
+            settingUiState = { uiState },
+            onNavigate = onNavigate
+        )
+    }
 
     NavDisplay(
         backStack = backStack,
@@ -106,14 +150,16 @@ fun AppNavHost(
                     openDrawer = {
                         onSetGesturesEnabled(true)
                         onOpenDrawer()
-                    }
-                ) {
-                    val open = isDrawerOpen()
-                    if (open) {
-                        onCloseDrawer()
-                    }
-                    open
-                }
+                    },
+                    drawerState = {
+                        val open = isDrawerOpen()
+                        if (open) {
+                            onCloseDrawer()
+                        }
+                        open
+                    },
+                    fileOpener = fileOpener
+                )
             }
 
             entry<Route.OfflineDownload> {
@@ -205,19 +251,9 @@ fun AppNavHost(
 
             entry<Route.Terminal> {
                 onSetGesturesEnabled(false)
-                val context = LocalContext.current
                 val currentCid = fileViewModel.currentCid
                 val currentPathList = fileViewModel.pathList
                 val currentPath = "/" + currentPathList.joinToString("/") { it.name }
-                val fileOpener = remember(fileViewModel, audioViewModel, uiState) {
-                    FileOpener(
-                        context = context,
-                        fileViewModel = fileViewModel,
-                        audioViewModel = audioViewModel,
-                        settingUiState = { uiState },
-                        onNavigate = onNavigate
-                    )
-                }
                 terminalViewModel.initDirectoryIfNeeded(currentCid, currentPath, currentPathList)
                 terminalViewModel.updateFileOpener(fileOpener)
                 terminalViewModel.onNavigateAction = onNavigate
@@ -269,9 +305,17 @@ fun AppNavHost(
             }
 
             entry<Route.Photo> {
-                MyPhotoScreen(fileViewModel) {
-                    onPopBack()
-                }
+                val photoList = mediaViewerStateHolder.photoFileBeanList.ifEmpty { fileViewModel.photoFileBeanList }
+                val photoIndex = mediaViewerStateHolder.photoIndexOf
+                val photoCid = mediaViewerStateHolder.photoCid.ifEmpty { fileViewModel.currentCid }
+                MyPhotoScreen(
+                    photoList = photoList,
+                    currentIndex = photoIndex,
+                    cid = photoCid,
+                    imageCache = fileViewModel.imageBeanCache[photoCid] ?: emptyMap(),
+                    onLoadImage = { fileViewModel.getImage(it) },
+                    onNav = onPopBack
+                )
             }
 
             entry<Route.RepeatFile> {
@@ -287,7 +331,7 @@ fun AppNavHost(
             }
 
             entry<Route.TxtReader> { route ->
-                val byteArray = fileViewModel.textBodyByteArray
+                val byteArray = mediaViewerStateHolder.textBodyByteArray ?: fileViewModel.textBodyByteArray
 
                 LaunchedEffect(byteArray) {
                     if (byteArray == null) {
@@ -311,7 +355,7 @@ fun AppNavHost(
             }
 
             entry<Route.HtmlWebViewScreen> { route ->
-                val byteArray = fileViewModel.webBodyByteArray
+                val byteArray = mediaViewerStateHolder.webBodyByteArray ?: fileViewModel.webBodyByteArray
 
                 LaunchedEffect(byteArray) {
                     if (byteArray == null) {

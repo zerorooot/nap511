@@ -63,16 +63,13 @@ import kotlin.math.absoluteValue
 
 @Composable
 fun MyPhotoScreen(
-    fileViewModel: FileViewModel,
+    photoList: List<FileBean>,
+    currentIndex: Int,
+    cid: String,
+    imageCache: Map<String, ImageBean>,
+    onLoadImage: (fileBean: FileBean) -> Unit,
     onNav: () -> Unit
 ) {
-    // 从 ViewModel 提取当前页面的状态数据
-    val photoList = fileViewModel.photoFileBeanList
-    val currentIndex = fileViewModel.photoIndexOf
-    val cid = fileViewModel.currentCid
-    // 提取当前相册的缓存字典
-    val imageCache = fileViewModel.imageBeanCache[cid] ?: emptyMap()
-
     LaunchedEffect(Unit) {
         XLog.d("MyPhotoScreen enter: totalPhotos=${photoList.size}, currentIndex=$currentIndex, cid=$cid")
     }
@@ -81,12 +78,23 @@ fun MyPhotoScreen(
         photoList = photoList,
         imageCache = imageCache,
         currentIndex = currentIndex,
-        onLoadImage = { fileBean ->
-            fileViewModel.getImage(fileBean)
-        },
-        onBack = {
-            onNav.invoke()
-        }
+        onLoadImage = onLoadImage,
+        onBack = onNav
+    )
+}
+
+@Composable
+fun MyPhotoScreen(
+    fileViewModel: FileViewModel,
+    onNav: () -> Unit
+) {
+    MyPhotoScreen(
+        photoList = fileViewModel.photoFileBeanList,
+        currentIndex = fileViewModel.photoIndexOf,
+        cid = fileViewModel.currentCid,
+        imageCache = fileViewModel.imageBeanCache[fileViewModel.currentCid] ?: emptyMap(),
+        onLoadImage = { fileViewModel.getImage(it) },
+        onNav = onNav
     )
 }
 

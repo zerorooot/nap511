@@ -16,10 +16,6 @@ import github.zerorooot.nap511.bean.VideoAttributeBean
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.viewmodel.AudioViewModel
-import github.zerorooot.nap511.viewmodel.FileViewModel
-import github.zerorooot.nap511.viewmodel.getTorrentTask
-import github.zerorooot.nap511.viewmodel.getZipListFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -61,20 +57,30 @@ fun extractSubtitles(files: List<FileBean>): List<SubtitleItem> {
 }
 
 /**
- * 公共文件打开器
- * 统一处理各类文件（视频、音频、图片、文本、网页、压缩包、种子）的校验、下载、参数装配与界面路由导航
+ * 公共文件打开器（纯领域类，无 ViewModel 依赖）
+ *
+ * 遵循高内聚、低耦合原则：
+ * 1. 查看器瞬态数据与缓存依赖 [MediaViewerStateHolder]；
+ * 2. 音频控制依赖 [AudioPlayerController] 抽象接口；
+ * 3. 弹窗交互依赖 [FileDialogController] 抽象接口；
+ * 4. 统一处理各类文件（视频、音频、图片、文本、网页、压缩包、种子）的校验、下载、参数装配与路由导航。
  */
 class FileOpener(
     private val context: Context,
     private val fileRepository: FileRepository = FileRepository.getInstance(),
-    private val fileViewModel: FileViewModel,
-    private val audioViewModel: AudioViewModel,
+    private val mediaViewerStateHolder: MediaViewerStateHolder,
+    private val audioPlayerController: AudioPlayerController,
+    private val fileDialogController: FileDialogController? = null,
     private val settingUiState: () -> SettingUiState,
     private val onNavigate: (Route) -> Unit
 ) {
 
     /**
      * 统一打开入口
+     *
+     * @param fileBean 要打开的文件对象
+     * @param siblingFiles 同级目录下的文件列表（用于装配连播视频列表、图片轮播列表或匹配伴随字幕）
+     * @param fromTerminal 是否来自命令行终端环境（为 true 时打开音频会自动跳转音乐详情）
      */
     suspend fun open(
         fileBean: FileBean,
@@ -83,8 +89,9 @@ class FileOpener(
     ): FileOpenResult {
         return when {
             fileBean.isVideo == 1 -> {
-                openVideo(fileBean, siblingFiles)
-                FileOpenResult.Success("video", "已启动视频播放器: ${fileBean.name}")
+                val ok = openVideo(fileBean, siblingFiles)
+                if (ok) FileOpenResult.Success("video", "已启动视频播放器: ${fileBean.name}")
+                else FileOpenResult.Failure("获取视频播放信息失败")
             }
             fileBean.photoThumb.isNotEmpty() || fileBean.fileIco == R.drawable.png -> {
                 openPhoto(fileBean, siblingFiles)
@@ -105,12 +112,14 @@ class FileOpener(
                 else FileOpenResult.Failure("网页打开失败或超出大小限制")
             }
             fileBean.fileIco == R.drawable.torrent -> {
-                openTorrent(fileBean)
-                FileOpenResult.Success("torrent", "已提交种子解析任务: ${fileBean.name}")
+                val ok = openTorrent(fileBean)
+                if (ok) FileOpenResult.Success("torrent", "已提交种子解析任务: ${fileBean.name}")
+                else FileOpenResult.Failure("当前环境不支持打开种子解析弹窗")
             }
             fileBean.fileIco == R.drawable.zip -> {
-                openZip(fileBean)
-                FileOpenResult.Success("zip", "已打开压缩包预览: ${fileBean.name}")
+                val ok = openZip(fileBean)
+                if (ok) FileOpenResult.Success("zip", "已打开压缩包预览: ${fileBean.name}")
+                else FileOpenResult.Failure("当前环境不支持打开压缩包弹窗，请使用 'unzip -l' 预览")
             }
             else -> {
                 FileOpenResult.Unsupported(fileBean.name)
@@ -119,10 +128,10 @@ class FileOpener(
     }
 
     /**
-     * 打开视频
+     * 打开视频文件并启动 [VideoActivity]
      */
     suspend fun openVideo(fileBean: FileBean, siblingFiles: List<FileBean> = emptyList()): Boolean {
-        audioViewModel.pause()
+        audioPlayerController.pauseAudio()
         val videoList = siblingFiles.filter { it.isVideo == 1 && it.playLong != 0.0 }.map {
             VideoBean(
                 name = it.name,
@@ -198,24 +207,24 @@ class FileOpener(
     }
 
     /**
-     * 打开图片
+     * 打开图片并导航至图片全屏浏览器
      */
     fun openPhoto(fileBean: FileBean, photoList: List<FileBean> = emptyList()): Boolean {
-        audioViewModel.pause()
+        audioPlayerController.pauseAudio()
         val validPhotoList = photoList.filter { it.photoThumb.isNotEmpty() || it.fileIco == R.drawable.png }
             .ifEmpty { listOf(fileBean) }
 
-        fileViewModel.photoFileBeanList.clear()
-        fileViewModel.photoFileBeanList.addAll(validPhotoList)
         val targetIndex = validPhotoList.indexOfFirst { it.pickCode == fileBean.pickCode || it.fileId == fileBean.fileId }
-        fileViewModel.photoIndexOf = if (targetIndex >= 0) targetIndex else 0
-        fileViewModel.currentCid = fileBean.categoryId.ifEmpty { fileBean.parentId }
+        val finalIndex = if (targetIndex >= 0) targetIndex else 0
+        val targetCid = fileBean.categoryId.ifEmpty { fileBean.parentId }
+
+        mediaViewerStateHolder.setPhotoList(list = validPhotoList, index = finalIndex, cid = targetCid)
         onNavigate(Route.Photo)
         return true
     }
 
     /**
-     * 打开音频
+     * 播放音频并关联字幕，支持可选跳转至 [Route.MusicDetail]
      */
     fun openAudio(
         fileBean: FileBean,
@@ -223,7 +232,7 @@ class FileOpener(
         navigateToDetail: Boolean = false
     ): Boolean {
         val localSubtitles = extractSubtitles(siblingFiles)
-        audioViewModel.playAudio(fileBean, localSubtitles)
+        audioPlayerController.playAudio(fileBean, localSubtitles)
         if (navigateToDetail) {
             onNavigate(Route.MusicDetail)
         }
@@ -231,7 +240,7 @@ class FileOpener(
     }
 
     /**
-     * 打开文本
+     * 校验大小、拉取/读取缓存字节流并导航至文本阅读器
      */
     suspend fun openText(fileBean: FileBean): Boolean {
         val settings = settingUiState()
@@ -242,13 +251,13 @@ class FileOpener(
         }
 
         val bytes = withContext(Dispatchers.IO) {
-            var cached = fileViewModel.textFileCache[fileBean]
+            var cached = mediaViewerStateHolder.getCachedBytes(fileBean)
             if (cached == null) {
                 runCatching {
                     val inputStream = fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
                     if (inputStream != null) {
                         cached = inputStream.readBytes()
-                        fileViewModel.textFileCache[fileBean] = cached
+                        mediaViewerStateHolder.putCachedBytes(fileBean, cached)
                     }
                 }
             }
@@ -257,7 +266,7 @@ class FileOpener(
 
         if (bytes != null) {
             withContext(Dispatchers.Main) {
-                fileViewModel.textBodyByteArray = bytes
+                mediaViewerStateHolder.setTextContent(bytes)
                 onNavigate(Route.TxtReader(title = fileBean.name))
             }
             return true
@@ -268,7 +277,7 @@ class FileOpener(
     }
 
     /**
-     * 打开网页
+     * 校验大小、拉取/读取缓存字节流并导航至网页预览器
      */
     suspend fun openWeb(fileBean: FileBean): Boolean {
         val settings = settingUiState()
@@ -279,13 +288,13 @@ class FileOpener(
         }
 
         val bytes = withContext(Dispatchers.IO) {
-            var cached = fileViewModel.textFileCache[fileBean]
+            var cached = mediaViewerStateHolder.getCachedBytes(fileBean)
             if (cached == null) {
                 runCatching {
                     val inputStream = fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
                     if (inputStream != null) {
                         cached = inputStream.readBytes()
-                        fileViewModel.textFileCache[fileBean] = cached
+                        mediaViewerStateHolder.putCachedBytes(fileBean, cached)
                     }
                 }
             }
@@ -294,7 +303,7 @@ class FileOpener(
 
         if (bytes != null) {
             withContext(Dispatchers.Main) {
-                fileViewModel.webBodyByteArray = bytes
+                mediaViewerStateHolder.setWebContent(bytes)
                 onNavigate(Route.HtmlWebViewScreen(title = fileBean.name))
             }
             return true
@@ -305,22 +314,22 @@ class FileOpener(
     }
 
     /**
-     * 打开种子任务
+     * 提交/打开种子任务弹窗
      */
     fun openTorrent(fileBean: FileBean): Boolean {
-        fileViewModel.getTorrentTask(fileBean.sha1)
-        return true
+        return fileDialogController?.let {
+            it.openTorrent(fileBean)
+            true
+        } ?: false
     }
 
     /**
-     * 打开压缩包
+     * 打开压缩包预览弹窗
      */
     fun openZip(fileBean: FileBean): Boolean {
-        val index = fileViewModel.fileBeanList.indexOfFirst { it.pickCode == fileBean.pickCode }
-        if (index >= 0) {
-            fileViewModel.selectIndex = index
-        }
-        fileViewModel.getZipListFile()
-        return true
+        return fileDialogController?.let {
+            it.openZip(fileBean)
+            true
+        } ?: false
     }
 }

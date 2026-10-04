@@ -62,10 +62,13 @@ import github.zerorooot.nap511.dialog.ForceOpenDialog
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.screen.components.AppBarAction
 import github.zerorooot.nap511.screen.components.MenuItemAction
-import github.zerorooot.nap511.screen.components.TopBarAction
+import github.zerorooot.nap511.bean.SubtitleItem
 import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.AudioPlayerController
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.FileDialogController
 import github.zerorooot.nap511.util.FileOpener
+import github.zerorooot.nap511.util.MediaViewerStateHolder
 import github.zerorooot.nap511.util.copy
 import github.zerorooot.nap511.util.isNotificationEnabled
 import github.zerorooot.nap511.viewmodel.AudioViewModel
@@ -76,6 +79,10 @@ import github.zerorooot.nap511.viewmodel.delete
 import github.zerorooot.nap511.viewmodel.deleteMultiple
 import github.zerorooot.nap511.viewmodel.getFileInfo
 import github.zerorooot.nap511.viewmodel.getImage
+import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.screen.components.TopBarAction
+import github.zerorooot.nap511.viewmodel.getTorrentTask
+import github.zerorooot.nap511.viewmodel.getZipListFile
 import github.zerorooot.nap511.viewmodel.openAria2Dialog
 import github.zerorooot.nap511.viewmodel.openCreateFolderDialog
 import github.zerorooot.nap511.viewmodel.openFileOrderDialog
@@ -101,7 +108,8 @@ fun FileScreen(
     gridCellMinSize: Dp,
     onNav: (Route) -> Unit,
     openDrawer: () -> Unit,
-    drawerState: () -> Boolean
+    drawerState: () -> Boolean,
+    fileOpener: FileOpener? = null
 ) {
 
     val fabPosition = when (settingUiState.fabPosition) {
@@ -270,11 +278,32 @@ fun FileScreen(
 
     // 记录上次点击时间，使用 longArrayOf 避免无意义的重组
     val lastClickTime = remember { longArrayOf(0L) }
-    val fileOpener = remember(fileViewModel, audioViewModel, settingUiState, onNav) {
+    val actualFileOpener = fileOpener ?: remember(fileViewModel, audioViewModel, settingUiState, onNav) {
+        val audioController = object : AudioPlayerController {
+            override fun playAudio(fileBean: FileBean, localSubtitles: List<SubtitleItem>) {
+                audioViewModel.playAudio(fileBean, localSubtitles)
+            }
+            override fun pauseAudio() {
+                audioViewModel.pause()
+            }
+        }
+        val dialogController = object : FileDialogController {
+            override fun openTorrent(fileBean: FileBean) {
+                fileViewModel.getTorrentTask(fileBean.sha1)
+            }
+            override fun openZip(fileBean: FileBean) {
+                val index = fileViewModel.fileBeanList.indexOfFirst { it.pickCode == fileBean.pickCode }
+                if (index >= 0) {
+                    fileViewModel.selectIndex = index
+                }
+                fileViewModel.getZipListFile()
+            }
+        }
         FileOpener(
             context = context,
-            fileViewModel = fileViewModel,
-            audioViewModel = audioViewModel,
+            mediaViewerStateHolder = MediaViewerStateHolder(),
+            audioPlayerController = audioController,
+            fileDialogController = dialogController,
             settingUiState = { settingUiState },
             onNavigate = onNav
         )
@@ -282,7 +311,7 @@ fun FileScreen(
 
     val clickHandler = remember(
         fileViewModel,
-        fileOpener,
+        actualFileOpener,
         settingUiState,
         scope,
         isPreviewActive,
@@ -294,7 +323,7 @@ fun FileScreen(
     ) {
         FileClickHandler(
             fileViewModel = fileViewModel,
-            fileOpener = fileOpener,
+            fileOpener = actualFileOpener,
             settingUiState = settingUiState,
             coroutineScope = scope,
             isPreviewActive = isPreviewActive,
