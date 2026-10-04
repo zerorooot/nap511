@@ -12,6 +12,7 @@ import github.zerorooot.nap511.bean.RenameBean
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.deleteCoilCache
+import github.zerorooot.nap511.util.formatFileSize
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -252,7 +253,7 @@ private val HTML_EXTS = setOf(
 )
 
 // 2. 改造函数：入参和返回值均为 List，利用 .map() 生成全新的不可变列表
-internal fun FileViewModel.formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
+fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
     // 复用同一个 SimpleDateFormat 实例
     val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
 
@@ -281,7 +282,7 @@ internal fun FileViewModel.formatFileBeanList(fileBeanList: List<FileBean>): Arr
                 dateFormat.format(it * 1000)
             } ?: ""
         } else {
-            sizeString = fileRepository.formatFileSize(fileBean.size.toLongOrNull() ?: 0) + " "
+            sizeString = (fileBean.size.toLongOrNull() ?: 0L).formatFileSize() + " "
             modifiedTimeString = fileBean.modifiedTime
 
             if (fileBean.modifiedTime.isDigitsOnly()) {

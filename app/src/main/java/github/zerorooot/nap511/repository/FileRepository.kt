@@ -30,6 +30,7 @@ import github.zerorooot.nap511.service.OfflineService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.crypto.Sha1Util
+import github.zerorooot.nap511.util.formatFileSize
 import github.zerorooot.nap511.util.network.NetworkClient
 import github.zerorooot.nap511.util.network.UserSessionManager
 import kotlinx.coroutines.CancellationException
@@ -231,13 +232,34 @@ class FileRepository {
         return fileService.createFolder(pid, folderName)
     }
 
+    private suspend fun executeWithRetry(
+        maxRetries: Int = 20,
+        delayMs: Long = 1000L,
+        block: suspend () -> BaseReturnMessage
+    ): BaseReturnMessage {
+        var retries = 0
+        while (true) {
+            val res = block()
+            if (res.state) {
+                return res
+            }
+            val err = res.error + res.errorMsg + res.message
+            if ((err.contains("尚未执行完成") || err.contains("请稍后再试") || err.contains("尚未完成") || err.contains("操作尚未完成")) && retries < maxRetries) {
+                retries++
+                delay(delayMs.milliseconds)
+                continue
+            }
+            return res
+        }
+    }
+
     suspend fun removeFile(currentCid: String, removeFileList: List<FileBean>): BaseReturnMessage {
         val hashMapOf = hashMapOf<String, String>()
         hashMapOf["pid"] = currentCid
         removeFileList.forEachIndexed { index, fileBean ->
             hashMapOf["fid[$index]"] = fileBean.fileId
         }
-        return fileService.move(hashMapOf)
+        return move(hashMapOf)
     }
 
     suspend fun setDownloadPath(cid: String): BaseReturnMessage {
@@ -245,7 +267,7 @@ class FileRepository {
     }
 
     suspend fun move(body: Map<String, String>): BaseReturnMessage {
-        return fileService.move(body)
+        return executeWithRetry { fileService.move(body) }
     }
 
     suspend fun recycleList(
@@ -279,11 +301,11 @@ class FileRepository {
     }
 
     suspend fun delete(pid: String, fid: String): BaseReturnMessage {
-        return fileService.delete(pid, fid)
+        return executeWithRetry { fileService.delete(pid, fid) }
     }
 
     suspend fun rename(renameBean: RequestBody): BaseReturnMessage {
-        return fileService.rename(renameBean)
+        return executeWithRetry { fileService.rename(renameBean) }
     }
 
     suspend fun unzipFile(
@@ -389,7 +411,7 @@ class FileRepository {
                 i.timeString = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
                     i.time.toLong() * 1000
                 )
-                i.sizeString = formatFileSize(i.size) + "  "
+                i.sizeString = i.size.formatFileSize() + "  "
                 when (i.icoString) {
                     "apk" -> i.fileIco = R.drawable.apk
                     "iso" -> i.fileIco = R.drawable.iso
@@ -407,17 +429,7 @@ class FileRepository {
         return zipBeanList
     }
 
-    fun formatFileSize(sizeInBytes: Long): String {
-        if (sizeInBytes <= 0) return "0 B"
-        val units = arrayOf("B", "KB", "MB", "GB", "TB", "PB")
-        val digitGroups = (log10(sizeInBytes.toDouble()) / log10(1024.0)).toInt()
-        return String.format(
-            Locale.US,
-            "%.2f %s",
-            sizeInBytes / 1024.0.pow(digitGroups.toDouble()),
-            units[digitGroups]
-        )
-    }
+
 
     suspend fun decryptZip(pickCode: String, secret: String): Boolean {
         //{"state":true,"message":"","code":"","data":{"unzip_status":4}}

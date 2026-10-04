@@ -54,6 +54,8 @@ data class TerminalHardwareKeyActions(
     val onCtrlA: () -> Unit = {},
     val onCtrlE: () -> Unit = {},
     val onCtrlD: () -> Unit = {},
+    val onCtrlLeft: () -> Unit = {},
+    val onCtrlRight: () -> Unit = {},
     val onAltB: () -> Unit = {},
     val onAltF: () -> Unit = {},
     val onAltD: () -> Unit = {},
@@ -264,6 +266,8 @@ private fun handleHardwareShortcutKeyEvent(
             Key.A -> { actions.onCtrlA(); true }
             Key.E -> { actions.onCtrlE(); true }
             Key.D -> { actions.onCtrlD(); true }
+            Key.DirectionLeft -> { actions.onCtrlLeft(); true }
+            Key.DirectionRight -> { actions.onCtrlRight(); true }
             else -> false
         }
     }
@@ -273,6 +277,8 @@ private fun handleHardwareShortcutKeyEvent(
             Key.B -> { actions.onAltB(); true }
             Key.F -> { actions.onAltF(); true }
             Key.D -> { actions.onAltD(); true }
+            Key.DirectionLeft -> { actions.onAltB(); true }
+            Key.DirectionRight -> { actions.onAltF(); true }
             Key.Backspace -> { actions.onAltBackspace(); true }
             Key.Period -> { actions.onAltDot(); true }
             else -> false

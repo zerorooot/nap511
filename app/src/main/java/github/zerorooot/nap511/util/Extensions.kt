@@ -27,7 +27,10 @@ import java.io.File
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import java.util.Locale
 import java.util.regex.Pattern
+import kotlin.math.log10
+import kotlin.math.pow
 
 /**
  * 将 Throwable 转换为对用户友好的提示文案
@@ -262,4 +265,17 @@ fun rememberListDetailDirective(horizontalSpacer: Dp = 0.dp): PaneScaffoldDirect
         calculatePaneScaffoldDirective(windowAdaptiveInfo)
             .copy(horizontalPartitionSpacerSize = horizontalSpacer)
     }
+}
+
+
+fun Long.formatFileSize(): String {
+    if (this <= 0) return "0 B"
+    val units = arrayOf("B", "KB", "MB", "GB", "TB", "PB")
+    val digitGroups = (log10(this.toDouble()) / log10(1024.0)).toInt()
+    return String.format(
+        Locale.US,
+        "%.2f %s",
+        this / 1024.0.pow(digitGroups.toDouble()),
+        units[digitGroups]
+    )
 }

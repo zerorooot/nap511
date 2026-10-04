@@ -347,6 +347,8 @@ fun TerminalScreen(
                                 onCtrlA = { viewModel.handleCtrlA() },
                                 onCtrlE = { viewModel.handleCtrlE() },
                                 onCtrlD = { viewModel.handleCtrlD(onBack) },
+                                onCtrlLeft = { viewModel.handleCtrlLeft() },
+                                onCtrlRight = { viewModel.handleCtrlRight() },
                                 onAltB = { viewModel.handleAltB() },
                                 onAltF = { viewModel.handleAltF() },
                                 onAltD = { viewModel.handleAltD() },

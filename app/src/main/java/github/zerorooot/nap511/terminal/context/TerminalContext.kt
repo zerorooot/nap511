@@ -2,10 +2,10 @@ package github.zerorooot.nap511.terminal.context
 
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.PathBean
-import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.FileOpener
+import github.zerorooot.nap511.viewmodel.formatFileBeanList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -15,8 +15,10 @@ import kotlinx.coroutines.withContext
 sealed class ResolvedTarget {
     /** 目标是目录 */
     data class Directory(val cid: String, val path: String) : ResolvedTarget()
+
     /** 目标是普通文件 */
-    data class File(val file: FileBean, val parentCid: String, val fullPath: String) : ResolvedTarget()
+    data class File(val file: FileBean, val parentCid: String, val fullPath: String) :
+        ResolvedTarget()
 }
 
 /**
@@ -29,7 +31,6 @@ class TerminalContext(
     initialPathList: List<PathBean> = emptyList(),
     val fileRepository: FileRepository = FileRepository.getInstance(),
     val fileCacheManager: FileCacheManager = FileCacheManager,
-    val onNavigate: ((Route) -> Unit)? = null,
     val onConfirmRequest: (suspend (prompt: String) -> Boolean)? = null,
     val onDirectoryChanged: ((cid: String, path: String) -> Unit)? = null,
     var fileOpener: FileOpener? = null
@@ -63,7 +64,10 @@ class TerminalContext(
      * 1. 优先从 FileCacheManager 读取
      * 2. 缓存未命中或 forceRefresh == true 时，请求 FileRepository.getFiles 并存入缓存
      */
-    suspend fun listDirectory(cid: String = currentCid, forceRefresh: Boolean = false): List<FileBean> =
+    suspend fun listDirectory(
+        cid: String = currentCid,
+        forceRefresh: Boolean = false
+    ): List<FileBean> =
         withContext(Dispatchers.IO) {
             if (!forceRefresh) {
                 val cached = fileCacheManager[cid]
@@ -76,15 +80,8 @@ class TerminalContext(
             return@withContext try {
                 val filesBean = fileRepository.getFiles(cid = cid)
                 // 规范化 isFolder
-                val normalizedList = filesBean.fileBeanList.map { file ->
-                    val isFolder = file.fileId.isEmpty()
-                    val actualFileId = if (isFolder) file.categoryId else file.fileId
-                    file.copy(
-                        isFolder = isFolder,
-                        fileId = actualFileId
-                    )
-                }
-                filesBean.fileBeanList = ArrayList(normalizedList)
+                val normalizedList = formatFileBeanList(filesBean.fileBeanList)
+                filesBean.fileBeanList = normalizedList
                 fileCacheManager.put(cid, filesBean)
                 normalizedList
             } catch (e: Exception) {
@@ -109,8 +106,8 @@ class TerminalContext(
             return@withContext ResolvedTarget.Directory(currentCid, currentPath)
         }
 
-        if (trimmed == "/" || trimmed == "~") {
-            return@withContext ResolvedTarget.Directory("0", "/")
+        if (trimmed == "/" || trimmed == "~" || trimmed == "/根目录" || trimmed == "/根目录/") {
+            return@withContext ResolvedTarget.Directory("0", "/根目录")
         }
 
         val hasTrailingSlash = trimmed.endsWith("/")
@@ -118,29 +115,40 @@ class TerminalContext(
         // 处理 .. 上一级
         if (trimmed == ".." || trimmed == "../") {
             if (currentCid == "0" || currentPath == "/") {
-                return@withContext ResolvedTarget.Directory("0", "/")
+                return@withContext ResolvedTarget.Directory("0", "/根目录")
             }
             if (pathList.size >= 2) {
                 val parent = pathList[pathList.size - 2]
-                val parentPath = "/" + pathList.dropLast(1).joinToString("/") { it.name }.trimStart('/')
-                return@withContext ResolvedTarget.Directory(parent.cid, parentPath.ifEmpty { "/" })
+                val parentPath =
+                    "/" + pathList.dropLast(1).joinToString("/") { it.name }.trimStart('/')
+                return@withContext ResolvedTarget.Directory(
+                    parent.cid,
+                    parentPath.ifEmpty { "/根目录" })
             } else {
-                return@withContext ResolvedTarget.Directory("0", "/")
+                return@withContext ResolvedTarget.Directory("0", "/根目录")
             }
         }
 
         // 分割路径段
         val isAbsolute = trimmed.startsWith("/")
-        val segments = trimmed.split("/").filter { it.isNotEmpty() && it != "." }
-        if (segments.isEmpty()) {
+        var rawSegments = trimmed.split("/").filter { it.isNotEmpty() && it != "." }
+
+        // 如果是绝对路径且第一段是 "根目录"，忽略该段（因为 CID "0" 就是 "根目录"）
+        if (isAbsolute && rawSegments.firstOrNull() == "根目录") {
+            rawSegments = rawSegments.drop(1)
+        }
+
+        if (rawSegments.isEmpty()) {
             return@withContext ResolvedTarget.Directory(
                 if (isAbsolute) "0" else currentCid,
-                if (isAbsolute) "/" else currentPath
+                if (isAbsolute) "/根目录" else currentPath
             )
         }
 
+        val segments = rawSegments
         var startCid = if (isAbsolute) "0" else currentCid
-        val currentSegments = if (isAbsolute) mutableListOf() else currentPath.split("/").filter { it.isNotEmpty() }.toMutableList()
+        val currentSegments = if (isAbsolute) mutableListOf("根目录") else currentPath.split("/")
+            .filter { it.isNotEmpty() }.toMutableList()
 
         for (i in segments.indices) {
             val segment = segments[i]
@@ -150,14 +158,16 @@ class TerminalContext(
                 if (currentSegments.isNotEmpty()) {
                     currentSegments.removeAt(currentSegments.size - 1)
                 }
-                startCid = if (currentSegments.isEmpty()) {
+                startCid = if (currentSegments.isEmpty() || currentSegments == listOf("根目录")) {
                     "0"
                 } else {
                     findCidByPathSegments(currentSegments) ?: "0"
                 }
                 if (isLast) {
                     val resolvedPath = "/" + currentSegments.joinToString("/")
-                    return@withContext ResolvedTarget.Directory(startCid, resolvedPath)
+                    return@withContext ResolvedTarget.Directory(
+                        startCid,
+                        resolvedPath.ifEmpty { "/根目录" })
                 }
             } else {
                 val files = listDirectory(startCid)
@@ -207,6 +217,7 @@ class TerminalContext(
     private suspend fun findCidByPathSegments(segments: List<String>): String? {
         var cid = "0"
         for (seg in segments) {
+            if (seg == "根目录") continue
             val files = listDirectory(cid)
             val folder = files.firstOrNull { it.isFolder && it.name == seg } ?: return null
             cid = folder.categoryId

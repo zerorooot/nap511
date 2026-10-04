@@ -42,26 +42,26 @@ object TerminalLineEditor {
     }
 
     /**
-     * 光标按词向前（左）跳跃 (Alt+B)
+     * 光标按词向前（左）跳跃 (Ctrl+Left / Alt+B)
      */
     fun moveWordBackward(value: TextFieldValue): TextFieldValue {
         val text = value.text
         var pos = value.selection.start.coerceIn(0, text.length)
         if (pos == 0) return value
 
-        // 1. 跳过光标左侧的连续空白
-        while (pos > 0 && text[pos - 1].isWhitespace()) {
+        // 1. 跳过光标左侧的连续非字母数字字符（空格、标点符号）
+        while (pos > 0 && (!text[pos - 1].isLetterOrDigit())) {
             pos--
         }
-        // 2. 跳过连续非空白字符（单词主体）
-        while (pos > 0 && !text[pos - 1].isWhitespace()) {
+        // 2. 跳过连续字母数字字符（单词主体）
+        while (pos > 0 && text[pos - 1].isLetterOrDigit()) {
             pos--
         }
         return value.copy(selection = TextRange(pos))
     }
 
     /**
-     * 光标按词向后（右）跳跃 (Alt+F)
+     * 光标按词向后（右）跳跃 (Ctrl+Right / Alt+F)
      */
     fun moveWordForward(value: TextFieldValue): TextFieldValue {
         val text = value.text
@@ -69,12 +69,12 @@ object TerminalLineEditor {
         val len = text.length
         if (pos >= len) return value
 
-        // 1. 跳过光标右侧的连续空白
-        while (pos < len && text[pos].isWhitespace()) {
+        // 1. 跳过光标右侧的连续非字母数字字符（空格、标点符号）
+        while (pos < len && (!text[pos].isLetterOrDigit())) {
             pos++
         }
-        // 2. 跳过连续非空白字符（单词主体）
-        while (pos < len && !text[pos].isWhitespace()) {
+        // 2. 跳过连续字母数字字符（单词主体）
+        while (pos < len && text[pos].isLetterOrDigit()) {
             pos++
         }
         return value.copy(selection = TextRange(pos))

@@ -133,7 +133,6 @@ class TerminalViewModel(
         initialCid = initialCid,
         initialPath = initialPath,
         initialPathList = initialPathList,
-        onNavigate = { route -> onNavigateAction?.invoke(route) },
         onConfirmRequest = { prompt ->
             isWaitingConfirmation = true
             appendTerminalLine(TerminalLine(prompt, TerminalLineType.PROMPT))
@@ -732,6 +731,24 @@ class TerminalViewModel(
     }
 
     /**
+     * Ctrl+Left: 光标向左跳跃一个单词
+     */
+    fun handleCtrlLeft() {
+        resetModifiers()
+        inputState = TerminalLineEditor.moveWordBackward(inputState)
+        ghostText = ""
+    }
+
+    /**
+     * Ctrl+Right: 光标向右跳跃一个单词
+     */
+    fun handleCtrlRight() {
+        resetModifiers()
+        inputState = TerminalLineEditor.moveWordForward(inputState)
+        updateGhostText(inputState.text, inputState.selection.end)
+    }
+
+    /**
      * Alt+B: 光标后退一个单词
      */
     fun handleAltB() {
@@ -823,11 +840,27 @@ class TerminalViewModel(
     }
 
     fun moveCursorLeft() {
+        if (isCtrlActive) {
+            handleCtrlLeft()
+            return
+        }
+        if (isAltActive) {
+            handleAltB()
+            return
+        }
         inputState = TerminalLineEditor.moveCursorLeft(inputState)
         ghostText = ""
     }
 
     fun moveCursorRight() {
+        if (isCtrlActive) {
+            handleCtrlRight()
+            return
+        }
+        if (isAltActive) {
+            handleAltF()
+            return
+        }
         if (inputState.selection.end == inputState.text.length && ghostText.isNotEmpty()) {
             acceptGhostText()
             return

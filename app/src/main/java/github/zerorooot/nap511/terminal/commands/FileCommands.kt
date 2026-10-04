@@ -1,9 +1,9 @@
 package github.zerorooot.nap511.terminal.commands
 
-import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.RenameBean
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.engine.CommandRegistry
+import github.zerorooot.nap511.util.formatFileSize
 import kotlinx.coroutines.flow.flow
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -50,24 +50,36 @@ object FileCommands {
                         when (resolved) {
                             is ResolvedTarget.Directory -> {
                                 val files = ctx.listDirectory(resolved.cid, forceRefresh)
-                                val filtered = if (isAll) files else files.filter { !it.name.startsWith(".") }
+                                val filtered =
+                                    if (isAll) files else files.filter { !it.name.startsWith(".") }
                                 Pair(filtered, false)
                             }
+
                             is ResolvedTarget.File -> {
                                 Pair(listOf(resolved.file), true)
                             }
                         }
                     } else {
                         val files = ctx.listDirectory(ctx.currentCid, forceRefresh)
-                        val filtered = if (isAll) files else files.filter { !it.name.startsWith(".") }
+                        val filtered =
+                            if (isAll) files else files.filter { !it.name.startsWith(".") }
                         Pair(filtered, false)
                     }
 
                     // 排序规则：默认完全保持接口请求/缓存中的原始顺序；仅在显式传入选项时重排
                     var sorted = when {
-                        sortByMtime -> candidateFiles.sortedByDescending { it.modifiedTime.toLongOrNull() ?: 0L }
-                        sortByAtime -> candidateFiles.sortedByDescending { it.updateTime.toLongOrNull() ?: 0L }
-                        sortBySize -> candidateFiles.sortedByDescending { it.size.toLongOrNull() ?: 0L }
+                        sortByMtime -> candidateFiles.sortedByDescending {
+                            it.modifiedTime.toLongOrNull() ?: 0L
+                        }
+
+                        sortByAtime -> candidateFiles.sortedByDescending {
+                            it.updateTime.toLongOrNull() ?: 0L
+                        }
+
+                        sortBySize -> candidateFiles.sortedByDescending {
+                            it.size.toLongOrNull() ?: 0L
+                        }
+
                         sortByExt -> candidateFiles.sortedBy { it.name.substringAfterLast(".", "") }
                         else -> candidateFiles
                     }
@@ -84,14 +96,24 @@ object FileCommands {
                         for (file in sorted) {
                             val typeChar = if (file.isFolder) "d" else "-"
                             val perm = "${typeChar}rwxr-xr-x"
-                            val sizeStr = if (file.isFolder) "-" else formatFileSize(file.size.toLongOrNull() ?: 0L)
+                            val sizeStr = if (file.isFolder) "-" else (file.size.toLongOrNull()
+                                ?: 0L).formatFileSize()
                             val timeStr = formatTimestamp(file.modifiedTime, dateFormat)
                             val nameStr = if (isSingleFile && targetPath != null) {
                                 if (file.isFolder && !targetPath.endsWith("/")) "$targetPath/" else targetPath
                             } else {
                                 if (file.isFolder) "${file.name}/" else file.name
                             }
-                            emit(String.format(Locale.getDefault(), "%-11s %10s %16s %s", perm, sizeStr, timeStr, nameStr))
+                            emit(
+                                String.format(
+                                    Locale.getDefault(),
+                                    "%-11s %10s %16s %s",
+                                    perm,
+                                    sizeStr,
+                                    timeStr,
+                                    nameStr
+                                )
+                            )
                         }
                     } else {
                         for (file in sorted) {
@@ -150,7 +172,10 @@ object FileCommands {
 
                     for (name in folderNames) {
                         try {
-                            val res = ctx.fileRepository.createFolder(pid = ctx.currentCid, folderName = name)
+                            val res = ctx.fileRepository.createFolder(
+                                pid = ctx.currentCid,
+                                folderName = name
+                            )
                             if (res.state) {
                                 ctx.invalidateCache(ctx.currentCid)
                                 emit("mkdir: created directory '$name'")
@@ -192,7 +217,8 @@ object FileCommands {
 
                         // 若未输入 -y 则交互确认
                         if (!autoConfirm) {
-                            val confirmed = ctx.confirm("rm: 是否确认删除 '${fileBean.name}'? (yes/no): ")
+                            val confirmed =
+                                ctx.confirm("rm: 是否确认删除 '${fileBean.name}'? (yes/no): ")
                             if (!confirmed) {
                                 emit("rm: 已取消删除 '${fileBean.name}'")
                                 continue
@@ -200,8 +226,10 @@ object FileCommands {
                         }
 
                         try {
-                            val actualFid = if (fileBean.isFolder) fileBean.categoryId else fileBean.fileId
-                            val res = ctx.fileRepository.delete(pid = ctx.currentCid, fid = actualFid)
+                            val actualFid =
+                                if (fileBean.isFolder) fileBean.categoryId else fileBean.fileId
+                            val res =
+                                ctx.fileRepository.delete(pid = ctx.currentCid, fid = actualFid)
                             if (res.state) {
                                 deletedCount++
                                 emit("rm: 已移入回收站 '${fileBean.name}'")
@@ -257,16 +285,20 @@ object FileCommands {
                     // 解析源文件/目录信息
                     suspend fun resolveSourceItem(rawSrc: String): Pair<String, String>? {
                         val cleanSrc = rawSrc.trim().trimEnd('/')
-                        val localFile = currentFiles.firstOrNull { it.name == cleanSrc || it.name == rawSrc.trim() }
+                        val localFile =
+                            currentFiles.firstOrNull { it.name == cleanSrc || it.name == rawSrc.trim() }
                         if (localFile != null) {
-                            val fid = if (localFile.isFolder) localFile.categoryId else localFile.fileId
+                            val fid =
+                                if (localFile.isFolder) localFile.categoryId else localFile.fileId
                             return Pair(fid, localFile.name)
                         }
 
                         // 尝试路径解析（支持绝对路径与相对路径）
-                        val resolved = ctx.resolveTarget(cleanSrc)
-                        return when (resolved) {
-                            is ResolvedTarget.Directory -> Pair(resolved.cid, cleanSrc.substringAfterLast('/').ifEmpty { "/" })
+                        return when (val resolved = ctx.resolveTarget(cleanSrc)) {
+                            is ResolvedTarget.Directory -> Pair(
+                                resolved.cid,
+                                cleanSrc.substringAfterLast('/').ifEmpty { "/" })
+
                             is ResolvedTarget.File -> Pair(resolved.file.fileId, resolved.file.name)
                             null -> null
                         }
@@ -277,11 +309,15 @@ object FileCommands {
                     var destDisplayName = destination
                     val cleanDest = destination.trim().trimEnd('/')
 
-                    val destFolder = currentFiles.firstOrNull { it.isFolder && (it.name == cleanDest || it.name == destination.trim()) }
+                    val destFolder =
+                        currentFiles.firstOrNull { it.isFolder && (it.name == cleanDest || it.name == destination.trim()) }
                     if (destFolder != null) {
                         targetDestCid = destFolder.categoryId
                         destDisplayName = destFolder.name
-                    } else if (cleanDest == ".." || cleanDest == "." || cleanDest == "~" || cleanDest.startsWith("/") || cleanDest.contains("/")) {
+                    } else if (cleanDest == ".." || cleanDest == "." || cleanDest == "~" || cleanDest.startsWith(
+                            "/"
+                        ) || cleanDest.contains("/")
+                    ) {
                         val resolvedPath = ctx.resolvePath(destination)
                         if (resolvedPath != null) {
                             targetDestCid = resolvedPath.first
@@ -308,7 +344,9 @@ object FileCommands {
                                     ctx.invalidateCache(targetDestCid)
                                     emit("mv: '$src' -> '$destDisplayName/'")
                                 } else {
-                                    emit("mv: 移动 '$src' 失败: ${res.error}")
+                                    val err =
+                                        res.error.ifEmpty { res.errorMsg.ifEmpty { res.message } }
+                                    emit("mv: 移动 '$src' 失败: $err")
                                 }
                             } catch (e: Exception) {
                                 emit("mv: 移动 '$src' 失败: ${e.message}")
@@ -330,7 +368,8 @@ object FileCommands {
                                 ctx.invalidateCache(ctx.currentCid)
                                 emit("mv: '$src' renamed to '$destination'")
                             } else {
-                                emit("mv: 重命名失败: ${res.error}")
+                                val err = res.error.ifEmpty { res.errorMsg.ifEmpty { res.message } }
+                                emit("mv: 重命名失败: $err")
                             }
                         } catch (e: Exception) {
                             emit("mv: 重命名失败: ${e.message}")
@@ -343,17 +382,6 @@ object FileCommands {
         }
     }
 
-    private fun formatFileSize(size: Long): String {
-        if (size <= 0) return "0 B"
-        val units = arrayOf("B", "KB", "MB", "GB", "TB")
-        var s = size.toDouble()
-        var unitIndex = 0
-        while (s >= 1024 && unitIndex < units.size - 1) {
-            s /= 1024
-            unitIndex++
-        }
-        return String.format(Locale.getDefault(), "%.1f %s", s, units[unitIndex])
-    }
 
     private fun formatTimestamp(timeStr: String, dateFormat: SimpleDateFormat): String {
         val timestamp = timeStr.toLongOrNull() ?: return timeStr
