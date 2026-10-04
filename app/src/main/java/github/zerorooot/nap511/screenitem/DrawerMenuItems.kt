@@ -9,12 +9,16 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
+import github.zerorooot.nap511.BuildConfig
 import github.zerorooot.nap511.bean.DrawerMenuItem
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.util.ConfigKeyUtil
 
 object DrawerMenuItems {
     fun buildMenuItems(isLogEnabled: Boolean): List<DrawerMenuItem> {
+        val terminalMenuItem = DrawerMenuItem(
+            Icons.Default.Terminal, ConfigKeyUtil.TERMINAL, Route.Terminal
+        )
         return arrayListOf(
             DrawerMenuItem(Icons.Default.Cloud, ConfigKeyUtil.MY_FILE, Route.MyFile),
             DrawerMenuItem(
@@ -29,9 +33,7 @@ object DrawerMenuItems {
             DrawerMenuItem(
                 Icons.Default.Delete, ConfigKeyUtil.RECYCLE_BIN, Route.RecycleBin
             ),
-            DrawerMenuItem(
-                Icons.Default.Terminal, ConfigKeyUtil.TERMINAL, Route.Terminal
-            ),
+            terminalMenuItem,
             DrawerMenuItem(
                 Icons.Default.Settings,
                 ConfigKeyUtil.ADVANCED_SETTINGS,
@@ -52,6 +54,11 @@ object DrawerMenuItems {
                     Route.ExitApp
                 )
             )
+            if (!BuildConfig.DEBUG) {
+                this.remove(
+                    terminalMenuItem
+                )
+            }
         }
     }
 }

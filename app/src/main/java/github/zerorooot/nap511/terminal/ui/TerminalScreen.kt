@@ -18,9 +18,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imeNestedScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -53,6 +56,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -65,11 +69,6 @@ import github.zerorooot.nap511.terminal.viewmodel.TerminalViewModel
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.copy
 import kotlinx.coroutines.launch
-
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.imeNestedScroll
-import androidx.compose.foundation.layout.isImeVisible
 
 private fun Context.findActivity(): Activity? {
     var ctx = this
@@ -120,20 +119,28 @@ fun TerminalScreen(
     }
 
     val bringUpKeyboard: () -> Unit = {
+        val current = viewModel.inputState
+        if (current.selection.start != current.text.length || current.selection.end != current.text.length) {
+            viewModel.onInputChange(
+                current.copy(selection = TextRange(current.text.length))
+            )
+        }
         focusRequester.requestFocus()
         keyboardController?.show()
-    }
-
-    // 实时监听软键盘状态与输出行数变化，软键盘升起或新行追加时锚定滚动到底部输入框
-    val isImeVisible = WindowInsets.isImeVisible
-    LaunchedEffect(viewModel.lines.size, isImeVisible) {
-        if (viewModel.lines.isNotEmpty()) {
+        scope.launch {
             listState.scrollToItem((viewModel.lines.size + 1).coerceAtLeast(0))
         }
     }
 
-    // 默认请求焦点弹出输入法
-    LaunchedEffect(Unit) {
+    // 实时监听软键盘高度与输出行数变化，在软键盘升起/变动或新输出追加时持续锚定滚动到底部输入框（行尾）
+    val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+    LaunchedEffect(viewModel.lines.size, imeBottom) {
+        listState.scrollToItem((viewModel.lines.size + 1).coerceAtLeast(0))
+    }
+
+    // 默认请求焦点弹出输入法并绑定退出回调
+    LaunchedEffect(onBack) {
+        viewModel.onExitAction = onBack
         bringUpKeyboard()
     }
 
@@ -248,6 +255,8 @@ fun TerminalScreen(
                         viewModel.insertCharacter("  ")
                     }
                 },
+                isCtrlActive = viewModel.isCtrlActive,
+                onCtrlToggle = { viewModel.toggleCtrl() },
                 onSlash = { viewModel.insertCharacter("/") },
                 onDash = { viewModel.insertCharacter("-") },
                 onHome = { viewModel.moveCursorHome() },
@@ -260,6 +269,8 @@ fun TerminalScreen(
                     }
                 },
                 onMenu = { showMenuSheet = true },
+                isAltActive = viewModel.isAltActive,
+                onAltToggle = { viewModel.toggleAlt() },
                 onPipe = { viewModel.insertCharacter("|") },
                 onStar = { viewModel.insertCharacter("*") },
                 onArrowLeft = { viewModel.moveCursorLeft() },
@@ -311,6 +322,24 @@ fun TerminalScreen(
                 }
 
                 item(key = "terminal_ghost_input") {
+                    val hardwareActions = remember(viewModel, onBack) {
+                        TerminalHardwareKeyActions(
+                            onCtrlC = { viewModel.handleCtrlC() },
+                            onCtrlU = { viewModel.handleCtrlU() },
+                            onCtrlK = { viewModel.handleCtrlK() },
+                            onCtrlW = { viewModel.handleCtrlW() },
+                            onCtrlL = { viewModel.handleCtrlL() },
+                            onCtrlA = { viewModel.handleCtrlA() },
+                            onCtrlE = { viewModel.handleCtrlE() },
+                            onCtrlD = { viewModel.handleCtrlD(onBack) },
+                            onAltB = { viewModel.handleAltB() },
+                            onAltF = { viewModel.handleAltF() },
+                            onAltD = { viewModel.handleAltD() },
+                            onAltBackspace = { viewModel.handleAltBackspace() },
+                            onAltDot = { viewModel.handleAltDot() }
+                        )
+                    }
+
                     GhostTextField(
                         value = viewModel.inputState,
                         onValueChange = { viewModel.onInputChange(it) },
@@ -321,6 +350,7 @@ fun TerminalScreen(
                         onTabOrRight = { viewModel.acceptGhostText() },
                         onArrowUp = { viewModel.navigateHistoryUp() },
                         onArrowDown = { viewModel.navigateHistoryDown() },
+                        hardwareKeyActions = hardwareActions,
                         focusRequester = focusRequester
                     )
                 }

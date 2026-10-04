@@ -19,10 +19,16 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -32,6 +38,26 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+/**
+ * 外接物理键盘快捷键动作集合
+ * 封装 Ctrl 和 Alt 系列快捷键处理回调，保持参数高内聚低耦合
+ */
+data class TerminalHardwareKeyActions(
+    val onCtrlC: () -> Unit = {},
+    val onCtrlU: () -> Unit = {},
+    val onCtrlK: () -> Unit = {},
+    val onCtrlW: () -> Unit = {},
+    val onCtrlL: () -> Unit = {},
+    val onCtrlA: () -> Unit = {},
+    val onCtrlE: () -> Unit = {},
+    val onCtrlD: () -> Unit = {},
+    val onAltB: () -> Unit = {},
+    val onAltF: () -> Unit = {},
+    val onAltD: () -> Unit = {},
+    val onAltBackspace: () -> Unit = {},
+    val onAltDot: () -> Unit = {}
+)
 
 @Composable
 fun GhostTextField(
@@ -44,6 +70,7 @@ fun GhostTextField(
     onTabOrRight: () -> Unit,
     onArrowUp: () -> Unit,
     onArrowDown: () -> Unit,
+    hardwareKeyActions: TerminalHardwareKeyActions = TerminalHardwareKeyActions(),
     focusRequester: FocusRequester,
     modifier: Modifier = Modifier
 ) {
@@ -57,10 +84,17 @@ fun GhostTextField(
     val promptColor = if (isWaitingConfirmation) Color(0xFFFFD54F) else Color(0xFF69F0AE)
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    val submitAndKeepKeyboard = {
-        onSubmit()
+    val requestFocusAndMoveCursorToEnd = {
+        if (value.selection.start != value.text.length || value.selection.end != value.text.length) {
+            onValueChange(value.copy(selection = TextRange(value.text.length)))
+        }
         focusRequester.requestFocus()
         keyboardController?.show()
+    }
+
+    val submitAndKeepKeyboard = {
+        onSubmit()
+        requestFocusAndMoveCursorToEnd()
     }
 
     Row(
@@ -70,8 +104,7 @@ fun GhostTextField(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ) {
-                focusRequester.requestFocus()
-                keyboardController?.show()
+                requestFocusAndMoveCursorToEnd()
             }
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -93,8 +126,7 @@ fun GhostTextField(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) {
-                    focusRequester.requestFocus()
-                    keyboardController?.show()
+                    requestFocusAndMoveCursorToEnd()
                 }
         ) {
             // 输入框
@@ -117,6 +149,12 @@ fun GhostTextField(
                     .fillMaxWidth()
                     .focusRequester(focusRequester)
                     .onKeyEvent { event ->
+                        // 1. 优先分发外接物理键盘的 Ctrl / Alt 组合键
+                        if (handleHardwareShortcutKeyEvent(event, hardwareKeyActions)) {
+                            return@onKeyEvent true
+                        }
+
+                        // 2. 常规按键处理 (Tab, End, 方向键等)
                         when (event.key) {
                             Key.Tab -> {
                                 onTabOrRight()
@@ -146,9 +184,7 @@ fun GhostTextField(
                                 onArrowDown()
                                 true
                             }
-                            else -> {
-                                false
-                            }
+                            else -> false
                         }
                     }
             )
@@ -173,4 +209,41 @@ fun GhostTextField(
             }
         }
     }
+}
+
+/**
+ * 物理键盘按键事件捕获解析
+ */
+private fun handleHardwareShortcutKeyEvent(
+    event: KeyEvent,
+    actions: TerminalHardwareKeyActions
+): Boolean {
+    if (event.type != KeyEventType.KeyDown) return false
+
+    if (event.isCtrlPressed) {
+        return when (event.key) {
+            Key.C -> { actions.onCtrlC(); true }
+            Key.U -> { actions.onCtrlU(); true }
+            Key.K -> { actions.onCtrlK(); true }
+            Key.W -> { actions.onCtrlW(); true }
+            Key.L -> { actions.onCtrlL(); true }
+            Key.A -> { actions.onCtrlA(); true }
+            Key.E -> { actions.onCtrlE(); true }
+            Key.D -> { actions.onCtrlD(); true }
+            else -> false
+        }
+    }
+
+    if (event.isAltPressed) {
+        return when (event.key) {
+            Key.B -> { actions.onAltB(); true }
+            Key.F -> { actions.onAltF(); true }
+            Key.D -> { actions.onAltD(); true }
+            Key.Backspace -> { actions.onAltBackspace(); true }
+            Key.Period -> { actions.onAltDot(); true }
+            else -> false
+        }
+    }
+
+    return false
 }

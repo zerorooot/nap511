@@ -104,10 +104,12 @@ class CommandRegistry {
 
     fun get(name: String): CommandDefinition? = commands[name]
 
+    fun hasCommand(name: String): Boolean = commands.containsKey(name)
+
     fun getAll(): List<CommandDefinition> = commands.values.toList().sortedBy { it.name }
 
     /**
-     * 汇总生成所有可用命令列表（用于 '?' 与 'help' 命令输出）
+     * 汇总生成所有可用命令列表与快捷键指南（用于 '?' 与 'help' 命令输出）
      */
     fun buildAllHelpMessage(): String {
         val sb = StringBuilder()
@@ -116,6 +118,19 @@ class CommandRegistry {
         getAll().forEach { cmd ->
             sb.appendLine("${cmd.name.padEnd(14)} : ${cmd.description}")
         }
+        sb.appendLine("--------------------------------------------------")
+        sb.appendLine("快捷键指南（悬浮栏点亮 CTRL / ALT 或连接物理键盘）：")
+        sb.appendLine("  Ctrl + C        中断运行中的任务 / 放弃当前输入另起新行")
+        sb.appendLine("  Ctrl + U        清除光标至行首")
+        sb.appendLine("  Ctrl + K        清除光标至行尾")
+        sb.appendLine("  Ctrl + W        向前删除一个单词")
+        sb.appendLine("  Ctrl + L        清空屏幕输出 (等同 clear)")
+        sb.appendLine("  Ctrl + A / E    光标跳到行首 / 行尾")
+        sb.appendLine("  Ctrl + D        输入为空时退出终端 / 向后删除字符")
+        sb.appendLine("  Alt + B / F     光标按单词向左 / 向右跳跃")
+        sb.appendLine("  Alt + D         向后删除一个单词")
+        sb.appendLine("  Alt + Backspace 向前删除一个单词 (同 Ctrl+W)")
+        sb.appendLine("  Alt + .         召回并插入上一条命令的最后一个参数")
         sb.append("--------------------------------------------------")
         return sb.toString()
     }
