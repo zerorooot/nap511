@@ -34,6 +34,7 @@ import github.zerorooot.nap511.screenitem.AppDrawer
 import github.zerorooot.nap511.screenitem.DrawerMenuItems
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.terminal.viewmodel.TerminalViewModel
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.LoginViewModel
@@ -57,6 +58,7 @@ fun MainScreen(
     val repeatViewModel: RepeatFileViewModel = viewModel()
     val settingViewModel: SettingViewModel = viewModel()
     val loginViewModel: LoginViewModel = viewModel()
+    val terminalViewModel: TerminalViewModel = viewModel()
 
     val context = LocalContext.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -221,6 +223,7 @@ fun MainScreen(
             repeatViewModel = repeatViewModel,
             settingViewModel = settingViewModel,
             loginViewModel = loginViewModel,
+            terminalViewModel = terminalViewModel,
             uiState = settingUiState,
             isDrawerOpen = { drawerState.isOpen },
             onOpenDrawer = { scope.launch { drawerState.open() } },

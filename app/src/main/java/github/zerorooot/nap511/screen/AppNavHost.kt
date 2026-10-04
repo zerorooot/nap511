@@ -65,6 +65,7 @@ fun AppNavHost(
     repeatViewModel: RepeatFileViewModel,
     settingViewModel: SettingViewModel,
     loginViewModel: LoginViewModel,
+    terminalViewModel: TerminalViewModel,
     uiState: SettingUiState,
     isDrawerOpen: () -> Boolean,
     onOpenDrawer: () -> Unit,
@@ -217,16 +218,10 @@ fun AppNavHost(
                         onNavigate = onNavigate
                     )
                 }
-                val terminalViewModel = remember {
-                    TerminalViewModel(
-                        initialCid = currentCid,
-                        initialPath = currentPath,
-                        initialPathList = currentPathList,
-                        avatarBean = avatarBean,
-                        onNavigateAction = { route -> onNavigate(route) },
-                        fileOpener = fileOpener
-                    )
-                }
+                terminalViewModel.initDirectoryIfNeeded(currentCid, currentPath, currentPathList)
+                terminalViewModel.updateFileOpener(fileOpener)
+                terminalViewModel.onNavigateAction = onNavigate
+                terminalViewModel.avatarBean = avatarBean
                 TerminalScreen(
                     viewModel = terminalViewModel,
                     onBack = onPopBack,

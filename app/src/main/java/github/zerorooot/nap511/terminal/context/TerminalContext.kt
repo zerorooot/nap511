@@ -32,7 +32,7 @@ class TerminalContext(
     val onNavigate: ((Route) -> Unit)? = null,
     val onConfirmRequest: (suspend (prompt: String) -> Boolean)? = null,
     val onDirectoryChanged: ((cid: String, path: String) -> Unit)? = null,
-    val fileOpener: FileOpener? = null
+    var fileOpener: FileOpener? = null
 ) {
     @Volatile
     var currentCid: String = initialCid

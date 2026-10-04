@@ -201,5 +201,16 @@ object StreamCommands {
                 flow { emit(registry.buildAllHelpMessage()) }
             }
         }
+
+        // 9. exit
+        registry.register("exit") {
+            description = "退出终端"
+            usage = "exit"
+            execute { _, _, _ ->
+                flow {
+                    emit("__TERMINAL_EXIT__")
+                }
+            }
+        }
     }
 }

@@ -35,10 +35,35 @@ class TerminalViewModel(
     initialCid: String = "0",
     initialPath: String = "/",
     initialPathList: List<PathBean> = emptyList(),
-    val avatarBean: AvatarBean,
-    private val onNavigateAction: ((Route) -> Unit)? = null,
-    val fileOpener: FileOpener? = null
+    avatarBean: AvatarBean = AvatarBean(),
+    var onNavigateAction: ((Route) -> Unit)? = null,
+    fileOpener: FileOpener? = null
 ) : ViewModel() {
+    var avatarBean by mutableStateOf(avatarBean)
+    var fileOpener: FileOpener? by mutableStateOf(fileOpener)
+        private set
+
+    fun updateFileOpener(opener: FileOpener?) {
+        this.fileOpener = opener
+        context.fileOpener = opener
+    }
+
+    var isSessionInitialized = false
+        private set
+
+    fun initDirectoryIfNeeded(cid: String, path: String, pathList: List<PathBean>) {
+        if (!isSessionInitialized) {
+            isSessionInitialized = true
+            currentCid = cid
+            currentPath = if (path.startsWith("/")) path else "/$path"
+            context.updateDirectory(cid, path, pathList)
+            if (lines.size >= 4 && lines[3].text.startsWith("当前工作目录:")) {
+                lines[3] = TerminalLine("当前工作目录: $currentPath (cid: $currentCid)\n", TerminalLineType.SYSTEM)
+            }
+            refreshCachedEntries(cid)
+        }
+    }
+
     val lines = mutableStateListOf<TerminalLine>()
     private val history = mutableListOf<String>()
     private var historyPointer = -1
@@ -521,6 +546,8 @@ class TerminalViewModel(
                 flow.collect { line ->
                     if (line == "__TERMINAL_CLEAR_SCREEN__") {
                         lines.clear()
+                    } else if (line == "__TERMINAL_EXIT__") {
+                        onExitAction?.invoke()
                     } else if (line.startsWith("terminal: command not found") || line.contains(": error:")) {
                         lines.add(TerminalLine(line, TerminalLineType.ERROR))
                     } else {
