@@ -28,8 +28,22 @@ import java.util.Locale
  */
 object CloudCommands {
 
+    /**
+     * 注册所有 115 网盘特色命令
+     */
     fun registerAll(registry: CommandRegistry) {
-        // 1. df
+        registerDf(registry)
+        registerFind(registry)
+        registerTrash(registry)
+        registerStat(registry)
+        registerUnzip(registry)
+        registerOpen(registry)
+    }
+
+    /**
+     * 注册 df 命令：查看网盘容量配额、已用空间与剩余空间
+     */
+    fun registerDf(registry: CommandRegistry) {
         registry.register("df") {
             description = "查看网盘容量配额、已用空间与剩余空间"
             usage = "df [-h]"
@@ -56,8 +70,12 @@ object CloudCommands {
                 }
             }
         }
+    }
 
-        // 2. find
+    /**
+     * 注册 find 命令：网盘文件检索（支持按名称、类型、后缀、深度、115分类筛选及全盘全局搜索）
+     */
+    fun registerFind(registry: CommandRegistry) {
         registry.register("find") {
             description = "网盘文件检索（支持按名称、类型、后缀、深度、115分类筛选及全盘全局搜索）"
             usage = "find [path] [options]"
@@ -205,8 +223,12 @@ object CloudCommands {
                 }
             }
         }
+    }
 
-        // 3. trash
+    /**
+     * 注册 trash 命令：网盘回收站管理（查看、还原或清空）
+     */
+    fun registerTrash(registry: CommandRegistry) {
         registry.register("trash") {
             description = "网盘回收站管理（查看、还原或清空）"
             usage = "trash [-l] [-r <rid>] [-c]"
@@ -271,8 +293,12 @@ object CloudCommands {
                 }
             }
         }
+    }
 
-        // 4. stat / info
+    /**
+     * 注册 stat 命令：查看文件或目录的详细元数据
+     */
+    fun registerStat(registry: CommandRegistry) {
         registry.register("stat") {
             description = "查看文件或目录的详细元数据"
             usage = "stat <filename>"
@@ -318,8 +344,12 @@ object CloudCommands {
                 }
             }
         }
+    }
 
-        // 5. unzip
+    /**
+     * 注册 unzip 命令：云端解压（支持查看压缩包列表及提交云端解压）
+     */
+    fun registerUnzip(registry: CommandRegistry) {
         registry.register("unzip") {
             description = "云端解压（支持查看压缩包列表及提交云端解压）"
             usage = "unzip [-l] [-p password] <filename...>"
@@ -487,8 +517,12 @@ object CloudCommands {
                 }
             }
         }
+    }
 
-        // 6. open
+    /**
+     * 注册 open 命令：根据文件类型自动打开对应的查看器或预览页面
+     */
+    fun registerOpen(registry: CommandRegistry) {
         registry.register("open") {
             description = "根据文件类型自动打开对应的查看器或预览页面"
             usage = "open <filename>"

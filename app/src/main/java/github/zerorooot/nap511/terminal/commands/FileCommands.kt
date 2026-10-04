@@ -15,8 +15,22 @@ import java.util.Locale
  */
 object FileCommands {
 
+    /**
+     * 注册所有基础文件管理命令
+     */
     fun registerAll(registry: CommandRegistry) {
-        // 1. ls
+        registerLs(registry)
+        registerCd(registry)
+        registerPwd(registry)
+        registerMkdir(registry)
+        registerRm(registry)
+        registerMv(registry)
+    }
+
+    /**
+     * 注册 ls 命令：列出当前或指定目录下的文件与文件夹
+     */
+    fun registerLs(registry: CommandRegistry) {
         registry.register("ls") {
             description = "列出当前或指定目录下的文件与文件夹"
             usage = "ls [options] [path]"
@@ -128,8 +142,12 @@ object FileCommands {
                 }
             }
         }
+    }
 
-        // 2. cd
+    /**
+     * 注册 cd 命令：切换网盘当前工作目录
+     */
+    fun registerCd(registry: CommandRegistry) {
         registry.register("cd") {
             description = "切换网盘当前工作目录"
             usage = "cd [path]"
@@ -145,8 +163,12 @@ object FileCommands {
                 }
             }
         }
+    }
 
-        // 3. pwd
+    /**
+     * 注册 pwd 命令：打印当前工作目录路径及 CID
+     */
+    fun registerPwd(registry: CommandRegistry) {
         registry.register("pwd") {
             description = "打印当前工作目录路径及 CID"
             usage = "pwd"
@@ -156,8 +178,12 @@ object FileCommands {
                 }
             }
         }
+    }
 
-        // 4. mkdir
+    /**
+     * 注册 mkdir 命令：在当前目录下新建文件夹
+     */
+    fun registerMkdir(registry: CommandRegistry) {
         registry.register("mkdir") {
             description = "在当前目录下新建文件夹"
             usage = "mkdir [-p] <folder_name>"
@@ -189,8 +215,12 @@ object FileCommands {
                 }
             }
         }
+    }
 
-        // 5. rm
+    /**
+     * 注册 rm 命令：删除当前目录下的指定文件或文件夹至回收站
+     */
+    fun registerRm(registry: CommandRegistry) {
         registry.register("rm") {
             description = "删除当前目录下的指定文件或文件夹至回收站"
             usage = "rm [-y] <file...>"
@@ -247,8 +277,12 @@ object FileCommands {
                 }
             }
         }
+    }
 
-        // 6. mv
+    /**
+     * 注册 mv 命令：重命名文件或将文件/目录移动至其他目录
+     */
+    fun registerMv(registry: CommandRegistry) {
         registry.register("mv") {
             description = "重命名文件或将文件/目录移动至其他目录"
             usage = "mv <source...> <target>"
@@ -381,7 +415,6 @@ object FileCommands {
             }
         }
     }
-
 
     private fun formatTimestamp(timeStr: String, dateFormat: SimpleDateFormat): String {
         val timestamp = timeStr.toLongOrNull() ?: return timeStr

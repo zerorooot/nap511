@@ -9,8 +9,26 @@ import kotlinx.coroutines.flow.toList
  */
 object StreamCommands {
 
+    /**
+     * 注册所有管道流处理与通用文本工具命令
+     */
     fun registerAll(registry: CommandRegistry) {
-        // 1. echo
+        registerEcho(registry)
+        registerGrep(registry)
+        registerWc(registry)
+        registerHead(registry)
+        registerTail(registry)
+        registerSort(registry)
+        registerClear(registry)
+        registerHelp(registry)
+        registerExit(registry)
+        registerXargs(registry)
+    }
+
+    /**
+     * 注册 echo 命令：回显输出指定的文本
+     */
+    fun registerEcho(registry: CommandRegistry) {
         registry.register("echo") {
             description = "回显输出指定的文本"
             usage = "echo [text...]"
@@ -20,8 +38,12 @@ object StreamCommands {
                 }
             }
         }
+    }
 
-        // 2. grep
+    /**
+     * 注册 grep 命令：文本匹配与正则过滤
+     */
+    fun registerGrep(registry: CommandRegistry) {
         registry.register("grep") {
             description = "文本匹配与正则过滤"
             usage = "grep [-i] [-v] [-c] <pattern>"
@@ -60,8 +82,12 @@ object StreamCommands {
                 }
             }
         }
+    }
 
-        // 3. wc
+    /**
+     * 注册 wc 命令：统计行数、单词数及字符数
+     */
+    fun registerWc(registry: CommandRegistry) {
         registry.register("wc") {
             description = "统计行数、单词数及字符数"
             usage = "wc [-l] [-w] [-c]"
@@ -93,8 +119,12 @@ object StreamCommands {
                 }
             }
         }
+    }
 
-        // 4. head
+    /**
+     * 注册 head 命令：输出前 N 行（默认 10 行）
+     */
+    fun registerHead(registry: CommandRegistry) {
         registry.register("head") {
             description = "输出前 N 行（默认 10 行）"
             usage = "head [-n <行数>]"
@@ -117,8 +147,12 @@ object StreamCommands {
                 }
             }
         }
+    }
 
-        // 5. tail
+    /**
+     * 注册 tail 命令：输出末尾 N 行（默认 10 行）
+     */
+    fun registerTail(registry: CommandRegistry) {
         registry.register("tail") {
             description = "输出末尾 N 行（默认 10 行）"
             usage = "tail [-n <行数>]"
@@ -142,8 +176,12 @@ object StreamCommands {
                 }
             }
         }
+    }
 
-        // 6. sort
+    /**
+     * 注册 sort 命令：对输入行进行文本排序
+     */
+    fun registerSort(registry: CommandRegistry) {
         registry.register("sort") {
             description = "对输入行进行文本排序"
             usage = "sort [-r] [-n] [-u]"
@@ -173,8 +211,12 @@ object StreamCommands {
                 }
             }
         }
+    }
 
-        // 7. clear
+    /**
+     * 注册 clear 命令：清空终端屏幕历史输出
+     */
+    fun registerClear(registry: CommandRegistry) {
         registry.register("clear") {
             description = "清空终端屏幕历史输出"
             usage = "clear"
@@ -184,8 +226,12 @@ object StreamCommands {
                 }
             }
         }
+    }
 
-        // 8. ? 与 help
+    /**
+     * 注册 ? 与 help 命令：显示所有可用命令及简介
+     */
+    fun registerHelp(registry: CommandRegistry) {
         registry.register("?") {
             description = "显示所有可用命令及简介"
             usage = "?"
@@ -201,8 +247,12 @@ object StreamCommands {
                 flow { emit(registry.buildAllHelpMessage()) }
             }
         }
+    }
 
-        // 9. exit
+    /**
+     * 注册 exit 命令：退出终端
+     */
+    fun registerExit(registry: CommandRegistry) {
         registry.register("exit") {
             description = "退出终端"
             usage = "exit"
@@ -212,8 +262,12 @@ object StreamCommands {
                 }
             }
         }
+    }
 
-        // 10. xargs
+    /**
+     * 注册 xargs 命令：从标准输入读取数据并构建执行命令行
+     */
+    fun registerXargs(registry: CommandRegistry) {
         registry.register("xargs") {
             description = "从标准输入读取数据并构建执行命令行"
             usage = "xargs [-I <replace-str>] [-n <num>] [-t] [command [initial-args...]]"
