@@ -63,7 +63,7 @@ fun extractSubtitles(files: List<FileBean>): List<SubtitleItem> {
  * 1. 查看器瞬态数据与缓存依赖 [MediaViewerStateHolder]；
  * 2. 音频控制依赖 [AudioPlayerController] 抽象接口；
  * 3. 弹窗交互依赖 [FileDialogController] 抽象接口；
- * 4. 统一处理各类文件（视频、音频、图片、文本、网页、压缩包、种子）的校验、下载、参数装配与路由导航。
+ * 4. 统一处理各类文件（视频、音频、图片、文本、网页、压缩包、种子、文件夹）的校验、下载、参数装配与路由导航。
  */
 class FileOpener(
     private val context: Context,
@@ -72,6 +72,7 @@ class FileOpener(
     private val audioPlayerController: AudioPlayerController,
     private val fileDialogController: FileDialogController? = null,
     private val settingUiState: () -> SettingUiState,
+    private val onOpenFolder: ((String) -> Unit)? = null,
     private val onNavigate: (Route) -> Unit
 ) {
 
@@ -127,6 +128,13 @@ class FileOpener(
         }
     }
 
+    /**
+     * 打开文件夹并跳转至 [Route.MyFile] (FileScreen)
+     */
+    fun openFolder(targetCid: String) {
+        onOpenFolder?.invoke(targetCid)
+        onNavigate(Route.MyFile)
+    }
     /**
      * 打开视频文件并启动 [VideoActivity]
      */

@@ -305,6 +305,9 @@ fun FileScreen(
             audioPlayerController = audioController,
             fileDialogController = dialogController,
             settingUiState = { settingUiState },
+            onOpenFolder = { cid ->
+                fileViewModel.getFiles(cid)
+            },
             onNavigate = onNav
         )
     }

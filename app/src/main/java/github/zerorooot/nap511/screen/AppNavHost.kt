@@ -112,13 +112,16 @@ fun AppNavHost(
             }
         }
     }
-    val fileOpener = remember(mediaViewerStateHolder, audioPlayerController, fileDialogController, uiState, onNavigate) {
+    val fileOpener = remember(mediaViewerStateHolder, audioPlayerController, fileDialogController, uiState, fileViewModel, onNavigate) {
         FileOpener(
             context = context,
             mediaViewerStateHolder = mediaViewerStateHolder,
             audioPlayerController = audioPlayerController,
             fileDialogController = fileDialogController,
             settingUiState = { uiState },
+            onOpenFolder = { cid ->
+                fileViewModel.getFiles(cid)
+            },
             onNavigate = onNavigate
         )
     }
@@ -256,7 +259,6 @@ fun AppNavHost(
                 val currentPath = "/" + currentPathList.joinToString("/") { it.name }
                 terminalViewModel.initDirectoryIfNeeded(currentCid, currentPath, currentPathList)
                 terminalViewModel.updateFileOpener(fileOpener)
-                terminalViewModel.onNavigateAction = onNavigate
                 terminalViewModel.avatarBean = avatarBean
                 TerminalScreen(
                     viewModel = terminalViewModel,

@@ -52,15 +52,39 @@ object CloudCommands {
                 flow {
                     try {
                         val json = ctx.fileRepository.remainingSpace(1)
-                        val spaceInfoJson = json.getAsJsonObject("data")?.getAsJsonObject("space_info")
+                        val spaceInfoJson =
+                            json.getAsJsonObject("data")?.getAsJsonObject("space_info")
                         if (spaceInfoJson != null) {
-                            val bean = Gson().fromJson(spaceInfoJson, RemainingSpaceBean::class.java)
+                            val bean =
+                                Gson().fromJson(spaceInfoJson, RemainingSpaceBean::class.java)
                             val totalBytes = bean.total.size.toDouble().coerceAtLeast(1.0)
                             val usedBytes = bean.use.size.toDouble()
                             val pct = ((usedBytes / totalBytes) * 100).toInt()
 
-                            emit(String.format(Locale.getDefault(), "%-18s %10s %10s %10s %5s %s", "Filesystem", "Size", "Used", "Avail", "Use%", "Mounted on"))
-                            emit(String.format(Locale.getDefault(), "%-18s %10s %10s %10s %4d%% %s", "115:CloudDrive", bean.total.sizeFormat, bean.use.sizeFormat, bean.remain.sizeFormat, pct, "/"))
+                            emit(
+                                String.format(
+                                    Locale.getDefault(),
+                                    "%-18s %10s %10s %10s %5s %s",
+                                    "Filesystem",
+                                    "Size",
+                                    "Used",
+                                    "Avail",
+                                    "Use%",
+                                    "Mounted on"
+                                )
+                            )
+                            emit(
+                                String.format(
+                                    Locale.getDefault(),
+                                    "%-18s %10s %10s %10s %4d%% %s",
+                                    "115:CloudDrive",
+                                    bean.total.sizeFormat,
+                                    bean.use.sizeFormat,
+                                    bean.remain.sizeFormat,
+                                    pct,
+                                    "/"
+                                )
+                            )
                         } else {
                             emit("df: 无法解析网盘空间配额数据")
                         }
@@ -82,7 +106,10 @@ object CloudCommands {
             flag("-name <pattern>", "按文件名或通配符过滤匹配（如 -name '*.mp4'）")
             flag("-type <f|d>", "按类型过滤，f 为普通文件，d 为目录")
             flag("-suffix <ext>", "按文件扩展名筛选（如 -suffix apk）")
-            flag("-filter <type>", "按 115 业务分类筛选：1/doc(文档), 2/img(图片), 3/audio(音频), 4/video(视频), 5/zip(压缩), 6/app(软件)")
+            flag(
+                "-filter <type>",
+                "按 115 业务分类筛选：1/doc(文档), 2/img(图片), 3/audio(音频), 4/video(视频), 5/zip(压缩), 6/app(软件)"
+            )
             flag("-maxdepth <N>", "限制递归搜索的最大层级深度")
             flag("-global", "在整个 115 网盘根目录进行全局云端搜索")
             execute { ctx, args, _ ->
@@ -99,19 +126,26 @@ object CloudCommands {
                         when (args[i]) {
                             "-name" -> if (i + 1 < args.size) namePattern = args[++i]
                             "-type" -> if (i + 1 < args.size) typeFilter = args[++i]
-                            "-suffix" -> if (i + 1 < args.size) suffixFilter = args[++i].trimStart('.')
-                            "-filter" -> if (i + 1 < args.size) filterType = parseFilterType(args[++i])
-                            "-maxdepth" -> if (i + 1 < args.size) maxDepth = args[++i].toIntOrNull() ?: 5
+                            "-suffix" -> if (i + 1 < args.size) suffixFilter =
+                                args[++i].trimStart('.')
+
+                            "-filter" -> if (i + 1 < args.size) filterType =
+                                parseFilterType(args[++i])
+
+                            "-maxdepth" -> if (i + 1 < args.size) maxDepth =
+                                args[++i].toIntOrNull() ?: 5
                         }
                         i++
                     }
 
                     // 提取目标路径（非选项参数）
-                    val pathArg = args.firstOrNull { !it.startsWith("-") && it != args.getOrNull(args.indexOf("-name") + 1)
-                            && it != args.getOrNull(args.indexOf("-type") + 1)
-                            && it != args.getOrNull(args.indexOf("-suffix") + 1)
-                            && it != args.getOrNull(args.indexOf("-filter") + 1)
-                            && it != args.getOrNull(args.indexOf("-maxdepth") + 1) }
+                    val pathArg = args.firstOrNull {
+                        !it.startsWith("-") && it != args.getOrNull(args.indexOf("-name") + 1)
+                                && it != args.getOrNull(args.indexOf("-type") + 1)
+                                && it != args.getOrNull(args.indexOf("-suffix") + 1)
+                                && it != args.getOrNull(args.indexOf("-filter") + 1)
+                                && it != args.getOrNull(args.indexOf("-maxdepth") + 1)
+                    }
 
                     val targetCid = if (isGlobal) {
                         "0"
@@ -127,14 +161,26 @@ object CloudCommands {
                     // 1. 若指定了 -filter，参考 FileViewModel.filterFile 直接调用 fileRepository.filterFile
                     if (filterType != null) {
                         try {
-                            val res = ctx.fileRepository.filterFile(cid = targetCid, type = filterType, limit = 999)
+                            val res = ctx.fileRepository.filterFile(
+                                cid = targetCid,
+                                type = filterType,
+                                limit = 999
+                            )
                             var list = res.fileBeanList.toList()
 
                             if (suffixFilter != null) {
-                                list = list.filter { it.name.substringAfterLast(".", "").equals(suffixFilter, ignoreCase = true) }
+                                list = list.filter {
+                                    it.name.substringAfterLast(".", "")
+                                        .equals(suffixFilter, ignoreCase = true)
+                                }
                             }
                             if (namePattern != null) {
-                                list = list.filter { GlobMatcher.matches(namePattern, it.name) || it.name.contains(namePattern, ignoreCase = true) }
+                                list = list.filter {
+                                    GlobMatcher.matches(
+                                        namePattern,
+                                        it.name
+                                    ) || it.name.contains(namePattern, ignoreCase = true)
+                                }
                             }
 
                             if (list.isEmpty()) {
@@ -186,11 +232,16 @@ object CloudCommands {
                     }
 
                     // 递归目录搜索
-                    suspend fun searchRecursive(currentCid: String, currentPrefix: String, currentDepth: Int) {
+                    suspend fun searchRecursive(
+                        currentCid: String,
+                        currentPrefix: String,
+                        currentDepth: Int
+                    ) {
                         if (currentDepth > maxDepth) return
                         val files = ctx.listDirectory(currentCid)
                         for (file in files) {
-                            val fullPath = if (currentPrefix == "/") "/${file.name}" else "$currentPrefix/${file.name}"
+                            val fullPath =
+                                if (currentPrefix == "/") "/${file.name}" else "$currentPrefix/${file.name}"
 
                             // 校验筛选条件
                             var matches = true
@@ -203,7 +254,11 @@ object CloudCommands {
                                 if (!ext.equals(suffixFilter, ignoreCase = true)) matches = false
                             }
                             if (namePattern != null) {
-                                if (!GlobMatcher.matches(namePattern, file.name) && !file.name.contains(namePattern, ignoreCase = true)) {
+                                if (!GlobMatcher.matches(
+                                        namePattern,
+                                        file.name
+                                    ) && !file.name.contains(namePattern, ignoreCase = true)
+                                ) {
                                     matches = false
                                 }
                             }
@@ -257,7 +312,8 @@ object CloudCommands {
                     }
 
                     if (isClean) {
-                        val confirmed = ctx.confirm("trash: 警告！确定要清空回收站中的全部文件吗？(yes/no): ")
+                        val confirmed =
+                            ctx.confirm("trash: 警告！确定要清空回收站中的全部文件吗？(yes/no): ")
                         if (!confirmed) {
                             emit("trash: 已取消清空操作")
                             return@flow
@@ -283,7 +339,15 @@ object CloudCommands {
                             } else {
                                 emit("回收站项目列表（共 ${list.recycleBeanList.size} 项）：")
                                 for (item in list.recycleBeanList) {
-                                    emit(String.format(Locale.getDefault(), "rid: %-15s %s (%s)", item.id, item.fileName, item.fileSize))
+                                    emit(
+                                        String.format(
+                                            Locale.getDefault(),
+                                            "rid: %-15s %s (%s)",
+                                            item.id,
+                                            item.fileName,
+                                            item.fileSize
+                                        )
+                                    )
                                 }
                             }
                         } catch (e: Exception) {
@@ -319,6 +383,7 @@ object CloudCommands {
                                 isFolder = true
                             )
                         }
+
                         null -> {
                             emit("stat: cannot stat '$targetName': No such file or directory")
                             return@flow
@@ -370,6 +435,7 @@ object CloudCommands {
                                     password = args[++idx]
                                 }
                             }
+
                             else -> {
                                 if (!arg.startsWith("-")) {
                                     fileArgs.add(arg)
@@ -391,8 +457,10 @@ object CloudCommands {
                     for (fileArg in fileArgs) {
                         if (GlobMatcher.hasGlobWildcards(fileArg)) {
                             // 包含通配符，在当前目录（或指定父目录）按 GlobMatcher 匹配展开
-                            val dirPath = if (fileArg.contains("/")) fileArg.substringBeforeLast("/") else ""
-                            val pattern = if (fileArg.contains("/")) fileArg.substringAfterLast("/") else fileArg
+                            val dirPath =
+                                if (fileArg.contains("/")) fileArg.substringBeforeLast("/") else ""
+                            val pattern =
+                                if (fileArg.contains("/")) fileArg.substringAfterLast("/") else fileArg
 
                             val searchCid = if (dirPath.isEmpty()) {
                                 ctx.currentCid
@@ -407,7 +475,12 @@ object CloudCommands {
 
                             targetCid = searchCid
                             val dirFiles = ctx.listDirectory(searchCid)
-                            val matched = dirFiles.filter { !it.isFolder && GlobMatcher.matches(pattern, it.name) }
+                            val matched = dirFiles.filter {
+                                !it.isFolder && GlobMatcher.matches(
+                                    pattern,
+                                    it.name
+                                )
+                            }
                             if (matched.isEmpty()) {
                                 emit("unzip: no match found for '$fileArg'")
                             } else {
@@ -420,9 +493,11 @@ object CloudCommands {
                                     targetCid = resolved.parentCid
                                     fileBeansList.add(resolved.file)
                                 }
+
                                 is ResolvedTarget.Directory -> {
                                     emit("unzip: '$fileArg' is a directory, not an archive")
                                 }
+
                                 null -> {
                                     emit("unzip: cannot find '$fileArg': No such file")
                                 }
@@ -449,13 +524,32 @@ object CloudCommands {
                                 continue
                             }
                             try {
-                                val zipBeanList = ctx.fileRepository.getZipListFile(pickCode = pickCode, fileName = file.name)
+                                val zipBeanList = ctx.fileRepository.getZipListFile(
+                                    pickCode = pickCode,
+                                    fileName = file.name
+                                )
                                 emit("Archive: ${file.name}")
                                 if (zipBeanList.list.isNotEmpty()) {
-                                    emit(String.format(Locale.getDefault(), "%-12s %-16s %s", "Length", "Date", "Name"))
+                                    emit(
+                                        String.format(
+                                            Locale.getDefault(),
+                                            "%-12s %-16s %s",
+                                            "Length",
+                                            "Date",
+                                            "Name"
+                                        )
+                                    )
                                     emit("--------------------------------------------------")
                                     for (item in zipBeanList.list) {
-                                        emit(String.format(Locale.getDefault(), "%-12s %-16s %s", item.sizeString.trim(), item.timeString, item.fileName))
+                                        emit(
+                                            String.format(
+                                                Locale.getDefault(),
+                                                "%-12s %-16s %s",
+                                                item.sizeString.trim(),
+                                                item.timeString,
+                                                item.fileName
+                                            )
+                                        )
                                     }
                                 } else {
                                     emit("unzip: 压缩包内无可显示文件或暂未完成分析")
@@ -471,7 +565,10 @@ object CloudCommands {
 
                             val listType = object : TypeToken<List<FileBean>>() {}.type
                             val listJson = Gson().toJson(distinctFileBeans, listType)
-                            val cacheFile = File(App.instance.cacheDir, "unzip_tasks_${System.currentTimeMillis()}.json")
+                            val cacheFile = File(
+                                App.instance.cacheDir,
+                                "unzip_tasks_${System.currentTimeMillis()}.json"
+                            )
                             cacheFile.writeText(listJson)
 
                             val dataBuilder = Data.Builder()
@@ -483,10 +580,12 @@ object CloudCommands {
                             }
 
                             // 查找失败移动目录 CID
-                            val moveFailFile = SettingsRepository.getDataSuspend(ConfigKeyUtil.MOVE_FAIL_FILE, "")
+                            val moveFailFile =
+                                SettingsRepository.getDataSuspend(ConfigKeyUtil.MOVE_FAIL_FILE, "")
                             if (moveFailFile.isNotEmpty()) {
                                 val currentFiles = ctx.listDirectory(targetCid)
-                                val errorCid = currentFiles.firstOrNull { it.isFolder && it.name == moveFailFile }?.categoryId
+                                val errorCid =
+                                    currentFiles.firstOrNull { it.isFolder && it.name == moveFailFile }?.categoryId
                                 if (errorCid != null) {
                                     dataBuilder.putString("errorCid", errorCid)
                                 }
@@ -503,7 +602,8 @@ object CloudCommands {
                                 .setInputData(dataBuilder.build())
                                 .build()
 
-                            val workManager = WorkManager.getInstance(App.instance.applicationContext)
+                            val workManager =
+                                WorkManager.getInstance(App.instance.applicationContext)
                             workManager.enqueueUniqueWork(
                                 "unzipAllFileWorker", ExistingWorkPolicy.APPEND_OR_REPLACE, request
                             )
@@ -539,30 +639,33 @@ object CloudCommands {
                         emit("open: cannot find '$fileName': No such file or directory")
                         return@flow
                     }
+                    val fileOpener = ctx.fileOpener
+                    if (fileOpener == null) {
+                        emit("open: 当前终端环境未配置文件打开器")
+                        return@flow
+                    }
 
                     when (resolved) {
                         is ResolvedTarget.Directory -> {
-                            ctx.updateDirectory(resolved.cid, resolved.path)
-                            emit("已进入目录: ${resolved.path}")
+                            emit("已跳转至文件夹: $fileName")
+                            fileOpener.openFolder(resolved.cid)
                             return@flow
                         }
+
                         is ResolvedTarget.File -> {
                             val file = resolved.file
-                            val fileOpener = ctx.fileOpener
-                            if (fileOpener == null) {
-                                emit("open: 当前终端环境未配置文件打开器")
-                                return@flow
-                            }
-
                             emit("正在准备打开: ${file.name}...")
                             val siblings = ctx.listDirectory(resolved.parentCid)
-                            when (val result = fileOpener.open(file, siblings, fromTerminal = true)) {
+                            when (val result =
+                                fileOpener.open(file, siblings, fromTerminal = true)) {
                                 is FileOpenResult.Success -> {
                                     emit("open: ${result.message}")
                                 }
+
                                 is FileOpenResult.Failure -> {
                                     emit("open: ${result.message}")
                                 }
+
                                 is FileOpenResult.Unsupported -> {
                                     emit("open: 未能识别该文件的专用预览器 (${result.fileName})")
                                 }

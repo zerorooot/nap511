@@ -36,7 +36,7 @@ class TerminalViewModel(
     initialPath: String = "/",
     initialPathList: List<PathBean> = emptyList(),
     avatarBean: AvatarBean = AvatarBean(),
-    var onNavigateAction: ((Route) -> Unit)? = null,
+//    var onNavigateAction: ((Route) -> Unit)? = null,
     fileOpener: FileOpener? = null
 ) : ViewModel() {
     var avatarBean by mutableStateOf(avatarBean)
