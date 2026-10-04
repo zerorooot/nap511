@@ -2,6 +2,7 @@ package github.zerorooot.nap511.terminal.commands
 
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.RenameBean
+import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.engine.CommandRegistry
 import kotlinx.coroutines.flow.flow
 import java.text.SimpleDateFormat
@@ -40,19 +41,27 @@ object FileCommands {
 
                     // 提取目标路径参数（排除选项）
                     val targetPath = args.firstOrNull { !it.startsWith("-") }
-                    val targetCid = if (targetPath != null) {
-                        val resolved = ctx.resolvePath(targetPath)
+                    val (candidateFiles, isSingleFile) = if (targetPath != null) {
+                        val resolved = ctx.resolveTarget(targetPath)
                         if (resolved == null) {
                             emit("ls: cannot access '$targetPath': No such file or directory")
                             return@flow
                         }
-                        resolved.first
+                        when (resolved) {
+                            is ResolvedTarget.Directory -> {
+                                val files = ctx.listDirectory(resolved.cid, forceRefresh)
+                                val filtered = if (isAll) files else files.filter { !it.name.startsWith(".") }
+                                Pair(filtered, false)
+                            }
+                            is ResolvedTarget.File -> {
+                                Pair(listOf(resolved.file), true)
+                            }
+                        }
                     } else {
-                        ctx.currentCid
+                        val files = ctx.listDirectory(ctx.currentCid, forceRefresh)
+                        val filtered = if (isAll) files else files.filter { !it.name.startsWith(".") }
+                        Pair(filtered, false)
                     }
-
-                    val files = ctx.listDirectory(targetCid, forceRefresh)
-                    val candidateFiles = if (isAll) files else files.filter { !it.name.startsWith(".") }
 
                     // 排序规则：默认完全保持接口请求/缓存中的原始顺序；仅在显式传入选项时重排
                     var sorted = when {
@@ -68,19 +77,29 @@ object FileCommands {
                     }
 
                     if (isLong) {
-                        emit("total ${sorted.size}")
+                        if (!isSingleFile) {
+                            emit("total ${sorted.size}")
+                        }
                         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
                         for (file in sorted) {
                             val typeChar = if (file.isFolder) "d" else "-"
                             val perm = "${typeChar}rwxr-xr-x"
                             val sizeStr = if (file.isFolder) "-" else formatFileSize(file.size.toLongOrNull() ?: 0L)
                             val timeStr = formatTimestamp(file.modifiedTime, dateFormat)
-                            val nameStr = if (file.isFolder) "${file.name}/" else file.name
+                            val nameStr = if (isSingleFile && targetPath != null) {
+                                if (file.isFolder && !targetPath.endsWith("/")) "$targetPath/" else targetPath
+                            } else {
+                                if (file.isFolder) "${file.name}/" else file.name
+                            }
                             emit(String.format(Locale.getDefault(), "%-11s %10s %16s %s", perm, sizeStr, timeStr, nameStr))
                         }
                     } else {
                         for (file in sorted) {
-                            val displayName = if (file.isFolder) "${file.name}/" else file.name
+                            val displayName = if (isSingleFile && targetPath != null) {
+                                if (file.isFolder && !targetPath.endsWith("/")) "$targetPath/" else targetPath
+                            } else {
+                                if (file.isFolder) "${file.name}/" else file.name
+                            }
                             emit(displayName)
                         }
                     }

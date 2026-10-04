@@ -96,7 +96,6 @@ class TerminalViewModel(
     var activeCandidateIndex by mutableIntStateOf(-1)
         private set
 
-    private var lastTabTimestamp = 0L
     private var baseInputText = ""
     private var baseParsedContext: ParsedContext? = null
 
@@ -322,7 +321,7 @@ class TerminalViewModel(
                 baseInputText = newText
                 baseParsedContext = CompletionEngine.parseContext(newText, newCursor)
                 val nextResult = computeCompletions()
-                if (nextResult != null && nextResult.candidates.isNotEmpty()) {
+                if (nextResult.candidates.isNotEmpty()) {
                     completionCandidates.clear()
                     completionCandidates.addAll(nextResult.candidates)
                     activeCandidateIndex = -1
@@ -362,37 +361,30 @@ class TerminalViewModel(
 
     /**
      * Tab 键事件处理核心逻辑：
-     * - 0. 若候选条当前已打开，按 Tab 轮询切换候选项
-     * - 1. 若当前存在行内幽灵文本建议且非连续双击 Tab，直接采纳幽灵文本
-     * - 2. 异步计算匹配候选项：
-     *      - 唯一匹配：直接补全替换
+     * - 0. 若候选条当前已处于展示状态且已有候选项，继续按 Tab 视为切换焦点轮询候选
+     * - 1. 异步计算匹配候选项：
+     *      - 唯一匹配：直接补全替换并收起候选栏
      *      - 多个匹配：
-     *          a. 尝试补全最长公共前缀 (LCP)
-     *          b. 若在 500ms 内双击 Tab (Tab+Tab)，呼出底部候选栏供点选与轮转
-     *          c. 若单击且无法再延伸前缀，展示首个候选为行内幽灵文本
+     *          a. 先检查是否有可延伸的最长公共前缀 (LCP)，补全公共前缀
+     *          b. 单击直接展开候选栏（Chips Bar），列出所有可能匹配的选项供点选或继续 Tab 轮询
+     *      - 无匹配：若存在历史幽灵文本则采纳，否则收起候选栏
      */
     fun handleTabPress() {
-        val now = System.currentTimeMillis()
-        val isDoubleTab = (now - lastTabTimestamp) < 500
-        lastTabTimestamp = now
-
         // 0. 若候选条当前已处于展示状态且已有候选项，继续按 Tab 视为切换焦点轮询候选
         if (isCompletionBarVisible && completionCandidates.isNotEmpty()) {
             cycleCandidates()
             return
         }
 
-        // 1. 若当前有幽灵文本且不是双击 Tab，直接采纳幽灵文本
-        if (!isDoubleTab && ghostText.isNotEmpty()) {
-            acceptGhostText()
-            return
-        }
-
-        // 2. 异步计算匹配候选
+        // 1. 异步计算匹配候选
         viewModelScope.launch {
             val result = computeCompletions()
-            if (result == null || result.candidates.isEmpty()) {
-                dismissCompletionBar()
+            if (result.candidates.isEmpty()) {
+                if (ghostText.isNotEmpty()) {
+                    acceptGhostText()
+                } else {
+                    dismissCompletionBar()
+                }
                 return@launch
             }
 
@@ -431,28 +423,20 @@ class TerminalViewModel(
                     updateGhostText(newText, newCursor)
                 }
 
-                if (isDoubleTab) {
-                    // 双击 Tab：展开候选栏
-                    baseInputText = inputState.text
-                    baseParsedContext =
-                        CompletionEngine.parseContext(inputState.text, inputState.selection.end)
-                    val updatedResult = if (canExtendLcp) computeCompletions() ?: result else result
-                    completionCandidates.clear()
-                    completionCandidates.addAll(updatedResult.candidates)
-                    activeCandidateIndex = -1
-                    isCompletionBarVisible = true
-                } else if (!canExtendLcp) {
-                    // 单击 Tab 且无法延长：显示首个候选作为幽灵文本
-                    val firstCandidate = result.candidates.first()
-                    if (firstCandidate.name.length > currentPrefix.length) {
-                        ghostText = firstCandidate.name.substring(currentPrefix.length)
-                    }
-                }
+                // B. 单击 Tab 直接展开候选栏
+                baseInputText = inputState.text
+                baseParsedContext =
+                    CompletionEngine.parseContext(inputState.text, inputState.selection.end)
+                val updatedResult = if (canExtendLcp) computeCompletions() else result
+                completionCandidates.clear()
+                completionCandidates.addAll(updatedResult.candidates)
+                activeCandidateIndex = -1
+                isCompletionBarVisible = true
             }
         }
     }
 
-    private suspend fun computeCompletions(): CompletionResult? {
+    private suspend fun computeCompletions(): CompletionResult {
         val cursor = inputState.selection.end
         val text = inputState.text
         val parsed = CompletionEngine.parseContext(text, cursor)

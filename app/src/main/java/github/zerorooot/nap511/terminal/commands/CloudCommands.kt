@@ -5,6 +5,7 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.RemainingSpaceBean
 import github.zerorooot.nap511.bean.Route
+import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.engine.CommandRegistry
 import github.zerorooot.nap511.terminal.engine.GlobMatcher
 import kotlinx.coroutines.flow.flow
@@ -271,11 +272,20 @@ object CloudCommands {
                         return@flow
                     }
 
-                    val files = ctx.listDirectory(ctx.currentCid)
-                    val file = files.firstOrNull { it.name == targetName }
-                    if (file == null) {
-                        emit("stat: cannot stat '$targetName': No such file or directory")
-                        return@flow
+                    val resolved = ctx.resolveTarget(targetName)
+                    val file = when (resolved) {
+                        is ResolvedTarget.File -> resolved.file
+                        is ResolvedTarget.Directory -> {
+                            FileBean(
+                                name = targetName.substringAfterLast("/").ifEmpty { "/" },
+                                categoryId = resolved.cid,
+                                isFolder = true
+                            )
+                        }
+                        null -> {
+                            emit("stat: cannot stat '$targetName': No such file or directory")
+                            return@flow
+                        }
                     }
 
                     emit("  File: ${file.name}")
@@ -312,16 +322,17 @@ object CloudCommands {
                         return@flow
                     }
 
-                    val files = ctx.listDirectory(ctx.currentCid)
-                    val file = files.firstOrNull { it.name == fileName }
-                    if (file == null) {
-                        emit("unzip: cannot find '$fileName': No such file")
-                        return@flow
-                    }
-
-                    if (file.isFolder) {
-                        emit("unzip: '$fileName' is a directory, not an archive")
-                        return@flow
+                    val resolved = ctx.resolveTarget(fileName)
+                    val (file, parentCid) = when (resolved) {
+                        is ResolvedTarget.File -> Pair(resolved.file, resolved.parentCid)
+                        is ResolvedTarget.Directory -> {
+                            emit("unzip: '$fileName' is a directory, not an archive")
+                            return@flow
+                        }
+                        null -> {
+                            emit("unzip: cannot find '$fileName': No such file")
+                            return@flow
+                        }
                     }
 
                     val pickCode = file.pickCode
@@ -353,14 +364,14 @@ object CloudCommands {
                             emit("正在提交云端解压任务: $fileName...")
                             val (success, msg) = ctx.fileRepository.unzipFile(
                                 pickCode = pickCode,
-                                zipFileCid = ctx.currentCid,
+                                zipFileCid = parentCid,
                                 files = null,
                                 dirs = null,
                                 unzipFolderName = file.name.substringBeforeLast("."),
                                 showToast = false
                             )
                             if (success) {
-                                ctx.invalidateCache(ctx.currentCid)
+                                ctx.invalidateCache(parentCid)
                                 emit("unzip: $msg")
                             } else {
                                 emit("unzip: 解压失败: $msg")
@@ -385,43 +396,44 @@ object CloudCommands {
                         return@flow
                     }
 
-                    val files = ctx.listDirectory(ctx.currentCid)
-                    val file = files.firstOrNull { it.name == fileName }
-                    if (file == null) {
+                    val resolved = ctx.resolveTarget(fileName)
+                    if (resolved == null) {
                         emit("open: cannot find '$fileName': No such file or directory")
                         return@flow
                     }
 
-                    if (file.isFolder) {
-                        // 目录直接进入
-                        val newPath = if (ctx.currentPath == "/") "/${file.name}" else "${ctx.currentPath}/${file.name}"
-                        ctx.updateDirectory(file.categoryId, newPath)
-                        emit("已进入目录: ${file.name}")
-                        return@flow
-                    }
-
-                    emit("正在打开: ${file.name}")
-                    when {
-                        file.photoThumb.isNotEmpty() || file.fileIco == R.drawable.png -> {
-                            ctx.onNavigate?.invoke(Route.Photo)
+                    when (resolved) {
+                        is ResolvedTarget.Directory -> {
+                            ctx.updateDirectory(resolved.cid, resolved.path)
+                            emit("已进入目录: ${resolved.path}")
+                            return@flow
                         }
-                        file.fileIco == R.drawable.mp3 -> {
-                            ctx.onNavigate?.invoke(Route.MusicDetail)
-                        }
-                        file.fileIco == R.drawable.txt -> {
-                            ctx.onNavigate?.invoke(Route.TxtReader)
-                        }
-                        file.fileIco == R.drawable.web -> {
-                            ctx.onNavigate?.invoke(Route.HtmlWebViewScreen)
-                        }
-                        file.isVideo == 1 -> {
-                            emit("视频文件: 可在文件列表中点击以使用播放器播放")
-                        }
-                        file.fileIco == R.drawable.zip -> {
-                            emit("压缩文件: 输入 'unzip -l \"${file.name}\"' 可预览，输入 'unzip \"${file.name}\"' 可云端解压")
-                        }
-                        else -> {
-                            emit("未能识别该文件的专用预览器 (${file.name})")
+                        is ResolvedTarget.File -> {
+                            val file = resolved.file
+                            emit("正在打开: ${file.name}")
+                            when {
+                                file.photoThumb.isNotEmpty() || file.fileIco == R.drawable.png -> {
+                                    ctx.onNavigate?.invoke(Route.Photo)
+                                }
+                                file.fileIco == R.drawable.mp3 -> {
+                                    ctx.onNavigate?.invoke(Route.MusicDetail)
+                                }
+                                file.fileIco == R.drawable.txt -> {
+                                    ctx.onNavigate?.invoke(Route.TxtReader)
+                                }
+                                file.fileIco == R.drawable.web -> {
+                                    ctx.onNavigate?.invoke(Route.HtmlWebViewScreen)
+                                }
+                                file.isVideo == 1 -> {
+                                    emit("视频文件: 可在文件列表中点击以使用播放器播放")
+                                }
+                                file.fileIco == R.drawable.zip -> {
+                                    emit("压缩文件: 输入 'unzip -l \"${file.name}\"' 可预览，输入 'unzip \"${file.name}\"' 可云端解压")
+                                }
+                                else -> {
+                                    emit("未能识别该文件的专用预览器 (${file.name})")
+                                }
+                            }
                         }
                     }
                 }

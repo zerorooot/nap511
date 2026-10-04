@@ -9,6 +9,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
+ * 目标路径解析结果类型
+ */
+sealed class ResolvedTarget {
+    /** 目标是目录 */
+    data class Directory(val cid: String, val path: String) : ResolvedTarget()
+    /** 目标是普通文件 */
+    data class File(val file: FileBean, val parentCid: String, val fullPath: String) : ResolvedTarget()
+}
+
+/**
  * 终端执行会话上下文
  * 维护当前终端的工作目录、115网盘仓库层接口、缓存管理器、路径解析及交互回调
  */
@@ -81,66 +91,115 @@ class TerminalContext(
             }
         }
 
+
     /**
-     * 解析目标路径（支持 "/", "..", ".", 绝对路径与相对路径）
-     * @return 匹配成功返回 Pair(目标CID, 规范化后的绝对路径)，若不存在则返回 null
+     * 智能解析目标路径（支持识别普通文件与目录）
+     * - 中间路径段必须全部为有效目录；
+     * - 若路径末尾带 '/' 则仅匹配目录；
+     * - 若路径末尾不带 '/'，优先匹配同名目录，其次匹配同名普通文件。
+     *
+     * @param target 目标路径（支持绝对路径、相对路径、~、..、. 等）
+     * @return 匹配成功返回 ResolvedTarget，不存在则返回 null
      */
-    suspend fun resolvePath(target: String): Pair<String, String>? = withContext(Dispatchers.IO) {
+    suspend fun resolveTarget(target: String): ResolvedTarget? = withContext(Dispatchers.IO) {
         val trimmed = target.trim()
         if (trimmed.isEmpty() || trimmed == ".") {
-            return@withContext Pair(currentCid, currentPath)
+            return@withContext ResolvedTarget.Directory(currentCid, currentPath)
         }
 
         if (trimmed == "/" || trimmed == "~") {
-            return@withContext Pair("0", "/")
+            return@withContext ResolvedTarget.Directory("0", "/")
         }
 
+        val hasTrailingSlash = trimmed.endsWith("/")
+
         // 处理 .. 上一级
-        if (trimmed == "..") {
+        if (trimmed == ".." || trimmed == "../") {
             if (currentCid == "0" || currentPath == "/") {
-                return@withContext Pair("0", "/")
+                return@withContext ResolvedTarget.Directory("0", "/")
             }
             if (pathList.size >= 2) {
                 val parent = pathList[pathList.size - 2]
                 val parentPath = "/" + pathList.dropLast(1).joinToString("/") { it.name }.trimStart('/')
-                return@withContext Pair(parent.cid, parentPath.ifEmpty { "/" })
+                return@withContext ResolvedTarget.Directory(parent.cid, parentPath.ifEmpty { "/" })
             } else {
-                // 默认退回根目录
-                return@withContext Pair("0", "/")
+                return@withContext ResolvedTarget.Directory("0", "/")
             }
         }
 
         // 分割路径段
         val isAbsolute = trimmed.startsWith("/")
         val segments = trimmed.split("/").filter { it.isNotEmpty() && it != "." }
+        if (segments.isEmpty()) {
+            return@withContext ResolvedTarget.Directory(
+                if (isAbsolute) "0" else currentCid,
+                if (isAbsolute) "/" else currentPath
+            )
+        }
 
         var startCid = if (isAbsolute) "0" else currentCid
         val currentSegments = if (isAbsolute) mutableListOf() else currentPath.split("/").filter { it.isNotEmpty() }.toMutableList()
 
-        for (segment in segments) {
+        for (i in segments.indices) {
+            val segment = segments[i]
+            val isLast = (i == segments.size - 1)
+
             if (segment == "..") {
                 if (currentSegments.isNotEmpty()) {
                     currentSegments.removeAt(currentSegments.size - 1)
                 }
-                // 需要解析出上级的 CID
-                // 如果退回根
                 startCid = if (currentSegments.isEmpty()) {
                     "0"
                 } else {
-                    // 从缓存链条中查找
                     findCidByPathSegments(currentSegments) ?: "0"
+                }
+                if (isLast) {
+                    val resolvedPath = "/" + currentSegments.joinToString("/")
+                    return@withContext ResolvedTarget.Directory(startCid, resolvedPath)
                 }
             } else {
                 val files = listDirectory(startCid)
-                val folder = files.firstOrNull { it.isFolder && it.name == segment }
-                    ?: return@withContext null // 路径未找到
-                startCid = folder.categoryId
-                currentSegments.add(segment)
+                if (isLast && !hasTrailingSlash) {
+                    // 最后一级且未以 '/' 结尾：先匹配目录，再匹配文件
+                    val folder = files.firstOrNull { it.isFolder && it.name == segment }
+                    if (folder != null) {
+                        currentSegments.add(segment)
+                        val resolvedPath = "/" + currentSegments.joinToString("/")
+                        return@withContext ResolvedTarget.Directory(folder.categoryId, resolvedPath)
+                    }
+                    val file = files.firstOrNull { !it.isFolder && it.name == segment }
+                    if (file != null) {
+                        currentSegments.add(segment)
+                        val resolvedPath = "/" + currentSegments.joinToString("/")
+                        return@withContext ResolvedTarget.File(file, startCid, resolvedPath)
+                    }
+                    return@withContext null
+                } else {
+                    // 中间层级或末尾带 '/'：必须为目录
+                    val folder = files.firstOrNull { it.isFolder && it.name == segment }
+                        ?: return@withContext null
+                    startCid = folder.categoryId
+                    currentSegments.add(segment)
+                }
             }
         }
 
         val resolvedPath = "/" + currentSegments.joinToString("/")
-        Pair(startCid, resolvedPath)
+        ResolvedTarget.Directory(startCid, resolvedPath)
+    }
+
+    /**
+     * 解析目标目录路径（支持 "/", "..", ".", 绝对路径与相对路径）
+     * 仅当目标为有效目录时匹配成功；若目标为普通文件则返回 null
+     *
+     * @return 匹配成功返回 Pair(目标CID, 规范化后的绝对路径)，若不存在或非目录则返回 null
+     */
+    suspend fun resolvePath(target: String): Pair<String, String>? = withContext(Dispatchers.IO) {
+        val resolved = resolveTarget(target) ?: return@withContext null
+        when (resolved) {
+            is ResolvedTarget.Directory -> Pair(resolved.cid, resolved.path)
+            is ResolvedTarget.File -> null
+        }
     }
 
     private suspend fun findCidByPathSegments(segments: List<String>): String? {

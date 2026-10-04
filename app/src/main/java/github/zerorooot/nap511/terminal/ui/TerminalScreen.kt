@@ -258,36 +258,36 @@ fun TerminalScreen(
                 )
                 TerminalAccessoryBar(
                     onTab = { viewModel.handleTabPress() },
-                isCtrlActive = viewModel.isCtrlActive,
-                onCtrlToggle = { viewModel.toggleCtrl() },
-                onSlash = { viewModel.insertCharacter("/") },
-                onDash = { viewModel.insertCharacter("-") },
-                onHome = { viewModel.moveCursorHome() },
-                onArrowUp = { viewModel.navigateHistoryUp() },
-                onEnd = { viewModel.moveCursorEnd() },
-                onPageUp = {
-                    scope.launch {
-                        val target = (listState.firstVisibleItemIndex - 12).coerceAtLeast(0)
-                        listState.animateScrollToItem(target)
+                    isCtrlActive = viewModel.isCtrlActive,
+                    onCtrlToggle = { viewModel.toggleCtrl() },
+                    onSlash = { viewModel.insertCharacter("/") },
+                    onDash = { viewModel.insertCharacter("-") },
+                    onHome = { viewModel.moveCursorHome() },
+                    onArrowUp = { viewModel.navigateHistoryUp() },
+                    onEnd = { viewModel.moveCursorEnd() },
+                    onPageUp = {
+                        scope.launch {
+                            val target = (listState.firstVisibleItemIndex - 12).coerceAtLeast(0)
+                            listState.animateScrollToItem(target)
+                        }
+                    },
+                    onMenu = { showMenuSheet = true },
+                    isAltActive = viewModel.isAltActive,
+                    onAltToggle = { viewModel.toggleAlt() },
+                    onPipe = { viewModel.insertCharacter("|") },
+                    onStar = { viewModel.insertCharacter("*") },
+                    onArrowLeft = { viewModel.moveCursorLeft() },
+                    onArrowDown = { viewModel.navigateHistoryDown() },
+                    onArrowRight = { viewModel.moveCursorRight() },
+                    onPageDown = {
+                        scope.launch {
+                            val target =
+                                (listState.firstVisibleItemIndex + 12).coerceAtMost(viewModel.lines.size)
+                            listState.animateScrollToItem(target)
+                        }
                     }
-                },
-                onMenu = { showMenuSheet = true },
-                isAltActive = viewModel.isAltActive,
-                onAltToggle = { viewModel.toggleAlt() },
-                onPipe = { viewModel.insertCharacter("|") },
-                onStar = { viewModel.insertCharacter("*") },
-                onArrowLeft = { viewModel.moveCursorLeft() },
-                onArrowDown = { viewModel.navigateHistoryDown() },
-                onArrowRight = { viewModel.moveCursorRight() },
-                onPageDown = {
-                    scope.launch {
-                        val target =
-                            (listState.firstVisibleItemIndex + 12).coerceAtMost(viewModel.lines.size)
-                        listState.animateScrollToItem(target)
-                    }
-                }
-            )
-        }
+                )
+            }
         }
     ) { innerPadding ->
         Box(
