@@ -44,6 +44,7 @@ internal fun FileViewModel.removeFile() {
         isCutState = false
         return
     }
+
     //提前保存cid,防止进入其他文件夹后刷新当前目录
     val tempCid = currentCid
     isCutState = false
@@ -54,6 +55,7 @@ internal fun FileViewModel.removeFile() {
         return
     }
 
+    setRefreshingStatus(true)
     viewModelScope.launch {
         runCatching {
             val move = fileRepository.removeFile(tempCid, cutFileList)

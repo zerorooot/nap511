@@ -72,6 +72,17 @@ fun isHandledException(throwable: Throwable?): Boolean {
 class VideoErrorInterceptor(
     private val onErrorCallback: ((url: String, contentType: MediaType, errorBody: String) -> Boolean)
 ) : Interceptor {
+    private companion object {
+        val NON_MEDIA_TYPES = listOf(
+            "application/json", "text/html", "text/plain",
+            "application/xml", "text/xml"
+        )
+        val MEDIA_TYPES = listOf(
+            "video/", "audio/", "mpegurl", "dash+xml",
+            "application/octet-stream"
+        )
+    }
+
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val url = request.url.toString()
@@ -106,14 +117,7 @@ class VideoErrorInterceptor(
      */
     private fun isNonMediaContentType(contentType: String): Boolean {
         if (contentType.isEmpty()) return false
-
-        val isBlacklisted = contentType.contains("application/json") ||
-                contentType.contains("text/html") ||
-                contentType.contains("text/plain") ||
-                contentType.contains("application/xml") ||
-                contentType.contains("text/xml")
-
-        if (isBlacklisted) return true
+        if (NON_MEDIA_TYPES.any { contentType.contains(it) }) return true
 
         // 常见的合法视频/音频 Content-Type 包括:
         // - video/* (video/mp4, video/x-flv 等)
@@ -121,13 +125,8 @@ class VideoErrorInterceptor(
         // - application/x-mpegurl, application/vnd.apple.mpegurl (HLS .m3u8)
         // - application/dash+xml (DASH)
         // - application/octet-stream (通用二进制流，部分 CDN 会强制返这个)
-        val isMediaStream = contentType.contains("video/") ||
-                contentType.contains("audio/") ||
-                contentType.contains("mpegurl") ||
-                contentType.contains("dash+xml") ||
-                contentType.contains("application/octet-stream")
+        return MEDIA_TYPES.none { contentType.contains(it) }
 
-        return !isMediaStream
     }
 }
 
@@ -201,6 +200,7 @@ object VideoErrorMapper {
     )
 
     fun getErrorMessage(code: Int): String {
-        return playbackErrorMessageMap.getOrDefault(code, "").ifEmpty { "发生未记录的错误 (错误码: $code)" }
+        return playbackErrorMessageMap.getOrDefault(code, "")
+            .ifEmpty { "发生未记录的错误 (错误码: $code)" }
     }
 }
