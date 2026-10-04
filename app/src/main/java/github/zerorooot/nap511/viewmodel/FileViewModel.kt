@@ -68,12 +68,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 
-data class FileUiState(
-    val path: String = "",
-    val isRefreshing: Boolean = false
-)
-
-
 @SuppressLint("MutableCollectionMutableState")
 class FileViewModel(
     application: Application,

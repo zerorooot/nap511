@@ -213,6 +213,7 @@ fun MainScreen(
             backStack = backStack,
             onNavigate = { navigateTo(it) },
             onPopBack = { popBack() },
+            avatarBean = avatarBean,
             fileViewModel = fileViewModel,
             offlineFileViewModel = offlineFileViewModel,
             recycleViewModel = recycleViewModel,

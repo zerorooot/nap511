@@ -224,6 +224,11 @@ class ConfigKeyUtil {
         const val ADVANCED_SETTINGS = "高级设置"
 
         /**
+         * 终端命令行
+         */
+        const val TERMINAL = "终端页面"
+
+        /**
          * 退出应用
          */
         const val EXIT_APPLICATION = "退出应用"

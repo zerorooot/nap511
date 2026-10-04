@@ -196,9 +196,9 @@ fun String.handleText(): Set<String> {
     }.toSet()
 }
 
-fun String.copy(context: Context) {
+fun String.copy(context: Context, label: String = "") {
     val clipboard = getSystemService(context, ClipboardManager::class.java)
-    val clip = ClipData.newPlainText("", this)
+    val clip = ClipData.newPlainText(label, this)
     clipboard?.setPrimaryClip(clip)
 }
 

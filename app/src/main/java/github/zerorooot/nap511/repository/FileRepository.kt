@@ -18,6 +18,7 @@ import github.zerorooot.nap511.bean.OfflineInfo
 import github.zerorooot.nap511.bean.OfflineListCount
 import github.zerorooot.nap511.bean.OfflineTaskType
 import github.zerorooot.nap511.bean.QuotaBean
+import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.bean.SignBean
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.UploadBean
@@ -241,6 +242,27 @@ class FileRepository {
 
     suspend fun setDownloadPath(cid: String): BaseReturnMessage {
         return fileService.setDownloadPath(cid)
+    }
+
+    suspend fun move(body: Map<String, String>): BaseReturnMessage {
+        return fileService.move(body)
+    }
+
+    suspend fun recycleList(
+        aid: String = "7",
+        cid: String = "0",
+        offset: String = "0",
+        limit: String = "999"
+    ): RecycleInfo {
+        return fileService.recycleList(aid, cid, offset, limit)
+    }
+
+    suspend fun revert(rid: String): BaseReturnMessage {
+        return fileService.revert(rid)
+    }
+
+    suspend fun recycleCleanAll(password: String = ""): BaseReturnMessage {
+        return fileService.recycleCleanAll(password)
     }
 
     /**

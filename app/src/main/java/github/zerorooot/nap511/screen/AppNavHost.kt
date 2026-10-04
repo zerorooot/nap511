@@ -4,6 +4,7 @@ import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavBackStack
@@ -11,6 +12,7 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import androidx.window.core.layout.WindowSizeClass
+import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
@@ -30,6 +32,8 @@ import github.zerorooot.nap511.screen.web.CaptchaVideoWebViewScreen
 import github.zerorooot.nap511.screen.web.CaptchaWebViewScreen
 import github.zerorooot.nap511.screen.web.HtmlWebViewScreen
 import github.zerorooot.nap511.screen.web.WebViewScreen
+import github.zerorooot.nap511.terminal.ui.TerminalScreen
+import github.zerorooot.nap511.terminal.viewmodel.TerminalViewModel
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.LoginViewModel
@@ -51,6 +55,7 @@ fun AppNavHost(
     backStack: NavBackStack<NavKey>,
     onNavigate: (Route) -> Unit,
     onPopBack: () -> Unit,
+    avatarBean: AvatarBean,
     fileViewModel: FileViewModel,
     offlineFileViewModel: OfflineFileViewModel,
     recycleViewModel: RecycleViewModel,
@@ -189,7 +194,32 @@ fun AppNavHost(
                             "RepeatFile" -> onNavigate(Route.RepeatFile)
                             "Login" -> onNavigate(Route.Login)
                             "Web" -> onNavigate(Route.WebScreen)
+                            "Terminal" -> onNavigate(Route.Terminal)
                         }
+                    }
+                )
+            }
+
+            entry<Route.Terminal> {
+                onSetGesturesEnabled(false)
+                val currentCid = fileViewModel.currentCid
+                val currentPathList = fileViewModel.pathList
+                val currentPath = "/" + currentPathList.joinToString("/") { it.name }
+                val terminalViewModel = remember {
+                    TerminalViewModel(
+                        initialCid = currentCid,
+                        initialPath = currentPath,
+                        initialPathList = currentPathList,
+                        avatarBean = avatarBean,
+                        onNavigateAction = { route -> onNavigate(route) }
+                    )
+                }
+                TerminalScreen(
+                    viewModel = terminalViewModel,
+                    onBack = onPopBack,
+                    openDrawer = {
+                        onSetGesturesEnabled(true)
+                        onOpenDrawer()
                     }
                 )
             }

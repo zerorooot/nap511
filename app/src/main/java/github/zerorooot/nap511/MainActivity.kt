@@ -10,7 +10,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,7 +45,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             // 4. 实时更新系统状态栏与导航栏
-            DisposableEffect(darkTheme) {
+            LaunchedEffect(darkTheme) {
                 enableEdgeToEdge(
                     statusBarStyle = if (darkTheme) {
                         SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
@@ -64,7 +64,6 @@ class MainActivity : AppCompatActivity() {
                         )
                     }
                 )
-                onDispose {}
             }
 
             // 5. 渲染应用核心内容

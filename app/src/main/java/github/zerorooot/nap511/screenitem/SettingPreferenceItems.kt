@@ -370,6 +370,13 @@ fun LazyListScope.maintenanceBackupPreferenceItems(
     item { PreferenceCategoryHeader("系统维护与高级诊断") }
     item {
         PreferenceItem(
+            title = "终端命令页面",
+            summary = "打开内置 Linux 风格网盘终端工具 (Terminal)",
+            onClick = { onActionClick("Terminal") }
+        )
+    }
+    item {
+        PreferenceItem(
             title = "导出配置文件",
             summary = "将当前所有应用设置导出为 JSON 配置文件",
             onClick = onExportConfig

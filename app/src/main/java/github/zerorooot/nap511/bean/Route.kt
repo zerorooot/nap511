@@ -32,6 +32,9 @@ sealed interface Route : NavKey {
     data object AdvancedSettings : Route
 
     @Serializable
+    data object Terminal : Route
+
+    @Serializable
     data object LogScreen : Route
 
     @Serializable
