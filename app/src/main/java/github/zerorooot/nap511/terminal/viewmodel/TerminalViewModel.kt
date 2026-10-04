@@ -491,20 +491,20 @@ class TerminalViewModel(
                         originalText = inputState.text,
                         parsedContext = result.parsedContext,
                         candidateToInsert = lcp,
-                        isDirectory = false
+                        isDirectory = false,
+                        isPartial = true
                     )
                     inputState = TextFieldValue(newText, selection = TextRange(newCursor))
                     ghostText = ""
                     updateGhostText(newText, newCursor)
                 }
 
-                // B. 单击 Tab 直接展开候选栏
+                // B. 单击 Tab 直接展开候选栏（Chips Bar）供点选或继续 Tab 轮询
                 baseInputText = inputState.text
                 baseParsedContext =
                     CompletionEngine.parseContext(inputState.text, inputState.selection.end)
-                val updatedResult = if (canExtendLcp) computeCompletions() else result
                 completionCandidates.clear()
-                completionCandidates.addAll(updatedResult.candidates)
+                completionCandidates.addAll(result.candidates)
                 activeCandidateIndex = -1
                 isCompletionBarVisible = true
             }

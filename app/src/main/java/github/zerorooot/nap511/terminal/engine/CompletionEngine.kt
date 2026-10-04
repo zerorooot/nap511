@@ -114,9 +114,13 @@ object CompletionEngine {
      *
      * @param name 原始文件名或目录名
      * @param isDirectory 是否为文件夹（文件夹结尾追加 '/'，普通文件结尾追加空格 ' '）
+     * @param isPartial 是否仅为部分公共前缀补全（为 true 时不追加结尾 '/' 或空格，避免提前闭合 Token）
      */
-    fun escapePath(name: String, isDirectory: Boolean): String {
+    fun escapePath(name: String, isDirectory: Boolean, isPartial: Boolean = false): String {
         val escaped = name.replace(" ", "\\ ")
+        if (isPartial) {
+            return escaped
+        }
         val suffix = if (isDirectory) {
             if (escaped.endsWith("/")) "" else "/"
         } else {
@@ -152,8 +156,14 @@ object CompletionEngine {
         while (tokenStartInSegment > 0) {
             val prevChar = segment[tokenStartInSegment - 1]
             if (prevChar.isWhitespace()) {
-                // 检查前一个字符是否为反斜杠转义
-                val isEscaped = (tokenStartInSegment - 2 >= 0 && segment[tokenStartInSegment - 2] == '\\')
+                // 计算该空白字符前连续的反斜杠数量（奇数个说明空格被反斜杠转义，偶数个说明反斜杠自身被转义，空格是分隔符）
+                var backslashCount = 0
+                var checkPos = tokenStartInSegment - 2
+                while (checkPos >= 0 && segment[checkPos] == '\\') {
+                    backslashCount++
+                    checkPos--
+                }
+                val isEscaped = (backslashCount % 2 != 0)
                 if (!isEscaped) {
                     break
                 }
@@ -320,29 +330,34 @@ object CompletionEngine {
      * @param originalText 原始输入的整行文本
      * @param parsedContext 上下文信息
      * @param candidateToInsert 需要插入的候选（或最长公共前缀）
+     * @param isDirectory 是否为文件夹
+     * @param isPartial 是否仅为部分公共前缀补全（为 true 时不追加结尾 '/' 或空格，避免提前闭合 Token）
      * @return Pair(全新替换后的字符串, 新的光标索引位置)
      */
     fun applyCandidate(
         originalText: String,
         parsedContext: ParsedContext,
         candidateToInsert: String,
-        isDirectory: Boolean = false
+        isDirectory: Boolean = false,
+        isPartial: Boolean = false
     ): Pair<String, Int> {
-        val prefixBeforeToken = originalText.substring(0, parsedContext.tokenStartIndex)
-        val textAfterCursor = originalText.substring(parsedContext.tokenEndIndex)
+        val safeStart = parsedContext.tokenStartIndex.coerceIn(0, originalText.length)
+        val safeEnd = parsedContext.tokenEndIndex.coerceIn(safeStart, originalText.length)
+        val prefixBeforeToken = originalText.substring(0, safeStart)
+        val textAfterCursor = originalText.substring(safeEnd)
 
         val fullReplacement = when (parsedContext.contextType) {
             CompletionContextType.PATH -> {
                 // 路径补全需拼接 parentPath 的转义形式 + 候选的转义形式
                 val escapedParent = escapeParentPath(parsedContext.parentPath)
-                val escapedName = escapePath(candidateToInsert, isDirectory)
+                val escapedName = escapePath(candidateToInsert, isDirectory = isDirectory, isPartial = isPartial)
                 escapedParent + escapedName
             }
             CompletionContextType.COMMAND -> {
-                if (candidateToInsert.endsWith(" ")) candidateToInsert else "$candidateToInsert "
+                if (isPartial) candidateToInsert else if (candidateToInsert.endsWith(" ")) candidateToInsert else "$candidateToInsert "
             }
             CompletionContextType.FLAG -> {
-                if (candidateToInsert.endsWith(" ")) candidateToInsert else "$candidateToInsert "
+                if (isPartial) candidateToInsert else if (candidateToInsert.endsWith(" ")) candidateToInsert else "$candidateToInsert "
             }
         }
 

@@ -182,9 +182,9 @@ fun GhostTextField(
                             // 2. 仅在 KeyDown 时响应，防止物理键盘单次敲击触发两次
                             if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
 
-                            when {
-                                // 外接键盘回车处理：Shift+Enter 允许换行，单独 Enter 执行提交
-                                event.key == Key.Enter || event.key == Key.NumPadEnter -> {
+                            // 外接键盘回车处理：Shift+Enter 允许换行，单独 Enter 执行提交
+                            when (event.key) {
+                                Key.Enter, Key.NumPadEnter -> {
                                     if (event.isShiftPressed) {
                                         false
                                     } else {
@@ -192,11 +192,13 @@ fun GhostTextField(
                                         true
                                     }
                                 }
-                                event.key == Key.Tab -> {
+
+                                Key.Tab -> {
                                     onTab()
                                     true
                                 }
-                                event.key == Key.MoveEnd || event.key == Key.DirectionRight -> {
+
+                                Key.MoveEnd, Key.DirectionRight -> {
                                     if (value.selection.end == value.text.length && ghostText.isNotEmpty()) {
                                         onAcceptGhostText()
                                         true
@@ -204,14 +206,17 @@ fun GhostTextField(
                                         false
                                     }
                                 }
-                                event.key == Key.DirectionUp -> {
+
+                                Key.DirectionUp -> {
                                     onArrowUp()
                                     true
                                 }
-                                event.key == Key.DirectionDown -> {
+
+                                Key.DirectionDown -> {
                                     onArrowDown()
                                     true
                                 }
+
                                 else -> false
                             }
                         }
