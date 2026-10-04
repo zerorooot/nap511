@@ -3,6 +3,7 @@ package github.zerorooot.nap511.terminal.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -23,6 +24,7 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
@@ -61,11 +63,14 @@ data class TerminalHardwareKeyActions(
 
 @Composable
 fun GhostTextField(
+    modifier: Modifier = Modifier,
     value: TextFieldValue,
     onValueChange: (TextFieldValue) -> Unit,
     ghostText: String,
-    prompt: String,
-    isWaitingConfirmation: Boolean,
+    prompt: String = "",
+    contextPrompt: String = "",
+    promptSign: String = if (contextPrompt.isNotEmpty()) "$ " else prompt,
+    isWaitingConfirmation: Boolean = false,
     onSubmit: () -> Unit,
     onTab: () -> Unit = {},
     onAcceptGhostText: () -> Unit = {},
@@ -73,7 +78,6 @@ fun GhostTextField(
     onArrowDown: () -> Unit,
     hardwareKeyActions: TerminalHardwareKeyActions = TerminalHardwareKeyActions(),
     focusRequester: FocusRequester,
-    modifier: Modifier = Modifier
 ) {
     val textStyle = TextStyle(
         color = Color(0xFFECEFF1),
@@ -98,7 +102,7 @@ fun GhostTextField(
         requestFocusAndMoveCursorToEnd()
     }
 
-    Row(
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .clickable(
@@ -107,108 +111,130 @@ fun GhostTextField(
             ) {
                 requestFocusAndMoveCursorToEnd()
             }
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = 4.dp)
     ) {
-        // 终端提示符
-        Text(
-            text = prompt,
-            color = promptColor,
-            fontSize = 14.sp,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold,
-            lineHeight = 20.sp
-        )
-
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    requestFocusAndMoveCursorToEnd()
-                }
-        ) {
-            // 输入框
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                textStyle = textStyle,
-                cursorBrush = SolidColor(Color(0xFF69F0AE)),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(
-                    imeAction = ImeAction.Send,
-                    autoCorrectEnabled = false
-                ),
-                keyboardActions = KeyboardActions(
-                    onSend = { submitAndKeepKeyboard() },
-                    onGo = { submitAndKeepKeyboard() },
-                    onDone = { submitAndKeepKeyboard() }
-                ),
+        // 第一行：上下文完整路径信息（仅在非确认模式且上下文非空时展示）
+        if (!isWaitingConfirmation && contextPrompt.isNotEmpty()) {
+            Text(
+                text = contextPrompt,
+                color = Color(0xFF4DD0E1), // 高亮青蓝终端配色
+                fontSize = 13.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                lineHeight = 18.sp,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .focusRequester(focusRequester)
-                    .onKeyEvent { event ->
-                        // 1. 优先分发外接物理键盘的 Ctrl / Alt 组合键
-                        if (handleHardwareShortcutKeyEvent(event, hardwareKeyActions)) {
-                            return@onKeyEvent true
-                        }
+                    .padding(bottom = 2.dp)
+            )
+        }
 
-                        // 2. 常规按键处理 (Tab, End, 方向键等) - 仅在 KeyDown 时响应，防止物理键盘单次敲击触发两次
-                        if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-
-                        when (event.key) {
-                            Key.Tab -> {
-                                onTab()
-                                true
-                            }
-                            Key.MoveEnd -> {
-                                if (value.selection.end == value.text.length && ghostText.isNotEmpty()) {
-                                    onAcceptGhostText()
-                                    true
-                                } else {
-                                    false
-                                }
-                            }
-                            Key.DirectionRight -> {
-                                if (value.selection.end == value.text.length && ghostText.isNotEmpty()) {
-                                    onAcceptGhostText()
-                                    true
-                                } else {
-                                    false
-                                }
-                            }
-                            Key.DirectionUp -> {
-                                onArrowUp()
-                                true
-                            }
-                            Key.DirectionDown -> {
-                                onArrowDown()
-                                true
-                            }
-                            else -> false
-                        }
-                    }
+        // 第二行（专属输入行）：提示符号 + 独占满宽输入框与幽灵预测补全
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top
+        ) {
+            // 引导提示符号（如 "$ " 或确认模式 "confirm (yes/no): "）
+            Text(
+                text = promptSign,
+                color = promptColor,
+                fontSize = 14.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                lineHeight = 20.sp
             )
 
-            // 行内幽灵文本层 (Inline Ghost Text)
-            // 仅当光标位于末尾且存在建议时渲染在末尾
-            if (ghostText.isNotEmpty() && value.selection.end == value.text.length) {
-                Text(
-                    text = buildAnnotatedString {
-                        // 前缀使用透明色占位，保证宽度与用户已输入文本完全一致
-                        withStyle(style = SpanStyle(color = Color.Transparent)) {
-                            append(value.text)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        requestFocusAndMoveCursorToEnd()
+                    }
+            ) {
+                // 输入框：支持多行自然折行排版 (maxLines = 5)，避免超长命令截断无法查看
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    textStyle = textStyle,
+                    cursorBrush = SolidColor(Color(0xFF69F0AE)),
+                    singleLine = false,
+                    maxLines = 5,
+                    keyboardOptions = KeyboardOptions(
+                        imeAction = ImeAction.Send,
+                        autoCorrectEnabled = false
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onSend = { submitAndKeepKeyboard() },
+                        onGo = { submitAndKeepKeyboard() },
+                        onDone = { submitAndKeepKeyboard() }
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester)
+                        .onKeyEvent { event ->
+                            // 1. 优先分发外接物理键盘的 Ctrl / Alt 组合键
+                            if (handleHardwareShortcutKeyEvent(event, hardwareKeyActions)) {
+                                return@onKeyEvent true
+                            }
+
+                            // 2. 仅在 KeyDown 时响应，防止物理键盘单次敲击触发两次
+                            if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+
+                            when {
+                                // 外接键盘回车处理：Shift+Enter 允许换行，单独 Enter 执行提交
+                                event.key == Key.Enter || event.key == Key.NumPadEnter -> {
+                                    if (event.isShiftPressed) {
+                                        false
+                                    } else {
+                                        submitAndKeepKeyboard()
+                                        true
+                                    }
+                                }
+                                event.key == Key.Tab -> {
+                                    onTab()
+                                    true
+                                }
+                                event.key == Key.MoveEnd || event.key == Key.DirectionRight -> {
+                                    if (value.selection.end == value.text.length && ghostText.isNotEmpty()) {
+                                        onAcceptGhostText()
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
+                                event.key == Key.DirectionUp -> {
+                                    onArrowUp()
+                                    true
+                                }
+                                event.key == Key.DirectionDown -> {
+                                    onArrowDown()
+                                    true
+                                }
+                                else -> false
+                            }
                         }
-                        // 后缀以浅灰淡色展示幽灵文本
-                        withStyle(style = SpanStyle(color = Color(0xFF888888), fontWeight = FontWeight.Normal)) {
-                            append(ghostText)
-                        }
-                    },
-                    style = textStyle,
-                    modifier = Modifier.fillMaxWidth()
                 )
+
+                // 行内幽灵文本层 (Inline Ghost Text)
+                // 仅当光标位于末尾且存在建议时渲染在末尾，保持字体度量与折行完全一致
+                if (ghostText.isNotEmpty() && value.selection.end == value.text.length) {
+                    Text(
+                        text = buildAnnotatedString {
+                            // 前缀使用透明色占位，保证排版与折行位置与用户已输入文本完全一致
+                            withStyle(style = SpanStyle(color = Color.Transparent)) {
+                                append(value.text)
+                            }
+                            // 后缀以浅灰淡色展示幽灵文本
+                            withStyle(style = SpanStyle(color = Color(0xFF888888), fontWeight = FontWeight.Normal)) {
+                                append(ghostText)
+                            }
+                        },
+                        style = textStyle,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
     }

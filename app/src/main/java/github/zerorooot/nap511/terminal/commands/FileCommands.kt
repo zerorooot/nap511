@@ -222,83 +222,121 @@ object FileCommands {
 
         // 6. mv
         registry.register("mv") {
-            description = "重命名文件或将文件移动至其他目录"
-            usage = "mv <source> <target>"
-            execute { ctx, args, _ ->
+            description = "重命名文件或将文件/目录移动至其他目录"
+            usage = "mv <source...> <target>"
+            execute { ctx, args, stdin ->
                 flow {
-                    val targets = args.filter { !it.startsWith("-") }
+                    val targets = args.filter { !it.startsWith("-") }.toMutableList()
+
+                    // 若命令行参数仅提供了 1 个目标目录（如 find ... | mv ../），且上游管道存在输入，智能从 stdin 获取源列表
+                    if (targets.size < 2) {
+                        val stdinSources = mutableListOf<String>()
+                        stdin.collect { line ->
+                            val trimmed = line.trim()
+                            if (trimmed.isNotEmpty()) {
+                                stdinSources.add(trimmed)
+                            }
+                        }
+                        if (stdinSources.isNotEmpty() && targets.size == 1) {
+                            val destination = targets[0]
+                            targets.clear()
+                            targets.addAll(stdinSources)
+                            targets.add(destination)
+                        }
+                    }
+
                     if (targets.size < 2) {
                         emit("mv: missing file operand")
                         return@flow
                     }
 
-                    val source = targets[0]
-                    val destination = targets[1]
-
+                    val destination = targets.last()
+                    val sources = targets.dropLast(1)
                     val currentFiles = ctx.listDirectory(ctx.currentCid)
-                    val sourceFile = currentFiles.firstOrNull { it.name == source }
-                    if (sourceFile == null) {
-                        emit("mv: cannot stat '$source': No such file or directory")
-                        return@flow
+
+                    // 解析源文件/目录信息
+                    suspend fun resolveSourceItem(rawSrc: String): Pair<String, String>? {
+                        val cleanSrc = rawSrc.trim().trimEnd('/')
+                        val localFile = currentFiles.firstOrNull { it.name == cleanSrc || it.name == rawSrc.trim() }
+                        if (localFile != null) {
+                            val fid = if (localFile.isFolder) localFile.categoryId else localFile.fileId
+                            return Pair(fid, localFile.name)
+                        }
+
+                        // 尝试路径解析（支持绝对路径与相对路径）
+                        val resolved = ctx.resolveTarget(cleanSrc)
+                        return when (resolved) {
+                            is ResolvedTarget.Directory -> Pair(resolved.cid, cleanSrc.substringAfterLast('/').ifEmpty { "/" })
+                            is ResolvedTarget.File -> Pair(resolved.file.fileId, resolved.file.name)
+                            null -> null
+                        }
                     }
 
-                    val actualFid = if (sourceFile.isFolder) sourceFile.categoryId else sourceFile.fileId
+                    // 判断目标是否为目录（支持当前目录下文件夹、上级目录 .. / ../、绝对路径或 ~）
+                    var targetDestCid: String? = null
+                    var destDisplayName = destination
+                    val cleanDest = destination.trim().trimEnd('/')
 
-                    // 判断目标是否为已存在的目录
-                    val destFolder = currentFiles.firstOrNull { it.isFolder && it.name == destination }
+                    val destFolder = currentFiles.firstOrNull { it.isFolder && (it.name == cleanDest || it.name == destination.trim()) }
                     if (destFolder != null) {
-                        // 移动到该文件夹
-                        try {
-                            val moveMap = hashMapOf<String, String>()
-                            moveMap["pid"] = destFolder.categoryId
-                            moveMap["fid[0]"] = actualFid
-                            val res = ctx.fileRepository.move(moveMap)
-                            if (res.state) {
-                                ctx.invalidateCache(ctx.currentCid)
-                                ctx.invalidateCache(destFolder.categoryId)
-                                emit("mv: '$source' -> '${destFolder.name}/'")
-                            } else {
-                                emit("mv: 移动失败: ${res.error}")
-                            }
-                        } catch (e: Exception) {
-                            emit("mv: 移动失败: ${e.message}")
+                        targetDestCid = destFolder.categoryId
+                        destDisplayName = destFolder.name
+                    } else if (cleanDest == ".." || cleanDest == "." || cleanDest == "~" || cleanDest.startsWith("/") || cleanDest.contains("/")) {
+                        val resolvedPath = ctx.resolvePath(destination)
+                        if (resolvedPath != null) {
+                            targetDestCid = resolvedPath.first
+                            destDisplayName = resolvedPath.second
                         }
-                    } else if (destination.startsWith("/") || destination.contains("/")) {
-                        // 路径移动
-                        val resolved = ctx.resolvePath(destination)
-                        if (resolved != null) {
+                    }
+
+                    if (targetDestCid != null) {
+                        // 移动操作：将所有 sources 移入 targetDestCid 目录
+                        for (src in sources) {
+                            val resolvedSrc = resolveSourceItem(src)
+                            if (resolvedSrc == null) {
+                                emit("mv: cannot stat '$src': No such file or directory")
+                                continue
+                            }
+                            val (actualFid, _) = resolvedSrc
                             try {
                                 val moveMap = hashMapOf<String, String>()
-                                moveMap["pid"] = resolved.first
+                                moveMap["pid"] = targetDestCid
                                 moveMap["fid[0]"] = actualFid
                                 val res = ctx.fileRepository.move(moveMap)
                                 if (res.state) {
                                     ctx.invalidateCache(ctx.currentCid)
-                                    ctx.invalidateCache(resolved.first)
-                                    emit("mv: '$source' -> '${resolved.second}/'")
+                                    ctx.invalidateCache(targetDestCid)
+                                    emit("mv: '$src' -> '$destDisplayName/'")
                                 } else {
-                                    emit("mv: 移动失败: ${res.error}")
+                                    emit("mv: 移动 '$src' 失败: ${res.error}")
                                 }
                             } catch (e: Exception) {
-                                emit("mv: 移动失败: ${e.message}")
+                                emit("mv: 移动 '$src' 失败: ${e.message}")
                             }
-                        } else {
-                            emit("mv: 目标路径不存在: $destination")
                         }
-                    } else {
-                        // 重命名
+                    } else if (sources.size == 1) {
+                        // 单源且目标不是现有目录：执行重命名
+                        val src = sources[0]
+                        val resolvedSrc = resolveSourceItem(src)
+                        if (resolvedSrc == null) {
+                            emit("mv: cannot stat '$src': No such file or directory")
+                            return@flow
+                        }
+                        val (actualFid, _) = resolvedSrc
                         try {
                             val renameBean = RenameBean(actualFid, destination)
                             val res = ctx.fileRepository.rename(renameBean.toRequestBody())
                             if (res.state) {
                                 ctx.invalidateCache(ctx.currentCid)
-                                emit("mv: '$source' renamed to '$destination'")
+                                emit("mv: '$src' renamed to '$destination'")
                             } else {
                                 emit("mv: 重命名失败: ${res.error}")
                             }
                         } catch (e: Exception) {
                             emit("mv: 重命名失败: ${e.message}")
                         }
+                    } else {
+                        emit("mv: target '$destination' is not a directory")
                     }
                 }
             }

@@ -10,12 +10,16 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -25,11 +29,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imeNestedScroll
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -38,11 +46,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,9 +66,13 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
@@ -132,10 +146,21 @@ fun TerminalScreen(
         }
     }
 
-    // 实时监听软键盘高度与输出行数变化，在软键盘升起/变动或新输出追加时持续锚定滚动到底部输入框（行尾）
+    // 判断用户当前是否已处于最底部（当前可见的最后一项是否为倒数前 2 项之一）
+    val isAtBottom by remember {
+        derivedStateOf {
+            val totalItems = viewModel.lines.size + 2 // lines + input + spacer
+            val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            lastVisibleIndex >= totalItems - 2
+        }
+    }
+
+    // 智能防打扰滚动：仅在软键盘升起/变动或新输出追加时，若用户原本就在底部，才自动锚定吸底
     val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
     LaunchedEffect(viewModel.lines.size, imeBottom) {
-        listState.scrollToItem((viewModel.lines.size + 1).coerceAtLeast(0))
+        if (isAtBottom) {
+            listState.scrollToItem((viewModel.lines.size + 1).coerceAtLeast(0))
+        }
     }
 
     // 默认请求焦点弹出输入法并绑定退出回调
@@ -294,76 +319,120 @@ fun TerminalScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color(0xFF101010))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    viewModel.dismissCompletionBar()
-                    bringUpKeyboard()
-                }
         ) {
-            LazyColumn(
-                state = listState,
-                contentPadding = innerPadding,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .imeNestedScroll()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) {
-                        viewModel.dismissCompletionBar()
-                        bringUpKeyboard()
+            SelectionContainer {
+                LazyColumn(
+                    state = listState,
+                    contentPadding = innerPadding,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .imeNestedScroll()
+                        .padding(horizontal = 10.dp)
+                ) {
+                    items(
+                        count = viewModel.lines.size,
+                        key = { index -> "line_$index" }
+                    ) { index ->
+                        TerminalLineRow(line = viewModel.lines[index])
                     }
-                    .padding(horizontal = 10.dp)
-            ) {
-                items(
-                    count = viewModel.lines.size,
-                    key = { index -> "line_$index" }
-                ) { index ->
-                    TerminalLineRow(
-                        line = viewModel.lines[index],
-                        onClick = bringUpKeyboard
-                    )
-                }
 
-                item(key = "terminal_ghost_input") {
-                    val hardwareActions = remember(viewModel, onBack) {
-                        TerminalHardwareKeyActions(
-                            onCtrlC = { viewModel.handleCtrlC() },
-                            onCtrlU = { viewModel.handleCtrlU() },
-                            onCtrlK = { viewModel.handleCtrlK() },
-                            onCtrlW = { viewModel.handleCtrlW() },
-                            onCtrlL = { viewModel.handleCtrlL() },
-                            onCtrlA = { viewModel.handleCtrlA() },
-                            onCtrlE = { viewModel.handleCtrlE() },
-                            onCtrlD = { viewModel.handleCtrlD(onBack) },
-                            onAltB = { viewModel.handleAltB() },
-                            onAltF = { viewModel.handleAltF() },
-                            onAltD = { viewModel.handleAltD() },
-                            onAltBackspace = { viewModel.handleAltBackspace() },
-                            onAltDot = { viewModel.handleAltDot() }
+                    item(key = "terminal_ghost_input") {
+                        val hardwareActions = remember(viewModel, onBack) {
+                            TerminalHardwareKeyActions(
+                                onCtrlC = { viewModel.handleCtrlC() },
+                                onCtrlU = { viewModel.handleCtrlU() },
+                                onCtrlK = { viewModel.handleCtrlK() },
+                                onCtrlW = { viewModel.handleCtrlW() },
+                                onCtrlL = { viewModel.handleCtrlL() },
+                                onCtrlA = { viewModel.handleCtrlA() },
+                                onCtrlE = { viewModel.handleCtrlE() },
+                                onCtrlD = { viewModel.handleCtrlD(onBack) },
+                                onAltB = { viewModel.handleAltB() },
+                                onAltF = { viewModel.handleAltF() },
+                                onAltD = { viewModel.handleAltD() },
+                                onAltBackspace = { viewModel.handleAltBackspace() },
+                                onAltDot = { viewModel.handleAltDot() }
+                            )
+                        }
+
+                        GhostTextField(
+                            value = viewModel.inputState,
+                            onValueChange = { viewModel.onInputChange(it) },
+                            ghostText = viewModel.ghostText,
+                            contextPrompt = viewModel.contextPromptText(),
+                            promptSign = if (viewModel.isWaitingConfirmation) "confirm (yes/no): " else "$ ",
+                            isWaitingConfirmation = viewModel.isWaitingConfirmation,
+                            onSubmit = {
+                                viewModel.submitInput()
+                                scope.launch {
+                                    listState.animateScrollToItem((viewModel.lines.size + 1).coerceAtLeast(0))
+                                }
+                            },
+                            onTab = { viewModel.handleTabPress() },
+                            onAcceptGhostText = { viewModel.acceptGhostText() },
+                            onArrowUp = { viewModel.navigateHistoryUp() },
+                            onArrowDown = { viewModel.navigateHistoryDown() },
+                            hardwareKeyActions = hardwareActions,
+                            focusRequester = focusRequester
                         )
                     }
 
-                    GhostTextField(
-                        value = viewModel.inputState,
-                        onValueChange = { viewModel.onInputChange(it) },
-                        ghostText = viewModel.ghostText,
-                        prompt = if (viewModel.isWaitingConfirmation) "confirm (yes/no): " else viewModel.promptText(),
-                        isWaitingConfirmation = viewModel.isWaitingConfirmation,
-                        onSubmit = { viewModel.submitInput() },
-                        onTab = { viewModel.handleTabPress() },
-                        onAcceptGhostText = { viewModel.acceptGhostText() },
-                        onArrowUp = { viewModel.navigateHistoryUp() },
-                        onArrowDown = { viewModel.navigateHistoryDown() },
-                        hardwareKeyActions = hardwareActions,
-                        focusRequester = focusRequester
-                    )
+                    item(key = "terminal_bottom_spacer") {
+                        Spacer(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) {
+                                    viewModel.dismissCompletionBar()
+                                    bringUpKeyboard()
+                                }
+                        )
+                    }
                 }
+            }
 
-                item(key = "terminal_bottom_spacer") {
-                    Spacer(modifier = Modifier.height(8.dp))
+            // 智能防打扰悬浮按钮：当用户向上翻阅历史时展示「回到底部」
+            AnimatedVisibility(
+                visible = !isAtBottom,
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(innerPadding)
+                    .padding(end = 16.dp, bottom = 12.dp)
+            ) {
+                Surface(
+                    onClick = {
+                        scope.launch {
+                            listState.animateScrollToItem((viewModel.lines.size + 1).coerceAtLeast(0))
+                        }
+                    },
+                    shape = RoundedCornerShape(18.dp),
+                    color = Color(0xFF263238),
+                    tonalElevation = 6.dp,
+                    shadowElevation = 6.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "回到底部",
+                            tint = Color(0xFF69F0AE),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "回到底部",
+                            color = Color(0xFFECEFF1),
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
                 }
             }
         }
@@ -391,28 +460,56 @@ fun TerminalScreen(
 }
 
 @Composable
-private fun TerminalLineRow(line: TerminalLine, onClick: () -> Unit) {
-    val color = when (line.type) {
-        TerminalLineType.SYSTEM -> Color(0xFF4DD0E1)
-        TerminalLineType.COMMAND -> Color(0xFFB0BEC5)
-        TerminalLineType.OUTPUT -> Color(0xFFEEEEEE)
-        TerminalLineType.ERROR -> Color(0xFFEF5350)
-        TerminalLineType.PROMPT -> Color(0xFFFFD54F)
-    }
+private fun TerminalLineRow(line: TerminalLine) {
+    if (line.type == TerminalLineType.COMMAND && line.text.contains("\n$ ")) {
+        // 双行历史命令格式美化解析：第 1 行上下文路径，第 2 行提示符与命令
+        val parts = line.text.split("\n$ ", limit = 2)
+        val contextPart = parts[0]
+        val commandPart = parts.getOrNull(1) ?: ""
 
-    Text(
-        text = line.text,
-        color = color,
-        fontSize = 13.sp,
-        fontFamily = FontFamily.Monospace,
-        lineHeight = 18.sp,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
-            )
-            .padding(vertical = 1.dp)
-    )
+        val annotatedString = buildAnnotatedString {
+            // 上下文路径：青蓝色高亮
+            withStyle(SpanStyle(color = Color(0xFF4DD0E1), fontWeight = FontWeight.Bold)) {
+                append(contextPart)
+            }
+            append("\n")
+            // 提示符 $：高亮绿色
+            withStyle(SpanStyle(color = Color(0xFF69F0AE), fontWeight = FontWeight.Bold)) {
+                append("$ ")
+            }
+            // 命令内容：亮灰白色
+            withStyle(SpanStyle(color = Color(0xFFECEFF1))) {
+                append(commandPart)
+            }
+        }
+
+        Text(
+            text = annotatedString,
+            fontSize = 13.sp,
+            fontFamily = FontFamily.Monospace,
+            lineHeight = 18.sp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 1.dp)
+        )
+    } else {
+        val color = when (line.type) {
+            TerminalLineType.SYSTEM -> Color(0xFF4DD0E1)
+            TerminalLineType.COMMAND -> Color(0xFFB0BEC5)
+            TerminalLineType.OUTPUT -> Color(0xFFEEEEEE)
+            TerminalLineType.ERROR -> Color(0xFFEF5350)
+            TerminalLineType.PROMPT -> Color(0xFFFFD54F)
+        }
+
+        Text(
+            text = line.text,
+            color = color,
+            fontSize = 13.sp,
+            fontFamily = FontFamily.Monospace,
+            lineHeight = 18.sp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 1.dp)
+        )
+    }
 }

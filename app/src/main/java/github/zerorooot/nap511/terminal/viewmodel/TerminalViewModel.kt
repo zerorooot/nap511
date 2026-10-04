@@ -136,7 +136,7 @@ class TerminalViewModel(
         onNavigate = { route -> onNavigateAction?.invoke(route) },
         onConfirmRequest = { prompt ->
             isWaitingConfirmation = true
-            lines.add(TerminalLine(prompt, TerminalLineType.PROMPT))
+            appendTerminalLine(TerminalLine(prompt, TerminalLineType.PROMPT))
             val deferred = CompletableDeferred<Boolean>()
             confirmDeferred = deferred
             deferred.await()
@@ -178,21 +178,58 @@ class TerminalViewModel(
         }
     }
 
+    companion object {
+        /**
+         * 终端屏幕输出最大保留行数上限 (Scrollback Limit)
+         * 避免长时间运行或海量输出导致内存暴涨与掉帧
+         */
+        const val MAX_SCROLLBACK_LINES = 2000
+    }
+
+    /**
+     * 安全向终端输出追加单行，带最大回滚行数截断保护，防止长期运行导致内存膨胀
+     */
+    fun appendTerminalLine(line: TerminalLine) {
+        if (lines.size >= MAX_SCROLLBACK_LINES) {
+            val removeCount = (lines.size - MAX_SCROLLBACK_LINES + 1).coerceAtLeast(1)
+            lines.subList(0, removeCount.coerceAtMost(lines.size)).clear()
+        }
+        lines.add(line)
+    }
+
+    /**
+     * 批量追加终端输出，降低 Compose 重组频率，保证海量输出流畅度
+     */
+    fun appendTerminalLines(newLines: List<TerminalLine>) {
+        if (newLines.isEmpty()) return
+        val effectiveNewLines = if (newLines.size > MAX_SCROLLBACK_LINES) {
+            newLines.takeLast(MAX_SCROLLBACK_LINES)
+        } else {
+            newLines
+        }
+        val total = lines.size + effectiveNewLines.size
+        if (total > MAX_SCROLLBACK_LINES) {
+            val removeCount = (total - MAX_SCROLLBACK_LINES).coerceAtLeast(1)
+            lines.subList(0, removeCount.coerceAtMost(lines.size)).clear()
+        }
+        lines.addAll(effectiveNewLines)
+    }
+
     private fun printWelcomeBanner() {
-        lines.add(TerminalLine("=== 115 Cloud Terminal (nap511) ===", TerminalLineType.SYSTEM))
-        lines.add(
+        appendTerminalLine(TerminalLine("=== 115 Cloud Terminal (nap511) ===", TerminalLineType.SYSTEM))
+        appendTerminalLine(
             TerminalLine(
                 "欢迎使用网盘极客终端！输入 '?' 或 'help' 可查看命令列表与快捷键指南。",
                 TerminalLineType.SYSTEM
             )
         )
-        lines.add(
+        appendTerminalLine(
             TerminalLine(
                 "提示：支持管道 '|' 与通配符；悬浮栏已内置 CTRL / ALT 粘滞键与常用 Readline 快捷键。",
                 TerminalLineType.SYSTEM
             )
         )
-        lines.add(
+        appendTerminalLine(
             TerminalLine(
                 "当前工作目录: $currentPath (cid: $currentCid)\n",
                 TerminalLineType.SYSTEM
@@ -200,8 +237,18 @@ class TerminalViewModel(
         )
     }
 
+    /**
+     * 上下文路径提示信息（用户名@用户ID:路径），用于第一行展示
+     */
+    fun contextPromptText(): String {
+        return "${avatarBean.userName}@${avatarBean.userId}:$currentPath"
+    }
+
+    /**
+     * 完整提示符文本（包含换行与提示符 $ ），保持向下兼容
+     */
     fun promptText(): String {
-        return "${avatarBean.userName}@${avatarBean.userId}:$currentPath$ "
+        return "${contextPromptText()}\n$ "
     }
 
     private fun refreshCachedEntries(cid: String) {
@@ -508,7 +555,7 @@ class TerminalViewModel(
         dismissCompletionBar()
 
         if (isWaitingConfirmation) {
-            lines.add(TerminalLine(raw, TerminalLineType.COMMAND))
+            appendTerminalLine(TerminalLine(raw, TerminalLineType.COMMAND))
             val isConfirmed =
                 raw.equals("yes", ignoreCase = true) || raw.equals("y", ignoreCase = true)
             isWaitingConfirmation = false
@@ -518,7 +565,7 @@ class TerminalViewModel(
         }
 
         if (raw.isEmpty()) {
-            lines.add(TerminalLine(promptText(), TerminalLineType.COMMAND))
+            appendTerminalLine(TerminalLine(promptText(), TerminalLineType.COMMAND))
             return
         }
 
@@ -537,27 +584,52 @@ class TerminalViewModel(
             }
         }
 
-        lines.add(TerminalLine("${promptText()}$raw", TerminalLineType.COMMAND))
+        // 统一双行格式入屏：第 1 行完整路径上下文，第 2 行提示符与用户命令
+        appendTerminalLine(TerminalLine("${contextPromptText()}\n$ $raw", TerminalLineType.COMMAND))
 
         isExecuting = true
         currentExecutionJob = viewModelScope.launch {
             try {
                 val flow = engine.execute(raw, context)
-                flow.collect { line ->
-                    if (line == "__TERMINAL_CLEAR_SCREEN__") {
-                        lines.clear()
-                    } else if (line == "__TERMINAL_EXIT__") {
-                        onExitAction?.invoke()
-                    } else if (line.startsWith("terminal: command not found") || line.contains(": error:")) {
-                        lines.add(TerminalLine(line, TerminalLineType.ERROR))
-                    } else {
-                        lines.add(TerminalLine(line, TerminalLineType.OUTPUT))
+                // 采用微批次聚合输出机制（缓冲区满 50 行或间隔 32ms 即刷屏），保障大量输出时的高帧率渲染
+                val buffer = mutableListOf<TerminalLine>()
+                var lastFlushTime = System.currentTimeMillis()
+
+                fun flushBuffer() {
+                    if (buffer.isNotEmpty()) {
+                        val toAdd = buffer.toList()
+                        buffer.clear()
+                        appendTerminalLines(toAdd)
                     }
                 }
+
+                flow.collect { line ->
+                    if (line == "__TERMINAL_CLEAR_SCREEN__") {
+                        flushBuffer()
+                        lines.clear()
+                    } else if (line == "__TERMINAL_EXIT__") {
+                        flushBuffer()
+                        onExitAction?.invoke()
+                    } else {
+                        val lineType = if (line.startsWith("terminal: command not found") || line.contains(": error:")) {
+                            TerminalLineType.ERROR
+                        } else {
+                            TerminalLineType.OUTPUT
+                        }
+                        buffer.add(TerminalLine(line, lineType))
+
+                        val now = System.currentTimeMillis()
+                        if (buffer.size >= 50 || now - lastFlushTime >= 32) {
+                            flushBuffer()
+                            lastFlushTime = now
+                        }
+                    }
+                }
+                flushBuffer()
             } catch (e: CancellationException) {
                 // 协程被 Ctrl+C 中断正常退出，不作为异常打印
             } catch (e: Exception) {
-                lines.add(TerminalLine("execution error: ${e.message}", TerminalLineType.ERROR))
+                appendTerminalLine(TerminalLine("execution error: ${e.message}", TerminalLineType.ERROR))
             } finally {
                 isExecuting = false
                 currentExecutionJob = null
@@ -580,10 +652,10 @@ class TerminalViewModel(
             currentExecutionJob?.cancel()
             currentExecutionJob = null
             isExecuting = false
-            lines.add(TerminalLine("^C", TerminalLineType.OUTPUT))
+            appendTerminalLine(TerminalLine("^C", TerminalLineType.OUTPUT))
         } else {
             val raw = inputState.text
-            lines.add(TerminalLine("${promptText()}$raw^C", TerminalLineType.COMMAND))
+            appendTerminalLine(TerminalLine("${contextPromptText()}\n$ $raw^C", TerminalLineType.COMMAND))
             inputState = TextFieldValue("")
             ghostText = ""
         }
