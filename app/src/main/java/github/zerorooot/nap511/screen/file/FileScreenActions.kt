@@ -6,23 +6,22 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
-import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.viewmodel.AudioViewModel
+import github.zerorooot.nap511.util.FileOpener
 import github.zerorooot.nap511.viewmodel.FileViewModel
-import github.zerorooot.nap511.viewmodel.downloadText
-import github.zerorooot.nap511.viewmodel.downloadWeb
-import github.zerorooot.nap511.viewmodel.getLocalSubtitleList
-import github.zerorooot.nap511.viewmodel.getTorrentTask
-import github.zerorooot.nap511.viewmodel.getVideoInfo
-import github.zerorooot.nap511.viewmodel.getZipListFile
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
+/**
+ * 文件列表点击与手势事件协调器
+ * 负责处理列表点击防抖、多选态分发、滚动位置持久化及顶底栏显隐联动，
+ * 底层文件类型的具体打开动作全部委托给 [FileOpener] 执行。
+ */
 class FileClickHandler(
     private val fileViewModel: FileViewModel,
-    private val audioViewModel: AudioViewModel,
+    private val fileOpener: FileOpener,
     private val settingUiState: SettingUiState,
-    private val onNav: (Route) -> Unit,
+    private val coroutineScope: CoroutineScope,
     private val isPreviewActive: Boolean,
     private val isAutoImagePreview: Boolean,
     private val isExpandedScreen: Boolean,
@@ -45,66 +44,49 @@ class FileClickHandler(
     }
 
     fun handleVideoClick(fileBean: FileBean) {
-        audioViewModel.pause()
-        fileViewModel.getVideoInfo(fileBean)
+        coroutineScope.launch {
+            fileOpener.openVideo(fileBean, fileViewModel.fileBeanList)
+            fileViewModel.setRefreshingStatus(false)
+        }
     }
 
     fun handleAudioClick(fileBean: FileBean) {
         onBottomBarShowChange(true)
+        fileOpener.openAudio(fileBean, fileViewModel.fileBeanList, navigateToDetail = false)
         fileViewModel.setRefreshingStatus(false)
-        val localSubtitles = fileViewModel.getLocalSubtitleList()
-        audioViewModel.playAudio(fileBean, localSubtitles)
     }
 
     fun handlePhotoClick(fileBean: FileBean) {
-        audioViewModel.pause()
-        val photoList = fileViewModel.fileBeanList.filter { it.photoThumb != "" }
-        if (photoList.isEmpty()) {
-            App.instance.toast("图片打开失败，找不到图片url！")
-        } else {
-            fileViewModel.photoFileBeanList.clear()
-            fileViewModel.photoFileBeanList.addAll(photoList)
-            fileViewModel.photoIndexOf = photoList.indexOf(fileBean)
-            onNav(Route.Photo)
-            // 当非自动图片预览模式（isAutoImagePreview 为 false）时，点击图片进入 PhotoScreen 前重置 TopBar 和 BottomBar 为显示状态，
-            // 确保返回 FileScreen 时自动恢复显示 systemBars 和 TopBar。
-            if (!isAutoImagePreview) {
-                onTopBarShowChange(true)
-                onBottomBarShowChange(true)
-            }
+        fileOpener.openPhoto(fileBean, fileViewModel.fileBeanList)
+        if (!isAutoImagePreview) {
+            onTopBarShowChange(true)
+            onBottomBarShowChange(true)
         }
         fileViewModel.setRefreshingStatus(false)
     }
 
     fun handleTorrentClick(fileBean: FileBean) {
-        fileViewModel.getTorrentTask(fileBean.sha1)
+        fileOpener.openTorrent(fileBean)
+        fileViewModel.setRefreshingStatus(false)
     }
 
-    fun handleZipClick(i: Int) {
-        fileViewModel.selectIndex = i
-        fileViewModel.getZipListFile()
+    fun handleZipClick(fileBean: FileBean) {
+        fileOpener.openZip(fileBean)
+        fileViewModel.setRefreshingStatus(false)
     }
 
-    private fun checkAndDownloadFile(i: Int, fileBean: FileBean, action: () -> Unit) {
-        val txtSize = settingUiState.txtSize.toIntOrNull() ?: 200
-        if (fileBean.size.toLong() < txtSize * 1024) {
-            fileViewModel.selectIndex = i
-            action()
-        } else {
+
+    fun handleTextClick(fileBean: FileBean) {
+        coroutineScope.launch {
+            fileOpener.openText(fileBean)
             fileViewModel.setRefreshingStatus(false)
-            App.instance.toast("仅支持打开${txtSize}kb以下的文件")
         }
     }
 
-    fun handleTextClick(i: Int, fileBean: FileBean) {
-        checkAndDownloadFile(i, fileBean) {
-            fileViewModel.downloadText(fileBean, onNav)
-        }
-    }
-
-    fun handleWebClick(i: Int, fileBean: FileBean) {
-        checkAndDownloadFile(i, fileBean) {
-            fileViewModel.downloadWeb(fileBean, onNav)
+    fun handleWebClick(fileBean: FileBean) {
+        coroutineScope.launch {
+            fileOpener.openWeb(fileBean)
+            fileViewModel.setRefreshingStatus(false)
         }
     }
 
@@ -131,9 +113,9 @@ class FileClickHandler(
                 fileBean.isFolder -> handleFolderClick(i, fileBean)
                 fileBean.isVideo == 1 -> handleVideoClick(fileBean)
                 fileBean.fileIco == R.drawable.torrent -> handleTorrentClick(fileBean)
-                fileBean.fileIco == R.drawable.zip -> handleZipClick(i)
-                fileBean.fileIco == R.drawable.txt -> handleTextClick(i, fileBean)
-                fileBean.fileIco == R.drawable.web -> handleWebClick(i, fileBean)
+                fileBean.fileIco == R.drawable.zip -> handleZipClick(fileBean)
+                fileBean.fileIco == R.drawable.txt -> handleTextClick(fileBean)
+                fileBean.fileIco == R.drawable.web -> handleWebClick(fileBean)
                 fileBean.fileIco == R.drawable.mp3 -> handleAudioClick(fileBean)
                 fileBean.photoThumb.isNotEmpty() -> handlePhotoClick(fileBean)
                 else -> fileViewModel.setRefreshingStatus(false)

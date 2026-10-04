@@ -167,30 +167,8 @@ internal fun FileViewModel.updateVideoFileBeans(
     }
 }
 
-private fun isSubtitleFile(fileName: String): Boolean {
-    val SUPPORTED_SUBTITLE_EXTS = setOf("srt", "vtt", "ass", "ssa", "sub", "lrc")
-    val ext = fileName.substringAfterLast('.', "").lowercase(Locale.US)
-    return SUPPORTED_SUBTITLE_EXTS.contains(ext)
-}
-
 internal fun FileViewModel.getLocalSubtitleList(): List<SubtitleItem> {
-    return fileBeanList.filter { fileBean ->
-        !fileBean.isFolder && isSubtitleFile(fileBean.name)
-    }.map { fileBean ->
-        val ext = fileBean.name.substringAfterLast('.', "srt").lowercase(Locale.US)
-        val durationMs = (fileBean.playLong * 1000).toLong()
-
-        SubtitleItem(
-            id = "115_${fileBean.pickCode}",
-            name = fileBean.name,
-            simpleName = fileBean.name,
-            sourceType = SubtitleSourceType.ONE_ONE_FIVE,
-            pickCode = fileBean.pickCode,
-            fileId = fileBean.fileId,
-            ext = ext,
-            durationMs = durationMs
-        )
-    }
+    return github.zerorooot.nap511.util.extractSubtitles(fileBeanList)
 }
 
 internal fun FileViewModel.getVideoInfo(fileBean: FileBean) {
@@ -285,14 +263,14 @@ internal fun FileViewModel.downloadSmallFile(
 internal fun FileViewModel.downloadText(fileBean: FileBean, onNav: (Route) -> Unit) {
     downloadSmallFile(fileBean) { bytes ->
         textBodyByteArray = bytes
-        onNav.invoke(Route.TxtReader)
+        onNav.invoke(Route.TxtReader(title = fileBean.name))
     }
 }
 
 internal fun FileViewModel.downloadWeb(fileBean: FileBean, onNav: (Route) -> Unit) {
     downloadSmallFile(fileBean) { bytes ->
         webBodyByteArray = bytes
-        onNav.invoke(Route.HtmlWebViewScreen)
+        onNav.invoke(Route.HtmlWebViewScreen(title = fileBean.name))
     }
 }
 

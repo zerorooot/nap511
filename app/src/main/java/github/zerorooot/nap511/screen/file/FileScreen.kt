@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridS
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -66,6 +65,7 @@ import github.zerorooot.nap511.screen.components.MenuItemAction
 import github.zerorooot.nap511.screen.components.TopBarAction
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.FileOpener
 import github.zerorooot.nap511.util.copy
 import github.zerorooot.nap511.util.isNotificationEnabled
 import github.zerorooot.nap511.viewmodel.AudioViewModel
@@ -194,7 +194,8 @@ fun FileScreen(
     val view = LocalView.current
     LaunchedEffect(isTopBarShow) {
         val window = (view.context as? Activity)?.window
-        val insetsController = window?.let { WindowCompat.getInsetsController(it, window.decorView) }
+        val insetsController =
+            window?.let { WindowCompat.getInsetsController(it, window.decorView) }
 
         if (!isTopBarShow) {
             insetsController?.hide(WindowInsetsCompat.Type.systemBars())
@@ -269,10 +270,21 @@ fun FileScreen(
 
     // 记录上次点击时间，使用 longArrayOf 避免无意义的重组
     val lastClickTime = remember { longArrayOf(0L) }
+    val fileOpener = remember(fileViewModel, audioViewModel, settingUiState, onNav) {
+        FileOpener(
+            context = context,
+            fileViewModel = fileViewModel,
+            audioViewModel = audioViewModel,
+            settingUiState = { settingUiState },
+            onNavigate = onNav
+        )
+    }
+
     val clickHandler = remember(
         fileViewModel,
-        audioViewModel,
+        fileOpener,
         settingUiState,
+        scope,
         isPreviewActive,
         isAutoImagePreview,
         isGridScreen,
@@ -282,9 +294,9 @@ fun FileScreen(
     ) {
         FileClickHandler(
             fileViewModel = fileViewModel,
-            audioViewModel = audioViewModel,
+            fileOpener = fileOpener,
             settingUiState = settingUiState,
-            onNav = onNav,
+            coroutineScope = scope,
             isPreviewActive = isPreviewActive,
             isAutoImagePreview = isAutoImagePreview,
             isExpandedScreen = isGridScreen,
@@ -312,9 +324,9 @@ fun FileScreen(
                     ForceOpenType.VIDEO -> clickHandler.handleVideoClick(bean)
                     ForceOpenType.AUDIO -> clickHandler.handleAudioClick(bean)
                     ForceOpenType.IMAGE -> clickHandler.handlePhotoClick(bean)
-                    ForceOpenType.TEXT -> clickHandler.handleTextClick(showForceOpenDialog, bean)
-                    ForceOpenType.WEB -> clickHandler.handleWebClick(showForceOpenDialog, bean)
-                    ForceOpenType.ARCHIVE -> clickHandler.handleZipClick(showForceOpenDialog)
+                    ForceOpenType.TEXT -> clickHandler.handleTextClick(bean)
+                    ForceOpenType.WEB -> clickHandler.handleWebClick( bean)
+                    ForceOpenType.ARCHIVE -> clickHandler.handleZipClick(bean)
                     ForceOpenType.TORRENT -> clickHandler.handleTorrentClick(bean)
                 }
             }

@@ -5,6 +5,7 @@ import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.FileCacheManager
+import github.zerorooot.nap511.util.FileOpener
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -30,7 +31,8 @@ class TerminalContext(
     val fileCacheManager: FileCacheManager = FileCacheManager,
     val onNavigate: ((Route) -> Unit)? = null,
     val onConfirmRequest: (suspend (prompt: String) -> Boolean)? = null,
-    val onDirectoryChanged: ((cid: String, path: String) -> Unit)? = null
+    val onDirectoryChanged: ((cid: String, path: String) -> Unit)? = null,
+    val fileOpener: FileOpener? = null
 ) {
     @Volatile
     var currentCid: String = initialCid

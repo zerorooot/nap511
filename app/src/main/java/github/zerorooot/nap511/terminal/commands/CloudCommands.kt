@@ -1,13 +1,12 @@
 package github.zerorooot.nap511.terminal.commands
 
 import com.google.gson.Gson
-import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.RemainingSpaceBean
-import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.engine.CommandRegistry
 import github.zerorooot.nap511.terminal.engine.GlobMatcher
+import github.zerorooot.nap511.util.FileOpenResult
 import kotlinx.coroutines.flow.flow
 import java.util.Locale
 
@@ -188,7 +187,7 @@ object CloudCommands {
                         }
                     }
 
-                    val searchRootPath = if (pathArg != null) pathArg else ctx.currentPath
+                    val searchRootPath = pathArg ?: ctx.currentPath
                     searchRecursive(targetCid, searchRootPath, 1)
                 }
             }
@@ -272,8 +271,7 @@ object CloudCommands {
                         return@flow
                     }
 
-                    val resolved = ctx.resolveTarget(targetName)
-                    val file = when (resolved) {
+                    val file = when (val resolved = ctx.resolveTarget(targetName)) {
                         is ResolvedTarget.File -> resolved.file
                         is ResolvedTarget.Directory -> {
                             FileBean(
@@ -410,28 +408,23 @@ object CloudCommands {
                         }
                         is ResolvedTarget.File -> {
                             val file = resolved.file
-                            emit("正在打开: ${file.name}")
-                            when {
-                                file.photoThumb.isNotEmpty() || file.fileIco == R.drawable.png -> {
-                                    ctx.onNavigate?.invoke(Route.Photo)
+                            val fileOpener = ctx.fileOpener
+                            if (fileOpener == null) {
+                                emit("open: 当前终端环境未配置文件打开器")
+                                return@flow
+                            }
+
+                            emit("正在准备打开: ${file.name}...")
+                            val siblings = ctx.listDirectory(resolved.parentCid)
+                            when (val result = fileOpener.open(file, siblings, fromTerminal = true)) {
+                                is FileOpenResult.Success -> {
+                                    emit("open: ${result.message}")
                                 }
-                                file.fileIco == R.drawable.mp3 -> {
-                                    ctx.onNavigate?.invoke(Route.MusicDetail)
+                                is FileOpenResult.Failure -> {
+                                    emit("open: ${result.message}")
                                 }
-                                file.fileIco == R.drawable.txt -> {
-                                    ctx.onNavigate?.invoke(Route.TxtReader)
-                                }
-                                file.fileIco == R.drawable.web -> {
-                                    ctx.onNavigate?.invoke(Route.HtmlWebViewScreen)
-                                }
-                                file.isVideo == 1 -> {
-                                    emit("视频文件: 可在文件列表中点击以使用播放器播放")
-                                }
-                                file.fileIco == R.drawable.zip -> {
-                                    emit("压缩文件: 输入 'unzip -l \"${file.name}\"' 可预览，输入 'unzip \"${file.name}\"' 可云端解压")
-                                }
-                                else -> {
-                                    emit("未能识别该文件的专用预览器 (${file.name})")
+                                is FileOpenResult.Unsupported -> {
+                                    emit("open: 未能识别该文件的专用预览器 (${result.fileName})")
                                 }
                             }
                         }

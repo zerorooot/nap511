@@ -57,13 +57,13 @@ sealed interface Route : NavKey {
     data object RepeatFile : Route
 
     @Serializable
-    data object TxtReader : Route
+    data class TxtReader(val title: String = "文本阅读") : Route
 
     @Serializable
     data object MusicDetail : Route
 
     @Serializable
-    data object HtmlWebViewScreen : Route
+    data class HtmlWebViewScreen(val title: String = "网页") : Route
 
 
     // 假设在别的 Screen 中跳转的“详情页”或“子页面”（带参数示例）

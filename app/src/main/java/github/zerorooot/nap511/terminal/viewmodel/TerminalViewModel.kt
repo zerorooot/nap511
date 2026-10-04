@@ -23,6 +23,7 @@ import github.zerorooot.nap511.terminal.engine.ParsedContext
 import github.zerorooot.nap511.terminal.engine.PipelineEngine
 import github.zerorooot.nap511.terminal.engine.TerminalHistoryManager
 import github.zerorooot.nap511.terminal.engine.TerminalLineEditor
+import github.zerorooot.nap511.util.FileOpener
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -35,7 +36,8 @@ class TerminalViewModel(
     initialPath: String = "/",
     initialPathList: List<PathBean> = emptyList(),
     val avatarBean: AvatarBean,
-    private val onNavigateAction: ((Route) -> Unit)? = null
+    private val onNavigateAction: ((Route) -> Unit)? = null,
+    val fileOpener: FileOpener? = null
 ) : ViewModel() {
     val lines = mutableStateListOf<TerminalLine>()
     private val history = mutableListOf<String>()
@@ -118,7 +120,8 @@ class TerminalViewModel(
             currentCid = cid
             currentPath = path
             refreshCachedEntries(cid)
-        }
+        },
+        fileOpener = fileOpener
     )
 
     val historyManager = TerminalHistoryManager()

@@ -5,8 +5,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import github.zerorooot.nap511.util.FileOpener
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -202,16 +204,27 @@ fun AppNavHost(
 
             entry<Route.Terminal> {
                 onSetGesturesEnabled(false)
+                val context = LocalContext.current
                 val currentCid = fileViewModel.currentCid
                 val currentPathList = fileViewModel.pathList
                 val currentPath = "/" + currentPathList.joinToString("/") { it.name }
+                val fileOpener = remember(fileViewModel, audioViewModel, uiState) {
+                    FileOpener(
+                        context = context,
+                        fileViewModel = fileViewModel,
+                        audioViewModel = audioViewModel,
+                        settingUiState = { uiState },
+                        onNavigate = onNavigate
+                    )
+                }
                 val terminalViewModel = remember {
                     TerminalViewModel(
                         initialCid = currentCid,
                         initialPath = currentPath,
                         initialPathList = currentPathList,
                         avatarBean = avatarBean,
-                        onNavigateAction = { route -> onNavigate(route) }
+                        onNavigateAction = { route -> onNavigate(route) },
+                        fileOpener = fileOpener
                     )
                 }
                 TerminalScreen(
@@ -278,9 +291,8 @@ fun AppNavHost(
                 }
             }
 
-            entry<Route.TxtReader> {
+            entry<Route.TxtReader> { route ->
                 val byteArray = fileViewModel.textBodyByteArray
-                val fileBean = fileViewModel.fileBeanList.getOrNull(fileViewModel.selectIndex)
 
                 LaunchedEffect(byteArray) {
                     if (byteArray == null) {
@@ -290,7 +302,7 @@ fun AppNavHost(
 
                 if (byteArray != null) {
                     onSetGesturesEnabled(false)
-                    TxtReaderScreen(byteArray, title = fileBean?.name ?: "文本阅读") {
+                    TxtReaderScreen(byteArray, title = route.title) {
                         onSetGesturesEnabled(true)
                         onPopBack()
                     }
@@ -303,9 +315,8 @@ fun AppNavHost(
                 }
             }
 
-            entry<Route.HtmlWebViewScreen> {
+            entry<Route.HtmlWebViewScreen> { route ->
                 val byteArray = fileViewModel.webBodyByteArray
-                val fileBean = fileViewModel.fileBeanList.getOrNull(fileViewModel.selectIndex)
 
                 LaunchedEffect(byteArray) {
                     if (byteArray == null) {
@@ -315,7 +326,7 @@ fun AppNavHost(
 
                 if (byteArray != null) {
                     onSetGesturesEnabled(false)
-                    HtmlWebViewScreen(byteArray, title = fileBean?.name ?: "网页") {
+                    HtmlWebViewScreen(byteArray, title = route.title) {
                         onSetGesturesEnabled(true)
                         onPopBack()
                     }
