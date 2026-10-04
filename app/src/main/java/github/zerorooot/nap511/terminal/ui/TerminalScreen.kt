@@ -69,6 +69,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imeNestedScroll
+import androidx.compose.foundation.layout.isImeVisible
 
 private fun Context.findActivity(): Activity? {
     var ctx = this
@@ -123,9 +124,9 @@ fun TerminalScreen(
         keyboardController?.show()
     }
 
-    // 实时监听软键盘高度与输出行数变化，在软键盘升起/变动过程中持续锚定滚动到底部输入框，消除布局空白
-    val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
-    LaunchedEffect(viewModel.lines.size, imeBottom) {
+    // 实时监听软键盘状态与输出行数变化，软键盘升起或新行追加时锚定滚动到底部输入框
+    val isImeVisible = WindowInsets.isImeVisible
+    LaunchedEffect(viewModel.lines.size, isImeVisible) {
         if (viewModel.lines.isNotEmpty()) {
             listState.scrollToItem((viewModel.lines.size + 1).coerceAtLeast(0))
         }
