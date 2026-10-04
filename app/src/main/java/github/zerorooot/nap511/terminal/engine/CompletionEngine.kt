@@ -1,7 +1,6 @@
 package github.zerorooot.nap511.terminal.engine
 
 import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.terminal.context.TerminalContext
 
 /**
  * 补全候选项类型
@@ -241,7 +240,7 @@ object CompletionEngine {
     fun calculateCompletion(
         parsedContext: ParsedContext,
         registeredCommands: List<String>,
-        commandFlagsMap: Map<String, List<String>>,
+        commandFlagsMap: Map<String, List<CommandFlag>>,
         directoryFiles: List<FileBean>
     ): CompletionResult {
         val candidates = mutableListOf<CompletionCandidate>()
@@ -269,14 +268,15 @@ object CompletionEngine {
                 val flags = commandFlagsMap[parsedContext.commandName] ?: emptyList()
                 val prefix = parsedContext.prefix
                 flags
-                    .filter { it.startsWith(prefix, ignoreCase = true) }
-                    .sorted()
+                    .filter { it.optionName.startsWith(prefix, ignoreCase = true) }
+                    .distinctBy { it.optionName }
+                    .sortedBy { it.optionName }
                     .forEach { flag ->
                         candidates.add(
                             CompletionCandidate(
-                                name = flag,
-                                displayText = flag,
-                                insertText = "$flag ",
+                                name = flag.optionName,
+                                displayText = flag.name,
+                                insertText = "${flag.optionName} ",
                                 type = CandidateType.FLAG,
                                 isDirectory = false
                             )

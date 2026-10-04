@@ -177,6 +177,25 @@ object TerminalLineEditor {
     }
 
     /**
+     * 计算幽灵文本 (Ghost Text) 的下一个单词片段 (用于 Ctrl+Right / Alt+F 渐进式采纳建议)
+     */
+    fun extractNextWord(ghostText: String): String {
+        if (ghostText.isEmpty()) return ""
+        var pos = 0
+        val len = ghostText.length
+
+        // 1. 跳过前导的非字母数字字符（如空格、标点符号）
+        while (pos < len && (!ghostText[pos].isLetterOrDigit())) {
+            pos++
+        }
+        // 2. 跳过单词主体（字母数字字符）
+        while (pos < len && ghostText[pos].isLetterOrDigit()) {
+            pos++
+        }
+        return ghostText.substring(0, pos)
+    }
+
+    /**
      * 从上一条历史命令中提取最后一个参数 (Alt+.)
      * 复用现有的 Lexer.tokenize 进行参数解析
      */

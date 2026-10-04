@@ -359,6 +359,23 @@ class TerminalViewModel(
     }
 
     /**
+     * 采纳幽灵文本的下一个单词 (Ctrl+Right 或 Alt+F)
+     */
+    fun acceptNextWordOfGhostText(): Boolean {
+        if (ghostText.isNotEmpty()) {
+            val chunk = TerminalLineEditor.extractNextWord(ghostText)
+            if (chunk.isNotEmpty()) {
+                val newText = inputState.text + chunk
+                inputState = TextFieldValue(newText, selection = TextRange(newText.length))
+                ghostText = ""
+                updateGhostText(newText, newText.length)
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
      * 关闭并重置自动补全候选栏
      */
     fun dismissCompletionBar() {
@@ -517,7 +534,7 @@ class TerminalViewModel(
 
         val registeredCommands = registry.commands.keys.toList()
         val commandFlagsMap = registry.commands.mapValues { entry ->
-            entry.value.flags.map { it.name }
+            entry.value.flags
         }
 
         val directoryFiles = if (parsed.contextType == CompletionContextType.PATH) {
@@ -740,12 +757,16 @@ class TerminalViewModel(
     }
 
     /**
-     * Ctrl+Right: 光标向右跳跃一个单词
+     * Ctrl+Right: 光标向右跳跃一个单词（若光标在行尾且存在幽灵文本，则采纳幽灵文本的下一个单词）
      */
     fun handleCtrlRight() {
         resetModifiers()
-        inputState = TerminalLineEditor.moveWordForward(inputState)
-        updateGhostText(inputState.text, inputState.selection.end)
+        if (inputState.selection.end == inputState.text.length && ghostText.isNotEmpty()) {
+            acceptNextWordOfGhostText()
+        } else {
+            inputState = TerminalLineEditor.moveWordForward(inputState)
+            updateGhostText(inputState.text, inputState.selection.end)
+        }
     }
 
     /**
@@ -758,12 +779,16 @@ class TerminalViewModel(
     }
 
     /**
-     * Alt+F: 光标前进一个单词
+     * Alt+F: 光标前进一个单词（若光标在行尾且存在幽灵文本，则采纳幽灵文本的下一个单词）
      */
     fun handleAltF() {
         resetModifiers()
-        inputState = TerminalLineEditor.moveWordForward(inputState)
-        updateGhostText(inputState.text, inputState.selection.end)
+        if (inputState.selection.end == inputState.text.length && ghostText.isNotEmpty()) {
+            acceptNextWordOfGhostText()
+        } else {
+            inputState = TerminalLineEditor.moveWordForward(inputState)
+            updateGhostText(inputState.text, inputState.selection.end)
+        }
     }
 
     /**

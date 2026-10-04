@@ -10,7 +10,13 @@ import kotlinx.coroutines.flow.flow
 data class CommandFlag(
     val name: String,
     val description: String
-)
+) {
+    /**
+     * 实际参数选项名（如从 "-n <NUM>" 中提取出的 "-n"）
+     */
+    val optionName: String
+        get() = name.trim().substringBefore(' ')
+}
 
 /**
  * 命令定义体
