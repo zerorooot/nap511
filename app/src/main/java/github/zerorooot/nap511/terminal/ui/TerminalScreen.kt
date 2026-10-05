@@ -106,6 +106,13 @@ fun TerminalScreen(
     val view = LocalView.current
     val keyboardController = LocalSoftwareKeyboardController.current
 
+    val handleBack: () -> Unit = remember(keyboardController, onBack) {
+        {
+            keyboardController?.hide()
+            onBack()
+        }
+    }
+
     // 控制系统状态栏和控制栏（导航栏）沉浸并保持深色背景一致
     DisposableEffect(view) {
         val window = view.context.findActivity()?.window
@@ -121,9 +128,12 @@ fun TerminalScreen(
             onDispose {
                 insetsController.isAppearanceLightStatusBars = originalLightStatus
                 insetsController.isAppearanceLightNavigationBars = originalLightNav
+                keyboardController?.hide()
             }
         } else {
-            onDispose {}
+            onDispose {
+                keyboardController?.hide()
+            }
         }
     }
 
@@ -162,10 +172,10 @@ fun TerminalScreen(
 
     //渲染时仅仅是把这个函数对象缓存起来；代码块 resetSession()、 onBack()
     //只会在未来用户真正触发事件（如点击按钮或按 Ctrl+D）调用 exitAndReset() 时才会被执行。
-    val exitAndReset = remember(viewModel, onBack) {
+    val exitAndReset = remember(viewModel, handleBack) {
         fun() {
             viewModel.resetSession()
-            onBack()
+            handleBack()
         }
     }
 
@@ -177,7 +187,7 @@ fun TerminalScreen(
 
     // 系统返回键 / 返回手势：常规返回，保留当前终端会话状态
     BackHandler {
-        onBack()
+        handleBack()
     }
 
     Scaffold(
@@ -204,7 +214,7 @@ fun TerminalScreen(
                         }
                     },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
+                        IconButton(onClick = handleBack) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "返回",
