@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -48,6 +49,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 外接物理键盘快捷键动作集合
@@ -118,6 +120,17 @@ fun GhostTextField(
             if (interaction is PressInteraction.Release) {
                 onRequestScrollToBottom()
             }
+        }
+    }
+
+    // 【关键机制 - 挂载入视口时自动请求焦点与呼起键盘】：
+    // 当 GhostTextField 无论因首帧渲染还是因滚动进入视口被实例化时，主动请求焦点并唤起键盘
+    LaunchedEffect(Unit) {
+        delay(30.milliseconds)
+        try {
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        } catch (_: Exception) {
         }
     }
 

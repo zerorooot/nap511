@@ -51,6 +51,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -100,7 +101,9 @@ fun TerminalScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val listState = rememberLazyListState()
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = (viewModel.lines.size + 1).coerceAtLeast(0)
+    )
     val focusRequester = remember { FocusRequester() }
 
     var showMenuSheet by remember { mutableStateOf(false) }
@@ -176,8 +179,11 @@ fun TerminalScreen(
             )
         }
         shouldScrollToBottomOnIme = true
-        focusRequester.requestFocus()
-        keyboardController?.show()
+        try {
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        } catch (_: Exception) {
+        }
         scope.launch {
             safeScrollToBottom()
         }
@@ -236,10 +242,13 @@ fun TerminalScreen(
     }
 
     // 当列表测量布局完成、条目总数增加时，如果正在执行命令或处于底部，确保滚动到最新添加的末尾项
-    LaunchedEffect(listState.layoutInfo.totalItemsCount) {
-        if (viewModel.isExecuting || isAtBottom) {
-            safeScrollToBottom()
-        }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.layoutInfo.totalItemsCount }
+            .collect {
+                if (viewModel.isExecuting || isAtBottom) {
+                    safeScrollToBottom()
+                }
+            }
     }
 
     //渲染时仅仅是把这个函数对象缓存起来；代码块 resetSession()、 onBack()
@@ -251,9 +260,24 @@ fun TerminalScreen(
         }
     }
 
-    // 默认请求焦点弹出输入法并绑定退出回调（执行 exit 命令时触发）
-    LaunchedEffect(exitAndReset) {
+    // 【关键生命周期 - 每次进入终端页面始终吸底并弹出键盘】：
+    // 1. 先尝试立即吸底并呼起键盘；
+    // 2. 延迟 50ms 等待 LazyColumn 首帧测量布局，确保 GhostTextField 必定渲染入视口；
+    // 3. 延迟 150ms 应对 NavHost 页面入场过渡动画和系统窗口焦点切换，确保软键盘 100% 成功弹出。
+    LaunchedEffect(Unit) {
         viewModel.onExitAction = exitAndReset
+        // 1. 立即尝试吸底并呼起键盘
+        safeScrollToBottom()
+        bringUpKeyboard()
+
+        // 2. 延迟 50ms 等待 LazyColumn 首帧测量布局，确保输入框必定渲染入视口
+        delay(50.milliseconds)
+        safeScrollToBottom()
+        bringUpKeyboard()
+
+        // 3. 延迟 150ms 应对 NavHost 进场动画与 Window 焦点切换，保证 100% 呼起成功
+        delay(150.milliseconds)
+        safeScrollToBottom()
         bringUpKeyboard()
     }
 
