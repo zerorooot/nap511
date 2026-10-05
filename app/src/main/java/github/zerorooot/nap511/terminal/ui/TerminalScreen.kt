@@ -37,6 +37,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -75,6 +76,8 @@ import github.zerorooot.nap511.terminal.viewmodel.TerminalViewModel
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.copy
 import kotlinx.coroutines.launch
+import my.nanihadesuka.compose.LazyColumnScrollbar
+import my.nanihadesuka.compose.ScrollbarSettings
 
 private fun Context.findActivity(): Activity? {
     var ctx = this
@@ -336,76 +339,83 @@ fun TerminalScreen(
                 }
         ) {
             SelectionContainer {
-                LazyColumn(
-                    state = listState,
-                    contentPadding = innerPadding,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 10.dp)
+                LazyColumnScrollbar(
+                    state = listState, settings = ScrollbarSettings.Default.copy(
+                        thumbUnselectedColor = MaterialTheme.colorScheme.secondary
+                    )
                 ) {
-                    items(
-                        count = viewModel.lines.size,
-                        key = { index -> viewModel.lines[index].id }
-                    ) { index ->
-                        TerminalLineRow(line = viewModel.lines[index])
-                    }
+                    LazyColumn(
+                        state = listState,
+                        contentPadding = innerPadding,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 10.dp)
+                    ) {
+                        items(
+                            count = viewModel.lines.size,
+                            key = { index -> viewModel.lines[index].id }
+                        ) { index ->
+                            TerminalLineRow(line = viewModel.lines[index])
+                        }
 
-                    item(key = "terminal_ghost_input") {
-                        DisableSelection {
-                            val hardwareActions = remember(viewModel, exitAndReset) {
-                                TerminalHardwareKeyActions(
-                                    onCtrlC = { viewModel.handleCtrlC() },
-                                    onCtrlU = { viewModel.handleCtrlU() },
-                                    onCtrlK = { viewModel.handleCtrlK() },
-                                    onCtrlW = { viewModel.handleCtrlW() },
-                                    onCtrlL = { viewModel.handleCtrlL() },
-                                    onCtrlA = { viewModel.handleCtrlA() },
-                                    onCtrlE = { viewModel.handleCtrlE() },
-                                    onCtrlD = { viewModel.handleCtrlD(exitAndReset) },
-                                    onCtrlLeft = { viewModel.handleCtrlLeft() },
-                                    onCtrlRight = { viewModel.handleCtrlRight() },
-                                    onAltB = { viewModel.handleAltB() },
-                                    onAltF = { viewModel.handleAltF() },
-                                    onAltD = { viewModel.handleAltD() },
-                                    onAltBackspace = { viewModel.handleAltBackspace() },
-                                    onAltDot = { viewModel.handleAltDot() }
+                        item(key = "terminal_ghost_input") {
+                            DisableSelection {
+                                val hardwareActions = remember(viewModel, exitAndReset) {
+                                    TerminalHardwareKeyActions(
+                                        onCtrlC = { viewModel.handleCtrlC() },
+                                        onCtrlU = { viewModel.handleCtrlU() },
+                                        onCtrlK = { viewModel.handleCtrlK() },
+                                        onCtrlW = { viewModel.handleCtrlW() },
+                                        onCtrlL = { viewModel.handleCtrlL() },
+                                        onCtrlA = { viewModel.handleCtrlA() },
+                                        onCtrlE = { viewModel.handleCtrlE() },
+                                        onCtrlD = { viewModel.handleCtrlD(exitAndReset) },
+                                        onCtrlLeft = { viewModel.handleCtrlLeft() },
+                                        onCtrlRight = { viewModel.handleCtrlRight() },
+                                        onAltB = { viewModel.handleAltB() },
+                                        onAltF = { viewModel.handleAltF() },
+                                        onAltD = { viewModel.handleAltD() },
+                                        onAltBackspace = { viewModel.handleAltBackspace() },
+                                        onAltDot = { viewModel.handleAltDot() }
+                                    )
+                                }
+
+                                GhostTextField(
+                                    value = viewModel.inputState,
+                                    onValueChange = { viewModel.onInputChange(it) },
+                                    ghostText = viewModel.ghostText,
+                                    contextPrompt = viewModel.contextPromptText(),
+                                    promptSign = if (viewModel.isWaitingConfirmation) "confirm (yes/no): " else "$ ",
+                                    isWaitingConfirmation = viewModel.isWaitingConfirmation,
+                                    onSubmit = {
+                                        viewModel.submitInput()
+                                        scope.launch {
+                                            listState.scrollToItem(
+                                                (viewModel.lines.size + 1).coerceAtLeast(
+                                                    0
+                                                )
+                                            )
+                                        }
+                                    },
+                                    onTab = { viewModel.handleTabPress() },
+                                    onAcceptGhostText = { viewModel.acceptGhostText() },
+                                    onArrowUp = { viewModel.navigateHistoryUp() },
+                                    onArrowDown = { viewModel.navigateHistoryDown() },
+                                    hardwareKeyActions = hardwareActions,
+                                    focusRequester = focusRequester
                                 )
                             }
-
-                            GhostTextField(
-                                value = viewModel.inputState,
-                                onValueChange = { viewModel.onInputChange(it) },
-                                ghostText = viewModel.ghostText,
-                                contextPrompt = viewModel.contextPromptText(),
-                                promptSign = if (viewModel.isWaitingConfirmation) "confirm (yes/no): " else "$ ",
-                                isWaitingConfirmation = viewModel.isWaitingConfirmation,
-                                onSubmit = {
-                                    viewModel.submitInput()
-                                    scope.launch {
-                                        listState.scrollToItem(
-                                            (viewModel.lines.size + 1).coerceAtLeast(
-                                                0
-                                            )
-                                        )
-                                    }
-                                },
-                                onTab = { viewModel.handleTabPress() },
-                                onAcceptGhostText = { viewModel.acceptGhostText() },
-                                onArrowUp = { viewModel.navigateHistoryUp() },
-                                onArrowDown = { viewModel.navigateHistoryDown() },
-                                hardwareKeyActions = hardwareActions,
-                                focusRequester = focusRequester
-                            )
                         }
-                    }
 
-                    item(key = "terminal_bottom_spacer") {
-                        DisableSelection {
-                            Spacer(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(40.dp)
-                            )
+
+                        item(key = "terminal_bottom_spacer") {
+                            DisableSelection {
+                                Spacer(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(40.dp)
+                                )
+                            }
                         }
                     }
                 }
