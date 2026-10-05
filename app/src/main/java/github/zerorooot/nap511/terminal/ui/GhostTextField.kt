@@ -187,6 +187,8 @@ fun GhostTextField(
     onArrowDown: () -> Unit,
     hardwareKeyActions: TerminalHardwareKeyActions = TerminalHardwareKeyActions(),
     focusRequester: FocusRequester,
+    focusTrigger: Long = 0L,
+    onFocusConsumed: () -> Unit = {},
     onRequestScrollToBottom: () -> Unit = {},
     onFocusChange: ((Boolean) -> Unit)? = null,
 ) {
@@ -199,6 +201,20 @@ fun GhostTextField(
 
     val promptColor = if (isWaitingConfirmation) TerminalColors.PromptConfirm else TerminalColors.Prompt
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    // 优雅的响应式焦点同步：当外部发起焦点请求时，若当前组件在视口中（或刚滚入视口挂载完成的一瞬间），
+    // 立即精准请求焦点并弹出键盘，彻底替代脆弱的 delay 延时轮询
+    LaunchedEffect(focusTrigger) {
+        if (focusTrigger > 0L) {
+            try {
+                focusRequester.requestFocus()
+                keyboardController?.show()
+            } catch (_: Exception) {
+            } finally {
+                onFocusConsumed()
+            }
+        }
+    }
 
     val textFieldInteractionSource = remember { MutableInteractionSource() }
 

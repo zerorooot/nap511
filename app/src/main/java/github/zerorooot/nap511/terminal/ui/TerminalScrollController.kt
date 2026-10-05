@@ -7,19 +7,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 终端列表滚动与边界安全纯算法辅助类
@@ -66,9 +63,9 @@ object TerminalScrollSafetyHelper {
  *
  * 集中管理终端界面的所有滚动、软键盘呼起及吸底跟随行为，彻底收拢 TerminalScreen 中的状态机逻辑：
  * 1. 【关键机制 3 - safeScrollToBottom 防越界】：结合 totalItemsCount 边界收敛并捕获并发帧异步异常；
- * 2. 【关键机制 4 - 双保险键盘弹出吸底】：软键盘高度变化触发吸底锁定并在 300ms 后释放；
+ * 2. 【关键机制 4 - 双保险键盘弹出吸底】：软键盘高度变化时由 imeBottom 状态响应式驱动吸底；
  * 3. 【关键机制 4B - autoScrollToBottom 跟随输出模式】：用户上滑翻看历史暂停吸底，滑回底部或提交输入自动恢复；
- * 4. 【关键机制 4C - 每次进入终端页面始终吸底并弹出键盘】：0ms / 50ms / 150ms 三段式延迟保障。
+ * 4. 【关键机制 4C - 每次进入终端页面始终吸底并弹出键盘】：基于响应式焦点令牌 (focusTrigger)，零 delay 延时。
  */
 @Stable
 class TerminalScrollController(
@@ -84,11 +81,23 @@ class TerminalScrollController(
      */
     var autoScrollToBottom by mutableStateOf(true)
 
-    /** 标记由于软键盘弹出而需要执行强制吸底锁定 */
-    var shouldScrollToBottomOnIme by mutableStateOf(false)
-
     /** 标记用户当前是否主动进行了滑动操作 */
     var userScrolled by mutableStateOf(false)
+
+    /**
+     * 响应式焦点触发令牌 (Focus Trigger Token)
+     * 0L 表示无待处理焦点请求；> 0L 表示有显式焦点唤起请求。
+     * 当 GhostTextField 在视口内（或滚动吸底重新挂载入视口）时，会精准消费该令牌并获取焦点。
+     */
+    var focusTrigger by mutableLongStateOf(0L)
+        private set
+
+    /**
+     * 消费当前焦点令牌，避免重复触发
+     */
+    fun consumeFocus() {
+        focusTrigger = 0L
+    }
 
     /**
      * 【关键机制 3 - 请勿删除 safeScrollToBottom】：
@@ -110,50 +119,23 @@ class TerminalScrollController(
     }
 
     /**
-     * 呼起软键盘并执行安全吸底，确保输入框与光标可见
+     * 优雅的响应式呼起软键盘并吸底 (Reactive Focus & Keyboard Request)
+     * 彻底告别脆弱的 delay 轮询重试！
      *
-     * 【关键机制增强 - 解决离开底部后单击只滑动不弹键盘的 Bug】：
-     * 当用户滚动到最上面时，底部的 GhostTextField 已被 LazyColumn 离屏回收（Uncomposed）。
-     * 若在此时同步执行 focusRequester.requestFocus()，由于输入框尚未挂载进视口，焦点请求会被静默丢弃。
-     * 因此采用多阶段时序：
-     * 1. 立即执行 safeScrollToBottom() 吸底；
-     * 2. 延迟 50ms 等待 LazyColumn 完成测量布局并重新挂载 GhostTextField，执行二次聚焦并呼起键盘；
-     * 3. 延迟 100ms 进一步应对动画与输入法窗口焦点切换，确保用户在顶部单次点击时同时吸底且弹出键盘！
+     * 工作机制：
+     * 1. 激活吸底跟随并立即启动 safeScrollToBottom()；
+     * 2. 派发响应式焦点令牌 focusTrigger = System.currentTimeMillis()；
+     * 3. 若 GhostTextField 已经在视口中，立即精准响应聚焦；
+     * 4. 若用户在最顶部（GhostTextField 被 LazyColumn 离屏回收），在吸底完成、GhostTextField 进入组合树的
+     *    第一帧，其内部的 LaunchedEffect(focusTrigger) 会在挂载成功的瞬间精准捕获该令牌并呼起软键盘！
      */
-    fun bringUpKeyboard(
-        focusRequester: FocusRequester,
-        keyboardController: SoftwareKeyboardController?,
-        onBeforeFocus: (() -> Unit)? = null
-    ) {
+    fun requestKeyboard(onBeforeFocus: (() -> Unit)? = null) {
         val beforeAction = onBeforeFocus ?: this.onBeforeBringUpKeyboard
         beforeAction()
-        shouldScrollToBottomOnIme = true
         autoScrollToBottom = true
+        focusTrigger = System.currentTimeMillis()
         coroutineScope.launch {
-            // 1. 首次尝试吸底与聚焦
             safeScrollToBottom()
-            try {
-                focusRequester.requestFocus()
-                keyboardController?.show()
-            } catch (_: Exception) {
-            }
-
-            // 2. 应对从顶部滑下来的情况：LazyColumn 需要等待首帧重新测量挂载 GhostTextField
-            delay(50.milliseconds)
-            safeScrollToBottom()
-            try {
-                focusRequester.requestFocus()
-                keyboardController?.show()
-            } catch (_: Exception) {
-            }
-
-            // 3. 延迟 100ms 进一步应对窗口焦点切换与系统动画
-            delay(100.milliseconds)
-            try {
-                focusRequester.requestFocus()
-                keyboardController?.show()
-            } catch (_: Exception) {
-            }
         }
     }
 
@@ -203,8 +185,6 @@ fun rememberTerminalScrollController(
     linesCount: Int,
     isExecuting: Boolean,
     imeBottom: Dp = 0.dp,
-    focusRequester: FocusRequester,
-    keyboardController: SoftwareKeyboardController?,
     isInputFocused: Boolean,
     onClearFocus: () -> Unit = {},
     onBeforeBringUpKeyboard: () -> Unit = {}
@@ -220,17 +200,12 @@ fun rememberTerminalScrollController(
     LaunchedEffect(isDragged) {
         if (isDragged) {
             controller.userScrolled = true
-            controller.shouldScrollToBottomOnIme = false
         }
     }
 
     // 2. 监听滚动状态：惯性滑动或拖拽彻底结束时，根据最终位置决定是否恢复 autoScrollToBottom
     LaunchedEffect(listState.isScrollInProgress) {
-        if (listState.isScrollInProgress) {
-            if (controller.userScrolled) {
-                controller.shouldScrollToBottomOnIme = false
-            }
-        } else {
+        if (!listState.isScrollInProgress) {
             val layoutInfo = listState.layoutInfo
             val totalItems = layoutInfo.totalItemsCount
             if (totalItems > 0) {
@@ -250,13 +225,15 @@ fun rememberTerminalScrollController(
 
     // 3. 【关键机制 4 - 双保险键盘弹出吸底】：
     // 无论用户是通过点击输出区、空白区还是直接点击输入框触发的键盘升起，
-    // 只要键盘高度从 0.dp 变为 > 0.dp，自动激活吸底锁定与跟随模式并在 300ms 后释放
+    // 只要键盘高度从 0.dp 变为 > 0.dp，自动激活吸底跟随模式，随软键盘高度响应式驱动吸底
     var wasImeClosed by remember { mutableStateOf(true) }
     LaunchedEffect(imeBottom) {
         if (imeBottom > 0.dp) {
             if (wasImeClosed) {
-                controller.shouldScrollToBottomOnIme = true
                 controller.autoScrollToBottom = true
+            }
+            if (controller.autoScrollToBottom) {
+                controller.safeScrollToBottom()
             }
             wasImeClosed = false
         } else {
@@ -264,14 +241,6 @@ fun rememberTerminalScrollController(
                 onClearFocus()
             }
             wasImeClosed = true
-        }
-    }
-
-    LaunchedEffect(imeBottom, controller.shouldScrollToBottomOnIme) {
-        if (controller.shouldScrollToBottomOnIme && imeBottom > 0.dp) {
-            controller.safeScrollToBottom()
-            delay(300.milliseconds)
-            controller.shouldScrollToBottomOnIme = false
         }
     }
 
@@ -293,18 +262,9 @@ fun rememberTerminalScrollController(
     }
 
     // 6. 【关键机制 4C - 每次进入终端页面始终吸底并弹出键盘】：
-    // 0ms / 50ms / 150ms 三段式延迟保障首帧测量与软键盘 100% 呼起
+    // 基于响应式焦点令牌 (focusTrigger)，当输入框完成首帧挂载时自发响应获取焦点并弹出键盘，零 delay 延迟
     LaunchedEffect(Unit) {
-        controller.safeScrollToBottom()
-        controller.bringUpKeyboard(focusRequester, keyboardController, onBeforeBringUpKeyboard)
-
-        delay(50.milliseconds)
-        controller.safeScrollToBottom()
-        controller.bringUpKeyboard(focusRequester, keyboardController, onBeforeBringUpKeyboard)
-
-        delay(150.milliseconds)
-        controller.safeScrollToBottom()
-        controller.bringUpKeyboard(focusRequester, keyboardController, onBeforeBringUpKeyboard)
+        controller.requestKeyboard(onBeforeBringUpKeyboard)
     }
 
     return controller

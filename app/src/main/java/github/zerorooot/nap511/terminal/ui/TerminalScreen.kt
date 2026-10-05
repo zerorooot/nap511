@@ -146,8 +146,6 @@ fun TerminalScreen(
         linesCount = viewModel.lines.size,
         isExecuting = viewModel.isExecuting,
         imeBottom = imeBottom,
-        focusRequester = focusRequester,
-        keyboardController = keyboardController,
         isInputFocused = isInputFocused,
         onClearFocus = { focusManager.clearFocus() },
         onBeforeBringUpKeyboard = {
@@ -316,8 +314,6 @@ fun TerminalContent(
     isInputFocused: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val keyboardController = LocalSoftwareKeyboardController.current
-
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = TerminalColors.Background,
@@ -352,7 +348,7 @@ fun TerminalContent(
         }
     ) { innerPadding ->
         val currentBringUpKeyboard by rememberUpdatedState {
-            scrollController.bringUpKeyboard(focusRequester, keyboardController)
+            scrollController.requestKeyboard()
         }
 
         // 【关键机制 5B - 请勿改用 clickable 或带 onLongPress 的 detectTapGestures】：
@@ -449,9 +445,10 @@ fun TerminalContent(
                                     onArrowDown = onArrowDown,
                                     hardwareKeyActions = hardwareKeyActions,
                                     focusRequester = focusRequester,
+                                    focusTrigger = scrollController.focusTrigger,
+                                    onFocusConsumed = { scrollController.consumeFocus() },
                                     onRequestScrollToBottom = {
                                         scrollController.autoScrollToBottom = true
-                                        scrollController.shouldScrollToBottomOnIme = true
                                         scrollController.coroutineScope.launchSafeScroll(scrollController)
                                     },
                                     onFocusChange = onFocusChange
