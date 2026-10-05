@@ -1,6 +1,6 @@
 package github.zerorooot.nap511.terminal.commands.cloud
 
-import github.zerorooot.nap511.terminal.commands.TerminalCommand
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.commands.util.SizeParser
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext

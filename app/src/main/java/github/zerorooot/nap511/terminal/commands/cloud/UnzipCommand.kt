@@ -11,7 +11,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.repository.SettingsRepository
-import github.zerorooot.nap511.terminal.commands.TerminalCommand
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag

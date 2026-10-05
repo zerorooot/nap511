@@ -1,7 +1,7 @@
 package github.zerorooot.nap511.terminal.commands.file
 
 import github.zerorooot.nap511.bean.RenameBean
-import github.zerorooot.nap511.terminal.commands.TerminalCommand
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import kotlinx.coroutines.flow.Flow

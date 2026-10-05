@@ -21,6 +21,7 @@ import github.zerorooot.nap511.terminal.engine.CompletionEngine
 import github.zerorooot.nap511.terminal.engine.CompletionResult
 import github.zerorooot.nap511.terminal.engine.ParsedContext
 import github.zerorooot.nap511.terminal.engine.PipelineEngine
+import github.zerorooot.nap511.terminal.engine.TerminalControlTokens
 import github.zerorooot.nap511.terminal.engine.TerminalHistoryManager
 import github.zerorooot.nap511.terminal.engine.TerminalLineEditor
 import github.zerorooot.nap511.util.FileOpener
@@ -653,12 +654,12 @@ class TerminalViewModel(
                 }
 
                 flow.collect { line ->
-                    if (line == "__TERMINAL_CLEAR_SCREEN__") {
+                    if (line == TerminalControlTokens.CLEAR_SCREEN) {
                         flushBuffer()
                         withContext(Dispatchers.Main) {
                             lines.clear()
                         }
-                    } else if (line == "__TERMINAL_EXIT__") {
+                    } else if (line == TerminalControlTokens.EXIT) {
                         flushBuffer()
                         withContext(Dispatchers.Main) {
                             resetSession()

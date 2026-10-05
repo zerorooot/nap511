@@ -109,6 +109,34 @@ class CommandRegistry {
         return def
     }
 
+    /**
+     * 原生注册面向对象的 TerminalCommand 命令对象（及其所有别名）
+     *
+     * 将命令的声明式元数据（名称、描述、用法、Flags）和执行体挂载到注册中心，
+     * 自动支持帮助拦截与 Tab 补全提示。
+     *
+     * @param command 遵循统一规范的终端命令实例
+     * @return 注册生成的 CommandDefinition 列表（主命令 + 别名）
+     */
+    fun register(command: TerminalCommand): List<CommandDefinition> {
+        val registeredDefinitions = mutableListOf<CommandDefinition>()
+        val allNames = listOf(command.name) + command.aliases
+
+        for (cmdName in allNames) {
+            val def = register(cmdName) {
+                description = command.description
+                usage = command.usage
+                command.flags.forEach { flag(it.name, it.description) }
+                execute { ctx, args, stdin ->
+                    command.execute(ctx, args, stdin)
+                }
+            }
+            registeredDefinitions.add(def)
+        }
+
+        return registeredDefinitions
+    }
+
     fun get(name: String): CommandDefinition? = commands[name]
 
     fun hasCommand(name: String): Boolean = commands.containsKey(name)

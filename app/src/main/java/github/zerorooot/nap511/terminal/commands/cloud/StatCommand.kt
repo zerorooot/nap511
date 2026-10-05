@@ -1,7 +1,7 @@
 package github.zerorooot.nap511.terminal.commands.cloud
 
 import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.terminal.commands.TerminalCommand
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext

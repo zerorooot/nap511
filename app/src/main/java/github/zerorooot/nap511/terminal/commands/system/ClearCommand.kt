@@ -1,14 +1,16 @@
 package github.zerorooot.nap511.terminal.commands.system
 
-import github.zerorooot.nap511.terminal.commands.TerminalCommand
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.context.TerminalContext
+import github.zerorooot.nap511.terminal.engine.TerminalControlTokens
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
 /**
  * 屏幕清空命令（clear）
  *
- * 向终端输出特殊的屏幕清除标记 __TERMINAL_CLEAR_SCREEN__，由 UI 观察者统一重置屏幕内容。
+ * 向终端输出统一协议定义的屏幕清除标记 [TerminalControlTokens.CLEAR_SCREEN]，
+ * 由终端 ViewModel 或 UI 观察者统一重置屏幕内容。
  */
 class ClearCommand : TerminalCommand {
 
@@ -23,6 +25,7 @@ class ClearCommand : TerminalCommand {
         args: List<String>,
         stdin: Flow<String>
     ): Flow<String> = flow {
-        emit("__TERMINAL_CLEAR_SCREEN__")
+        // 输出统一控制标记通知终端视图清屏
+        emit(TerminalControlTokens.CLEAR_SCREEN)
     }
 }

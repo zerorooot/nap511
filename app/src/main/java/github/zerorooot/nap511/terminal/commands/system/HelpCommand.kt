@@ -1,8 +1,8 @@
 package github.zerorooot.nap511.terminal.commands.system
 
-import github.zerorooot.nap511.terminal.commands.TerminalCommand
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandRegistry
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 

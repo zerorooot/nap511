@@ -24,6 +24,7 @@ import github.zerorooot.nap511.terminal.commands.system.ExitCommand
 import github.zerorooot.nap511.terminal.commands.system.HelpCommand
 import github.zerorooot.nap511.terminal.commands.system.HistoryCommand
 import github.zerorooot.nap511.terminal.engine.CommandRegistry
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.engine.TerminalHistoryManager
 
 /**
@@ -45,7 +46,7 @@ object CommandRegistryFactory {
     ): CommandRegistry {
         val registry = CommandRegistry()
 
-        val commands = arrayOf(
+        val commands = arrayOf<TerminalCommand>(
             // 1. 注册流式工具及系统控制命令
             EchoCommand(),
             GrepCommand(),
