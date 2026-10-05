@@ -54,9 +54,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
@@ -159,12 +159,22 @@ fun TerminalScreen(
         }
     }
 
-    // 默认请求焦点弹出输入法并绑定退出回调
-    LaunchedEffect(onBack) {
-        viewModel.onExitAction = onBack
+    //渲染时仅仅是把这个函数对象缓存起来；代码块 resetSession()、 onBack()
+    //只会在未来用户真正触发事件（如点击按钮或按 Ctrl+D）调用 exitAndReset() 时才会被执行。
+    val exitAndReset = remember(viewModel, onBack) {
+        fun() {
+            viewModel.resetSession()
+            onBack()
+        }
+    }
+
+    // 默认请求焦点弹出输入法并绑定退出回调（执行 exit 命令时触发）
+    LaunchedEffect(exitAndReset) {
+        viewModel.onExitAction = exitAndReset
         bringUpKeyboard()
     }
 
+    // 系统返回键 / 返回手势：常规返回，保留当前终端会话状态
     BackHandler {
         onBack()
     }
@@ -341,7 +351,7 @@ fun TerminalScreen(
                     }
 
                     item(key = "terminal_ghost_input") {
-                        val hardwareActions = remember(viewModel, onBack) {
+                        val hardwareActions = remember(viewModel, exitAndReset) {
                             TerminalHardwareKeyActions(
                                 onCtrlC = { viewModel.handleCtrlC() },
                                 onCtrlU = { viewModel.handleCtrlU() },
@@ -350,7 +360,7 @@ fun TerminalScreen(
                                 onCtrlL = { viewModel.handleCtrlL() },
                                 onCtrlA = { viewModel.handleCtrlA() },
                                 onCtrlE = { viewModel.handleCtrlE() },
-                                onCtrlD = { viewModel.handleCtrlD(onBack) },
+                                onCtrlD = { viewModel.handleCtrlD(exitAndReset) },
                                 onCtrlLeft = { viewModel.handleCtrlLeft() },
                                 onCtrlRight = { viewModel.handleCtrlRight() },
                                 onAltB = { viewModel.handleAltB() },
@@ -371,7 +381,11 @@ fun TerminalScreen(
                             onSubmit = {
                                 viewModel.submitInput()
                                 scope.launch {
-                                    listState.scrollToItem((viewModel.lines.size + 1).coerceAtLeast(0))
+                                    listState.scrollToItem(
+                                        (viewModel.lines.size + 1).coerceAtLeast(
+                                            0
+                                        )
+                                    )
                                 }
                             },
                             onTab = { viewModel.handleTabPress() },
@@ -418,7 +432,7 @@ fun TerminalScreen(
                 Toast.makeText(context, "已复制终端输出内容", Toast.LENGTH_SHORT).show()
             },
             onOpenDrawer = openDrawer,
-            onCloseTerminal = onBack
+            onCloseTerminal = exitAndReset
         )
     }
 }

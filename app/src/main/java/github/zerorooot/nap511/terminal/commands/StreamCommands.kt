@@ -114,7 +114,10 @@ object StreamCommands {
                         linesOnly && !wordsOnly && !charsOnly -> emit(lineCount.toString())
                         wordsOnly && !linesOnly && !charsOnly -> emit(wordCount.toString())
                         charsOnly && !linesOnly && !wordsOnly -> emit(charCount.toString())
-                        else -> emit("     $lineCount      $wordCount      $charCount")
+                        else -> {
+                            emit("   Lines    Words    Chars")
+                            emit(String.format(java.util.Locale.getDefault(), "%8d %8d %8d", lineCount, wordCount, charCount))
+                        }
                     }
                 }
             }

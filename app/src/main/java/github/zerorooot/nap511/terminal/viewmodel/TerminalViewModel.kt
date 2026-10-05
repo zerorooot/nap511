@@ -57,11 +57,20 @@ class TerminalViewModel(
             currentCid = cid
             currentPath = if (path.startsWith("/")) path else "/$path"
             context.updateDirectory(cid, path, pathList)
-            if (lines.size >= 4 && lines[3].text.startsWith("当前工作目录:")) {
-                lines[3] = TerminalLine("当前工作目录: $currentPath (cid: $currentCid)\n", TerminalLineType.SYSTEM)
-            }
+            lines.clear()
+            printWelcomeBanner()
             refreshCachedEntries(cid)
         }
+    }
+
+    fun resetSession() {
+        isSessionInitialized = false
+        lines.clear()
+        inputState = TextFieldValue("")
+        ghostText = ""
+        lastSubmittedText = ""
+        resetModifiers()
+        dismissCompletionBar()
     }
 
     val lines = mutableStateListOf<TerminalLine>()
@@ -643,6 +652,7 @@ class TerminalViewModel(
                         lines.clear()
                     } else if (line == "__TERMINAL_EXIT__") {
                         flushBuffer()
+                        resetSession()
                         onExitAction?.invoke()
                     } else {
                         val lineType = if (line.startsWith("terminal: command not found") || line.contains(": error:")) {
