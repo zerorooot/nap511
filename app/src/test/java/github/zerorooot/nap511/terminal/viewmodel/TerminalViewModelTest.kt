@@ -1,0 +1,362 @@
+package github.zerorooot.nap511.terminal.viewmodel
+
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+import github.zerorooot.nap511.bean.AvatarBean
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+
+class TerminalViewModelTest {
+
+    private lateinit var viewModel: TerminalViewModel
+
+    @Before
+    fun setup() {
+        val avatar = AvatarBean(
+            face = "",
+            userName = "tester",
+            userId = "1001"
+        )
+        viewModel = TerminalViewModel(
+            initialCid = "0",
+            initialPath = "/",
+            avatarBean = avatar
+        )
+    }
+
+    @Test
+    fun testStickyModifiersToggle() {
+        assertFalse(viewModel.isCtrlActive)
+        assertFalse(viewModel.isAltActive)
+
+        // 开启 CTRL
+        viewModel.toggleCtrl()
+        assertTrue(viewModel.isCtrlActive)
+        assertFalse(viewModel.isAltActive)
+
+        // 切换到 ALT，自动关闭 CTRL
+        viewModel.toggleAlt()
+        assertFalse(viewModel.isCtrlActive)
+        assertTrue(viewModel.isAltActive)
+
+        // 再次点击 ALT，关闭 ALT
+        viewModel.toggleAlt()
+        assertFalse(viewModel.isAltActive)
+
+        // resetModifiers
+        viewModel.toggleCtrl()
+        assertTrue(viewModel.isCtrlActive)
+        viewModel.resetModifiers()
+        assertFalse(viewModel.isCtrlActive)
+    }
+
+    @Test
+    fun testCtrlCIdleBehavior() {
+        viewModel.onInputChange(TextFieldValue("git clone https://test.git"))
+        assertEquals("git clone https://test.git", viewModel.inputState.text)
+
+        viewModel.handleCtrlC()
+
+        // 验证当前输入框被清空
+        assertEquals("", viewModel.inputState.text)
+
+        // 验证屏幕追加了带 ^C 的命令行
+        val lastLine = viewModel.lines.lastOrNull()
+        assertTrue(lastLine != null)
+        assertTrue(lastLine!!.text.endsWith("git clone https://test.git^C"))
+    }
+
+    @Test
+    fun testCtrlUAndCtrlK() {
+        // "cd /root/config" 光标位于索引 3（即 '/' 处）
+        viewModel.onInputChange(TextFieldValue("cd /root/config", selection = TextRange(3)))
+
+        // Ctrl+U：清空光标前内容 -> 留下 "/root/config"
+        viewModel.handleCtrlU()
+        assertEquals("/root/config", viewModel.inputState.text)
+        assertEquals(0, viewModel.inputState.selection.start)
+
+        // Ctrl+K：清空光标后内容 -> 留下 ""
+        viewModel.handleCtrlK()
+        assertEquals("", viewModel.inputState.text)
+    }
+
+    @Test
+    fun testCtrlW() {
+        viewModel.onInputChange(TextFieldValue("rm -rf old_folder", selection = TextRange(17)))
+        viewModel.handleCtrlW()
+        assertEquals("rm -rf ", viewModel.inputState.text)
+    }
+
+    @Test
+    fun testCtrlAAndCtrlE() {
+        viewModel.onInputChange(TextFieldValue("ls -l /tmp", selection = TextRange(5)))
+
+        viewModel.handleCtrlA()
+        assertEquals(0, viewModel.inputState.selection.start)
+
+        viewModel.handleCtrlE()
+        assertEquals(10, viewModel.inputState.selection.start)
+    }
+
+    @Test
+    fun testCtrlDBehavior() {
+        var exitCalled = false
+        val exitCallback = { exitCalled = true }
+
+        // 1. 输入框为空时触发退出
+        viewModel.onInputChange(TextFieldValue(""))
+        viewModel.handleCtrlD(exitCallback)
+        assertTrue(exitCalled)
+
+        // 2. 输入框非空时向后删除字符
+        viewModel.onInputChange(TextFieldValue("abc", selection = TextRange(1)))
+        viewModel.handleCtrlD(exitCallback)
+        assertEquals("ac", viewModel.inputState.text)
+        assertEquals(1, viewModel.inputState.selection.start)
+    }
+
+    @Test
+    fun testAltShortcuts() {
+        // Alt+B 与 Alt+F
+        viewModel.onInputChange(TextFieldValue("cp source target", selection = TextRange(16)))
+
+        // Alt+B 跳到 "target"
+        viewModel.handleAltB()
+        assertEquals(10, viewModel.inputState.selection.start)
+
+        // Alt+B 跳到 "source"
+        viewModel.handleAltB()
+        assertEquals(3, viewModel.inputState.selection.start)
+
+        // Alt+F 跳到 "source" 词尾 (9)
+        viewModel.handleAltF()
+        assertEquals(9, viewModel.inputState.selection.start)
+
+        // Alt+D 向后删词 -> 删除空格和 target
+        viewModel.handleAltD()
+        assertEquals("cp source", viewModel.inputState.text)
+    }
+
+    @Test
+    fun testCtrlLeftAndRightShortcuts() {
+        // "cat /var/log/syslog" 长度 19，光标处于 19
+        viewModel.onInputChange(TextFieldValue("cat /var/log/syslog", selection = TextRange(19)))
+
+        // handleCtrlLeft: 跳到 "syslog" 词首 (13)
+        viewModel.handleCtrlLeft()
+        assertEquals(13, viewModel.inputState.selection.start)
+
+        // handleCtrlLeft: 跳到 "log" 词首 (9)
+        viewModel.handleCtrlLeft()
+        assertEquals(9, viewModel.inputState.selection.start)
+
+        // handleCtrlRight: 跳到 "log" 词尾 (12)
+        viewModel.handleCtrlRight()
+        assertEquals(12, viewModel.inputState.selection.start)
+
+        // 测试 sticky CTRL 与方向键触发
+        viewModel.toggleCtrl()
+        assertTrue(viewModel.isCtrlActive)
+        viewModel.moveCursorLeft() // 应触发 handleCtrlLeft 跳到 "log" 词首 (9)
+        assertFalse(viewModel.isCtrlActive) // 验证 CTRL 状态已复位
+        assertEquals(9, viewModel.inputState.selection.start)
+
+        viewModel.handleCtrlLeft() // 跳到 "var" 词首 (5)
+        assertEquals(5, viewModel.inputState.selection.start)
+    }
+
+    @Test
+    fun testCtrlRightWithGhostText() {
+        viewModel.onInputChange(TextFieldValue("ls", selection = TextRange(2)))
+        val ghost = " -la /tmp"
+        val chunk = github.zerorooot.nap511.terminal.engine.TerminalLineEditor.extractNextWord(ghost)
+        assertEquals(" -la", chunk)
+    }
+
+    @Test
+    fun testSoftKeyboardInterceptionWhenCtrlActive() {
+        viewModel.onInputChange(TextFieldValue("long draft text"))
+        viewModel.toggleCtrl()
+        assertTrue(viewModel.isCtrlActive)
+
+        // 模拟软键盘输入字母 'c'（文本由 15 变 16，光标位置输入 'c'）
+        viewModel.onInputChange(TextFieldValue("long draft textc", selection = TextRange(16)))
+
+        // 验证 CTRL 粘滞模式自动复位
+        assertFalse(viewModel.isCtrlActive)
+        // 验证 Ctrl+C 被拦截执行：输入框被清空，历史行包含 ^C
+        assertEquals("", viewModel.inputState.text)
+        assertTrue(viewModel.lines.last().text.contains("^C"))
+    }
+
+    @Test
+    fun testValidCommandValidation() {
+        val manager = viewModel.historyManager
+        // 验证系统命令合法
+        assertTrue(manager.isValidCommand("help") { true })
+        assertTrue(manager.isValidCommand("ls -l") { true })
+        // 验证未知命令非法
+        assertFalse(manager.isValidCommand("invalid_cmd") { false })
+    }
+
+    @Test
+    fun testCandidateSelectionAndDismiss() {
+        // 1. 测试直接选取补全候选（普通命令）
+        viewModel.onInputChange(TextFieldValue("cle", selection = TextRange(3)))
+        val candidate = github.zerorooot.nap511.terminal.engine.CompletionCandidate(
+            name = "clear",
+            displayText = "clear",
+            insertText = "clear ",
+            type = github.zerorooot.nap511.terminal.engine.CandidateType.COMMAND,
+            isDirectory = false
+        )
+        viewModel.selectCandidate(candidate)
+        assertEquals("clear ", viewModel.inputState.text)
+        assertFalse(viewModel.isCompletionBarVisible)
+
+        // 2. 测试输入变动时自动关闭补全栏
+        viewModel.onInputChange(TextFieldValue("cd"))
+        viewModel.dismissCompletionBar()
+        assertFalse(viewModel.isCompletionBarVisible)
+        assertEquals(0, viewModel.completionCandidates.size)
+    }
+
+    @Test
+    fun testInitDirectoryIfNeededPreservesSessionAndResetsOnExit() {
+        // 1. 第一次初始化进入 /MyFolder
+        viewModel.initDirectoryIfNeeded("100", "/MyFolder", emptyList())
+        assertTrue(viewModel.isSessionInitialized)
+        assertEquals("100", viewModel.currentCid)
+        assertEquals("/MyFolder", viewModel.currentPath)
+
+        // 模拟用户在终端执行操作，添加了行内容
+        viewModel.lines.add(TerminalLine("custom test output", TerminalLineType.OUTPUT_TEXT))
+        val countBefore = viewModel.lines.size
+
+        // 2. 当前会话保持状态（如从 open 文件预览返回），不应被覆盖
+        viewModel.initDirectoryIfNeeded("200", "/OtherFolder", emptyList())
+        assertEquals("100", viewModel.currentCid)
+        assertEquals("/MyFolder", viewModel.currentPath)
+        assertEquals(countBefore, viewModel.lines.size)
+
+        // 3. 执行 exit 退出终端（调用 resetSession）
+        viewModel.resetSession()
+        assertFalse(viewModel.isSessionInitialized)
+        assertEquals(0, viewModel.lines.size)
+
+        // 4. exit 退出后重新进入，视同第一次进入，工作目录与新的 FileScreen 目录一致
+        viewModel.initDirectoryIfNeeded("200", "/OtherFolder", emptyList())
+        assertTrue(viewModel.isSessionInitialized)
+        assertEquals("200", viewModel.currentCid)
+        assertEquals("/OtherFolder", viewModel.currentPath)
+    }
+
+    @Test
+    fun testDualLinePromptFormatting() {
+        assertEquals("tester@1001:/", viewModel.contextPromptText())
+        assertEquals("tester@1001:/\n$ ", viewModel.promptText())
+
+        // 验证切换目录后上下文同步更新
+        viewModel.initDirectoryIfNeeded("123", "/电影/科幻", emptyList())
+        assertEquals("tester@1001:/电影/科幻", viewModel.contextPromptText())
+        assertEquals("tester@1001:/电影/科幻\n$ ", viewModel.promptText())
+    }
+
+    @Test
+    fun testCtrlCIdleDualLineFormat() {
+        viewModel.onInputChange(TextFieldValue("pwd"))
+        viewModel.handleCtrlC()
+
+        // 验证历史屏幕记录为双行：第一行路径，第二行 $ 命令 + ^C
+        val commandLine = viewModel.lines.lastOrNull { it.type == TerminalLineType.COMMAND }
+        assertTrue(commandLine != null)
+        assertEquals("tester@1001:/\n$ pwd^C", commandLine!!.text)
+    }
+
+    @Test
+    fun testScrollbackBufferLimit() {
+        viewModel.clearScreen()
+        assertEquals(0, viewModel.lines.size)
+
+        // 追加 2050 行输出，验证自动截断修剪至 MAX_SCROLLBACK_LINES (2000)
+        val dummyLines = (1..2050).map { TerminalLine("line $it", TerminalLineType.OUTPUT_TEXT) }
+        viewModel.appendTerminalLines(dummyLines)
+
+        assertEquals(TerminalViewModel.MAX_SCROLLBACK_LINES, viewModel.lines.size)
+        // 顶部最旧的 50 行被修剪，第一行应为第 51 行
+        assertEquals("line 51", viewModel.lines.first().text)
+        assertEquals("line 2050", viewModel.lines.last().text)
+
+        // 单行追加再触发一次修剪
+        viewModel.appendTerminalLine(TerminalLine("line 2051", TerminalLineType.OUTPUT_TEXT))
+        assertEquals(TerminalViewModel.MAX_SCROLLBACK_LINES, viewModel.lines.size)
+        assertEquals("line 52", viewModel.lines.first().text)
+        assertEquals("line 2051", viewModel.lines.last().text)
+    }
+
+    @Test
+    fun testStaleImeReplayInterceptionAfterSubmit() {
+        val command = "find -name '*.mp4'"
+        viewModel.onInputChange(TextFieldValue(command))
+        assertEquals(command, viewModel.inputState.text)
+
+        viewModel.submitInput()
+        // 提交后输入框应已被清空
+        assertEquals("", viewModel.inputState.text)
+
+        // 模拟软键盘 IME 或软按键提交后传回的旧文本 replay
+        viewModel.onInputChange(TextFieldValue(command))
+        // 应拦截旧文本，输入框依然保持为空
+        assertEquals("", viewModel.inputState.text)
+
+        // 用户输入新字符，应正常更新
+        viewModel.onInputChange(TextFieldValue("ls"))
+        assertEquals("ls", viewModel.inputState.text)
+    }
+
+    @Test
+    fun testTerminalLineTypeHelpStorageAndScrolling() {
+        // 先清空初始化欢迎信息
+        viewModel.clearScreen()
+        assertEquals(0, viewModel.lines.size)
+
+        // 验证 TerminalLineType.HELP 能够安全追加至终端行缓冲并在列表中正常保持
+        val helpLine = TerminalLine("命令名称: find", TerminalLineType.HELP)
+        viewModel.appendTerminalLine(helpLine)
+
+        assertEquals(1, viewModel.lines.size)
+        assertEquals(TerminalLineType.HELP, viewModel.lines.first().type)
+        assertEquals("命令名称: find", viewModel.lines.first().text)
+    }
+
+    @Test
+    fun testAppendTerminalLinesWithAllTypes() {
+        viewModel.clearScreen()
+
+        val allTypedLines = listOf(
+            TerminalLine("plain text", TerminalLineType.OUTPUT_TEXT),
+            TerminalLine("movie.mp4", TerminalLineType.OUTPUT_FILE_ENTRY),
+            TerminalLine("/Movies/movie.mp4", TerminalLineType.OUTPUT_PATH_ENTRY),
+            TerminalLine("-rwxr-xr-x 100 2026-10-05 file.txt", TerminalLineType.OUTPUT_LONG_LISTING),
+            TerminalLine("[目录] docs (-)", TerminalLineType.OUTPUT_FIND_CATEGORY),
+            TerminalLine("\u001B[31mError\u001B[0m", TerminalLineType.OUTPUT_ANSI),
+            TerminalLine("help doc", TerminalLineType.HELP),
+            TerminalLine("system banner", TerminalLineType.SYSTEM),
+            TerminalLine("error msg", TerminalLineType.ERROR),
+            TerminalLine("prompt confirm", TerminalLineType.PROMPT),
+            TerminalLine("user command", TerminalLineType.COMMAND)
+        )
+
+        viewModel.appendTerminalLines(allTypedLines)
+        assertEquals(11, viewModel.lines.size)
+
+        for (i in allTypedLines.indices) {
+            assertEquals(allTypedLines[i].type, viewModel.lines[i].type)
+            assertEquals(allTypedLines[i].text, viewModel.lines[i].text)
+        }
+    }
+}

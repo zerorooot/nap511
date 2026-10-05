@@ -14,7 +14,16 @@ local.properties
 .deepseek
 修复方案.md
 app/src/androidTest/
-app/src/test/
+app/src/test/*
+!app/src/test/java/
+app/src/test/java/*
+!app/src/test/java/github/
+app/src/test/java/github/*
+!app/src/test/java/github/zerorooot/
+app/src/test/java/github/zerorooot/*
+!app/src/test/java/github/zerorooot/nap511/
+app/src/test/java/github/zerorooot/nap511/*
+!app/src/test/java/github/zerorooot/nap511/terminal/
 app/release/
 .artifacts
 .proxyai
