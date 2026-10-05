@@ -456,55 +456,73 @@ fun TerminalScreen(
 
 @Composable
 private fun TerminalLineRow(line: TerminalLine) {
-    if (line.type == TerminalLineType.COMMAND && line.text.contains("\n$ ")) {
-        // 双行历史命令格式美化解析：第 1 行上下文路径，第 2 行提示符与命令
-        val parts = line.text.split("\n$ ", limit = 2)
-        val contextPart = parts[0]
-        val commandPart = parts.getOrNull(1) ?: ""
+    when (line.type) {
+        TerminalLineType.COMMAND if line.text.contains("\n$ ") -> {
+            // 双行历史命令格式美化解析：第 1 行上下文路径，第 2 行提示符与命令
+            val parts = line.text.split("\n$ ", limit = 2)
+            val contextPart = parts[0]
+            val commandPart = parts.getOrNull(1) ?: ""
 
-        val annotatedString = buildAnnotatedString {
-            // 上下文路径：青蓝色高亮
-            withStyle(SpanStyle(color = Color(0xFF4DD0E1), fontWeight = FontWeight.Bold)) {
-                append(contextPart)
+            val annotatedString = remember(line.text) {
+                buildAnnotatedString {
+                    // 上下文路径：青蓝色高亮
+                    withStyle(SpanStyle(color = Color(0xFF4DD0E1), fontWeight = FontWeight.Bold)) {
+                        append(contextPart)
+                    }
+                    append("\n")
+                    // 提示符 $：高亮绿色
+                    withStyle(SpanStyle(color = Color(0xFF69F0AE), fontWeight = FontWeight.Bold)) {
+                        append("$ ")
+                    }
+                    // 命令内容：亮灰白色
+                    withStyle(SpanStyle(color = Color(0xFFECEFF1))) {
+                        append(commandPart)
+                    }
+                }
             }
-            append("\n")
-            // 提示符 $：高亮绿色
-            withStyle(SpanStyle(color = Color(0xFF69F0AE), fontWeight = FontWeight.Bold)) {
-                append("$ ")
-            }
-            // 命令内容：亮灰白色
-            withStyle(SpanStyle(color = Color(0xFFECEFF1))) {
-                append(commandPart)
-            }
+
+            Text(
+                text = annotatedString,
+                fontSize = 13.sp,
+                fontFamily = FontFamily.Monospace,
+                lineHeight = 18.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 1.dp)
+            )
         }
-
-        Text(
-            text = annotatedString,
-            fontSize = 13.sp,
-            fontFamily = FontFamily.Monospace,
-            lineHeight = 18.sp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 1.dp)
-        )
-    } else {
-        val color = when (line.type) {
-            TerminalLineType.SYSTEM -> Color(0xFF4DD0E1)
-            TerminalLineType.COMMAND -> Color(0xFFB0BEC5)
-            TerminalLineType.OUTPUT -> Color(0xFFEEEEEE)
-            TerminalLineType.ERROR -> Color(0xFFEF5350)
-            TerminalLineType.PROMPT -> Color(0xFFFFD54F)
+        TerminalLineType.OUTPUT -> {
+            val annotatedString = remember(line.text) {
+                TerminalStyleParser.parseOutputLine(line.text)
+            }
+            Text(
+                text = annotatedString,
+                fontSize = 13.sp,
+                fontFamily = FontFamily.Monospace,
+                lineHeight = 18.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 1.dp)
+            )
         }
+        else -> {
+            val color = when (line.type) {
+                TerminalLineType.SYSTEM -> Color(0xFF4DD0E1)
+                TerminalLineType.COMMAND -> Color(0xFFB0BEC5)
+                TerminalLineType.ERROR -> Color(0xFFEF5350)
+                TerminalLineType.PROMPT -> Color(0xFFFFD54F)
+            }
 
-        Text(
-            text = line.text,
-            color = color,
-            fontSize = 13.sp,
-            fontFamily = FontFamily.Monospace,
-            lineHeight = 18.sp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 1.dp)
-        )
+            Text(
+                text = line.text,
+                color = color,
+                fontSize = 13.sp,
+                fontFamily = FontFamily.Monospace,
+                lineHeight = 18.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 1.dp)
+            )
+        }
     }
 }

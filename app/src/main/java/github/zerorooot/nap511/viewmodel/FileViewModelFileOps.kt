@@ -228,16 +228,16 @@ internal fun FileViewModel.deleteMultiple() {
 }
 
 // 1. 静态提取扩展名集合，避免每次遍历重复构造数组
-private val ZIP_EXTS = setOf("rar", "tar", "gz", "7z", "zip", "part", "jar")
-private val IMG_EXTS =
+internal val ZIP_EXTS = setOf("rar", "tar", "gz", "7z", "zip", "part", "jar")
+internal val IMG_EXTS =
     setOf("gif", "jpg", "png", "jpeg", "bmp", "tif", "svg", "pic", "heic", "dng", "webp")
-private val AUDIO_EXTS = setOf(
+internal val AUDIO_EXTS = setOf(
     "mp3", "wma", "wav", "midi", "flac", "ram", "ra", "mid", "aac", "m4a", "ape", "au",
     "ogg", "aif", "aiff", "snd", "voc", "mpa", "cda", "vqf", "wvx", "wmx", "m3u", "m3u8",
     "ttbl", "ttpl", "tta", "tak", "mpc", "mp+", "mp3pro", "mp1", "mp2", "mac", "xm",
     "umx", "stm", "s3m", "mtm", "mod", "it", "far", "rmi", "fla", "dts", "dtswav", "awb"
 )
-private val TXT_EXTS = setOf(
+internal val TXT_EXTS = setOf(
     "doc", "docx", "xls", "pdf", "ppt", "wps", "dps", "et", "mdb", "reg", "txt", "wri",
     "rtf", "lrc", "vob", "sub", "srt", "ass", "ssa", "idx", "umd", "xlsx", "xlsm", "xltx",
     "xltm", "xlam", "xlsb", "odt", "pptx", "ods", "odp", "chm", "pot", "pps", "ppsx",
@@ -248,8 +248,11 @@ private val TXT_EXTS = setOf(
     "ets", "mhtml", "mht", "uof", "dot", "wpt", "dotx", "docm", "dotm", "ett", "xlt",
     "pptm", "ppsm", "potx", "potm", "csv", "xml", "url"
 )
-private val HTML_EXTS = setOf(
+internal val HTML_EXTS = setOf(
     "html", "htm"
+)
+internal val VIDEO_EXTS = setOf(
+    "mp4", "mkv", "avi", "flv", "mov", "rmvb", "wmv", "m4v", "webm", "ts"
 )
 
 // 2. 改造函数：入参和返回值均为 List，利用 .map() 生成全新的不可变列表
