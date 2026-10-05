@@ -11,17 +11,16 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -55,7 +54,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
@@ -151,22 +149,22 @@ fun TerminalScreen(
         }
     }
 
-    // 判断用户当前是否处于最底部（当前可见的最后一项是否为倒数前 2 项之一）
+    // 判断用户当前是否处于最底部（当前可见的最后一项是否为倒数前 3 项之一）
     val isAtBottom by remember {
         derivedStateOf {
             val layoutInfo = listState.layoutInfo
             val totalItems = layoutInfo.totalItemsCount
             if (totalItems == 0) return@derivedStateOf true
             val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            lastVisibleIndex >= totalItems - 2
+            lastVisibleIndex >= totalItems - 3
         }
     }
 
-    // 智能防打扰滚动：仅在软键盘升起/变动或新输出追加时，若用户原本就在底部，才自动锚定吸底
-    val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
-    LaunchedEffect(viewModel.lines.size, imeBottom) {
-        if (isAtBottom) {
-            listState.scrollToItem((viewModel.lines.size + 1).coerceAtLeast(0))
+    // 智能防打扰滚动：在行数变化（新输出追加）或命令执行中（isExecuting），自动锚定吸底
+    LaunchedEffect(viewModel.lines.size, viewModel.isExecuting) {
+        if (viewModel.isExecuting || isAtBottom) {
+            val targetIndex = (viewModel.lines.size + 1).coerceAtLeast(0)
+            listState.scrollToItem(targetIndex)
         }
     }
 
@@ -336,16 +334,12 @@ fun TerminalScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color(0xFF101010))
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onTap = {
-                            viewModel.dismissCompletionBar()
-                            bringUpKeyboard()
-                        },
-                        onLongPress = {
-                            // 拦截长按事件，防止松开手时触发 onTap 导致重置键盘 focus 与滚动列表
-                        }
-                    )
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {
+                    viewModel.dismissCompletionBar()
+                    bringUpKeyboard()
                 }
         ) {
             SelectionContainer {
