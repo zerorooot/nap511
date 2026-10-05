@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
@@ -176,6 +177,16 @@ fun GhostTextField(
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(focusRequester)
+                        // 【关键机制 - 请勿删除】：
+                        // 终端历史输出被 SelectionContainer 包裹，用户长按选中文本时，焦点可能发生转移。
+                        // 若失焦，系统输入法（IME）会自动收回，导致 WindowInsets 剧烈突变（高度从 ~300dp 骤降至 0），
+                        // 界面与 LazyColumn 重排会打断正在进行的手势并销毁文本选择框（Selection Toolbar）。
+                        // 此处监听失焦并自动重新请求焦点，确保长按文本时键盘不意外缩回，选择框可稳定弹出。
+                        .onFocusChanged { focusState ->
+                            if (!focusState.isFocused) {
+                                focusRequester.requestFocus()
+                            }
+                        }
                         .onKeyEvent { event ->
                             // 1. 优先分发外接物理键盘的 Ctrl / Alt 组合键
                             if (handleHardwareShortcutKeyEvent(event, hardwareKeyActions)) {

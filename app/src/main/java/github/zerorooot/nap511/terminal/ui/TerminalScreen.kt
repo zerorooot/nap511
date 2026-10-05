@@ -11,8 +11,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -48,12 +47,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
@@ -330,24 +331,38 @@ fun TerminalScreen(
             }
         }
     ) { innerPadding ->
+        val currentBringUpKeyboard by rememberUpdatedState(bringUpKeyboard)
+
+        // 【关键交互容器 - 请勿改用 Modifier.clickable】：
+        // 1. 禁止使用 Modifier.clickable：clickable 默认带有 focusable 属性，会与 GhostTextField 抢夺焦点；
+        //    且用户长按松开手指时，clickable 仍会派发 onClick，导致意外触发 bringUpKeyboard() 重置光标并 scrollToItem 销毁选择框。
+        // 2. 必须使用 pointerInput + detectTapGestures 并显式实现 onLongPress：
+        //    显式拦截长按事件，消耗事件直至手指抬起，防止长按选中文本松手时误触发 onTap。
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color(0xFF101010))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    viewModel.dismissCompletionBar()
-                    bringUpKeyboard()
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = {
+                            viewModel.dismissCompletionBar()
+                            currentBringUpKeyboard()
+                        },
+                        onLongPress = {
+                            // 显式拦截长按事件，防止松手时被判定为点击而触发 onTap
+                        }
+                    )
                 }
         ) {
-            SelectionContainer {
-                LazyColumnScrollbar(
-                    state = listState, settings = ScrollbarSettings.Default.copy(
-                        thumbUnselectedColor = MaterialTheme.colorScheme.secondary
-                    )
-                ) {
+            // 【关键层级结构 - 请勿调换】：
+            // LazyColumnScrollbar 位于外层，SelectionContainer 直接包裹 LazyColumn。
+            // 避免滚动条指示器组件自身被纳入 SelectionContainer 导致选择坐标计算失真。
+            LazyColumnScrollbar(
+                state = listState, settings = ScrollbarSettings.Default.copy(
+                    thumbUnselectedColor = MaterialTheme.colorScheme.secondary
+                )
+            ) {
+                SelectionContainer {
                     LazyColumn(
                         state = listState,
                         contentPadding = innerPadding,
@@ -363,6 +378,8 @@ fun TerminalScreen(
                         }
 
                         item(key = "terminal_ghost_input") {
+                            // 【关键保护 - 请勿删除 DisableSelection】：
+                            // 隔离输入框与外部 SelectionContainer，防止输入框内部文本与光标受到外部文本选择手势干扰
                             DisableSelection {
                                 val hardwareActions = remember(viewModel, exitAndReset) {
                                     TerminalHardwareKeyActions(
@@ -413,6 +430,8 @@ fun TerminalScreen(
 
 
                         item(key = "terminal_bottom_spacer") {
+                            // 【关键保护 - 请勿删除 DisableSelection】：
+                            // 隔离底部空白占位区域，防止空白区域被误选为文本
                             DisableSelection {
                                 Spacer(
                                     modifier = Modifier
@@ -485,6 +504,7 @@ private fun TerminalLineRow(line: TerminalLine) {
                     .padding(vertical = 1.dp)
             )
         }
+
         TerminalLineType.OUTPUT -> {
             val annotatedString = remember(line.text) {
                 TerminalStyleParser.parseOutputLine(line.text)
@@ -499,6 +519,7 @@ private fun TerminalLineRow(line: TerminalLine) {
                     .padding(vertical = 1.dp)
             )
         }
+
         else -> {
             val color = when (line.type) {
                 TerminalLineType.SYSTEM -> Color(0xFF4DD0E1)
