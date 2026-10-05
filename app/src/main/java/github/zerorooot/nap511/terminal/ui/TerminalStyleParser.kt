@@ -24,6 +24,18 @@ object TerminalStyleParser {
         lineText: String,
         theme: TerminalColorTheme = TerminalColorTheme.Default
     ): AnnotatedString {
+        if (lineText.contains('\n')) {
+            val lines = lineText.split('\n')
+            return buildAnnotatedString {
+                lines.forEachIndexed { index, line ->
+                    append(parseOutputLine(line, theme))
+                    if (index < lines.size - 1) {
+                        append("\n")
+                    }
+                }
+            }
+        }
+
         return when {
             // 1. 包含 ANSI 转义序列
             lineText.contains("\u001B[") -> {
@@ -185,8 +197,14 @@ object TerminalStyleParser {
         val trimmed = lineText.trim()
         if (trimmed.isEmpty()) return AnnotatedString(lineText)
 
-        // 多级路径字符串 (如 /a/b/c/ 或 /a/b/c.mp4)
-        if (trimmed.trimEnd('/').contains('/')) {
+        // 判断是否属于多级路径字符串 (如 /a/b/c/ 或 /a/b/c.mp4)
+        // 排除非文件路径场景：斜线周围包含空格 (如 " / "、" /"、"/ ")，或包含命令说明分隔符 " : "
+        val hasPathSlash = trimmed.trimEnd('/').contains('/')
+                && !trimmed.contains(" /")
+                && !trimmed.contains("/ ")
+                && !trimmed.contains(" : ")
+
+        if (hasPathSlash) {
             val isDir = trimmed.endsWith("/")
             val fileName = trimmed.trimEnd('/').substringAfterLast('/') + if (isDir) "/" else ""
             val prefix = trimmed.substring(0, trimmed.length - fileName.length)

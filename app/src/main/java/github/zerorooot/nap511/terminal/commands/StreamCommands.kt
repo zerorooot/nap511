@@ -232,12 +232,20 @@ object StreamCommands {
     }
 
     /**
-     * 注册 ? 与 help 命令：显示所有可用命令及简介
+     * 注册 ?、？ 与 help 命令：显示所有可用命令及简介
      */
     fun registerHelp(registry: CommandRegistry) {
         registry.register("?") {
             description = "显示所有可用命令及简介"
             usage = "?"
+            execute { _, _, _ ->
+                flow { emit(registry.buildAllHelpMessage()) }
+            }
+        }
+
+        registry.register("？") {
+            description = "显示所有可用命令及简介"
+            usage = "？"
             execute { _, _, _ ->
                 flow { emit(registry.buildAllHelpMessage()) }
             }
