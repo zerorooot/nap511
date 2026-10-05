@@ -2,6 +2,7 @@ package github.zerorooot.nap511.terminal.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -81,6 +83,7 @@ fun GhostTextField(
     onArrowDown: () -> Unit,
     hardwareKeyActions: TerminalHardwareKeyActions = TerminalHardwareKeyActions(),
     focusRequester: FocusRequester,
+    onRequestScrollToBottom: () -> Unit = {},
 ) {
     val textStyle = TextStyle(
         color = Color(0xFFECEFF1),
@@ -92,10 +95,25 @@ fun GhostTextField(
     val promptColor = if (isWaitingConfirmation) Color(0xFFFFD54F) else Color(0xFF69F0AE)
     val keyboardController = LocalSoftwareKeyboardController.current
 
+    val textFieldInteractionSource = remember { MutableInteractionSource() }
+
+    // 【关键机制 - 请勿删除】：
+    // 监听 BasicTextField 内部的点击与抬起交互。当用户直接点击输入行文本或光标位置时，
+    // 外层容器的手势会被 BasicTextField 自身消费，导致外层点击事件无法触发吸底。
+    // 此处监听 PressInteraction.Release，确保点击输入文本框时也能通知外部立即滚动并吸底。
+    LaunchedEffect(textFieldInteractionSource) {
+        textFieldInteractionSource.interactions.collect { interaction ->
+            if (interaction is PressInteraction.Release) {
+                onRequestScrollToBottom()
+            }
+        }
+    }
+
     val requestFocusAndMoveCursorToEnd = {
         if (value.text.isNotEmpty() && (value.selection.start != value.text.length || value.selection.end != value.text.length)) {
             onValueChange(value.copy(selection = TextRange(value.text.length)))
         }
+        onRequestScrollToBottom()
         focusRequester.requestFocus()
         keyboardController?.show()
     }
@@ -165,6 +183,7 @@ fun GhostTextField(
                     cursorBrush = SolidColor(Color(0xFF69F0AE)),
                     singleLine = false,
                     maxLines = 5,
+                    interactionSource = textFieldInteractionSource,
                     keyboardOptions = KeyboardOptions(
                         imeAction = ImeAction.Send,
                         autoCorrectEnabled = false

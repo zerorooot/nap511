@@ -66,7 +66,7 @@ class PipelineEngine(
     /**
      * 使用 ChannelFlow 与 Buffer 隔离管道阶段，确保各级命令并发流畅流动，避免死锁
      */
-    private suspend fun executeStage(
+    private fun executeStage(
         commandDef: CommandDefinition,
         ctx: TerminalContext,
         args: List<String>,
@@ -74,7 +74,7 @@ class PipelineEngine(
     ): Flow<String> = channelFlow {
         try {
             // 管道流按行规范化展开，确保包含 \n 的输出在下游以独立单行流转
-            val lineStream = kotlinx.coroutines.flow.flow {
+            val lineStream = flow {
                 stdin.collect { chunk ->
                     for (line in chunk.split('\n')) {
                         emit(line)

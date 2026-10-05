@@ -142,6 +142,23 @@ fun TerminalScreen(
 
     var shouldScrollToBottomOnIme by remember { mutableStateOf(false) }
 
+    // 【关键机制 - 请勿删除 safeScrollToBottom】：
+    // 安全吸底函数：严格防御 IndexOutOfBoundsException。
+    // 在 LazyColumn 重组或大量异步输出（如连续快速执行 ls）刷屏时，
+    // listState 的内部 itemProvider 数量可能与 viewModel.lines.size 存在微小的帧异步。
+    // 此处结合 layoutInfo.totalItemsCount 进行范围收敛，并在极端情况下捕获越界异常，确保应用绝对不崩溃。
+    suspend fun safeScrollToBottom() {
+        val total = listState.layoutInfo.totalItemsCount
+        if (total > 0) {
+            val targetIndex = (total - 1).coerceAtLeast(0)
+            try {
+                listState.scrollToItem(targetIndex)
+            } catch (_: IndexOutOfBoundsException) {
+                // 捕获并发帧间可能出现的短暂越界，安全降级
+            }
+        }
+    }
+
     val bringUpKeyboard: () -> Unit = {
         val current = viewModel.inputState
         if (current.selection.start != current.text.length || current.selection.end != current.text.length) {
@@ -153,7 +170,7 @@ fun TerminalScreen(
         focusRequester.requestFocus()
         keyboardController?.show()
         scope.launch {
-            listState.scrollToItem((viewModel.lines.size + 1).coerceAtLeast(0))
+            safeScrollToBottom()
         }
     }
 
@@ -166,10 +183,25 @@ fun TerminalScreen(
 
     // 监听软键盘高度动态变化：当用户显式唤起软键盘时，在软键盘升起全过程以及升起完成后，持续锚定滚动到行尾输入框
     val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+    var wasImeClosed by remember { mutableStateOf(true) }
+
+    // 【关键机制 - 双保险键盘弹出吸底】：
+    // 无论用户是通过点击输出区、空白区还是直接点击输入框触发的键盘升起，
+    // 只要键盘高度从 0.dp 变为 > 0.dp，说明软键盘正在弹出，自动激活吸底锁定。
+    LaunchedEffect(imeBottom) {
+        if (imeBottom > 0.dp) {
+            if (wasImeClosed) {
+                shouldScrollToBottomOnIme = true
+            }
+            wasImeClosed = false
+        } else {
+            wasImeClosed = true
+        }
+    }
+
     LaunchedEffect(imeBottom, shouldScrollToBottomOnIme) {
         if (shouldScrollToBottomOnIme && imeBottom > 0.dp) {
-            val targetIndex = (viewModel.lines.size + 1).coerceAtLeast(0)
-            listState.scrollToItem(targetIndex)
+            safeScrollToBottom()
             // 等待软键盘升起动画稳定后解除强制吸底锁定
             delay(300.milliseconds)
             shouldScrollToBottomOnIme = false
@@ -190,8 +222,14 @@ fun TerminalScreen(
     // 智能防打扰滚动：在行数变化（新输出追加）或命令执行中（isExecuting），自动锚定吸底
     LaunchedEffect(viewModel.lines.size, viewModel.isExecuting) {
         if (viewModel.isExecuting || isAtBottom) {
-            val targetIndex = (viewModel.lines.size + 1).coerceAtLeast(0)
-            listState.scrollToItem(targetIndex)
+            safeScrollToBottom()
+        }
+    }
+
+    // 当列表测量布局完成、条目总数增加时，如果正在执行命令或处于底部，确保滚动到最新添加的末尾项
+    LaunchedEffect(listState.layoutInfo.totalItemsCount) {
+        if (viewModel.isExecuting || isAtBottom) {
+            safeScrollToBottom()
         }
     }
 
@@ -335,7 +373,10 @@ fun TerminalScreen(
                     onPageUp = {
                         scope.launch {
                             val target = (listState.firstVisibleItemIndex - 12).coerceAtLeast(0)
-                            listState.animateScrollToItem(target)
+                            try {
+                                listState.animateScrollToItem(target)
+                            } catch (_: IndexOutOfBoundsException) {
+                            }
                         }
                     },
                     onMenu = { showMenuSheet = true },
@@ -348,9 +389,13 @@ fun TerminalScreen(
                     onArrowRight = { viewModel.moveCursorRight() },
                     onPageDown = {
                         scope.launch {
+                            val maxIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
                             val target =
-                                (listState.firstVisibleItemIndex + 12).coerceAtMost(viewModel.lines.size)
-                            listState.animateScrollToItem(target)
+                                (listState.firstVisibleItemIndex + 12).coerceAtMost(maxIndex)
+                            try {
+                                listState.animateScrollToItem(target)
+                            } catch (_: IndexOutOfBoundsException) {
+                            }
                         }
                     }
                 )
@@ -437,11 +482,7 @@ fun TerminalScreen(
                                     onSubmit = {
                                         viewModel.submitInput()
                                         scope.launch {
-                                            listState.scrollToItem(
-                                                (viewModel.lines.size + 1).coerceAtLeast(
-                                                    0
-                                                )
-                                            )
+                                            safeScrollToBottom()
                                         }
                                     },
                                     onTab = { viewModel.handleTabPress() },
@@ -449,7 +490,13 @@ fun TerminalScreen(
                                     onArrowUp = { viewModel.navigateHistoryUp() },
                                     onArrowDown = { viewModel.navigateHistoryDown() },
                                     hardwareKeyActions = hardwareActions,
-                                    focusRequester = focusRequester
+                                    focusRequester = focusRequester,
+                                    onRequestScrollToBottom = {
+                                        shouldScrollToBottomOnIme = true
+                                        scope.launch {
+                                            safeScrollToBottom()
+                                        }
+                                    }
                                 )
                             }
                         }

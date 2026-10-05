@@ -638,22 +638,28 @@ class TerminalViewModel(
                 val buffer = mutableListOf<TerminalLine>()
                 var lastFlushTime = System.currentTimeMillis()
 
-                fun flushBuffer() {
+                suspend fun flushBuffer() {
                     if (buffer.isNotEmpty()) {
                         val toAdd = buffer.toList()
                         buffer.clear()
-                        appendTerminalLines(toAdd)
+                        withContext(Dispatchers.Main) {
+                            appendTerminalLines(toAdd)
+                        }
                     }
                 }
 
                 flow.collect { line ->
                     if (line == "__TERMINAL_CLEAR_SCREEN__") {
                         flushBuffer()
-                        lines.clear()
+                        withContext(Dispatchers.Main) {
+                            lines.clear()
+                        }
                     } else if (line == "__TERMINAL_EXIT__") {
                         flushBuffer()
-                        resetSession()
-                        onExitAction?.invoke()
+                        withContext(Dispatchers.Main) {
+                            resetSession()
+                            onExitAction?.invoke()
+                        }
                     } else {
                         val lineType = if (line.startsWith("terminal: command not found") || line.contains(": error:")) {
                             TerminalLineType.ERROR
@@ -673,10 +679,14 @@ class TerminalViewModel(
             } catch (e: CancellationException) {
                 // 协程被 Ctrl+C 中断正常退出，不作为异常打印
             } catch (e: Exception) {
-                appendTerminalLine(TerminalLine("execution error: ${e.message}", TerminalLineType.ERROR))
+                withContext(Dispatchers.Main) {
+                    appendTerminalLine(TerminalLine("execution error: ${e.message}", TerminalLineType.ERROR))
+                }
             } finally {
-                isExecuting = false
-                currentExecutionJob = null
+                withContext(Dispatchers.Main) {
+                    isExecuting = false
+                    currentExecutionJob = null
+                }
                 refreshCachedEntries(currentCid)
             }
         }
