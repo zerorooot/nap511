@@ -30,6 +30,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUp
@@ -491,8 +492,7 @@ fun TerminalScreen(
         // 2. 禁止使用 detectTapGestures(onLongPress = ...)：Compose 的 detectTapGestures 在触发长按时会执行 consumeUntilUp()，
         //    会无差别消费后续所有 Pointer 事件，导致子级 SelectionContainer 的长按文本手势被取消。
         // 3. 采用 awaitEachGesture + PointerEventPass.Initial：
-        //    a) 在手指按下的瞬间（Down），若输入框持有焦点，立即主动 clearFocus()，避免 SelectionContainer 随后请求焦点时
-        //       经历 Compose 焦点树“清理旧节点 -> 挂载新节点”的 hasFocus(true -> false) 瞬态突变，导致刚生成的选区被 onRelease() 自毁。
+        //    a) 在手指按下的瞬间（Down），不主动调用 clearFocus()，以保证键盘弹出状态下长按选中文本时软键盘不会因失焦而收回；
         //    b) 仅在判定为轻触单击（非滑动、且耗时小于 longPressTimeoutMillis）抬手时，才唤起输入法并吸底；
         //    c) 若超时判定为长按，则立即退出循环并不消费事件，让子级 SelectionContainer 原生接管文本选区和工具栏。
         Box(
@@ -505,11 +505,8 @@ fun TerminalScreen(
                         val startTime = System.currentTimeMillis()
                         var moved = false
 
-                        // 若输入框持有焦点，在触摸发生的第一时间（Initial Pass Down）主动释放输入框焦点。
-                        // 这样既能收拢焦点，又能避免长按发生时 SelectionContainer 的 hasFocus 发生 true -> false 瞬态切换触发 onRelease() 销毁选择
-                        if (isInputFocused) {
-                            focusManager.clearFocus()
-                        }
+                        // 若输入框持有焦点，不要在按下时盲目 clearFocus，否则会导致软键盘立即收回。
+                        // 用户希望在软键盘展开时长按选中文本，软键盘保持展开状态。
 
                         while (true) {
                             val event = awaitPointerEvent(pass = PointerEventPass.Initial)
@@ -544,7 +541,16 @@ fun TerminalScreen(
                     thumbUnselectedColor = MaterialTheme.colorScheme.secondary
                 )
             ) {
-                SelectionContainer {
+                // 【关键机制 - 请勿删除 focusProperties】：
+                // 当输入框正持有焦点（键盘弹出）时，将 SelectionContainer 的 canFocus 设为 false。
+                // 这样当用户长按选中文本时，SelectionManager 的 focusRequester.requestFocus() 不会强行夺走输入框的焦点，
+                // 使得软键盘能够稳定保持弹出状态；同时由于输入框（子节点）仍持有焦点，SelectionContainer.hasFocus 仍为 true，
+                // 文本选区与操作工具栏（复制、全选）依然可以正常展示。
+                SelectionContainer(
+                    modifier = Modifier.focusProperties {
+                        canFocus = !isInputFocused
+                    }
+                ) {
                     LazyColumn(
                         state = listState,
                         contentPadding = innerPadding,
