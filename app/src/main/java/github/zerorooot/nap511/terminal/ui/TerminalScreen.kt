@@ -11,7 +11,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,15 +27,8 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.changedToUp
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteSweep
@@ -52,7 +46,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,10 +56,14 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.SpanStyle
@@ -120,15 +117,8 @@ fun TerminalScreen(
     val view = LocalView.current
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    // 【关键退出状态 - 请勿删除】：
-    // 标记当前页面是否正在退出（如按返回键、执行 exit 命令或页面被销毁）。
-    // 传递给 GhostTextField 以彻底阻止失焦时重新请求焦点，
-    // 避免退出页面时输入法意外闪弹以及在已脱落节点上触发 "visitAncestors called on an unattached node" 致命崩溃。
-    var isExiting by remember { mutableStateOf(false) }
-
     val handleBack: () -> Unit = remember(keyboardController, onBack) {
         {
-            isExiting = true
             keyboardController?.hide()
             onBack()
         }
@@ -147,14 +137,12 @@ fun TerminalScreen(
             insetsController.isAppearanceLightNavigationBars = false
 
             onDispose {
-                isExiting = true
                 insetsController.isAppearanceLightStatusBars = originalLightStatus
                 insetsController.isAppearanceLightNavigationBars = originalLightNav
                 keyboardController?.hide()
             }
         } else {
             onDispose {
-                isExiting = true
                 keyboardController?.hide()
             }
         }
@@ -469,7 +457,8 @@ fun TerminalScreen(
                     onArrowRight = { viewModel.moveCursorRight() },
                     onPageDown = {
                         scope.launch {
-                            val maxIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                            val maxIndex =
+                                (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
                             val target =
                                 (listState.firstVisibleItemIndex + 12).coerceAtMost(maxIndex)
                             try {
@@ -501,7 +490,10 @@ fun TerminalScreen(
                 .background(Color(0xFF101010))
                 .pointerInput(Unit) {
                     awaitEachGesture {
-                        val down = awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
+                        val down = awaitFirstDown(
+                            pass = PointerEventPass.Initial,
+                            requireUnconsumed = false
+                        )
                         val startTime = System.currentTimeMillis()
                         var moved = false
 
@@ -609,8 +601,6 @@ fun TerminalScreen(
                                     onArrowDown = { viewModel.navigateHistoryDown() },
                                     hardwareKeyActions = hardwareActions,
                                     focusRequester = focusRequester,
-                                    isImeVisible = imeBottom > 0.dp,
-                                    isExiting = isExiting,
                                     onRequestScrollToBottom = {
                                         autoScrollToBottom = true
                                         shouldScrollToBottomOnIme = true

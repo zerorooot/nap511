@@ -90,10 +90,6 @@ fun GhostTextField(
     onArrowDown: () -> Unit,
     hardwareKeyActions: TerminalHardwareKeyActions = TerminalHardwareKeyActions(),
     focusRequester: FocusRequester,
-    // 【关键状态 - 请勿删除】：用于判定当前软键盘是否处于展开状态，配合长按选中文本时的焦点保持机制
-    isImeVisible: Boolean = false,
-    // 【关键状态 - 请勿删除】：标记页面是否正在退出，防止返回时反向拉起软键盘或在已脱落节点上触发崩溃
-    isExiting: Boolean = false,
     onRequestScrollToBottom: () -> Unit = {},
     onFocusChange: ((Boolean) -> Unit)? = null,
 ) {
@@ -107,7 +103,6 @@ fun GhostTextField(
     val promptColor = if (isWaitingConfirmation) Color(0xFFFFD54F) else Color(0xFF69F0AE)
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    val scope = rememberCoroutineScope()
     var hasBeenFocused by remember { mutableStateOf(false) }
 
     val textFieldInteractionSource = remember { MutableInteractionSource() }
