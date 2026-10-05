@@ -12,6 +12,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -171,6 +172,17 @@ fun TerminalScreen(
         }
     }
 
+    // 【关键跟随输出模式 - 请勿删除 autoScrollToBottom】：
+    // 终端核心吸底跟随状态（Follow Output Mode）：
+    // 1. 默认为 true（持续跟随最新输出并吸底锚定输入框）。
+    // 2. 当用户主动向上拖拽手势离开底部去翻看历史输出时，置为 false，防止新输出打扰用户阅读。
+    // 3. 当用户滑回底部、提交命令、点击输入框或重新呼起键盘时，立即恢复为 true。
+    // 4. 彻底解决旧逻辑依赖瞬时 isAtBottom (lastVisible >= total - 3) 在快速输出大量新条目时因 totalItems 骤增
+    //    导致判定瞬态失真为 false、跳过滚动使页面停留在旧位置的恶性 Bug。
+    var autoScrollToBottom by remember { mutableStateOf(true) }
+    val isDragged by listState.interactionSource.collectIsDraggedAsState()
+    var userScrolled by remember { mutableStateOf(false) }
+
     val bringUpKeyboard: () -> Unit = {
         val current = viewModel.inputState
         if (current.selection.start != current.text.length || current.selection.end != current.text.length) {
@@ -179,6 +191,7 @@ fun TerminalScreen(
             )
         }
         shouldScrollToBottomOnIme = true
+        autoScrollToBottom = true
         try {
             focusRequester.requestFocus()
             keyboardController?.show()
@@ -189,10 +202,36 @@ fun TerminalScreen(
         }
     }
 
-    // 用户主动滚动列表时，若当前处于请求升起键盘吸底模式，则立刻解除锁定，避免与用户滑动手势冲突
+    // 监听用户物理拖拽手势：用户手指按在屏幕上拖拽列表时，标记 userScrolled
+    LaunchedEffect(isDragged) {
+        if (isDragged) {
+            userScrolled = true
+            shouldScrollToBottomOnIme = false
+        }
+    }
+
+    // 用户滚动进行状态监听（包含惯性滑动与程序化滚动）
     LaunchedEffect(listState.isScrollInProgress) {
         if (listState.isScrollInProgress) {
-            shouldScrollToBottomOnIme = false
+            if (userScrolled) {
+                shouldScrollToBottomOnIme = false
+            }
+        } else {
+            // 当滚动彻底停止（包括惯性滑动 fling 结束）
+            val layoutInfo = listState.layoutInfo
+            val totalItems = layoutInfo.totalItemsCount
+            if (totalItems > 0) {
+                val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                val atBottom = lastVisibleIndex >= totalItems - 3
+                if (atBottom) {
+                    // 用户滑到底部附近，恢复自动吸底跟随模式
+                    autoScrollToBottom = true
+                } else if (userScrolled) {
+                    // 仅当用户主动向上滑动离开底部查看历史时，才暂停自动吸底跟随模式
+                    autoScrollToBottom = false
+                }
+            }
+            userScrolled = false
         }
     }
 
@@ -202,11 +241,12 @@ fun TerminalScreen(
 
     // 【关键机制 - 双保险键盘弹出吸底】：
     // 无论用户是通过点击输出区、空白区还是直接点击输入框触发的键盘升起，
-    // 只要键盘高度从 0.dp 变为 > 0.dp，说明软键盘正在弹出，自动激活吸底锁定。
+    // 只要键盘高度从 0.dp 变为 > 0.dp，说明软键盘正在弹出，自动激活吸底锁定与跟随模式。
     LaunchedEffect(imeBottom) {
         if (imeBottom > 0.dp) {
             if (wasImeClosed) {
                 shouldScrollToBottomOnIme = true
+                autoScrollToBottom = true
             }
             wasImeClosed = false
         } else {
@@ -223,29 +263,19 @@ fun TerminalScreen(
         }
     }
 
-    // 判断用户当前是否处于最底部（当前可见的最后一项是否为倒数前 3 项之一）
-    val isAtBottom by remember {
-        derivedStateOf {
-            val layoutInfo = listState.layoutInfo
-            val totalItems = layoutInfo.totalItemsCount
-            if (totalItems == 0) return@derivedStateOf true
-            val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            lastVisibleIndex >= totalItems - 3
-        }
-    }
-
-    // 智能防打扰滚动：在行数变化（新输出追加）或命令执行中（isExecuting），自动锚定吸底
-    LaunchedEffect(viewModel.lines.size, viewModel.isExecuting) {
-        if (viewModel.isExecuting || isAtBottom) {
+    // 【智能防打扰滚动】：
+    // 在输出行变化（新输出追加）或命令执行状态变化时，只要处于吸底跟随模式，自动锚定吸底
+    LaunchedEffect(viewModel.lines.lastOrNull()?.id, viewModel.isExecuting) {
+        if (autoScrollToBottom) {
             safeScrollToBottom()
         }
     }
 
-    // 当列表测量布局完成、条目总数增加时，如果正在执行命令或处于底部，确保滚动到最新添加的末尾项
+    // 当列表测量布局完成、条目总数增加时，如果处于吸底跟随模式，确保滚动到最新添加的末尾项
     LaunchedEffect(listState) {
         snapshotFlow { listState.layoutInfo.totalItemsCount }
             .collect {
-                if (viewModel.isExecuting || isAtBottom) {
+                if (autoScrollToBottom) {
                     safeScrollToBottom()
                 }
             }
@@ -319,7 +349,10 @@ fun TerminalScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = { viewModel.clearScreen() }) {
+                        IconButton(onClick = {
+                            autoScrollToBottom = true
+                            viewModel.clearScreen()
+                        }) {
                             Icon(
                                 imageVector = Icons.Default.DeleteSweep,
                                 contentDescription = "清屏",
@@ -341,6 +374,7 @@ fun TerminalScreen(
                                 text = { Text("帮助手册") },
                                 onClick = {
                                     showTopDropdown = false
+                                    autoScrollToBottom = true
                                     viewModel.onInputChange(TextFieldValue("?"))
                                     viewModel.submitInput()
                                 }
@@ -408,6 +442,7 @@ fun TerminalScreen(
                             val target = (listState.firstVisibleItemIndex - 12).coerceAtLeast(0)
                             try {
                                 listState.animateScrollToItem(target)
+                                autoScrollToBottom = false
                             } catch (_: IndexOutOfBoundsException) {
                             }
                         }
@@ -427,6 +462,9 @@ fun TerminalScreen(
                                 (listState.firstVisibleItemIndex + 12).coerceAtMost(maxIndex)
                             try {
                                 listState.animateScrollToItem(target)
+                                if (target >= maxIndex - 2) {
+                                    autoScrollToBottom = true
+                                }
                             } catch (_: IndexOutOfBoundsException) {
                             }
                         }
@@ -513,6 +551,7 @@ fun TerminalScreen(
                                     promptSign = if (viewModel.isWaitingConfirmation) "confirm (yes/no): " else "$ ",
                                     isWaitingConfirmation = viewModel.isWaitingConfirmation,
                                     onSubmit = {
+                                        autoScrollToBottom = true
                                         viewModel.submitInput()
                                         scope.launch {
                                             safeScrollToBottom()
@@ -527,6 +566,7 @@ fun TerminalScreen(
                                     isImeVisible = imeBottom > 0.dp,
                                     isExiting = isExiting,
                                     onRequestScrollToBottom = {
+                                        autoScrollToBottom = true
                                         shouldScrollToBottomOnIme = true
                                         scope.launch {
                                             safeScrollToBottom()
