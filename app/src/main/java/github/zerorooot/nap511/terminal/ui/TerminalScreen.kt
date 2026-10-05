@@ -17,9 +17,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -74,9 +76,11 @@ import github.zerorooot.nap511.terminal.viewmodel.TerminalLineType
 import github.zerorooot.nap511.terminal.viewmodel.TerminalViewModel
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.copy
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
+import kotlin.time.Duration.Companion.milliseconds
 
 private fun Context.findActivity(): Activity? {
     var ctx = this
@@ -136,6 +140,8 @@ fun TerminalScreen(
         }
     }
 
+    var shouldScrollToBottomOnIme by remember { mutableStateOf(false) }
+
     val bringUpKeyboard: () -> Unit = {
         val current = viewModel.inputState
         if (current.selection.start != current.text.length || current.selection.end != current.text.length) {
@@ -143,10 +149,30 @@ fun TerminalScreen(
                 current.copy(selection = TextRange(current.text.length))
             )
         }
+        shouldScrollToBottomOnIme = true
         focusRequester.requestFocus()
         keyboardController?.show()
         scope.launch {
             listState.scrollToItem((viewModel.lines.size + 1).coerceAtLeast(0))
+        }
+    }
+
+    // 用户主动滚动列表时，若当前处于请求升起键盘吸底模式，则立刻解除锁定，避免与用户滑动手势冲突
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) {
+            shouldScrollToBottomOnIme = false
+        }
+    }
+
+    // 监听软键盘高度动态变化：当用户显式唤起软键盘时，在软键盘升起全过程以及升起完成后，持续锚定滚动到行尾输入框
+    val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+    LaunchedEffect(imeBottom, shouldScrollToBottomOnIme) {
+        if (shouldScrollToBottomOnIme && imeBottom > 0.dp) {
+            val targetIndex = (viewModel.lines.size + 1).coerceAtLeast(0)
+            listState.scrollToItem(targetIndex)
+            // 等待软键盘升起动画稳定后解除强制吸底锁定
+            delay(300.milliseconds)
+            shouldScrollToBottomOnIme = false
         }
     }
 
