@@ -11,9 +11,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -24,10 +22,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.imeNestedScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -330,6 +328,9 @@ fun TerminalScreen(
                         onTap = {
                             viewModel.dismissCompletionBar()
                             bringUpKeyboard()
+                        },
+                        onLongPress = {
+                            // 拦截长按事件，防止松开手时触发 onTap 导致重置键盘 focus 与滚动列表
                         }
                     )
                 }
@@ -340,7 +341,6 @@ fun TerminalScreen(
                     contentPadding = innerPadding,
                     modifier = Modifier
                         .fillMaxSize()
-                        .imeNestedScroll()
                         .padding(horizontal = 10.dp)
                 ) {
                     items(
@@ -351,65 +351,62 @@ fun TerminalScreen(
                     }
 
                     item(key = "terminal_ghost_input") {
-                        val hardwareActions = remember(viewModel, exitAndReset) {
-                            TerminalHardwareKeyActions(
-                                onCtrlC = { viewModel.handleCtrlC() },
-                                onCtrlU = { viewModel.handleCtrlU() },
-                                onCtrlK = { viewModel.handleCtrlK() },
-                                onCtrlW = { viewModel.handleCtrlW() },
-                                onCtrlL = { viewModel.handleCtrlL() },
-                                onCtrlA = { viewModel.handleCtrlA() },
-                                onCtrlE = { viewModel.handleCtrlE() },
-                                onCtrlD = { viewModel.handleCtrlD(exitAndReset) },
-                                onCtrlLeft = { viewModel.handleCtrlLeft() },
-                                onCtrlRight = { viewModel.handleCtrlRight() },
-                                onAltB = { viewModel.handleAltB() },
-                                onAltF = { viewModel.handleAltF() },
-                                onAltD = { viewModel.handleAltD() },
-                                onAltBackspace = { viewModel.handleAltBackspace() },
-                                onAltDot = { viewModel.handleAltDot() }
+                        DisableSelection {
+                            val hardwareActions = remember(viewModel, exitAndReset) {
+                                TerminalHardwareKeyActions(
+                                    onCtrlC = { viewModel.handleCtrlC() },
+                                    onCtrlU = { viewModel.handleCtrlU() },
+                                    onCtrlK = { viewModel.handleCtrlK() },
+                                    onCtrlW = { viewModel.handleCtrlW() },
+                                    onCtrlL = { viewModel.handleCtrlL() },
+                                    onCtrlA = { viewModel.handleCtrlA() },
+                                    onCtrlE = { viewModel.handleCtrlE() },
+                                    onCtrlD = { viewModel.handleCtrlD(exitAndReset) },
+                                    onCtrlLeft = { viewModel.handleCtrlLeft() },
+                                    onCtrlRight = { viewModel.handleCtrlRight() },
+                                    onAltB = { viewModel.handleAltB() },
+                                    onAltF = { viewModel.handleAltF() },
+                                    onAltD = { viewModel.handleAltD() },
+                                    onAltBackspace = { viewModel.handleAltBackspace() },
+                                    onAltDot = { viewModel.handleAltDot() }
+                                )
+                            }
+
+                            GhostTextField(
+                                value = viewModel.inputState,
+                                onValueChange = { viewModel.onInputChange(it) },
+                                ghostText = viewModel.ghostText,
+                                contextPrompt = viewModel.contextPromptText(),
+                                promptSign = if (viewModel.isWaitingConfirmation) "confirm (yes/no): " else "$ ",
+                                isWaitingConfirmation = viewModel.isWaitingConfirmation,
+                                onSubmit = {
+                                    viewModel.submitInput()
+                                    scope.launch {
+                                        listState.scrollToItem(
+                                            (viewModel.lines.size + 1).coerceAtLeast(
+                                                0
+                                            )
+                                        )
+                                    }
+                                },
+                                onTab = { viewModel.handleTabPress() },
+                                onAcceptGhostText = { viewModel.acceptGhostText() },
+                                onArrowUp = { viewModel.navigateHistoryUp() },
+                                onArrowDown = { viewModel.navigateHistoryDown() },
+                                hardwareKeyActions = hardwareActions,
+                                focusRequester = focusRequester
                             )
                         }
-
-                        GhostTextField(
-                            value = viewModel.inputState,
-                            onValueChange = { viewModel.onInputChange(it) },
-                            ghostText = viewModel.ghostText,
-                            contextPrompt = viewModel.contextPromptText(),
-                            promptSign = if (viewModel.isWaitingConfirmation) "confirm (yes/no): " else "$ ",
-                            isWaitingConfirmation = viewModel.isWaitingConfirmation,
-                            onSubmit = {
-                                viewModel.submitInput()
-                                scope.launch {
-                                    listState.scrollToItem(
-                                        (viewModel.lines.size + 1).coerceAtLeast(
-                                            0
-                                        )
-                                    )
-                                }
-                            },
-                            onTab = { viewModel.handleTabPress() },
-                            onAcceptGhostText = { viewModel.acceptGhostText() },
-                            onArrowUp = { viewModel.navigateHistoryUp() },
-                            onArrowDown = { viewModel.navigateHistoryDown() },
-                            hardwareKeyActions = hardwareActions,
-                            focusRequester = focusRequester
-                        )
                     }
 
                     item(key = "terminal_bottom_spacer") {
-                        Spacer(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(40.dp)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null
-                                ) {
-                                    viewModel.dismissCompletionBar()
-                                    bringUpKeyboard()
-                                }
-                        )
+                        DisableSelection {
+                            Spacer(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(40.dp)
+                            )
+                        }
                     }
                 }
             }
