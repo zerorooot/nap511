@@ -29,8 +29,9 @@ class CommandDefinition(
     private val executor: suspend (ctx: TerminalContext, args: List<String>, stdin: Flow<String>) -> Flow<String>
 ) {
     suspend fun execute(ctx: TerminalContext, args: List<String>, stdin: Flow<String>): Flow<String> {
-        // 自动拦截 -h 与 --help 参数，输出该命令的参数说明与用法
-        if (args.contains("-h") || args.contains("--help")) {
+        // 当使用 --help 或 (当命令本身未定义 -h 选项且参数包含 -h) 时自动拦截输出参数说明与用法
+        val hasHOption = flags.any { it.optionName == "-h" }
+        if (args.contains("--help") || (!hasHOption && args.contains("-h"))) {
             return flow {
                 emit(buildHelpMessage())
             }

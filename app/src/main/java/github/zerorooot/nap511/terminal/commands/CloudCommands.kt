@@ -18,6 +18,7 @@ import github.zerorooot.nap511.terminal.engine.GlobMatcher
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileOpenResult
+import github.zerorooot.nap511.util.formatFileSize
 import github.zerorooot.nap511.worker.UnzipAllFileWorker
 import kotlinx.coroutines.flow.flow
 import java.io.File
@@ -48,7 +49,7 @@ object CloudCommands {
             description = "查看网盘容量配额、已用空间与剩余空间"
             usage = "df [-h]"
             flag("-h", "人性化容量单位显示")
-            execute { ctx, _, _ ->
+            execute { ctx, args, _ ->
                 flow {
                     try {
                         val json = ctx.fileRepository.remainingSpace(1)
@@ -60,6 +61,23 @@ object CloudCommands {
                             val totalBytes = bean.total.size.toDouble().coerceAtLeast(1.0)
                             val usedBytes = bean.use.size.toDouble()
                             val pct = ((usedBytes / totalBytes) * 100).toInt()
+
+                            val isHuman = args.contains("-h")
+                            val totalStr = if (isHuman) {
+                                bean.total.sizeFormat.ifEmpty { bean.total.size.formatFileSize() }
+                            } else {
+                                "${bean.total.size} B"
+                            }
+                            val usedStr = if (isHuman) {
+                                bean.use.sizeFormat.ifEmpty { bean.use.size.formatFileSize() }
+                            } else {
+                                "${bean.use.size} B"
+                            }
+                            val availStr = if (isHuman) {
+                                bean.remain.sizeFormat.ifEmpty { bean.remain.size.formatFileSize() }
+                            } else {
+                                "${bean.remain.size} B"
+                            }
 
                             emit(
                                 String.format(
@@ -78,9 +96,9 @@ object CloudCommands {
                                     Locale.getDefault(),
                                     "%-18s %10s %10s %10s %4d%% %s",
                                     "115:CloudDrive",
-                                    bean.total.sizeFormat,
-                                    bean.use.sizeFormat,
-                                    bean.remain.sizeFormat,
+                                    totalStr,
+                                    usedStr,
+                                    availStr,
                                     pct,
                                     "/"
                                 )
@@ -110,7 +128,9 @@ object CloudCommands {
                 "-filter <type>",
                 "按 115 业务分类筛选：1/doc(文档), 2/img(图片), 3/audio(音频), 4/video(视频), 5/zip(压缩), 6/app(软件)"
             )
-            flag("-maxdepth <N>", "限制递归搜索的最大层级深度")
+            flag("-maxdepth <N>", "限制递归搜索的最大层级深度，默认为5")
+            flag("-empty", "只匹配空文件（大小为 0）或空目录（内容为空）")
+            flag("-size <[+|-]N[k|M|G]>", "按文件大小筛选（如 +100M 大于 100MB，-10k 小于 10KB）")
             flag("-global", "在整个 115 网盘根目录进行全局云端搜索")
             execute { ctx, args, _ ->
                 flow {
@@ -119,43 +139,47 @@ object CloudCommands {
                     var suffixFilter: String? = null
                     var filterType: Int? = null
                     var maxDepth = 5
-                    val isGlobal = args.contains("-global")
+                    var isEmptyFilter = false
+                    var sizeFilterSpec: String? = null
+                    var pathArg: String? = null
+                    var isGlobal = false
 
                     var i = 0
                     while (i < args.size) {
-                        when (args[i]) {
-                            "-name" -> if (i + 1 < args.size) namePattern = args[++i]
-                            "-type" -> if (i + 1 < args.size) typeFilter = args[++i]
-                            "-suffix" -> if (i + 1 < args.size) suffixFilter =
+                        val arg = args[i]
+                        when {
+                            arg == "-name" && i + 1 < args.size -> namePattern = args[++i]
+                            arg == "-type" && i + 1 < args.size -> typeFilter = args[++i]
+                            arg == "-suffix" && i + 1 < args.size -> suffixFilter =
                                 args[++i].trimStart('.')
 
-                            "-filter" -> if (i + 1 < args.size) filterType =
+                            arg == "-filter" && i + 1 < args.size -> filterType =
                                 parseFilterType(args[++i])
 
-                            "-maxdepth" -> if (i + 1 < args.size) maxDepth =
+                            arg == "-maxdepth" && i + 1 < args.size -> maxDepth =
                                 args[++i].toIntOrNull() ?: 5
+
+                            arg == "-size" && i + 1 < args.size -> sizeFilterSpec = args[++i]
+                            arg == "-empty" -> isEmptyFilter = true
+                            arg == "-global" -> isGlobal = true
+                            !arg.startsWith("-") && pathArg == null -> pathArg = arg
                         }
                         i++
                     }
 
-                    // 提取目标路径（非选项参数）
-                    val pathArg = args.firstOrNull {
-                        !it.startsWith("-") && it != args.getOrNull(args.indexOf("-name") + 1)
-                                && it != args.getOrNull(args.indexOf("-type") + 1)
-                                && it != args.getOrNull(args.indexOf("-suffix") + 1)
-                                && it != args.getOrNull(args.indexOf("-filter") + 1)
-                                && it != args.getOrNull(args.indexOf("-maxdepth") + 1)
-                    }
+                    val sizeFilter = sizeFilterSpec?.let { parseSizeFilter(it) }
 
-                    val targetCid = if (isGlobal) {
-                        "0"
+                    val (targetCid, searchRootPath) = if (isGlobal) {
+                        Pair("0", "/根目录")
                     } else if (pathArg != null) {
-                        ctx.resolvePath(pathArg)?.first ?: run {
+                        val resolved = ctx.resolvePath(pathArg)
+                        if (resolved == null) {
                             emit("find: '$pathArg': No such file or directory")
                             return@flow
                         }
+                        resolved
                     } else {
-                        ctx.currentCid
+                        Pair(ctx.currentCid, ctx.currentPath)
                     }
 
                     // 1. 若指定了 -filter，参考 FileViewModel.filterFile 直接调用 fileRepository.filterFile
@@ -179,6 +203,21 @@ object CloudCommands {
                                         namePattern,
                                         it.name
                                     ) || it.name.contains(namePattern, ignoreCase = true)
+                                }
+                            }
+                            if (sizeFilter != null) {
+                                list = list.filter {
+                                    val sz = it.size.toLongOrNull() ?: 0L
+                                    matchesSize(sz, sizeFilter)
+                                }
+                            }
+                            if (isEmptyFilter) {
+                                list = list.filter {
+                                    if (it.isFolder) {
+                                        ctx.listDirectory(it.categoryId).isEmpty()
+                                    } else {
+                                        (it.size.toLongOrNull() ?: 0L) == 0L
+                                    }
                                 }
                             }
 
@@ -258,6 +297,25 @@ object CloudCommands {
                                     matches = false
                                 }
                             }
+                            if (sizeFilter != null) {
+                                val fileSize = file.size.toLongOrNull() ?: 0L
+                                if (!matchesSize(fileSize, sizeFilter)) {
+                                    matches = false
+                                }
+                            }
+                            if (isEmptyFilter && matches) {
+                                if (file.isFolder) {
+                                    val subFiles = ctx.listDirectory(file.categoryId)
+                                    if (subFiles.isNotEmpty()) {
+                                        matches = false
+                                    }
+                                } else {
+                                    val fileSize = file.size.toLongOrNull() ?: 0L
+                                    if (fileSize != 0L) {
+                                        matches = false
+                                    }
+                                }
+                            }
 
                             if (matches) {
                                 emit(fullPath + if (file.isFolder) "/" else "")
@@ -269,7 +327,6 @@ object CloudCommands {
                         }
                     }
 
-                    val searchRootPath = pathArg ?: ctx.currentPath
                     searchRecursive(targetCid, searchRootPath, 1)
                 }
             }
@@ -682,6 +739,54 @@ object CloudCommands {
             "5", "zip", "archive", "rar", "7z", "压缩" -> 5
             "6", "app", "apk", "software", "软件" -> 6
             else -> raw.toIntOrNull()
+        }
+    }
+
+    private data class SizeFilter(
+        val operator: Char,
+        val targetBytes: Long
+    )
+
+    private fun parseSizeFilter(raw: String): SizeFilter? {
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty()) return null
+        val operator = when (trimmed.first()) {
+            '+' -> '+'
+            '-' -> '-'
+            else -> '='
+        }
+        val numberAndUnit = if (trimmed.first() == '+' || trimmed.first() == '-') {
+            trimmed.substring(1)
+        } else {
+            trimmed
+        }
+        if (numberAndUnit.isEmpty()) return null
+
+        var multiplier = 1L
+        val lastChar = numberAndUnit.last()
+        val numStr = if (lastChar.isLetter()) {
+            multiplier = when (lastChar.lowercaseChar()) {
+                'k' -> 1024L
+                'm' -> 1024L * 1024L
+                'g' -> 1024L * 1024L * 1024L
+                'b', 'c' -> 1L
+                else -> return null
+            }
+            numberAndUnit.dropLast(1)
+        } else {
+            numberAndUnit
+        }
+
+        val num = numStr.toLongOrNull() ?: return null
+        return SizeFilter(operator, num * multiplier)
+    }
+
+    private fun matchesSize(fileSize: Long, filter: SizeFilter): Boolean {
+        return when (filter.operator) {
+            '+' -> fileSize > filter.targetBytes
+            '-' -> fileSize < filter.targetBytes
+            '=' -> fileSize == filter.targetBytes
+            else -> false
         }
     }
 }

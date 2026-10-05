@@ -114,13 +114,24 @@ class TerminalContext(
      * @return 匹配成功返回 ResolvedTarget，不存在则返回 null
      */
     suspend fun resolveTarget(target: String): ResolvedTarget? = withContext(Dispatchers.IO) {
+        val res = resolveTargetInternal(target)
+        if (res != null) return@withContext res
+
+        val trimmed = target.trim()
+        if (!trimmed.startsWith("/") && !trimmed.startsWith("~") && currentCid != "0") {
+            return@withContext resolveTargetInternal("/$trimmed")
+        }
+        null
+    }
+
+    private suspend fun resolveTargetInternal(target: String): ResolvedTarget? {
         val trimmed = target.trim()
         if (trimmed.isEmpty() || trimmed == ".") {
-            return@withContext ResolvedTarget.Directory(currentCid, currentPath)
+            return ResolvedTarget.Directory(currentCid, currentPath)
         }
 
         if (trimmed == "/" || trimmed == "~" || trimmed == "/根目录" || trimmed == "/根目录/") {
-            return@withContext ResolvedTarget.Directory("0", "/根目录")
+            return ResolvedTarget.Directory("0", "/根目录")
         }
 
         val hasTrailingSlash = trimmed.endsWith("/")
@@ -135,7 +146,7 @@ class TerminalContext(
         }
 
         if (rawSegments.isEmpty()) {
-            return@withContext ResolvedTarget.Directory(
+            return ResolvedTarget.Directory(
                 if (isAbsolute) "0" else currentCid,
                 if (isAbsolute) "/根目录" else currentPath
             )
@@ -165,7 +176,7 @@ class TerminalContext(
                 }
                 if (isLast) {
                     val resolvedPath = if (currentSegments.isEmpty() || currentSegments == listOf("根目录")) "/根目录" else "/" + currentSegments.joinToString("/")
-                    return@withContext ResolvedTarget.Directory(startCid, resolvedPath)
+                    return ResolvedTarget.Directory(startCid, resolvedPath)
                 }
             } else {
                 val files = listDirectory(startCid)
@@ -175,19 +186,19 @@ class TerminalContext(
                     if (folder != null) {
                         currentSegments.add(segment)
                         val resolvedPath = if (currentSegments.isEmpty() || currentSegments == listOf("根目录")) "/根目录" else "/" + currentSegments.joinToString("/")
-                        return@withContext ResolvedTarget.Directory(folder.categoryId, resolvedPath)
+                        return ResolvedTarget.Directory(folder.categoryId, resolvedPath)
                     }
                     val file = files.firstOrNull { !it.isFolder && it.name == segment }
                     if (file != null) {
                         currentSegments.add(segment)
                         val resolvedPath = if (currentSegments.isEmpty() || currentSegments == listOf("根目录")) "/根目录" else "/" + currentSegments.joinToString("/")
-                        return@withContext ResolvedTarget.File(file, startCid, resolvedPath)
+                        return ResolvedTarget.File(file, startCid, resolvedPath)
                     }
-                    return@withContext null
+                    return null
                 } else {
                     // 中间层级或末尾带 '/'：必须为目录
                     val folder = files.firstOrNull { it.isFolder && it.name == segment }
-                        ?: return@withContext null
+                        ?: return null
                     startCid = folder.categoryId
                     currentSegments.add(segment)
                 }
@@ -195,7 +206,7 @@ class TerminalContext(
         }
 
         val resolvedPath = if (currentSegments.isEmpty() || currentSegments == listOf("根目录")) "/根目录" else "/" + currentSegments.joinToString("/")
-        ResolvedTarget.Directory(startCid, resolvedPath)
+        return ResolvedTarget.Directory(startCid, resolvedPath)
     }
 
     /**

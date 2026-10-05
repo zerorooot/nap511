@@ -97,6 +97,8 @@ class TerminalViewModel(
     var inputState by mutableStateOf(TextFieldValue(""))
         private set
 
+    private var lastSubmittedText = ""
+
     var ghostText by mutableStateOf("")
         private set
 
@@ -262,6 +264,16 @@ class TerminalViewModel(
     }
 
     fun onInputChange(newValue: TextFieldValue) {
+        // 拦截 IME 软键盘回弹的已提交旧文本，防止提交后输入框依然残留上一次输入的命令
+        if (lastSubmittedText.isNotEmpty() && inputState.text.isEmpty()) {
+            val trimmedNew = newValue.text.trim()
+            val trimmedLast = lastSubmittedText.trim()
+            if (trimmedNew == trimmedLast) {
+                return
+            }
+        }
+        lastSubmittedText = ""
+
         // 如果处于 CTRL 或 ALT 粘滞模式，拦截用户通过软键盘输入的对应按键
         if (isCtrlActive || isAltActive) {
             val oldText = inputState.text
@@ -565,6 +577,7 @@ class TerminalViewModel(
      */
     fun submitInput() {
         val raw = inputState.text.trim()
+        lastSubmittedText = inputState.text
         inputState = TextFieldValue("")
         ghostText = ""
         resetModifiers()
@@ -577,6 +590,11 @@ class TerminalViewModel(
             isWaitingConfirmation = false
             confirmDeferred?.complete(isConfirmed)
             confirmDeferred = null
+            return
+        }
+
+        if (isExecuting) {
+            // 已有命令在前台执行中，且非等待确认状态，忽略重复提交
             return
         }
 
@@ -604,7 +622,7 @@ class TerminalViewModel(
         appendTerminalLine(TerminalLine("${contextPromptText()}\n$ $raw", TerminalLineType.COMMAND))
 
         isExecuting = true
-        currentExecutionJob = viewModelScope.launch {
+        currentExecutionJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val flow = engine.execute(raw, context)
                 // 采用微批次聚合输出机制（缓冲区满 50 行或间隔 32ms 即刷屏），保障大量输出时的高帧率渲染
@@ -664,6 +682,7 @@ class TerminalViewModel(
     fun handleCtrlC() {
         resetModifiers()
         dismissCompletionBar()
+        lastSubmittedText = ""
         if (isExecuting) {
             currentExecutionJob?.cancel()
             currentExecutionJob = null

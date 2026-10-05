@@ -92,7 +92,7 @@ fun GhostTextField(
     val keyboardController = LocalSoftwareKeyboardController.current
 
     val requestFocusAndMoveCursorToEnd = {
-        if (value.selection.start != value.text.length || value.selection.end != value.text.length) {
+        if (value.text.isNotEmpty() && (value.selection.start != value.text.length || value.selection.end != value.text.length)) {
             onValueChange(value.copy(selection = TextRange(value.text.length)))
         }
         focusRequester.requestFocus()
@@ -101,7 +101,8 @@ fun GhostTextField(
 
     val submitAndKeepKeyboard = {
         onSubmit()
-        requestFocusAndMoveCursorToEnd()
+        focusRequester.requestFocus()
+        keyboardController?.show()
     }
 
     Column(
