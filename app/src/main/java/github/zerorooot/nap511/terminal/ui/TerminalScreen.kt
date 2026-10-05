@@ -26,8 +26,14 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteSweep
@@ -153,6 +159,8 @@ fun TerminalScreen(
         }
     }
 
+    val focusManager = LocalFocusManager.current
+    var isInputFocused by remember { mutableStateOf(false) }
     var shouldScrollToBottomOnIme by remember { mutableStateOf(false) }
 
     // 【关键机制 - 请勿删除 safeScrollToBottom】：
@@ -250,6 +258,9 @@ fun TerminalScreen(
             }
             wasImeClosed = false
         } else {
+            if (!wasImeClosed && isInputFocused) {
+                focusManager.clearFocus()
+            }
             wasImeClosed = true
         }
     }
@@ -475,25 +486,54 @@ fun TerminalScreen(
     ) { innerPadding ->
         val currentBringUpKeyboard by rememberUpdatedState(bringUpKeyboard)
 
-        // 【关键交互容器 - 请勿改用 Modifier.clickable】：
-        // 1. 禁止使用 Modifier.clickable：clickable 默认带有 focusable 属性，会与 GhostTextField 抢夺焦点；
-        //    且用户长按松开手指时，clickable 仍会派发 onClick，导致意外触发 bringUpKeyboard() 重置光标并 scrollToItem 销毁选择框。
-        // 2. 必须使用 pointerInput + detectTapGestures 并显式实现 onLongPress：
-        //    显式拦截长按事件，消耗事件直至手指抬起，防止长按选中文本松手时误触发 onTap。
+        // 【关键手势与焦点联动机制 - 请勿改用 clickable 或带 onLongPress 的 detectTapGestures】：
+        // 1. 禁止使用 Modifier.clickable：clickable 默认带有 focusable，会抢夺焦点；且长按抬起时仍会派发 onClick。
+        // 2. 禁止使用 detectTapGestures(onLongPress = ...)：Compose 的 detectTapGestures 在触发长按时会执行 consumeUntilUp()，
+        //    会无差别消费后续所有 Pointer 事件，导致子级 SelectionContainer 的长按文本手势被取消。
+        // 3. 采用 awaitEachGesture + PointerEventPass.Initial：
+        //    a) 在手指按下的瞬间（Down），若输入框持有焦点，立即主动 clearFocus()，避免 SelectionContainer 随后请求焦点时
+        //       经历 Compose 焦点树“清理旧节点 -> 挂载新节点”的 hasFocus(true -> false) 瞬态突变，导致刚生成的选区被 onRelease() 自毁。
+        //    b) 仅在判定为轻触单击（非滑动、且耗时小于 longPressTimeoutMillis）抬手时，才唤起输入法并吸底；
+        //    c) 若超时判定为长按，则立即退出循环并不消费事件，让子级 SelectionContainer 原生接管文本选区和工具栏。
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color(0xFF101010))
                 .pointerInput(Unit) {
-                    detectTapGestures(
-                        onTap = {
-                            viewModel.dismissCompletionBar()
-                            currentBringUpKeyboard()
-                        },
-                        onLongPress = {
-                            // 显式拦截长按事件，防止松手时被判定为点击而触发 onTap
+                    awaitEachGesture {
+                        val down = awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
+                        val startTime = System.currentTimeMillis()
+                        var moved = false
+
+                        // 若输入框持有焦点，在触摸发生的第一时间（Initial Pass Down）主动释放输入框焦点。
+                        // 这样既能收拢焦点，又能避免长按发生时 SelectionContainer 的 hasFocus 发生 true -> false 瞬态切换触发 onRelease() 销毁选择
+                        if (isInputFocused) {
+                            focusManager.clearFocus()
                         }
-                    )
+
+                        while (true) {
+                            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+
+                            if (change.changedToUp()) {
+                                val elapsed = System.currentTimeMillis() - startTime
+                                if (!moved && elapsed < viewConfiguration.longPressTimeoutMillis) {
+                                    viewModel.dismissCompletionBar()
+                                    currentBringUpKeyboard()
+                                }
+                                break
+                            }
+
+                            if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                                moved = true
+                            }
+
+                            if (System.currentTimeMillis() - startTime >= viewConfiguration.longPressTimeoutMillis) {
+                                // 达到长按判定阈值，交由 SelectionContainer 接管长按选中文本，本手势不消费事件且不触发单击
+                                break
+                            }
+                        }
+                    }
                 }
         ) {
             // 【关键层级结构 - 请勿调换】：
@@ -571,7 +611,8 @@ fun TerminalScreen(
                                         scope.launch {
                                             safeScrollToBottom()
                                         }
-                                    }
+                                    },
+                                    onFocusChange = { isInputFocused = it }
                                 )
                             }
                         }

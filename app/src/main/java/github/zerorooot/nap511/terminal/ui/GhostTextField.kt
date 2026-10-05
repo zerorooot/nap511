@@ -95,6 +95,7 @@ fun GhostTextField(
     // 【关键状态 - 请勿删除】：标记页面是否正在退出，防止返回时反向拉起软键盘或在已脱落节点上触发崩溃
     isExiting: Boolean = false,
     onRequestScrollToBottom: () -> Unit = {},
+    onFocusChange: ((Boolean) -> Unit)? = null,
 ) {
     val textStyle = TextStyle(
         color = Color(0xFFECEFF1),
@@ -221,26 +222,18 @@ fun GhostTextField(
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(focusRequester)
-                        // 【关键机制 - 请勿直接同步调用 focusRequester.requestFocus()】：
-                        // 1. 终端历史输出被 SelectionContainer 包裹，用户长按选中文本时，焦点可能发生转移。
-                        //    若失焦，系统输入法（IME）会自动收回，导致 WindowInsets 剧烈突变（高度从 ~300dp 骤降至 0），
-                        //    界面与 LazyColumn 重排会打断正在进行的手势并销毁文本选择框（Selection Toolbar）。
-                        // 2. 只有在【键盘原本正展开 (isImeVisible)】且【曾经获得过焦点 (hasBeenFocused)】且【页面未在退出 (!isExiting)】时，
-                        //    才通过协程异步重新请求焦点，保持软键盘展开。
-                        // 3. 严禁在初次渲染、键盘收起时或页面退出时强行请求焦点，否则会导致退出时键盘闪弹以及
-                        //    "visitAncestors called on an unattached node" 致命崩溃。
+                        // 【关键机制 - 请勿在失焦时自动抢回焦点】：
+                        // 1. 终端历史输出被 SelectionContainer 包裹，用户长按选中文本时焦点会转移给 SelectionContainer。
+                        //    如果此处在失焦时强行 requestFocus() 抢回焦点，会导致：
+                        //    a) 触发 Compose 的 bringIntoView 自动向下滚动露出输入框，出现“长按时界面向下回滑”；
+                        //    b) 强行打断 SelectionContainer 的焦点持有，导致刚生成的文本选区瞬间被 onRelease() 销毁。
+                        // 2. 软键盘的弹出与收起由 TerminalScreen 的外层点击与 IME 状态统一控制；
+                        // 3. onFocusChange 会向外部同步焦点状态，供父容器在手指按下第一时间剥离焦点，避免长按事件失效。
                         .onFocusChanged { focusState ->
                             if (focusState.isFocused) {
                                 hasBeenFocused = true
-                            } else if (hasBeenFocused && isImeVisible && !isExiting) {
-                                scope.launch {
-                                    try {
-                                        focusRequester.requestFocus()
-                                    } catch (_: Exception) {
-                                        // 安全防护，忽略节点处于 detach 边缘时的异常
-                                    }
-                                }
                             }
+                            onFocusChange?.invoke(focusState.isFocused)
                         }
                         .onKeyEvent { event ->
                             // 1. 优先分发外接物理键盘的 Ctrl / Alt 组合键
