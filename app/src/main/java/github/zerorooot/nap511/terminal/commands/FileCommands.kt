@@ -369,13 +369,17 @@ object FileCommands {
 
                             is ResolvedTarget.Directory -> {
                                 // 安全校验：严禁删除根目录
-                                if (resolved.cid == "0" || resolved.parentCid == null) {
+                                if (resolved.cid == "0") {
                                     emit("rm: cannot remove '$target': Cannot remove root directory")
                                     continue
                                 }
                                 // 安全校验：禁止删除当前工作目录
                                 if (resolved.cid == ctx.currentCid) {
                                     emit("rm: cannot remove '$target': Cannot remove current working directory")
+                                    continue
+                                }
+                                if (resolved.parentCid == null) {
+                                    emit("rm: cannot remove '$target': Cannot determine parent directory")
                                     continue
                                 }
                                 actualFid = resolved.cid
