@@ -181,35 +181,137 @@ object FileCommands {
     }
 
     /**
-     * 注册 mkdir 命令：在当前目录下新建文件夹
+     * 注册 mkdir 命令：在当前目录或指定路径下新建文件夹
      */
     fun registerMkdir(registry: CommandRegistry) {
         registry.register("mkdir") {
-            description = "在当前目录下新建文件夹"
-            usage = "mkdir [-p] <folder_name>"
-            flag("-p", "若目录已存在不报错，并支持递归创建")
+            description = "在当前目录或指定路径下新建文件夹"
+            usage = "mkdir [-p] <folder_name...>"
+            flag("-p", "若目录已存在不报错，并支持递归创建父目录")
             execute { ctx, args, _ ->
                 flow {
+                    val isParents = args.contains("-p")
                     val folderNames = args.filter { !it.startsWith("-") }
                     if (folderNames.isEmpty()) {
                         emit("mkdir: missing operand")
                         return@flow
                     }
 
-                    for (name in folderNames) {
-                        try {
-                            val res = ctx.fileRepository.createFolder(
-                                pid = ctx.currentCid,
-                                folderName = name
-                            )
-                            if (res.state) {
-                                ctx.invalidateCache(ctx.currentCid)
-                                emit("mkdir: created directory '$name'")
-                            } else {
-                                emit("mkdir: cannot create directory '$name': ${res.error}")
+                    for (rawName in folderNames) {
+                        // 去除末尾斜杠
+                        val cleanTarget = rawName.trim().trimEnd('/')
+                        if (cleanTarget.isEmpty() || cleanTarget == "/" || cleanTarget == "/根目录") {
+                            if (!isParents) {
+                                emit("mkdir: cannot create directory '$rawName': File exists")
                             }
-                        } catch (e: Exception) {
-                            emit("mkdir: cannot create directory '$name': ${e.message}")
+                            continue
+                        }
+
+                        if (isParents) {
+                            // -p 模式：支持逐层递归创建目录，若各层级已存在则直接沿用
+                            val isAbsolute = cleanTarget.startsWith("/")
+                            var rawSegments = cleanTarget.split("/").filter { it.isNotEmpty() && it != "." }
+                            if (isAbsolute && rawSegments.firstOrNull() == "根目录") {
+                                rawSegments = rawSegments.drop(1)
+                            }
+                            if (rawSegments.isEmpty()) continue
+
+                            var curCid = if (isAbsolute) "0" else ctx.currentCid
+                            var createSuccess = true
+
+                            for (seg in rawSegments) {
+                                if (seg == "..") {
+                                    val resolved = ctx.resolvePath(seg)
+                                    if (resolved != null) {
+                                        curCid = resolved.first
+                                    }
+                                    continue
+                                }
+                                val existingFiles = ctx.listDirectory(curCid)
+                                val existingFolder = existingFiles.firstOrNull { it.isFolder && it.name == seg }
+                                if (existingFolder != null) {
+                                    // 目录已存在，步入该目录
+                                    curCid = existingFolder.categoryId
+                                } else {
+                                    val existingFile = existingFiles.firstOrNull { !it.isFolder && it.name == seg }
+                                    if (existingFile != null) {
+                                        emit("mkdir: cannot create directory '$rawName': File exists")
+                                        createSuccess = false
+                                        break
+                                    }
+                                    try {
+                                        // 调用网盘接口创建该层级文件夹
+                                        val res = ctx.fileRepository.createFolder(pid = curCid, folderName = seg)
+                                        if (res.state) {
+                                            ctx.invalidateCache(curCid)
+                                            // 获取新建文件夹的 CID 以供下一层使用
+                                            val nextCid = res.cid.ifEmpty {
+                                                val refreshed = ctx.listDirectory(curCid, forceRefresh = true)
+                                                refreshed.firstOrNull { it.isFolder && it.name == seg }?.categoryId ?: ""
+                                            }
+                                            if (nextCid.isNotEmpty()) {
+                                                curCid = nextCid
+                                            } else {
+                                                break
+                                            }
+                                        } else {
+                                            val err = res.error.ifEmpty { "创建失败" }
+                                            emit("mkdir: cannot create directory '$rawName': $err")
+                                            createSuccess = false
+                                            break
+                                        }
+                                    } catch (e: Exception) {
+                                        emit("mkdir: cannot create directory '$rawName': ${e.message}")
+                                        createSuccess = false
+                                        break
+                                    }
+                                }
+                            }
+                            if (createSuccess) {
+                                emit("mkdir: created directory '$rawName'")
+                            }
+                        } else {
+                            // 非 -p 模式：若带路径则解析其父目录，必须在已有父目录下创建
+                            val parentCid: String
+                            val folderName: String
+
+                            if (cleanTarget.contains("/")) {
+                                val parentPath = cleanTarget.substringBeforeLast('/')
+                                folderName = cleanTarget.substringAfterLast('/')
+                                val effectiveParentPath = parentPath.ifEmpty { "/" }
+                                val resolvedParent = ctx.resolvePath(effectiveParentPath)
+                                if (resolvedParent == null) {
+                                    emit("mkdir: cannot create directory '$rawName': No such file or directory")
+                                    continue
+                                }
+                                parentCid = resolvedParent.first
+                            } else {
+                                parentCid = ctx.currentCid
+                                folderName = cleanTarget
+                            }
+
+                            // 校验目标父目录下是否已存在同名项
+                            val existing = ctx.listDirectory(parentCid).firstOrNull { it.name == folderName }
+                            if (existing != null) {
+                                emit("mkdir: cannot create directory '$rawName': File exists")
+                                continue
+                            }
+
+                            try {
+                                val res = ctx.fileRepository.createFolder(
+                                    pid = parentCid,
+                                    folderName = folderName
+                                )
+                                if (res.state) {
+                                    ctx.invalidateCache(parentCid)
+                                    emit("mkdir: created directory '$rawName'")
+                                } else {
+                                    val err = res.error.ifEmpty { "创建失败" }
+                                    emit("mkdir: cannot create directory '$rawName': $err")
+                                }
+                            } catch (e: Exception) {
+                                emit("mkdir: cannot create directory '$rawName': ${e.message}")
+                            }
                         }
                     }
                 }
@@ -218,16 +320,21 @@ object FileCommands {
     }
 
     /**
-     * 注册 rm 命令：删除当前目录下的指定文件或文件夹至回收站
+     * 注册 rm 命令：删除当前目录或指定路径下的指定文件或文件夹至回收站
+     * 支持绝对路径、相对路径、转义空格路径与末尾斜杠，并自动获取真实 parentCid 执行删除
      */
     fun registerRm(registry: CommandRegistry) {
         registry.register("rm") {
-            description = "删除当前目录下的指定文件或文件夹至回收站"
-            usage = "rm [-y] <file...>"
+            description = "删除当前目录或指定路径下的指定文件或文件夹至回收站"
+            usage = "rm [-y] [-r|-R] [-f] <file...>"
             flag("-y", "免确认直接删除")
+            flag("-f", "强制删除，免确认")
+            flag("-r", "支持递归删除目录")
             execute { ctx, args, _ ->
                 flow {
-                    val autoConfirm = args.contains("-y")
+                    // 支持 -y 与 -f 免确认参数
+                    val autoConfirm = args.contains("-y") || args.contains("-f") ||
+                            args.contains("-rf") || args.contains("-fr")
                     val targetNames = args.filter { !it.startsWith("-") }
 
                     if (targetNames.isEmpty()) {
@@ -235,44 +342,84 @@ object FileCommands {
                         return@flow
                     }
 
-                    val currentFiles = ctx.listDirectory(ctx.currentCid)
+                    // 收集所有被影响的目录 CID（用于统一刷新本地缓存）
+                    val affectedCids = mutableSetOf<String>()
                     var deletedCount = 0
 
                     for (target in targetNames) {
-                        val fileBean = currentFiles.firstOrNull { it.name == target }
-                        if (fileBean == null) {
+                        // 使用 resolveTarget 解析目标对象（支持路径解析与末尾斜杠）
+                        val resolved = ctx.resolveTarget(target)
+                        if (resolved == null) {
                             emit("rm: cannot remove '$target': No such file or directory")
                             continue
                         }
 
-                        // 若未输入 -y 则交互确认
+                        val actualFid: String
+                        val parentCid: String
+                        val displayName: String
+                        val isFolder: Boolean
+
+                        when (resolved) {
+                            is ResolvedTarget.File -> {
+                                actualFid = resolved.file.fileId
+                                parentCid = resolved.parentCid
+                                displayName = resolved.file.name
+                                isFolder = false
+                            }
+
+                            is ResolvedTarget.Directory -> {
+                                // 安全校验：严禁删除根目录
+                                if (resolved.cid == "0" || resolved.parentCid == null) {
+                                    emit("rm: cannot remove '$target': Cannot remove root directory")
+                                    continue
+                                }
+                                // 安全校验：禁止删除当前工作目录
+                                if (resolved.cid == ctx.currentCid) {
+                                    emit("rm: cannot remove '$target': Cannot remove current working directory")
+                                    continue
+                                }
+                                actualFid = resolved.cid
+                                parentCid = resolved.parentCid
+                                displayName = resolved.name.ifEmpty {
+                                    target.trimEnd('/').substringAfterLast('/')
+                                }
+                                isFolder = true
+                            }
+                        }
+
+                        // 若未输入 -y / -f 则交互确认
                         if (!autoConfirm) {
                             val confirmed =
-                                ctx.confirm("rm: 是否确认删除 '${fileBean.name}'? (yes/no): ")
+                                ctx.confirm("rm: 是否确认删除 '$displayName'? (yes/no): ")
                             if (!confirmed) {
-                                emit("rm: 已取消删除 '${fileBean.name}'")
+                                emit("rm: 已取消删除 '$displayName'")
                                 continue
                             }
                         }
 
                         try {
-                            val actualFid =
-                                if (fileBean.isFolder) fileBean.categoryId else fileBean.fileId
+                            // 传入目标真实的 parentCid 与 fid，确保跨目录删除成功
                             val res =
-                                ctx.fileRepository.delete(pid = ctx.currentCid, fid = actualFid)
+                                ctx.fileRepository.delete(pid = parentCid, fid = actualFid)
                             if (res.state) {
                                 deletedCount++
-                                emit("rm: 已移入回收站 '${fileBean.name}'")
+                                affectedCids.add(parentCid)
+                                if (isFolder) {
+                                    affectedCids.add(actualFid)
+                                }
+                                emit("rm: 已移入回收站 '$displayName'")
                             } else {
-                                emit("rm: 删除失败 '${fileBean.name}': ${res.error}")
+                                val err = res.error.ifEmpty { res.message }
+                                emit("rm: 删除失败 '$displayName': $err")
                             }
                         } catch (e: Exception) {
-                            emit("rm: 删除失败 '${fileBean.name}': ${e.message}")
+                            emit("rm: 删除失败 '$displayName': ${e.message}")
                         }
                     }
 
-                    if (deletedCount > 0) {
-                        ctx.invalidateCache(ctx.currentCid)
+                    // 批量失效所有受影响目录的本地缓存，确保后续 ls 呈现最新数据
+                    for (cid in affectedCids) {
+                        ctx.invalidateCache(cid)
                     }
                 }
             }
@@ -316,24 +463,28 @@ object FileCommands {
                     val sources = targets.dropLast(1)
                     val currentFiles = ctx.listDirectory(ctx.currentCid)
 
-                    // 解析源文件/目录信息
-                    suspend fun resolveSourceItem(rawSrc: String): Pair<String, String>? {
+                    // 解析源文件/目录信息封装体（包含其原本所在目录的 parentCid）
+                    data class ResolvedSource(val fid: String, val name: String, val parentCid: String?)
+
+                    suspend fun resolveSourceItem(rawSrc: String): ResolvedSource? {
                         val cleanSrc = rawSrc.trim().trimEnd('/')
                         val localFile =
                             currentFiles.firstOrNull { it.name == cleanSrc || it.name == rawSrc.trim() }
                         if (localFile != null) {
                             val fid =
                                 if (localFile.isFolder) localFile.categoryId else localFile.fileId
-                            return Pair(fid, localFile.name)
+                            return ResolvedSource(fid, localFile.name, ctx.currentCid)
                         }
 
                         // 尝试路径解析（支持绝对路径与相对路径）
                         return when (val resolved = ctx.resolveTarget(cleanSrc)) {
-                            is ResolvedTarget.Directory -> Pair(
+                            is ResolvedTarget.Directory -> ResolvedSource(
                                 resolved.cid,
-                                cleanSrc.substringAfterLast('/').ifEmpty { "/" })
+                                resolved.name.ifEmpty { cleanSrc.substringAfterLast('/').ifEmpty { "/" } },
+                                resolved.parentCid
+                            )
 
-                            is ResolvedTarget.File -> Pair(resolved.file.fileId, resolved.file.name)
+                            is ResolvedTarget.File -> ResolvedSource(resolved.file.fileId, resolved.file.name, resolved.parentCid)
                             null -> null
                         }
                     }
@@ -361,21 +512,21 @@ object FileCommands {
 
                     if (targetDestCid != null) {
                         // 移动操作：将所有 sources 移入 targetDestCid 目录
+                        val affectedCids = mutableSetOf(ctx.currentCid, targetDestCid)
                         for (src in sources) {
                             val resolvedSrc = resolveSourceItem(src)
                             if (resolvedSrc == null) {
                                 emit("mv: cannot stat '$src': No such file or directory")
                                 continue
                             }
-                            val (actualFid, _) = resolvedSrc
                             try {
                                 val moveMap = hashMapOf<String, String>()
                                 moveMap["pid"] = targetDestCid
-                                moveMap["fid[0]"] = actualFid
+                                moveMap["fid[0]"] = resolvedSrc.fid
                                 val res = ctx.fileRepository.move(moveMap)
                                 if (res.state) {
-                                    ctx.invalidateCache(ctx.currentCid)
-                                    ctx.invalidateCache(targetDestCid)
+                                    // 同时刷新源文件所在的父目录缓存
+                                    resolvedSrc.parentCid?.let { affectedCids.add(it) }
                                     emit("mv: '$src' -> '$destDisplayName/'")
                                 } else {
                                     val err =
@@ -386,21 +537,30 @@ object FileCommands {
                                 emit("mv: 移动 '$src' 失败: ${e.message}")
                             }
                         }
+                        for (cid in affectedCids) {
+                            ctx.invalidateCache(cid)
+                        }
                     } else if (sources.size == 1) {
                         // 单源且目标不是现有目录：执行重命名
+                        if (destination.endsWith("/")) {
+                            emit("mv: target '$destination' is not a directory")
+                            return@flow
+                        }
                         val src = sources[0]
                         val resolvedSrc = resolveSourceItem(src)
                         if (resolvedSrc == null) {
                             emit("mv: cannot stat '$src': No such file or directory")
                             return@flow
                         }
-                        val (actualFid, _) = resolvedSrc
+                        // 截取纯文件名，防止将路径名误作为文件名传入 rename API
+                        val newName = destination.trimEnd('/').substringAfterLast('/')
                         try {
-                            val renameBean = RenameBean(actualFid, destination)
+                            val renameBean = RenameBean(resolvedSrc.fid, newName)
                             val res = ctx.fileRepository.rename(renameBean.toRequestBody())
                             if (res.state) {
                                 ctx.invalidateCache(ctx.currentCid)
-                                emit("mv: '$src' renamed to '$destination'")
+                                resolvedSrc.parentCid?.let { ctx.invalidateCache(it) }
+                                emit("mv: '$src' renamed to '$newName'")
                             } else {
                                 val err = res.error.ifEmpty { res.errorMsg.ifEmpty { res.message } }
                                 emit("mv: 重命名失败: $err")

@@ -172,12 +172,18 @@ object CloudCommands {
                     val (targetCid, searchRootPath) = if (isGlobal) {
                         Pair("0", "/根目录")
                     } else if (pathArg != null) {
-                        val resolved = ctx.resolvePath(pathArg)
-                        if (resolved == null) {
-                            emit("find: '$pathArg': No such file or directory")
-                            return@flow
+                        // 解析目标路径：若是目录则以此为根遍历，若是单个文件则直接输出并终止
+                        when (val resolved = ctx.resolveTarget(pathArg)) {
+                            is ResolvedTarget.Directory -> Pair(resolved.cid, resolved.path)
+                            is ResolvedTarget.File -> {
+                                emit(resolved.fullPath)
+                                return@flow
+                            }
+                            null -> {
+                                emit("find: '$pathArg': No such file or directory")
+                                return@flow
+                            }
                         }
-                        resolved
                     } else {
                         Pair(ctx.currentCid, ctx.currentPath)
                     }
@@ -430,8 +436,9 @@ object CloudCommands {
                     val file = when (val resolved = ctx.resolveTarget(targetName)) {
                         is ResolvedTarget.File -> resolved.file
                         is ResolvedTarget.Directory -> {
-                            FileBean(
-                                name = targetName.substringAfterLast("/").ifEmpty { "/" },
+                            // 优先使用 resolveTarget 获取的完整 folderBean，若无则使用解析所得真实目录名，防止末尾斜杠导致截断为空
+                            resolved.folderBean ?: FileBean(
+                                name = resolved.name.ifEmpty { targetName.trimEnd('/').substringAfterLast('/').ifEmpty { "根目录" } },
                                 categoryId = resolved.cid,
                                 isFolder = true
                             )
@@ -510,8 +517,10 @@ object CloudCommands {
                     for (fileArg in fileArgs) {
                         if (GlobMatcher.hasGlobWildcards(fileArg)) {
                             // 包含通配符，在当前目录（或指定父目录）按 GlobMatcher 匹配展开
-                            val dirPath =
-                                if (fileArg.contains("/")) fileArg.substringBeforeLast("/") else ""
+                            val dirPath = if (fileArg.contains("/")) {
+                                val before = fileArg.substringBeforeLast("/")
+                                before.ifEmpty { "/" }
+                            } else ""
                             val pattern =
                                 if (fileArg.contains("/")) fileArg.substringAfterLast("/") else fileArg
 

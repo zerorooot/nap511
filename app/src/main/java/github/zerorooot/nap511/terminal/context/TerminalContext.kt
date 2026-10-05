@@ -13,10 +13,30 @@ import kotlinx.coroutines.withContext
  * 目标路径解析结果类型
  */
 sealed class ResolvedTarget {
-    /** 目标是目录 */
-    data class Directory(val cid: String, val path: String) : ResolvedTarget()
+    /**
+     * 目标是目录
+     *
+     * @param cid 目录自身的分类 ID（Category ID）
+     * @param path 规范化后的绝对路径（如 "/根目录/t1/sub"）
+     * @param parentCid 父级目录的分类 ID（用于 delete、move 等需要指定父目录的 API 操作）
+     * @param name 目录名称（如 "sub"）
+     * @param folderBean 该目录对应的 FileBean 元数据对象（若有）
+     */
+    data class Directory(
+        val cid: String,
+        val path: String,
+        val parentCid: String? = null,
+        val name: String = "",
+        val folderBean: FileBean? = null
+    ) : ResolvedTarget()
 
-    /** 目标是普通文件 */
+    /**
+     * 目标是普通文件
+     *
+     * @param file 文件元数据对象
+     * @param parentCid 文件所在父级目录的分类 ID
+     * @param fullPath 规范化后的完整路径
+     */
     data class File(val file: FileBean, val parentCid: String, val fullPath: String) :
         ResolvedTarget()
 }
@@ -126,29 +146,36 @@ class TerminalContext(
 
     private suspend fun resolveTargetInternal(target: String): ResolvedTarget? {
         val trimmed = target.trim()
+        // 空路径或 "." 表示当前工作目录
         if (trimmed.isEmpty() || trimmed == ".") {
-            return ResolvedTarget.Directory(currentCid, currentPath)
+            val name = if (currentPath == "/" || currentPath == "/根目录") "根目录" else currentPath.substringAfterLast('/')
+            return ResolvedTarget.Directory(currentCid, currentPath, parentCid = null, name = name)
         }
 
+        // 根目录快捷表示
         if (trimmed == "/" || trimmed == "~" || trimmed == "/根目录" || trimmed == "/根目录/") {
-            return ResolvedTarget.Directory("0", "/根目录")
+            return ResolvedTarget.Directory("0", "/根目录", parentCid = null, name = "根目录")
         }
 
         val hasTrailingSlash = trimmed.endsWith("/")
 
-        // 分割路径段
-        val isAbsolute = trimmed.startsWith("/")
+        // 路径切分并判断是否为绝对路径（以 "/"、"~" 或 "根目录" 开头）
+        val isAbsolute = trimmed.startsWith("/") || trimmed == "根目录" || trimmed.startsWith("根目录/")
         var rawSegments = trimmed.split("/").filter { it.isNotEmpty() && it != "." }
 
-        // 如果是绝对路径且第一段是 "根目录"，忽略该段（因为 CID "0" 就是 "根目录"）
-        if (isAbsolute && rawSegments.firstOrNull() == "根目录") {
+        // 如果第一段是 "根目录"，忽略该段（因为 CID "0" 对应网盘根目录）
+        if (rawSegments.firstOrNull() == "根目录") {
             rawSegments = rawSegments.drop(1)
         }
 
         if (rawSegments.isEmpty()) {
+            val fallbackName = if (isAbsolute) "根目录" else (currentPath.split("/")
+                .lastOrNull { it.isNotEmpty() } ?: "根目录")
             return ResolvedTarget.Directory(
                 if (isAbsolute) "0" else currentCid,
-                if (isAbsolute) "/根目录" else currentPath
+                if (isAbsolute) "/根目录" else currentPath,
+                parentCid = null,
+                name = fallbackName
             )
         }
 
@@ -161,12 +188,17 @@ class TerminalContext(
             if (list.isEmpty()) mutableListOf("根目录") else list
         }
 
+        // 记录上一级的 CID 与最后一级的 FileBean，用于构造最终 Directory 对象的 parentCid 和 name
+        var lastParentCid: String? = null
+        var lastFolderBean: FileBean? = null
+
         for (i in segments.indices) {
             val segment = segments[i]
             val isLast = (i == segments.size - 1)
 
             if (segment == "..") {
-                if (currentSegments.isNotEmpty()) {
+                // 返回上一级目录
+                if (currentSegments.size > 1) {
                     currentSegments.removeAt(currentSegments.size - 1)
                 }
                 startCid = if (currentSegments.isEmpty() || currentSegments == listOf("根目录")) {
@@ -174,19 +206,33 @@ class TerminalContext(
                 } else {
                     findCidByPathSegments(currentSegments) ?: "0"
                 }
+                lastParentCid = null
+                lastFolderBean = null
                 if (isLast) {
                     val resolvedPath = if (currentSegments.isEmpty() || currentSegments == listOf("根目录")) "/根目录" else "/" + currentSegments.joinToString("/")
-                    return ResolvedTarget.Directory(startCid, resolvedPath)
+                    return ResolvedTarget.Directory(
+                        cid = startCid,
+                        path = resolvedPath,
+                        parentCid = null,
+                        name = currentSegments.lastOrNull() ?: "根目录",
+                        folderBean = null
+                    )
                 }
             } else {
                 val files = listDirectory(startCid)
                 if (isLast && !hasTrailingSlash) {
-                    // 最后一级且未以 '/' 结尾：先匹配目录，再匹配文件
+                    // 最后一级且未以 '/' 结尾：先匹配同名目录，若无则匹配同名文件
                     val folder = files.firstOrNull { it.isFolder && it.name == segment }
                     if (folder != null) {
                         currentSegments.add(segment)
                         val resolvedPath = if (currentSegments.isEmpty() || currentSegments == listOf("根目录")) "/根目录" else "/" + currentSegments.joinToString("/")
-                        return ResolvedTarget.Directory(folder.categoryId, resolvedPath)
+                        return ResolvedTarget.Directory(
+                            cid = folder.categoryId,
+                            path = resolvedPath,
+                            parentCid = startCid,
+                            name = folder.name,
+                            folderBean = folder
+                        )
                     }
                     val file = files.firstOrNull { !it.isFolder && it.name == segment }
                     if (file != null) {
@@ -196,9 +242,11 @@ class TerminalContext(
                     }
                     return null
                 } else {
-                    // 中间层级或末尾带 '/'：必须为目录
+                    // 中间层级或末尾带 '/'：必须严格匹配为目录
                     val folder = files.firstOrNull { it.isFolder && it.name == segment }
                         ?: return null
+                    lastParentCid = startCid
+                    lastFolderBean = folder
                     startCid = folder.categoryId
                     currentSegments.add(segment)
                 }
@@ -206,7 +254,13 @@ class TerminalContext(
         }
 
         val resolvedPath = if (currentSegments.isEmpty() || currentSegments == listOf("根目录")) "/根目录" else "/" + currentSegments.joinToString("/")
-        return ResolvedTarget.Directory(startCid, resolvedPath)
+        return ResolvedTarget.Directory(
+            cid = startCid,
+            path = resolvedPath,
+            parentCid = lastParentCid,
+            name = lastFolderBean?.name ?: (currentSegments.lastOrNull() ?: "根目录"),
+            folderBean = lastFolderBean
+        )
     }
 
     /**
