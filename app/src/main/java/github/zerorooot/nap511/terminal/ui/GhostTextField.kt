@@ -14,8 +14,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -83,6 +88,10 @@ fun GhostTextField(
     onArrowDown: () -> Unit,
     hardwareKeyActions: TerminalHardwareKeyActions = TerminalHardwareKeyActions(),
     focusRequester: FocusRequester,
+    // 【关键状态 - 请勿删除】：用于判定当前软键盘是否处于展开状态，配合长按选中文本时的焦点保持机制
+    isImeVisible: Boolean = false,
+    // 【关键状态 - 请勿删除】：标记页面是否正在退出，防止返回时反向拉起软键盘或在已脱落节点上触发崩溃
+    isExiting: Boolean = false,
     onRequestScrollToBottom: () -> Unit = {},
 ) {
     val textStyle = TextStyle(
@@ -94,6 +103,9 @@ fun GhostTextField(
 
     val promptColor = if (isWaitingConfirmation) Color(0xFFFFD54F) else Color(0xFF69F0AE)
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    val scope = rememberCoroutineScope()
+    var hasBeenFocused by remember { mutableStateOf(false) }
 
     val textFieldInteractionSource = remember { MutableInteractionSource() }
 
@@ -196,14 +208,25 @@ fun GhostTextField(
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(focusRequester)
-                        // 【关键机制 - 请勿删除】：
-                        // 终端历史输出被 SelectionContainer 包裹，用户长按选中文本时，焦点可能发生转移。
-                        // 若失焦，系统输入法（IME）会自动收回，导致 WindowInsets 剧烈突变（高度从 ~300dp 骤降至 0），
-                        // 界面与 LazyColumn 重排会打断正在进行的手势并销毁文本选择框（Selection Toolbar）。
-                        // 此处监听失焦并自动重新请求焦点，确保长按文本时键盘不意外缩回，选择框可稳定弹出。
+                        // 【关键机制 - 请勿直接同步调用 focusRequester.requestFocus()】：
+                        // 1. 终端历史输出被 SelectionContainer 包裹，用户长按选中文本时，焦点可能发生转移。
+                        //    若失焦，系统输入法（IME）会自动收回，导致 WindowInsets 剧烈突变（高度从 ~300dp 骤降至 0），
+                        //    界面与 LazyColumn 重排会打断正在进行的手势并销毁文本选择框（Selection Toolbar）。
+                        // 2. 只有在【键盘原本正展开 (isImeVisible)】且【曾经获得过焦点 (hasBeenFocused)】且【页面未在退出 (!isExiting)】时，
+                        //    才通过协程异步重新请求焦点，保持软键盘展开。
+                        // 3. 严禁在初次渲染、键盘收起时或页面退出时强行请求焦点，否则会导致退出时键盘闪弹以及
+                        //    "visitAncestors called on an unattached node" 致命崩溃。
                         .onFocusChanged { focusState ->
-                            if (!focusState.isFocused) {
-                                focusRequester.requestFocus()
+                            if (focusState.isFocused) {
+                                hasBeenFocused = true
+                            } else if (hasBeenFocused && isImeVisible && !isExiting) {
+                                scope.launch {
+                                    try {
+                                        focusRequester.requestFocus()
+                                    } catch (_: Exception) {
+                                        // 安全防护，忽略节点处于 detach 边缘时的异常
+                                    }
+                                }
                             }
                         }
                         .onKeyEvent { event ->

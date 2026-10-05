@@ -638,6 +638,10 @@ class TerminalViewModel(
                 val buffer = mutableListOf<TerminalLine>()
                 var lastFlushTime = System.currentTimeMillis()
 
+                // 【关键机制 - 请勿移除 withContext(Dispatchers.Main)】：
+                // 必须在主线程调度更新 Compose 的 SnapshotStateList（lines）。
+                // 若在 Dispatchers.IO 后台线程直接修改 lines，会与 Compose 主线程测量/布局发生并发状态竞争，
+                // 导致 LazyColumn 内部 itemProvider 数量出现帧不同步并抛出 IndexOutOfBoundsException 崩溃。
                 suspend fun flushBuffer() {
                     if (buffer.isNotEmpty()) {
                         val toAdd = buffer.toList()

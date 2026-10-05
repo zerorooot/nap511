@@ -109,8 +109,15 @@ fun TerminalScreen(
     val view = LocalView.current
     val keyboardController = LocalSoftwareKeyboardController.current
 
+    // 【关键退出状态 - 请勿删除】：
+    // 标记当前页面是否正在退出（如按返回键、执行 exit 命令或页面被销毁）。
+    // 传递给 GhostTextField 以彻底阻止失焦时重新请求焦点，
+    // 避免退出页面时输入法意外闪弹以及在已脱落节点上触发 "visitAncestors called on an unattached node" 致命崩溃。
+    var isExiting by remember { mutableStateOf(false) }
+
     val handleBack: () -> Unit = remember(keyboardController, onBack) {
         {
+            isExiting = true
             keyboardController?.hide()
             onBack()
         }
@@ -129,12 +136,14 @@ fun TerminalScreen(
             insetsController.isAppearanceLightNavigationBars = false
 
             onDispose {
+                isExiting = true
                 insetsController.isAppearanceLightStatusBars = originalLightStatus
                 insetsController.isAppearanceLightNavigationBars = originalLightNav
                 keyboardController?.hide()
             }
         } else {
             onDispose {
+                isExiting = true
                 keyboardController?.hide()
             }
         }
@@ -491,6 +500,8 @@ fun TerminalScreen(
                                     onArrowDown = { viewModel.navigateHistoryDown() },
                                     hardwareKeyActions = hardwareActions,
                                     focusRequester = focusRequester,
+                                    isImeVisible = imeBottom > 0.dp,
+                                    isExiting = isExiting,
                                     onRequestScrollToBottom = {
                                         shouldScrollToBottomOnIme = true
                                         scope.launch {
