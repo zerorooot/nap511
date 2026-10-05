@@ -119,16 +119,11 @@ fun GhostTextField(
         }
     }
 
-    // 【关键机制 - 挂载入视口时自动请求焦点与呼起键盘】：
-    // 当 GhostTextField 无论因首帧渲染还是因滚动进入视口被实例化时，主动请求焦点并唤起键盘
-    LaunchedEffect(Unit) {
-        delay(30.milliseconds)
-        try {
-            focusRequester.requestFocus()
-            keyboardController?.show()
-        } catch (_: Exception) {
-        }
-    }
+    // 注意：请勿在此处添加 LaunchedEffect(Unit) 挂载呼起键盘！
+    // GhostTextField 作为 LazyColumn 的末尾项，当用户向上浏览历史输出时会离屏被销毁回收；
+    // 当用户在键盘收起状态下滑回底部时，GhostTextField 会重新挂载进视口。
+    // 如果在此处挂载时自动 requestFocus/show()，会导致滑回底部时误弹起软键盘。
+    // 页面初次进入时的键盘唤起由宿主 TerminalScreen 统一调度。
 
     val requestFocusAndMoveCursorToEnd = {
         if (value.text.isNotEmpty() && (value.selection.start != value.text.length || value.selection.end != value.text.length)) {
