@@ -1,9 +1,12 @@
 package github.zerorooot.nap511.terminal.commands.cloud
 
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitError
+import github.zerorooot.nap511.terminal.viewmodel.emitText
 import github.zerorooot.nap511.util.FileOpenResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -26,48 +29,48 @@ class OpenCommand : TerminalCommand {
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String> = flow {
+    ): Flow<TerminalOutput> = flow {
         val cmdArgs = CommandArgs(args)
         val fileName = cmdArgs.firstPositional
         if (fileName == null) {
-            emit("open: missing file operand")
+            emitError("open: missing file operand")
             return@flow
         }
 
         val resolved = ctx.resolveTarget(fileName)
         if (resolved == null) {
-            emit("open: cannot find '$fileName': No such file or directory")
+            emitError("open: cannot find '$fileName': No such file or directory")
             return@flow
         }
         val fileOpener = ctx.fileOpener
         if (fileOpener == null) {
-            emit("open: 当前终端环境未配置文件打开器")
+            emitError("open: 当前终端环境未配置文件打开器")
             return@flow
         }
 
         when (resolved) {
             is ResolvedTarget.Directory -> {
-                emit("已跳转至文件夹: $fileName")
+                emitText("已跳转至文件夹: $fileName")
                 fileOpener.openFolder(resolved.cid)
                 return@flow
             }
 
             is ResolvedTarget.File -> {
                 val file = resolved.file
-                emit("正在准备打开: ${file.name}...")
+                emitText("正在准备打开: ${file.name}...")
                 val siblings = ctx.listDirectory(resolved.parentCid)
                 when (val result =
                     fileOpener.open(file, siblings, fromTerminal = true)) {
                     is FileOpenResult.Success -> {
-                        emit("open: ${result.message}")
+                        emitText("open: ${result.message}")
                     }
 
                     is FileOpenResult.Failure -> {
-                        emit("open: ${result.message}")
+                        emitError("open: ${result.message}")
                     }
 
                     is FileOpenResult.Unsupported -> {
-                        emit("open: 未能识别该文件的专用预览器 (${result.fileName})")
+                        emitError("open: 未能识别该文件的专用预览器 (${result.fileName})")
                     }
                 }
             }

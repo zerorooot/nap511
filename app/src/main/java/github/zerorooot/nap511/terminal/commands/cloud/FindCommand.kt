@@ -6,6 +6,11 @@ import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
 import github.zerorooot.nap511.terminal.engine.GlobMatcher
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitError
+import github.zerorooot.nap511.terminal.viewmodel.emitFindCategory
+import github.zerorooot.nap511.terminal.viewmodel.emitPath
+import github.zerorooot.nap511.terminal.viewmodel.emitText
 import github.zerorooot.nap511.viewmodel.formatFileBeanList
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -44,7 +49,7 @@ class FindCommand : TerminalCommand {
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String> = flow {
+    ): Flow<TerminalOutput> = flow {
         var namePattern: String? = null
         var typeFilter: String? = null
         var suffixFilter: String? = null
@@ -87,12 +92,12 @@ class FindCommand : TerminalCommand {
             when (val resolved = ctx.resolveTarget(pathArg)) {
                 is ResolvedTarget.Directory -> Pair(resolved.cid, resolved.path)
                 is ResolvedTarget.File -> {
-                    emit(resolved.fullPath)
+                    emitPath(resolved.fullPath)
                     return@flow
                 }
 
                 null -> {
-                    emit("find: '$pathArg': No such file or directory")
+                    emitError("find: '$pathArg': No such file or directory")
                     return@flow
                 }
             }
@@ -140,18 +145,18 @@ class FindCommand : TerminalCommand {
                 }
 
                 if (list.isEmpty()) {
-                    emit("find: 未找到匹配的分类文件 (filterType: $filterType)")
+                    emitText("find: 未找到匹配的分类文件 (filterType: $filterType)")
                 } else {
-                    emit("分类筛选结果（共 ${list.size} 项，分类: $filterType）：")
+                    emitText("分类筛选结果（共 ${list.size} 项，分类: $filterType）：")
                     for (file in list) {
                         val isFolder = file.fileId.isEmpty()
                         val prefix = if (isFolder) "[目录] " else "[文件] "
                         val sizeStr = if (isFolder) "-" else file.sizeString.trim()
-                        emit("$prefix${file.name}  ($sizeStr)")
+                        emitFindCategory("$prefix${file.name}  ($sizeStr)")
                     }
                 }
             } catch (e: Exception) {
-                emit("find: 分类筛选失败: ${e.message}")
+                emitError("find: 分类筛选失败: ${e.message}")
             }
             return@flow
         }
@@ -160,7 +165,7 @@ class FindCommand : TerminalCommand {
         if (isGlobal) {
             val queryKeyword = namePattern ?: suffixFilter ?: ""
             if (queryKeyword.isEmpty()) {
-                emit("find: -global 全局搜索需要提供 -name 或 -suffix 关键词")
+                emitError("find: -global 全局搜索需要提供 -name 或 -suffix 关键词")
                 return@flow
             }
             try {
@@ -170,16 +175,16 @@ class FindCommand : TerminalCommand {
                 )
                 val list = searchResult.fileBeanList
                 if (list.isEmpty()) {
-                    emit("find: 未在网盘中找到匹配项")
+                    emitText("find: 未在网盘中找到匹配项")
                 } else {
                     list.forEach { file ->
                         val isFolder = file.fileId.isEmpty()
                         val prefix = if (isFolder) "[目录] " else "[文件] "
-                        emit("$prefix${file.name} (cid: ${if (isFolder) file.categoryId else file.parentId})")
+                        emitFindCategory("$prefix${file.name} (cid: ${if (isFolder) file.categoryId else file.parentId})")
                     }
                 }
             } catch (e: Exception) {
-                emit("find: 全局搜索失败: ${e.message}")
+                emitError("find: 全局搜索失败: ${e.message}")
             }
             return@flow
         }
@@ -236,7 +241,7 @@ class FindCommand : TerminalCommand {
                 }
 
                 if (matches) {
-                    emit(fullPath + if (file.isFolder) "/" else "")
+                    emitPath(fullPath + if (file.isFolder) "/" else "")
                 }
 
                 if (file.isFolder && currentDepth < maxDepth) {

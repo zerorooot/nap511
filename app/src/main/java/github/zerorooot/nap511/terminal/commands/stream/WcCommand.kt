@@ -1,9 +1,11 @@
 package github.zerorooot.nap511.terminal.commands.stream
 
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitText
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import java.util.Locale
@@ -31,7 +33,7 @@ class WcCommand : TerminalCommand {
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String> = flow {
+    ): Flow<TerminalOutput> = flow {
         val cmdArgs = CommandArgs(args)
         val linesOnly = cmdArgs.hasFlag("-l")
         val wordsOnly = cmdArgs.hasFlag("-w")
@@ -49,12 +51,12 @@ class WcCommand : TerminalCommand {
 
         // 根据选项过滤输出，若未单独指定某个维度则格式化输出全部三列
         when {
-            linesOnly && !wordsOnly && !charsOnly -> emit(lineCount.toString())
-            wordsOnly && !linesOnly && !charsOnly -> emit(wordCount.toString())
-            charsOnly && !linesOnly && !wordsOnly -> emit(charCount.toString())
+            linesOnly && !wordsOnly && !charsOnly -> emitText(lineCount.toString())
+            wordsOnly && !linesOnly && !charsOnly -> emitText(wordCount.toString())
+            charsOnly && !linesOnly && !wordsOnly -> emitText(charCount.toString())
             else -> {
-                emit("   Lines    Words    Chars")
-                emit(
+                emitText("   Lines    Words    Chars")
+                emitText(
                     String.format(
                         Locale.getDefault(),
                         "%8d %8d %8d",

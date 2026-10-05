@@ -1,10 +1,13 @@
 package github.zerorooot.nap511.terminal.commands.file
 
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitError
+import github.zerorooot.nap511.terminal.viewmodel.emitText
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -31,14 +34,14 @@ class RmCommand : TerminalCommand {
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String> = flow {
+    ): Flow<TerminalOutput> = flow {
         val cmdArgs = CommandArgs(args)
         // 支持 -y、-f 以及复合开关 -rf / -fr 免确认参数
         val autoConfirm = cmdArgs.hasAny("-f", "-rf", "-fr")
         val targetNames = cmdArgs.positionalArgs
 
         if (targetNames.isEmpty()) {
-            emit("rm: missing operand")
+            emitError("rm: missing operand")
             return@flow
         }
 
@@ -49,7 +52,7 @@ class RmCommand : TerminalCommand {
         for (target in targetNames) {
             val resolved = ctx.resolveTarget(target)
             if (resolved == null) {
-                emit("rm: cannot remove '$target': No such file or directory")
+                emitError("rm: cannot remove '$target': No such file or directory")
                 continue
             }
 
@@ -69,16 +72,16 @@ class RmCommand : TerminalCommand {
                 is ResolvedTarget.Directory -> {
                     // 安全校验 1：严禁删除根目录
                     if (resolved.cid == "0") {
-                        emit("rm: cannot remove '$target': Cannot remove root directory")
+                        emitError("rm: cannot remove '$target': Cannot remove root directory")
                         continue
                     }
                     // 安全校验 2：禁止删除当前工作目录自身
                     if (resolved.cid == ctx.currentCid) {
-                        emit("rm: cannot remove '$target': Cannot remove current working directory")
+                        emitError("rm: cannot remove '$target': Cannot remove current working directory")
                         continue
                     }
                     if (resolved.parentCid == null) {
-                        emit("rm: cannot remove '$target': Cannot determine parent directory")
+                        emitError("rm: cannot remove '$target': Cannot determine parent directory")
                         continue
                     }
                     actualFid = resolved.cid
@@ -94,7 +97,7 @@ class RmCommand : TerminalCommand {
             if (!autoConfirm) {
                 val confirmed = ctx.confirm("rm: 是否确认删除 '$displayName'? (yes/no): ")
                 if (!confirmed) {
-                    emit("rm: 已取消删除 '$displayName'")
+                    emitText("rm: 已取消删除 '$displayName'")
                     continue
                 }
             }
@@ -108,13 +111,13 @@ class RmCommand : TerminalCommand {
                     if (isFolder) {
                         affectedCids.add(actualFid)
                     }
-                    emit("rm: 已移入回收站 '$displayName'")
+                    emitText("rm: 已移入回收站 '$displayName'")
                 } else {
                     val err = res.error.ifEmpty { res.message }
-                    emit("rm: 删除失败 '$displayName': $err")
+                    emitError("rm: 删除失败 '$displayName': $err")
                 }
             } catch (e: Exception) {
-                emit("rm: 删除失败 '$displayName': ${e.message}")
+                emitError("rm: 删除失败 '$displayName': ${e.message}")
             }
         }
 

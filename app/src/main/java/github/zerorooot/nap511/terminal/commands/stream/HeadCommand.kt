@@ -1,9 +1,11 @@
 package github.zerorooot.nap511.terminal.commands.stream
 
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitText
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -28,14 +30,14 @@ class HeadCommand : TerminalCommand {
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String> = flow {
+    ): Flow<TerminalOutput> = flow {
         val cmdArgs = CommandArgs(args)
         val limit = cmdArgs.getIntOption("-n", default = 10) ?: 10
 
         var count = 0
         stdin.collect { line ->
             if (count < limit) {
-                emit(line)
+                emitText(line)
                 count++
             }
         }

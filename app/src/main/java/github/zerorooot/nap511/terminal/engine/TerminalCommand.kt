@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.terminal.engine
 
 import github.zerorooot.nap511.terminal.context.TerminalContext
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -8,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
  *
  * 遵循微内核架构规范，作为引擎层调度与具体业务命令实现之间的标准契约。
  * 声明式定义命令元数据（名称、描述、用法、参数选项、别名）及异步流式执行体。
+ * 按照方案 A（强类型流模型），execute 返回包含显式语义类型的 Flow<TerminalOutput>。
  */
 interface TerminalCommand {
 
@@ -41,12 +43,12 @@ interface TerminalCommand {
      *
      * @param ctx 终端执行会话上下文（包含工作目录、云端接口仓库、本地缓存及交互确认等）
      * @param args 分词后的命令行参数列表（包含所有选项和位置参数）
-     * @param stdin 来自管道上游的标准输入数据流
-     * @return 产生终端文本输出的冷流 (Flow<String>)
+     * @param stdin 来自管道上游的标准输入数据流（标准 Unix 文本行流）
+     * @return 产生终端结构化输出的冷流 (Flow<TerminalOutput>)
      */
     suspend fun execute(
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String>
+    ): Flow<TerminalOutput>
 }

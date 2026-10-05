@@ -1,9 +1,12 @@
 package github.zerorooot.nap511.terminal.commands.stream
 
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
 import github.zerorooot.nap511.terminal.engine.CommandRegistry
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitError
+import github.zerorooot.nap511.terminal.viewmodel.emitText
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
@@ -35,7 +38,7 @@ class XargsCommand(
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String> = flow {
+    ): Flow<TerminalOutput> = flow {
         var replaceStr: String? = null
         var maxArgs: Int? = null
         var verbose = false
@@ -77,7 +80,7 @@ class XargsCommand(
 
         val targetCommandDef = registrySupplier().get(targetCommandName)
         if (targetCommandDef == null) {
-            emit("xargs: $targetCommandName: command not found")
+            emitError("xargs: $targetCommandName: command not found")
             return@flow
         }
 
@@ -93,7 +96,7 @@ class XargsCommand(
                     }
 
                     if (verbose) {
-                        emit("+ $targetCommandName ${substitutedArgs.joinToString(" ")}")
+                        emitText("+ $targetCommandName ${substitutedArgs.joinToString(" ")}")
                     }
 
                     val resultFlow = targetCommandDef.execute(ctx, substitutedArgs, emptyFlow())
@@ -121,7 +124,7 @@ class XargsCommand(
             for (batch in batches) {
                 val finalArgs = initialArgs + batch
                 if (verbose) {
-                    emit("+ $targetCommandName ${finalArgs.joinToString(" ")}")
+                    emitText("+ $targetCommandName ${finalArgs.joinToString(" ")}")
                 }
                 val resultFlow = targetCommandDef.execute(ctx, finalArgs, emptyFlow())
                 resultFlow.collect { emit(it) }

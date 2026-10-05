@@ -685,8 +685,7 @@ private fun TerminalLineRow(line: TerminalLine) {
         }
 
         TerminalLineType.HELP -> {
-            // 命令行帮助与快捷键文档：源头直接定性，绝对不走 TerminalStyleParser 路径解析
-            // 彻底杜绝字符串猜测与误判，保证全行颜色一致纯净
+            // 命令行帮助与快捷键文档：源头直接定性，整行统一使用柔和次要色，杜绝任何二次误染
             Text(
                 text = line.text,
                 color = TerminalColors.TextMuted,
@@ -699,9 +698,45 @@ private fun TerminalLineRow(line: TerminalLine) {
             )
         }
 
+        // 【核心直通渲染通道】：普通文本输出（echo, wc, stat, 普通管道等，占绝大多数终端行）
+        // 直接使用 Text 组件单色渲染，彻底免除 AnnotatedString 组装与正则解析开销，实现极致滚动性能
+        TerminalLineType.OUTPUT_TEXT -> {
+            Text(
+                text = line.text,
+                color = TerminalColors.TextPrimary,
+                fontSize = 13.sp,
+                fontFamily = FontFamily.Monospace,
+                lineHeight = 18.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 1.dp)
+            )
+        }
+
+        // 富文本输出类型：按显式 TerminalLineType 委托给 TerminalStyleParser 组装样式
+        TerminalLineType.OUTPUT_FILE_ENTRY,
+        TerminalLineType.OUTPUT_PATH_ENTRY,
+        TerminalLineType.OUTPUT_LONG_LISTING,
+        TerminalLineType.OUTPUT_FIND_CATEGORY,
+        TerminalLineType.OUTPUT_ANSI -> {
+            val annotatedString = remember(line.text, line.type) {
+                TerminalStyleParser.parseLine(line.text, line.type)
+            }
+            Text(
+                text = annotatedString,
+                fontSize = 13.sp,
+                fontFamily = FontFamily.Monospace,
+                lineHeight = 18.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 1.dp)
+            )
+        }
+
+        @Suppress("DEPRECATION")
         TerminalLineType.OUTPUT -> {
             val annotatedString = remember(line.text) {
-                TerminalStyleParser.parseOutputLine(line.text)
+                TerminalStyleParser.parseLine(line.text, TerminalLineType.OUTPUT)
             }
             Text(
                 text = annotatedString,
@@ -720,6 +755,7 @@ private fun TerminalLineRow(line: TerminalLine) {
                 TerminalLineType.COMMAND -> TerminalColors.Command
                 TerminalLineType.ERROR -> TerminalColors.Error
                 TerminalLineType.PROMPT -> TerminalColors.PromptConfirm
+                else -> TerminalColors.TextPrimary
             }
 
             Text(

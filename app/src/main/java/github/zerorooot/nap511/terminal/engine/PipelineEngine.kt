@@ -1,6 +1,8 @@
 package github.zerorooot.nap511.terminal.engine
 
 import github.zerorooot.nap511.terminal.context.TerminalContext
+import github.zerorooot.nap511.terminal.viewmodel.TerminalLineType
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
@@ -8,21 +10,25 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.launch
 
 /**
  * 协程与 Flow 管道命令执行引擎
+ *
+ * 遵循强类型流模型规范（方案 A）：
+ * 1. 管道中继传递纯文本 (Flow<String>) 保证 Unix 流式计算互操作性；
+ * 2. 管道终点输出保留强类型语义 (Flow<TerminalOutput>) 供给上层 ViewModel 精准渲染。
  */
 class PipelineEngine(
     val registry: CommandRegistry
 ) {
     /**
      * 执行整行终端输入命令（支持管道串联与通配符展开）
+     *
      * @param input 原始终端输入指令字符串（如 `ls -l | grep "*.mp4" | wc -l`）
      * @param ctx 终端上下文
-     * @return 最终管道输出的标准行文本流 Flow<String>
+     * @return 最终管道输出的标准语义行冷流 Flow<TerminalOutput>
      */
-    suspend fun execute(input: String, ctx: TerminalContext): Flow<String> {
+    suspend fun execute(input: String, ctx: TerminalContext): Flow<TerminalOutput> {
         val trimmed = input.trim()
         if (trimmed.isEmpty()) {
             return emptyFlow()
@@ -33,17 +39,23 @@ class PipelineEngine(
             return emptyFlow()
         }
 
-        // 当前目录文件候选集，用于自动展开 Glob 通配符（* 和 ?）
-        val candidates = runCatching {
-            ctx.listDirectory(ctx.currentCid).map { it.name }
-        }.getOrDefault(emptyList())
+        // 仅在参数列表中确实包含 Glob 通配符（* 和 ?）时才按需查询目录候选集，避免无谓的网络与缓存开销
+        val hasWildcards = stages.any { stage -> stage.args.any { GlobMatcher.hasGlobWildcards(it) } }
+        val candidates = if (hasWildcards) {
+            runCatching {
+                ctx.listDirectory(ctx.currentCid).map { it.name }
+            }.getOrDefault(emptyList())
+        } else {
+            emptyList()
+        }
 
         var currentStdin: Flow<String> = emptyFlow()
+        var lastStdout: Flow<TerminalOutput> = emptyFlow()
 
         for (stage in stages) {
             val commandDef = registry.get(stage.command) ?: return flow {
-                emit("terminal: command not found: ${stage.command}")
-                emit("输入 '?' 或 'help' 可查看所有支持的命令")
+                emit(TerminalOutput("terminal: command not found: ${stage.command}", TerminalLineType.ERROR))
+                emit(TerminalOutput("输入 '?' 或 'help' 可查看所有支持的命令", TerminalLineType.HELP))
             }
 
             // 对参数列表中的 Glob 通配符（*.mp4 等）进行自动展开
@@ -56,11 +68,23 @@ class PipelineEngine(
                 }
             }
 
-            val nextStdout = executeStage(commandDef, ctx, expandedArgs, currentStdin)
-            currentStdin = nextStdout
+            // 【关键机制 - 不可变局部变量绑定】：
+            // 使用局部只读 val stageStdout 接收当前阶段的输出流，保证随后赋值给 currentStdin 的流闭包
+            // 严格捕获上一级的只读引用，绝不会因为外层 var 变量被下一轮循环重写而导致将自己作为自己的 stdin 陷入自循环死锁。
+            val stageStdout = executeStage(commandDef, ctx, expandedArgs, currentStdin)
+            lastStdout = stageStdout
+
+            // 将当前阶段的输出转换为纯文本行流供给下一阶段作为 stdin
+            currentStdin = flow {
+                stageStdout.collect { output ->
+                    for (subLine in output.text.split('\n')) {
+                        emit(subLine)
+                    }
+                }
+            }
         }
 
-        return currentStdin
+        return lastStdout
     }
 
     /**
@@ -71,7 +95,7 @@ class PipelineEngine(
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String> = channelFlow {
+    ): Flow<TerminalOutput> = channelFlow {
         try {
             // 管道流按行规范化展开，确保包含 \n 的输出在下游以独立单行流转
             val lineStream = flow {
@@ -82,11 +106,11 @@ class PipelineEngine(
                 }
             }
             val stdoutFlow = commandDef.execute(ctx, args, lineStream.buffer())
-            stdoutFlow.collect { line ->
-                send(line)
+            stdoutFlow.collect { output ->
+                send(output)
             }
         } catch (e: Exception) {
-            send("${commandDef.name}: error: ${e.message ?: e.javaClass.simpleName}")
+            send(TerminalOutput("${commandDef.name}: error: ${e.message ?: e.javaClass.simpleName}", TerminalLineType.ERROR))
         }
     }.flowOn(Dispatchers.IO)
 }

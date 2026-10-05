@@ -1,6 +1,8 @@
 package github.zerorooot.nap511.terminal.engine
 
 import github.zerorooot.nap511.terminal.context.TerminalContext
+import github.zerorooot.nap511.terminal.viewmodel.TerminalLineType
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -26,15 +28,17 @@ class CommandDefinition(
     val description: String,
     val flags: List<CommandFlag>,
     val usageExample: String?,
-    private val executor: suspend (ctx: TerminalContext, args: List<String>, stdin: Flow<String>) -> Flow<String>
+    private val executor: suspend (ctx: TerminalContext, args: List<String>, stdin: Flow<String>) -> Flow<TerminalOutput>
 ) {
-    suspend fun execute(ctx: TerminalContext, args: List<String>, stdin: Flow<String>): Flow<String> {
+    suspend fun execute(ctx: TerminalContext, args: List<String>, stdin: Flow<String>): Flow<TerminalOutput> {
         // 当使用 --help 或 (当命令本身未定义 -h 选项且参数包含 -h) 时自动拦截输出参数说明与用法
         val hasHOption = flags.any { it.optionName == "-h" }
         if (args.contains("--help") || (!hasHOption && args.contains("-h"))) {
             return flow {
-                // 从源头发射带有 HELP_PREFIX 语义标记的帮助文档流，确保上层直接定性为 TerminalLineType.HELP
-                emit("${TerminalControlTokens.HELP_PREFIX}${buildHelpMessage()}")
+                // 源头直接发射带有 TerminalLineType.HELP 语义类型的帮助文档行
+                for (subLine in buildHelpMessage().split('\n')) {
+                    emit(TerminalOutput(subLine, TerminalLineType.HELP))
+                }
             }
         }
         return executor(ctx, args, stdin)
@@ -64,7 +68,7 @@ class CommandBuilder(val name: String) {
     var description: String = ""
     var usage: String? = null
     private val flags = mutableListOf<CommandFlag>()
-    private var executor: (suspend (ctx: TerminalContext, args: List<String>, stdin: Flow<String>) -> Flow<String>)? = null
+    private var executor: (suspend (ctx: TerminalContext, args: List<String>, stdin: Flow<String>) -> Flow<TerminalOutput>)? = null
 
     /**
      * 声明命令支持的 Flag 参数选项
@@ -76,12 +80,12 @@ class CommandBuilder(val name: String) {
     /**
      * 声明命令的执行体
      */
-    fun execute(block: suspend (ctx: TerminalContext, args: List<String>, stdin: Flow<String>) -> Flow<String>) {
+    fun execute(block: suspend (ctx: TerminalContext, args: List<String>, stdin: Flow<String>) -> Flow<TerminalOutput>) {
         this.executor = block
     }
 
     fun build(): CommandDefinition {
-        val exec = executor ?: { _, _, _ -> flow { emit("命令 $name 未定义实现") } }
+        val exec = executor ?: { _, _, _ -> flow { emit(TerminalOutput("命令 $name 未定义实现", TerminalLineType.ERROR)) } }
         return CommandDefinition(
             name = name,
             description = description,

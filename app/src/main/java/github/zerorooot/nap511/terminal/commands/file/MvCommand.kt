@@ -1,9 +1,12 @@
 package github.zerorooot.nap511.terminal.commands.file
 
 import github.zerorooot.nap511.bean.RenameBean
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitError
+import github.zerorooot.nap511.terminal.viewmodel.emitText
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -26,7 +29,7 @@ class MvCommand : TerminalCommand {
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String> = flow {
+    ): Flow<TerminalOutput> = flow {
         val targets = args.filter { !it.startsWith("-") }.toMutableList()
 
         // 管道支持：若命令行参数仅提供了 1 个目标目录（例如 find ... | mv ../），且上游管道存在输入，智能从 stdin 获取源列表
@@ -47,7 +50,7 @@ class MvCommand : TerminalCommand {
         }
 
         if (targets.size < 2) {
-            emit("mv: missing file operand")
+            emitError("mv: missing file operand")
             return@flow
         }
 
@@ -112,7 +115,7 @@ class MvCommand : TerminalCommand {
             for (src in sources) {
                 val resolvedSrc = resolveSourceItem(src)
                 if (resolvedSrc == null) {
-                    emit("mv: cannot stat '$src': No such file or directory")
+                    emitError("mv: cannot stat '$src': No such file or directory")
                     continue
                 }
                 try {
@@ -123,14 +126,14 @@ class MvCommand : TerminalCommand {
                     if (res.state) {
                         // 同时记录源文件所在的父目录，后续一并失效缓存
                         resolvedSrc.parentCid?.let { affectedCids.add(it) }
-                        emit("mv: '$src' -> '$destDisplayName/'")
+                        emitText("mv: '$src' -> '$destDisplayName/'")
                     } else {
                         val err =
                             res.error.ifEmpty { res.errorMsg.ifEmpty { res.message } }
-                        emit("mv: 移动 '$src' 失败: $err")
+                        emitError("mv: 移动 '$src' 失败: $err")
                     }
                 } catch (e: Exception) {
-                    emit("mv: 移动 '$src' 失败: ${e.message}")
+                    emitError("mv: 移动 '$src' 失败: ${e.message}")
                 }
             }
             for (cid in affectedCids) {
@@ -139,13 +142,13 @@ class MvCommand : TerminalCommand {
         } else if (sources.size == 1) {
             // 单源且目标不是现有目录：执行重命名
             if (destination.endsWith("/")) {
-                emit("mv: target '$destination' is not a directory")
+                emitError("mv: target '$destination' is not a directory")
                 return@flow
             }
             val src = sources[0]
             val resolvedSrc = resolveSourceItem(src)
             if (resolvedSrc == null) {
-                emit("mv: cannot stat '$src': No such file or directory")
+                emitError("mv: cannot stat '$src': No such file or directory")
                 return@flow
             }
             // 截取纯文件名，防止将路径名误作为文件名传入 rename API
@@ -156,16 +159,16 @@ class MvCommand : TerminalCommand {
                 if (res.state) {
                     ctx.invalidateCache(ctx.currentCid)
                     resolvedSrc.parentCid?.let { ctx.invalidateCache(it) }
-                    emit("mv: '$src' renamed to '$newName'")
+                    emitText("mv: '$src' renamed to '$newName'")
                 } else {
                     val err = res.error.ifEmpty { res.errorMsg.ifEmpty { res.message } }
-                    emit("mv: 重命名失败: $err")
+                    emitError("mv: 重命名失败: $err")
                 }
             } catch (e: Exception) {
-                emit("mv: 重命名失败: ${e.message}")
+                emitError("mv: 重命名失败: ${e.message}")
             }
         } else {
-            emit("mv: target '$destination' is not a directory")
+            emitError("mv: target '$destination' is not a directory")
         }
     }
 }

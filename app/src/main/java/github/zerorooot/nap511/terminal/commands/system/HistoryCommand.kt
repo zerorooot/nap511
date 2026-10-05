@@ -1,11 +1,12 @@
 package github.zerorooot.nap511.terminal.commands.system
 
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.engine.TerminalHistoryManager
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitText
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 
 /**
@@ -35,12 +36,12 @@ class HistoryCommand(
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String> = flow {
+    ): Flow<TerminalOutput> = flow {
         // 1. 若携带 -c 参数，执行历史记录清空
         if (args.contains("-c")) {
             historyManager.clearHistory()
             onClearMemoryHistory()
-            emit("terminal: history cleared")
+            emitText("terminal: history cleared")
             return@flow
         }
 
@@ -49,6 +50,8 @@ class HistoryCommand(
         val limit = if (limitArg != null && limitArg > 0) limitArg else Int.MAX_VALUE
 
         // 3. 流式发射历史命令记录
-        emitAll(historyManager.streamHistory(limit))
+        historyManager.streamHistory(limit).collect { line ->
+            emitText(line)
+        }
     }
 }

@@ -653,38 +653,27 @@ class TerminalViewModel(
                     }
                 }
 
-                flow.collect { line ->
-                    if (line == TerminalControlTokens.CLEAR_SCREEN) {
+                flow.collect { output ->
+                    if (output.text == TerminalControlTokens.CLEAR_SCREEN) {
                         flushBuffer()
                         withContext(Dispatchers.Main) {
                             lines.clear()
                         }
-                    } else if (line == TerminalControlTokens.EXIT) {
+                    } else if (output.text == TerminalControlTokens.EXIT) {
                         flushBuffer()
                         withContext(Dispatchers.Main) {
                             resetSession()
                             onExitAction?.invoke()
                         }
-                    } else if (line.startsWith(TerminalControlTokens.HELP_PREFIX)) {
-                        // 捕获源头发射的帮助文档流标记，按行解包并统一归类为 TerminalLineType.HELP
-                        // 从源头彻底杜绝进入下游路径匹配与样式解析器，保障帮助文本颜色一致性
-                        val helpContent = line.removePrefix(TerminalControlTokens.HELP_PREFIX)
-                        for (subLine in helpContent.split('\n')) {
-                            buffer.add(TerminalLine(subLine, TerminalLineType.HELP))
-                        }
-
-                        val now = System.currentTimeMillis()
-                        if (buffer.size >= 50 || now - lastFlushTime >= 32) {
-                            flushBuffer()
-                            lastFlushTime = now
-                        }
                     } else {
-                        val lineType = if (line.startsWith("terminal: command not found") || line.contains(": error:")) {
-                            TerminalLineType.ERROR
+                        // 兼容处理可能包含换行符的输出，拆分为独立行并继承源头赋予的语义类型
+                        if (output.text.contains('\n')) {
+                            for (subLine in output.text.split('\n')) {
+                                buffer.add(TerminalLine(subLine, output.type))
+                            }
                         } else {
-                            TerminalLineType.OUTPUT
+                            buffer.add(TerminalLine(output.text, output.type))
                         }
-                        buffer.add(TerminalLine(line, lineType))
 
                         val now = System.currentTimeMillis()
                         if (buffer.size >= 50 || now - lastFlushTime >= 32) {
@@ -725,7 +714,7 @@ class TerminalViewModel(
             currentExecutionJob?.cancel()
             currentExecutionJob = null
             isExecuting = false
-            appendTerminalLine(TerminalLine("^C", TerminalLineType.OUTPUT))
+            appendTerminalLine(TerminalLine("^C", TerminalLineType.OUTPUT_TEXT))
         } else {
             val raw = inputState.text
             appendTerminalLine(TerminalLine("${contextPromptText()}\n$ $raw^C", TerminalLineType.COMMAND))

@@ -1,9 +1,12 @@
 package github.zerorooot.nap511.terminal.commands.file
 
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitError
+import github.zerorooot.nap511.terminal.viewmodel.emitText
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -29,13 +32,13 @@ class MkdirCommand : TerminalCommand {
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String> = flow {
+    ): Flow<TerminalOutput> = flow {
         val cmdArgs = CommandArgs(args)
         val isParents = cmdArgs.hasFlag("-p")
         val folderNames = cmdArgs.positionalArgs
 
         if (folderNames.isEmpty()) {
-            emit("mkdir: missing operand")
+            emitError("mkdir: missing operand")
             return@flow
         }
 
@@ -43,7 +46,7 @@ class MkdirCommand : TerminalCommand {
             val cleanTarget = rawName.trim().trimEnd('/')
             if (cleanTarget.isEmpty() || cleanTarget == "/" || cleanTarget == "/根目录") {
                 if (!isParents) {
-                    emit("mkdir: cannot create directory '$rawName': File exists")
+                    emitError("mkdir: cannot create directory '$rawName': File exists")
                 }
                 continue
             }
@@ -76,7 +79,7 @@ class MkdirCommand : TerminalCommand {
                     } else {
                         val existingFile = existingFiles.firstOrNull { !it.isFolder && it.name == seg }
                         if (existingFile != null) {
-                            emit("mkdir: cannot create directory '$rawName': File exists")
+                            emitError("mkdir: cannot create directory '$rawName': File exists")
                             createSuccess = false
                             break
                         }
@@ -96,19 +99,19 @@ class MkdirCommand : TerminalCommand {
                                 }
                             } else {
                                 val err = res.error.ifEmpty { "创建失败" }
-                                emit("mkdir: cannot create directory '$rawName': $err")
+                                emitError("mkdir: cannot create directory '$rawName': $err")
                                 createSuccess = false
                                 break
                             }
                         } catch (e: Exception) {
-                            emit("mkdir: cannot create directory '$rawName': ${e.message}")
+                            emitError("mkdir: cannot create directory '$rawName': ${e.message}")
                             createSuccess = false
                             break
                         }
                     }
                 }
                 if (createSuccess) {
-                    emit("mkdir: created directory '$rawName'")
+                    emitText("mkdir: created directory '$rawName'")
                 }
             } else {
                 // 非 -p 模式：若带路径则必须在其已存在的父目录下创建
@@ -121,7 +124,7 @@ class MkdirCommand : TerminalCommand {
                     val effectiveParentPath = parentPath.ifEmpty { "/" }
                     val resolvedParent = ctx.resolvePath(effectiveParentPath)
                     if (resolvedParent == null) {
-                        emit("mkdir: cannot create directory '$rawName': No such file or directory")
+                        emitError("mkdir: cannot create directory '$rawName': No such file or directory")
                         continue
                     }
                     parentCid = resolvedParent.first
@@ -133,7 +136,7 @@ class MkdirCommand : TerminalCommand {
                 // 校验父目录下是否已存在同名文件夹或文件
                 val existing = ctx.listDirectory(parentCid).firstOrNull { it.name == folderName }
                 if (existing != null) {
-                    emit("mkdir: cannot create directory '$rawName': File exists")
+                    emitError("mkdir: cannot create directory '$rawName': File exists")
                     continue
                 }
 
@@ -144,13 +147,13 @@ class MkdirCommand : TerminalCommand {
                     )
                     if (res.state) {
                         ctx.invalidateCache(parentCid)
-                        emit("mkdir: created directory '$rawName'")
+                        emitText("mkdir: created directory '$rawName'")
                     } else {
                         val err = res.error.ifEmpty { "创建失败" }
-                        emit("mkdir: cannot create directory '$rawName': $err")
+                        emitError("mkdir: cannot create directory '$rawName': $err")
                     }
                 } catch (e: Exception) {
-                    emit("mkdir: cannot create directory '$rawName': ${e.message}")
+                    emitError("mkdir: cannot create directory '$rawName': ${e.message}")
                 }
             }
         }

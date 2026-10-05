@@ -11,11 +11,14 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.repository.SettingsRepository
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
 import github.zerorooot.nap511.terminal.engine.GlobMatcher
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitError
+import github.zerorooot.nap511.terminal.viewmodel.emitText
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.worker.UnzipAllFileWorker
@@ -48,7 +51,7 @@ class UnzipCommand : TerminalCommand {
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String> = flow {
+    ): Flow<TerminalOutput> = flow {
         var isList = false
         var password = ""
         val fileArgs = mutableListOf<String>()
@@ -73,7 +76,7 @@ class UnzipCommand : TerminalCommand {
         }
 
         if (fileArgs.isEmpty()) {
-            emit("unzip: missing file operand")
+            emitError("unzip: missing file operand")
             return@flow
         }
 
@@ -98,7 +101,7 @@ class UnzipCommand : TerminalCommand {
                 }
 
                 if (searchCid == null) {
-                    emit("unzip: '$dirPath': No such directory")
+                    emitError("unzip: '$dirPath': No such directory")
                     continue
                 }
 
@@ -111,7 +114,7 @@ class UnzipCommand : TerminalCommand {
                     )
                 }
                 if (matched.isEmpty()) {
-                    emit("unzip: no match found for '$fileArg'")
+                    emitError("unzip: no match found for '$fileArg'")
                 } else {
                     fileBeansList.addAll(matched)
                 }
@@ -124,11 +127,11 @@ class UnzipCommand : TerminalCommand {
                     }
 
                     is ResolvedTarget.Directory -> {
-                        emit("unzip: '$fileArg' is a directory, not an archive")
+                        emitError("unzip: '$fileArg' is a directory, not an archive")
                     }
 
                     null -> {
-                        emit("unzip: cannot find '$fileArg': No such file")
+                        emitError("unzip: cannot find '$fileArg': No such file")
                     }
                 }
             }
@@ -140,7 +143,7 @@ class UnzipCommand : TerminalCommand {
         }
 
         if (distinctFileBeans.isEmpty()) {
-            emit("unzip: 未找到可解压的文件")
+            emitError("unzip: 未找到可解压的文件")
             return@flow
         }
 
@@ -149,7 +152,7 @@ class UnzipCommand : TerminalCommand {
             for (file in distinctFileBeans) {
                 val pickCode = file.pickCode
                 if (pickCode.isEmpty()) {
-                    emit("unzip: 文件 '${file.name}' 缺失 pickCode，无法预览")
+                    emitError("unzip: 文件 '${file.name}' 缺失 pickCode，无法预览")
                     continue
                 }
                 try {
@@ -157,9 +160,9 @@ class UnzipCommand : TerminalCommand {
                         pickCode = pickCode,
                         fileName = file.name
                     )
-                    emit("Archive: ${file.name}")
+                    emitText("Archive: ${file.name}")
                     if (zipBeanList.list.isNotEmpty()) {
-                        emit(
+                        emitText(
                             String.format(
                                 Locale.getDefault(),
                                 "%-12s %-16s %s",
@@ -168,9 +171,9 @@ class UnzipCommand : TerminalCommand {
                                 "Name"
                             )
                         )
-                        emit("--------------------------------------------------")
+                        emitText("--------------------------------------------------")
                         for (item in zipBeanList.list) {
-                            emit(
+                            emitText(
                                 String.format(
                                     Locale.getDefault(),
                                     "%-12s %-16s %s",
@@ -181,16 +184,16 @@ class UnzipCommand : TerminalCommand {
                             )
                         }
                     } else {
-                        emit("unzip: 压缩包内无可显示文件或暂未完成分析")
+                        emitText("unzip: 压缩包内无可显示文件或暂未完成分析")
                     }
                 } catch (e: Exception) {
-                    emit("unzip: 预览 '${file.name}' 失败: ${e.message}")
+                    emitError("unzip: 预览 '${file.name}' 失败: ${e.message}")
                 }
             }
         } else {
             // 提交云端解压任务至 UnzipAllFileWorker 统一处理
             try {
-                emit("正在提交 ${distinctFileBeans.size} 个解压任务至后台...")
+                emitText("正在提交 ${distinctFileBeans.size} 个解压任务至后台...")
 
                 val listType = object : TypeToken<List<FileBean>>() {}.type
                 val listJson = Gson().toJson(distinctFileBeans, listType)
@@ -238,9 +241,9 @@ class UnzipCommand : TerminalCommand {
                 )
 
                 ctx.invalidateCache(targetCid)
-                emit("unzip: 已成功提交 ${distinctFileBeans.size} 个解压任务到后台 UnzipAllFileWorker 处理 (${distinctFileBeans.joinToString { it.name }})")
+                emitText("unzip: 已成功提交 ${distinctFileBeans.size} 个解压任务到后台 UnzipAllFileWorker 处理 (${distinctFileBeans.joinToString { it.name }})")
             } catch (e: Exception) {
-                emit("unzip: 提交解压任务失败: ${e.message}")
+                emitError("unzip: 提交解压任务失败: ${e.message}")
             }
         }
     }

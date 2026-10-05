@@ -1,7 +1,9 @@
 package github.zerorooot.nap511.terminal.commands.file
 
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.context.TerminalContext
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitText
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -22,7 +24,7 @@ class PwdCommand : TerminalCommand {
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String> = flow {
-        emit("${ctx.currentPath} (cid: ${ctx.currentCid})")
+    ): Flow<TerminalOutput> = flow {
+        emitText("${ctx.currentPath} (cid: ${ctx.currentCid})")
     }
 }

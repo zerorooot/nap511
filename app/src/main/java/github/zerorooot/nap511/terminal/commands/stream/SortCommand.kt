@@ -1,9 +1,11 @@
 package github.zerorooot.nap511.terminal.commands.stream
 
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitText
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
@@ -31,7 +33,7 @@ class SortCommand : TerminalCommand {
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String> = flow {
+    ): Flow<TerminalOutput> = flow {
         val cmdArgs = CommandArgs(args)
         val reverse = cmdArgs.hasFlag("-r")
         val numeric = cmdArgs.hasFlag("-n")
@@ -55,6 +57,6 @@ class SortCommand : TerminalCommand {
         }
 
         val finalLines = if (unique) sorted.distinct() else sorted
-        finalLines.forEach { emit(it) }
+        finalLines.forEach { emitText(it) }
     }
 }

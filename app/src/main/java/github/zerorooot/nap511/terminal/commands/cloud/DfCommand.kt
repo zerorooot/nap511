@@ -2,10 +2,13 @@ package github.zerorooot.nap511.terminal.commands.cloud
 
 import com.google.gson.Gson
 import github.zerorooot.nap511.bean.RemainingSpaceBean
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitError
+import github.zerorooot.nap511.terminal.viewmodel.emitText
 import github.zerorooot.nap511.util.formatFileSize
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -33,7 +36,7 @@ class DfCommand : TerminalCommand {
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String> = flow {
+    ): Flow<TerminalOutput> = flow {
         val cmdArgs = CommandArgs(args)
         val isHuman = cmdArgs.hasFlag("-h")
 
@@ -62,7 +65,7 @@ class DfCommand : TerminalCommand {
                     "${bean.remain.size} B"
                 }
 
-                emit(
+                emitText(
                     String.format(
                         Locale.getDefault(),
                         "%-18s %10s %10s %10s %5s %s",
@@ -74,7 +77,7 @@ class DfCommand : TerminalCommand {
                         "Mounted on"
                     )
                 )
-                emit(
+                emitText(
                     String.format(
                         Locale.getDefault(),
                         "%-18s %10s %10s %10s %4d%% %s",
@@ -87,10 +90,10 @@ class DfCommand : TerminalCommand {
                     )
                 )
             } else {
-                emit("df: 无法解析网盘空间配额数据")
+                emitError("df: 无法解析网盘空间配额数据")
             }
         } catch (e: Exception) {
-            emit("df: 获取网盘配额失败: ${e.message}")
+            emitError("df: 获取网盘配额失败: ${e.message}")
         }
     }
 }

@@ -6,6 +6,12 @@ import github.zerorooot.nap511.terminal.commands.util.CommandFormatUtil
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitError
+import github.zerorooot.nap511.terminal.viewmodel.emitFile
+import github.zerorooot.nap511.terminal.viewmodel.emitLongListing
+import github.zerorooot.nap511.terminal.viewmodel.emitPath
+import github.zerorooot.nap511.terminal.viewmodel.emitText
 import github.zerorooot.nap511.util.formatFileSize
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -40,7 +46,7 @@ class LsCommand : TerminalCommand {
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String> = flow {
+    ): Flow<TerminalOutput> = flow {
         val cmdArgs = CommandArgs(args)
         val isLong = cmdArgs.hasFlag("-l")
         val isAll = cmdArgs.hasFlag("-a")
@@ -58,7 +64,8 @@ class LsCommand : TerminalCommand {
         val (candidateFiles, isSingleFile) = if (targetPath != null) {
             val resolved = ctx.resolveTarget(targetPath)
             if (resolved == null) {
-                emit("ls: cannot access '$targetPath': No such file or directory")
+                // 源头直接标注错误类型
+                emitError("ls: cannot access '$targetPath': No such file or directory")
                 return@flow
             }
             when (resolved) {
@@ -100,10 +107,11 @@ class LsCommand : TerminalCommand {
             sorted = sorted.reversed()
         }
 
-        // 3. 格式化输出
+        // 3. 格式化输出：源头显式赋予对应的 TerminalLineType 语义
         if (isLong) {
             if (!isSingleFile) {
-                emit("total ${sorted.size}")
+                // "total X" 属于普通文本信息
+                emitText("total ${sorted.size}")
             }
             for (file in sorted) {
                 val typeChar = if (file.isFolder) "d" else "-"
@@ -115,16 +123,16 @@ class LsCommand : TerminalCommand {
                 } else {
                     if (file.isFolder) "${file.name}/" else file.name
                 }
-                emit(
-                    String.format(
-                        Locale.getDefault(),
-                        "%-11s %10s %16s %s",
-                        perm,
-                        sizeStr,
-                        timeStr,
-                        nameStr
-                    )
+                val formattedRow = String.format(
+                    Locale.getDefault(),
+                    "%-11s %10s %16s %s",
+                    perm,
+                    sizeStr,
+                    timeStr,
+                    nameStr
                 )
+                // 源头直接标注为 OUTPUT_LONG_LISTING
+                emitLongListing(formattedRow)
             }
         } else {
             for (file in sorted) {
@@ -133,7 +141,12 @@ class LsCommand : TerminalCommand {
                 } else {
                     if (file.isFolder) "${file.name}/" else file.name
                 }
-                emit(displayName)
+                // 若包含多级斜杠路径，发射 OUTPUT_PATH_ENTRY；单文件/文件夹发射 OUTPUT_FILE_ENTRY
+                if (displayName.trimEnd('/').contains('/')) {
+                    emitPath(displayName)
+                } else {
+                    emitFile(displayName)
+                }
             }
         }
     }

@@ -1,8 +1,10 @@
 package github.zerorooot.nap511.terminal.commands.file
 
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.TerminalContext
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitError
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -23,13 +25,13 @@ class CdCommand : TerminalCommand {
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String> = flow {
+    ): Flow<TerminalOutput> = flow {
         val cmdArgs = CommandArgs(args)
         // 若缺省目标路径，默认切换至根目录 "/"
         val target = cmdArgs.firstPositional ?: "/"
         val resolved = ctx.resolvePath(target)
         if (resolved == null) {
-            emit("cd: no such file or directory: $target")
+            emitError("cd: no such file or directory: $target")
             return@flow
         }
         ctx.updateDirectory(resolved.first, resolved.second)

@@ -1,9 +1,12 @@
 package github.zerorooot.nap511.terminal.commands.cloud
 
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitError
+import github.zerorooot.nap511.terminal.viewmodel.emitText
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import java.util.Locale
@@ -32,7 +35,7 @@ class TrashCommand : TerminalCommand {
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String> = flow {
+    ): Flow<TerminalOutput> = flow {
         val cmdArgs = CommandArgs(args)
         val isList = cmdArgs.hasFlag("-l") || args.isEmpty()
         val ridToRevert = cmdArgs.getOption("-r")
@@ -43,12 +46,12 @@ class TrashCommand : TerminalCommand {
             try {
                 val res = ctx.fileRepository.revert(ridToRevert)
                 if (res.state) {
-                    emit("trash: 已成功还原项 rid: $ridToRevert")
+                    emitText("trash: 已成功还原项 rid: $ridToRevert")
                 } else {
-                    emit("trash: 还原失败: ${res.error}")
+                    emitError("trash: 还原失败: ${res.error}")
                 }
             } catch (e: Exception) {
-                emit("trash: 还原异常: ${e.message}")
+                emitError("trash: 还原异常: ${e.message}")
             }
             return@flow
         }
@@ -58,18 +61,18 @@ class TrashCommand : TerminalCommand {
             val confirmed =
                 ctx.confirm("trash: 警告！确定要清空回收站中的全部文件吗？(yes/no): ")
             if (!confirmed) {
-                emit("trash: 已取消清空操作")
+                emitText("trash: 已取消清空操作")
                 return@flow
             }
             try {
                 val res = ctx.fileRepository.recycleCleanAll("")
                 if (res.state) {
-                    emit("trash: 回收站已成功清空")
+                    emitText("trash: 回收站已成功清空")
                 } else {
-                    emit("trash: 清空失败: ${res.error}")
+                    emitError("trash: 清空失败: ${res.error}")
                 }
             } catch (e: Exception) {
-                emit("trash: 清空异常: ${e.message}")
+                emitError("trash: 清空异常: ${e.message}")
             }
             return@flow
         }
@@ -79,11 +82,11 @@ class TrashCommand : TerminalCommand {
             try {
                 val list = ctx.fileRepository.recycleList()
                 if (list.recycleBeanList.isEmpty()) {
-                    emit("trash: 回收站为空")
+                    emitText("trash: 回收站为空")
                 } else {
-                    emit("回收站项目列表（共 ${list.recycleBeanList.size} 项）：")
+                    emitText("回收站项目列表（共 ${list.recycleBeanList.size} 项）：")
                     for (item in list.recycleBeanList) {
-                        emit(
+                        emitText(
                             String.format(
                                 Locale.getDefault(),
                                 "rid: %-15s %s (%s)",
@@ -95,7 +98,7 @@ class TrashCommand : TerminalCommand {
                     }
                 }
             } catch (e: Exception) {
-                emit("trash: 获取回收站列表失败: ${e.message}")
+                emitError("trash: 获取回收站列表失败: ${e.message}")
             }
         }
     }

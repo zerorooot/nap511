@@ -1,10 +1,13 @@
 package github.zerorooot.nap511.terminal.commands.cloud
 
 import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitError
+import github.zerorooot.nap511.terminal.viewmodel.emitText
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -25,11 +28,11 @@ class StatCommand : TerminalCommand {
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String> = flow {
+    ): Flow<TerminalOutput> = flow {
         val cmdArgs = CommandArgs(args)
         val targetName = cmdArgs.firstPositional
         if (targetName == null) {
-            emit("stat: missing operand")
+            emitError("stat: missing operand")
             return@flow
         }
 
@@ -47,26 +50,26 @@ class StatCommand : TerminalCommand {
             }
 
             null -> {
-                emit("stat: cannot stat '$targetName': No such file or directory")
+                emitError("stat: cannot stat '$targetName': No such file or directory")
                 return@flow
             }
         }
 
-        emit("  File: ${file.name}")
-        emit("  Type: ${if (file.isFolder) "Directory" else "Regular File"}")
-        emit("  Size: ${file.size} bytes (${file.sizeString.trim()})")
-        emit("  CID:  ${file.categoryId}  |  FID: ${file.fileId}")
+        emitText("  File: ${file.name}")
+        emitText("  Type: ${if (file.isFolder) "Directory" else "Regular File"}")
+        emitText("  Size: ${file.size} bytes (${file.sizeString.trim()})")
+        emitText("  CID:  ${file.categoryId}  |  FID: ${file.fileId}")
         if (file.pickCode.isNotEmpty()) {
-            emit("  PickCode: ${file.pickCode}")
+            emitText("  PickCode: ${file.pickCode}")
         }
         if (file.sha1.isNotEmpty()) {
-            emit("  SHA-1:    ${file.sha1}")
+            emitText("  SHA-1:    ${file.sha1}")
         }
         if (file.modifiedTime.isNotEmpty()) {
-            emit("  Modify:   ${file.modifiedTimeString}")
+            emitText("  Modify:   ${file.modifiedTimeString}")
         }
         if (file.createTime.isNotEmpty()) {
-            emit("  Created:  ${file.createTimeString}")
+            emitText("  Created:  ${file.createTimeString}")
         }
     }
 }

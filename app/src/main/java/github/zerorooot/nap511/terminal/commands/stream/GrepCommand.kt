@@ -1,9 +1,11 @@
 package github.zerorooot.nap511.terminal.commands.stream
 
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitText
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -30,7 +32,7 @@ class GrepCommand : TerminalCommand {
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<String> = flow {
+    ): Flow<TerminalOutput> = flow {
         val cmdArgs = CommandArgs(args)
         val ignoreCase = cmdArgs.hasFlag("-i")
         val invertMatch = cmdArgs.hasFlag("-v")
@@ -51,14 +53,14 @@ class GrepCommand : TerminalCommand {
             if (isSuccess) {
                 matchCount++
                 if (!countOnly) {
-                    emit(line)
+                    emitText(line)
                 }
             }
         }
 
         // 若开启 -c 选项，仅输出匹配总行数
         if (countOnly) {
-            emit(matchCount.toString())
+            emitText(matchCount.toString())
         }
     }
 }
