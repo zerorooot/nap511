@@ -84,7 +84,7 @@ fun TerminalCompletionBar(
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = Color(0xFF181818),
+            color = TerminalColors.SurfaceTopBar,
             tonalElevation = 6.dp
         ) {
             Row(
@@ -124,7 +124,7 @@ fun TerminalCompletionBar(
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "关闭补全栏",
-                        tint = Color(0xFF9E9E9E),
+                        tint = TerminalColors.IconMuted,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -144,15 +144,15 @@ private fun CompletionChip(
     modifier: Modifier = Modifier
 ) {
     val (icon, iconColor) = when (candidate.type) {
-        CandidateType.DIRECTORY -> Pair(Icons.Default.Folder, Color(0xFF81D4FA))
-        CandidateType.FILE -> Pair(Icons.AutoMirrored.Filled.InsertDriveFile, Color(0xFFB0BEC5))
-        CandidateType.COMMAND -> Pair(Icons.Default.Terminal, Color(0xFF69F0AE))
-        CandidateType.FLAG -> Pair(Icons.Default.Flag, Color(0xFFFFD54F))
+        CandidateType.DIRECTORY -> Pair(Icons.Default.Folder, TerminalColors.KeyTextAccent)
+        CandidateType.FILE -> Pair(Icons.AutoMirrored.Filled.InsertDriveFile, TerminalColors.TextSecondary)
+        CandidateType.COMMAND -> Pair(Icons.Default.Terminal, TerminalColors.Prompt)
+        CandidateType.FLAG -> Pair(Icons.Default.Flag, TerminalColors.PromptConfirm)
     }
 
-    val backgroundColor = if (isSelected) Color(0xFF263238) else Color(0xFF242424)
-    val borderColor = if (isSelected) Color(0xFF69F0AE) else Color(0xFF383838)
-    val textColor = if (isSelected) Color(0xFF69F0AE) else Color(0xFFECEFF1)
+    val backgroundColor = if (isSelected) TerminalColors.ChipBackgroundSelected else TerminalColors.ChipBackground
+    val borderColor = if (isSelected) TerminalColors.ChipBorderSelected else TerminalColors.ChipBorder
+    val textColor = if (isSelected) TerminalColors.Prompt else TerminalColors.TextPrimary
 
     Row(
         modifier = modifier

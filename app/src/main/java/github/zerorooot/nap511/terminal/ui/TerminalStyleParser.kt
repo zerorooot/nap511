@@ -90,23 +90,23 @@ object TerminalStyleParser {
                         when (code) {
                             1 -> fontWeight = FontWeight.Bold
                             22 -> fontWeight = FontWeight.Normal
-                            30 -> color = Color(0xFF212121) // Black
-                            31 -> color = Color(0xFFEF5350) // Red
-                            32 -> color = Color(0xFF66BB6A) // Green
-                            33 -> color = Color(0xFFFFA726) // Yellow
-                            34 -> color = Color(0xFF42A5F5) // Blue
-                            35 -> color = Color(0xFFAB47BC) // Magenta
-                            36 -> color = Color(0xFF26A69A) // Cyan
-                            37 -> color = Color(0xFFECEFF1) // White
+                            30 -> color = TerminalColors.Ansi.Black
+                            31 -> color = TerminalColors.Ansi.Red
+                            32 -> color = TerminalColors.Ansi.Green
+                            33 -> color = TerminalColors.Ansi.Yellow
+                            34 -> color = TerminalColors.Ansi.Blue
+                            35 -> color = TerminalColors.Ansi.Magenta
+                            36 -> color = TerminalColors.Ansi.Cyan
+                            37 -> color = TerminalColors.Ansi.White
                             39 -> color = theme.otherStyle.color // Default fg
-                            90 -> color = Color(0xFF78909C) // Bright Black/Gray
-                            91 -> color = Color(0xFFFF7043) // Bright Red
-                            92 -> color = Color(0xFFB2FF59) // Bright Green
-                            93 -> color = Color(0xFFFFD54F) // Bright Yellow
-                            94 -> color = Color(0xFF90CAF9) // Bright Blue
-                            95 -> color = Color(0xFFE040FB) // Bright Magenta
-                            96 -> color = Color(0xFF4DD0E1) // Bright Cyan
-                            97 -> color = Color(0xFFFFFFFF) // Bright White
+                            90 -> color = TerminalColors.Ansi.BrightBlack
+                            91 -> color = TerminalColors.Ansi.BrightRed
+                            92 -> color = TerminalColors.Ansi.BrightGreen
+                            93 -> color = TerminalColors.Ansi.BrightYellow
+                            94 -> color = TerminalColors.Ansi.BrightBlue
+                            95 -> color = TerminalColors.Ansi.BrightMagenta
+                            96 -> color = TerminalColors.Ansi.BrightCyan
+                            97 -> color = TerminalColors.Ansi.BrightWhite
                         }
                     }
                     SpanStyle(color = color, fontWeight = fontWeight)
@@ -198,11 +198,14 @@ object TerminalStyleParser {
         if (trimmed.isEmpty()) return AnnotatedString(lineText)
 
         // 判断是否属于多级路径字符串 (如 /a/b/c/ 或 /a/b/c.mp4)
-        // 排除非文件路径场景：斜线周围包含空格 (如 " / "、" /"、"/ ")，或包含命令说明分隔符 " : "
+        // 排除非文件路径场景：以横线开头（选项行）、斜线周围包含空格 (如 " / "、" /"、"/ ")、包含全角冒号或命令说明冒号 ": " / " : "
         val hasPathSlash = trimmed.trimEnd('/').contains('/')
+                && !trimmed.startsWith("-")
                 && !trimmed.contains(" /")
                 && !trimmed.contains("/ ")
                 && !trimmed.contains(" : ")
+                && !trimmed.contains(": ")
+                && !trimmed.contains("：")
 
         if (hasPathSlash) {
             val isDir = trimmed.endsWith("/")

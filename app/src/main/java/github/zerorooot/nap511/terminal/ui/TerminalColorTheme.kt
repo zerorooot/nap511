@@ -16,31 +16,31 @@ import github.zerorooot.nap511.viewmodel.ZIP_EXTS
  */
 data class TerminalColorTheme(
     // 1. 文件夹：来自 folder.xml (#FFA726)，加粗
-    val folderStyle: SpanStyle = SpanStyle(color = Color(0xFFFFA726), fontWeight = FontWeight.Bold),
+    val folderStyle: SpanStyle = SpanStyle(color = TerminalColors.FileFolder, fontWeight = FontWeight.Bold),
     // 2. 视频文件：来自 mp4.xml (#EF5350)
-    val videoStyle: SpanStyle = SpanStyle(color = Color(0xFFEF5350)),
+    val videoStyle: SpanStyle = SpanStyle(color = TerminalColors.FileVideo),
     // 3. 音频文件：来自 mp3.xml (#FF7043)
-    val audioStyle: SpanStyle = SpanStyle(color = Color(0xFFFF7043)),
+    val audioStyle: SpanStyle = SpanStyle(color = TerminalColors.FileAudio),
     // 4. 图片文件：来自 png.xml (#26A69A)
-    val imageStyle: SpanStyle = SpanStyle(color = Color(0xFF26A69A)),
+    val imageStyle: SpanStyle = SpanStyle(color = TerminalColors.FileImage),
     // 5. 压缩包：来自 zip.xml (#8D6E63)
-    val archiveStyle: SpanStyle = SpanStyle(color = Color(0xFF8D6E63)),
+    val archiveStyle: SpanStyle = SpanStyle(color = TerminalColors.FileArchive),
     // 6. 安装包：来自 apk.xml (#66BB6A)，不加粗
-    val apkStyle: SpanStyle = SpanStyle(color = Color(0xFF66BB6A), fontWeight = FontWeight.Normal),
+    val apkStyle: SpanStyle = SpanStyle(color = TerminalColors.FileApk, fontWeight = FontWeight.Normal),
     // 7. 可执行文件：来自 exe.xml (#5C6BC0)，不加粗
-    val execStyle: SpanStyle = SpanStyle(color = Color(0xFF5C6BC0), fontWeight = FontWeight.Normal),
+    val execStyle: SpanStyle = SpanStyle(color = TerminalColors.FileExecutable, fontWeight = FontWeight.Normal),
     // 8. 文本/文档：来自 txt.xml (#42A5F5)
-    val documentStyle: SpanStyle = SpanStyle(color = Color(0xFF42A5F5)),
+    val documentStyle: SpanStyle = SpanStyle(color = TerminalColors.FileDocument),
     // 9. 网页文件：来自 web.xml (#00BCD4)
-    val webStyle: SpanStyle = SpanStyle(color = Color(0xFF00BCD4)),
+    val webStyle: SpanStyle = SpanStyle(color = TerminalColors.FileWeb),
     // 10. ISO/镜像：来自 iso.xml (#7E57C2)
-    val isoStyle: SpanStyle = SpanStyle(color = Color(0xFF7E57C2)),
+    val isoStyle: SpanStyle = SpanStyle(color = TerminalColors.FileIso),
     // 11. 种子文件：来自 torrent.xml (#43A047)
-    val torrentStyle: SpanStyle = SpanStyle(color = Color(0xFF43A047)),
+    val torrentStyle: SpanStyle = SpanStyle(color = TerminalColors.FileTorrent),
     // 12. 其他文件：来自 other.xml (#BABABA)
-    val otherStyle: SpanStyle = SpanStyle(color = Color(0xFFBABABA)),
+    val otherStyle: SpanStyle = SpanStyle(color = TerminalColors.FileOther),
     // 13. 元数据（权限位、大小、修改时间等）
-    val metadataStyle: SpanStyle = SpanStyle(color = Color(0xFF78909C))
+    val metadataStyle: SpanStyle = SpanStyle(color = TerminalColors.Metadata)
 ) {
     /**
      * 根据文件名后缀或名称特征获取对应的 SpanStyle

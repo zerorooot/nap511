@@ -69,7 +69,7 @@ fun TerminalAccessoryBar(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = Color(0xFF1E1E1E),
+        color = TerminalColors.AccessoryBarBackground,
         tonalElevation = 4.dp
     ) {
         Column(
@@ -206,16 +206,16 @@ private fun AccessoryKey(
     var isPressed by remember { mutableStateOf(false) }
 
     val bgColor = when {
-        isActive -> Color(0xFF00ACC1) // 激活状态：突出高亮青色
-        isPressed -> Color(0xFF424242) // 按下/连按中即时视觉反馈
-        isAccent -> Color(0xFF383838) // 特殊功能键
-        else -> Color(0xFF2C2C2C)     // 普通符号键
+        isActive -> TerminalColors.KeyActive       // 激活状态：突出高亮青色
+        isPressed -> TerminalColors.KeyPressed     // 按下/连按中即时视觉反馈
+        isAccent -> TerminalColors.KeyAccent       // 特殊功能键
+        else -> TerminalColors.KeyDefault          // 普通符号键
     }
     val textColor = when {
-        isActive -> Color(0xFF101010) // 激活高反差深色字体
-        isPressed -> Color(0xFF69F0AE) // 连按中绿色高亮文本
-        isAccent -> Color(0xFF81D4FA) // 强调色文本
-        else -> Color(0xFFE0E0E0)     // 常规白色文本
+        isActive -> TerminalColors.KeyTextActive   // 激活高反差深色字体
+        isPressed -> TerminalColors.KeyTextPressed // 连按中绿色高亮文本
+        isAccent -> TerminalColors.KeyTextAccent   // 强调色文本
+        else -> TerminalColors.KeyTextDefault      // 常规白色文本
     }
 
     val clickModifier = if (autoRepeat) {

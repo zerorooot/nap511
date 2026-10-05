@@ -33,7 +33,8 @@ class CommandDefinition(
         val hasHOption = flags.any { it.optionName == "-h" }
         if (args.contains("--help") || (!hasHOption && args.contains("-h"))) {
             return flow {
-                emit(buildHelpMessage())
+                // 从源头发射带有 HELP_PREFIX 语义标记的帮助文档流，确保上层直接定性为 TerminalLineType.HELP
+                emit("${TerminalControlTokens.HELP_PREFIX}${buildHelpMessage()}")
             }
         }
         return executor(ctx, args, stdin)

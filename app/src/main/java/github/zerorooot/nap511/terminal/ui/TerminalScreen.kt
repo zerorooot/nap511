@@ -1,11 +1,8 @@
 package github.zerorooot.nap511.terminal.ui
 
 import android.app.Activity
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.ContextWrapper
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -318,8 +315,8 @@ fun TerminalScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = Color(0xFF101010),
-        contentColor = Color(0xFFECEFF1),
+        containerColor = TerminalColors.Background,
+        contentColor = TerminalColors.TextPrimary,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             Box(modifier = Modifier.fillMaxWidth()) {
@@ -329,12 +326,12 @@ fun TerminalScreen(
                             Text(
                                 text = "Terminal",
                                 fontSize = 17.sp,
-                                color = Color(0xFFECEFF1)
+                                color = TerminalColors.TextPrimary
                             )
                             Text(
                                 text = viewModel.currentPath,
                                 fontSize = 11.sp,
-                                color = Color(0xFFB0BEC5),
+                                color = TerminalColors.TextSecondary,
                                 fontFamily = FontFamily.Monospace
                             )
                         }
@@ -344,7 +341,7 @@ fun TerminalScreen(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "返回",
-                                tint = Color(0xFFECEFF1)
+                                tint = TerminalColors.TextPrimary
                             )
                         }
                     },
@@ -356,14 +353,14 @@ fun TerminalScreen(
                             Icon(
                                 imageVector = Icons.Default.DeleteSweep,
                                 contentDescription = "清屏",
-                                tint = Color(0xFFB0BEC5)
+                                tint = TerminalColors.TextSecondary
                             )
                         }
                         IconButton(onClick = { showTopDropdown = true }) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
                                 contentDescription = "更多",
-                                tint = Color(0xFFB0BEC5)
+                                tint = TerminalColors.TextSecondary
                             )
                         }
                         DropdownMenu(
@@ -397,7 +394,7 @@ fun TerminalScreen(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color(0xFF181818)
+                        containerColor = TerminalColors.SurfaceTopBar
                     )
                 )
 
@@ -412,7 +409,7 @@ fun TerminalScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(2.dp),
-                        color = Color(0xFF69F0AE),
+                        color = TerminalColors.Prompt,
                         trackColor = Color.Transparent,
                         strokeCap = StrokeCap.Round
                     )
@@ -487,7 +484,7 @@ fun TerminalScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF101010))
+                .background(TerminalColors.Background)
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         val down = awaitFirstDown(
@@ -640,11 +637,8 @@ fun TerminalScreen(
             },
             onClearScreen = { viewModel.clearScreen() },
             onCopyAll = {
-                val clipboard =
-                    context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                val clip = ClipData.newPlainText("Terminal Output", viewModel.getAllTerminalText())
-                clipboard.setPrimaryClip(clip)
-                Toast.makeText(context, "已复制终端输出内容", Toast.LENGTH_SHORT).show()
+                viewModel.getAllTerminalText().copy(context, "Terminal Output")
+                App.instance.toast("已复制终端输出内容")
             },
             onOpenDrawer = openDrawer,
             onCloseTerminal = exitAndReset
@@ -664,16 +658,16 @@ private fun TerminalLineRow(line: TerminalLine) {
             val annotatedString = remember(line.text) {
                 buildAnnotatedString {
                     // 上下文路径：青蓝色高亮
-                    withStyle(SpanStyle(color = Color(0xFF4DD0E1), fontWeight = FontWeight.Bold)) {
+                    withStyle(SpanStyle(color = TerminalColors.System, fontWeight = FontWeight.Bold)) {
                         append(contextPart)
                     }
                     append("\n")
                     // 提示符 $：高亮绿色
-                    withStyle(SpanStyle(color = Color(0xFF69F0AE), fontWeight = FontWeight.Bold)) {
+                    withStyle(SpanStyle(color = TerminalColors.Prompt, fontWeight = FontWeight.Bold)) {
                         append("$ ")
                     }
                     // 命令内容：亮灰白色
-                    withStyle(SpanStyle(color = Color(0xFFECEFF1))) {
+                    withStyle(SpanStyle(color = TerminalColors.TextPrimary)) {
                         append(commandPart)
                     }
                 }
@@ -681,6 +675,21 @@ private fun TerminalLineRow(line: TerminalLine) {
 
             Text(
                 text = annotatedString,
+                fontSize = 13.sp,
+                fontFamily = FontFamily.Monospace,
+                lineHeight = 18.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 1.dp)
+            )
+        }
+
+        TerminalLineType.HELP -> {
+            // 命令行帮助与快捷键文档：源头直接定性，绝对不走 TerminalStyleParser 路径解析
+            // 彻底杜绝字符串猜测与误判，保证全行颜色一致纯净
+            Text(
+                text = line.text,
+                color = TerminalColors.TextMuted,
                 fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace,
                 lineHeight = 18.sp,
@@ -707,10 +716,10 @@ private fun TerminalLineRow(line: TerminalLine) {
 
         else -> {
             val color = when (line.type) {
-                TerminalLineType.SYSTEM -> Color(0xFF4DD0E1)
-                TerminalLineType.COMMAND -> Color(0xFFB0BEC5)
-                TerminalLineType.ERROR -> Color(0xFFEF5350)
-                TerminalLineType.PROMPT -> Color(0xFFFFD54F)
+                TerminalLineType.SYSTEM -> TerminalColors.System
+                TerminalLineType.COMMAND -> TerminalColors.Command
+                TerminalLineType.ERROR -> TerminalColors.Error
+                TerminalLineType.PROMPT -> TerminalColors.PromptConfirm
             }
 
             Text(

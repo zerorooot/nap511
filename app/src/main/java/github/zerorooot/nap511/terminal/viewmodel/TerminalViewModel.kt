@@ -665,6 +665,19 @@ class TerminalViewModel(
                             resetSession()
                             onExitAction?.invoke()
                         }
+                    } else if (line.startsWith(TerminalControlTokens.HELP_PREFIX)) {
+                        // 捕获源头发射的帮助文档流标记，按行解包并统一归类为 TerminalLineType.HELP
+                        // 从源头彻底杜绝进入下游路径匹配与样式解析器，保障帮助文本颜色一致性
+                        val helpContent = line.removePrefix(TerminalControlTokens.HELP_PREFIX)
+                        for (subLine in helpContent.split('\n')) {
+                            buffer.add(TerminalLine(subLine, TerminalLineType.HELP))
+                        }
+
+                        val now = System.currentTimeMillis()
+                        if (buffer.size >= 50 || now - lastFlushTime >= 32) {
+                            flushBuffer()
+                            lastFlushTime = now
+                        }
                     } else {
                         val lineType = if (line.startsWith("terminal: command not found") || line.contains(": error:")) {
                             TerminalLineType.ERROR

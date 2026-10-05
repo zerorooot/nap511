@@ -21,4 +21,12 @@ object TerminalControlTokens {
      * 当终端流式管道发射此标记时，终端 ViewModel 会触发终端页面的关闭或会话终止回调。
      */
     const val EXIT = "__TERMINAL_EXIT__"
+
+    /**
+     * 命令行帮助文档前缀标记（对应 --help、-h 或 help/? 命令输出）
+     *
+     * 用于在发射源头为帮助文档流打上专属语义元数据标签，使终端 ViewModel 直接将其归类为 TerminalLineType.HELP，
+     * 从而在根源上一开始就杜绝帮助说明中的字符（如紧凑斜杠、冒号、标点）被下游样式解析器意外误判为文件路径。
+     */
+    const val HELP_PREFIX = "__TERMINAL_HELP_DOC__:"
 }

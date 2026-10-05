@@ -94,13 +94,13 @@ fun GhostTextField(
     onFocusChange: ((Boolean) -> Unit)? = null,
 ) {
     val textStyle = TextStyle(
-        color = Color(0xFFECEFF1),
+        color = TerminalColors.TextPrimary,
         fontSize = 14.sp,
         fontFamily = FontFamily.Monospace,
         lineHeight = 20.sp
     )
 
-    val promptColor = if (isWaitingConfirmation) Color(0xFFFFD54F) else Color(0xFF69F0AE)
+    val promptColor = if (isWaitingConfirmation) TerminalColors.PromptConfirm else TerminalColors.Prompt
     val keyboardController = LocalSoftwareKeyboardController.current
 
     var hasBeenFocused by remember { mutableStateOf(false) }
@@ -155,7 +155,7 @@ fun GhostTextField(
         if (!isWaitingConfirmation && contextPrompt.isNotEmpty()) {
             Text(
                 text = contextPrompt,
-                color = Color(0xFF4DD0E1), // 高亮青蓝终端配色
+                color = TerminalColors.System, // 高亮青蓝终端配色
                 fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
@@ -196,7 +196,7 @@ fun GhostTextField(
                     value = value,
                     onValueChange = onValueChange,
                     textStyle = textStyle,
-                    cursorBrush = SolidColor(Color(0xFF69F0AE)),
+                    cursorBrush = SolidColor(TerminalColors.Prompt),
                     singleLine = false,
                     maxLines = 5,
                     interactionSource = textFieldInteractionSource,
@@ -284,7 +284,7 @@ fun GhostTextField(
                                 append(value.text)
                             }
                             // 后缀以浅灰淡色展示幽灵文本
-                            withStyle(style = SpanStyle(color = Color(0xFF888888), fontWeight = FontWeight.Normal)) {
+                            withStyle(style = SpanStyle(color = TerminalColors.GhostText, fontWeight = FontWeight.Normal)) {
                                 append(ghostText)
                             }
                         },

@@ -1,11 +1,12 @@
 package github.zerorooot.nap511.terminal.commands.cloud
 
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.commands.util.SizeParser
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
 import github.zerorooot.nap511.terminal.engine.GlobMatcher
+import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.viewmodel.formatFileBeanList
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import java.util.Locale
@@ -20,7 +21,8 @@ class FindCommand : TerminalCommand {
 
     override val name: String = "find"
 
-    override val description: String = "网盘文件检索（支持按名称、类型、后缀、深度、115分类筛选及全盘全局搜索）"
+    override val description: String =
+        "网盘文件检索（支持按名称、类型、后缀、深度、115分类筛选及全盘全局搜索）"
 
     override val usage: String = "find [path] [options]"
 
@@ -30,7 +32,7 @@ class FindCommand : TerminalCommand {
         CommandFlag("-suffix <ext>", "按文件扩展名筛选（如 -suffix apk）"),
         CommandFlag(
             "-filter <type>",
-            "按 115 业务分类筛选：1/doc(文档), 2/img(图片), 3/audio(音频), 4/video(视频), 5/zip(压缩), 6/app(软件)"
+            "按 115 业务分类筛选：1|doc(文档), 2|img(图片), 3|audio(音频), 4|video(视频), 5|zip(压缩), 6|app(软件)"
         ),
         CommandFlag("-maxdepth <N>", "限制递归搜索的最大层级深度，默认为5"),
         CommandFlag("-empty", "只匹配空文件（大小为 0）或空目录（内容为空）"),
@@ -88,6 +90,7 @@ class FindCommand : TerminalCommand {
                     emit(resolved.fullPath)
                     return@flow
                 }
+
                 null -> {
                     emit("find: '$pathArg': No such file or directory")
                     return@flow
@@ -104,7 +107,7 @@ class FindCommand : TerminalCommand {
                     cid = targetCid,
                     type = filterType
                 )
-                var list = res.fileBeanList.toList()
+                var list = formatFileBeanList(res.fileBeanList).toList()
 
                 if (suffixFilter != null) {
                     list = list.filter {
