@@ -33,6 +33,11 @@ object TerminalStyleParser {
         type: TerminalLineType,
         theme: TerminalColorTheme = TerminalColorTheme.Default
     ): AnnotatedString {
+        // 双行历史命令格式美化解析：优先直接交给 parseCommandLine 处理，避免被换行误切
+        if (type == TerminalLineType.COMMAND && text.contains("\n$ ")) {
+            return parseCommandLine(text, theme)
+        }
+
         if (text.contains('\n')) {
             val lines = text.split('\n')
             return buildAnnotatedString {
@@ -91,6 +96,37 @@ object TerminalStyleParser {
                 }
             }
         }
+    }
+
+    /**
+     * 格式化历史命令行（COMMAND 类型）
+     * 针对双行格式（第 1 行上下文路径，第 2 行提示符与命令）进行确定性高亮：
+     * - 上下文路径：青蓝色粗体 (TerminalColors.System)
+     * - 提示符 "$ "：高亮绿色粗体 (TerminalColors.Prompt)
+     * - 命令内容：亮灰白普通文本 (TerminalColors.TextPrimary)
+     */
+    fun parseCommandLine(
+        text: String,
+        theme: TerminalColorTheme = TerminalColorTheme.Default
+    ): AnnotatedString {
+        if (text.contains("\n$ ")) {
+            val parts = text.split("\n$ ", limit = 2)
+            val contextPart = parts[0]
+            val commandPart = parts.getOrNull(1) ?: ""
+            return buildAnnotatedString {
+                withStyle(SpanStyle(color = TerminalColors.System, fontWeight = FontWeight.Bold)) {
+                    append(contextPart)
+                }
+                append("\n")
+                withStyle(SpanStyle(color = TerminalColors.Prompt, fontWeight = FontWeight.Bold)) {
+                    append("$ ")
+                }
+                withStyle(SpanStyle(color = TerminalColors.TextPrimary)) {
+                    append(commandPart)
+                }
+            }
+        }
+        return AnnotatedString(text)
     }
 
     /**

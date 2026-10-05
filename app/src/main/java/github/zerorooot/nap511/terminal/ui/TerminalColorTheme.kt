@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.terminal.ui
 
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -70,3 +71,8 @@ data class TerminalColorTheme(
         val Default = TerminalColorTheme()
     }
 }
+
+/**
+ * 终端色彩主题 CompositionLocal，供 UI 树中各组件隐式获取主题配置，消除层层手动透传 (高内聚、低耦合)
+ */
+val LocalTerminalTheme = staticCompositionLocalOf { TerminalColorTheme.Default }

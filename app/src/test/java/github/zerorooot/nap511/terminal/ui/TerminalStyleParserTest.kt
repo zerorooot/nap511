@@ -261,4 +261,49 @@ class TerminalStyleParserTest {
         assertEquals(unmatchedCategory, parsedUnmatched.text)
         assertTrue(parsedUnmatched.spanStyles.isEmpty())
     }
+
+    @Test
+    fun testParseCommandLineMultilineContextAndPrompt() {
+        val commandLine = "/Movies/Sci-Fi\n$ ls -la"
+        val parsed = TerminalStyleParser.parseLine(commandLine, TerminalLineType.COMMAND, theme)
+        assertEquals(commandLine, parsed.text)
+
+        // 验证三段 SpanStyle：
+        // 1. 上下文路径：System 青蓝 (粗体)
+        // 2. 提示符 "$ "：Prompt 亮绿 (粗体)
+        // 3. 命令文本 "ls -la"：TextPrimary 亮灰白
+        assertEquals(3, parsed.spanStyles.size)
+
+        val contextSpan = parsed.spanStyles[0]
+        assertEquals(0, contextSpan.start)
+        assertEquals("/Movies/Sci-Fi".length, contextSpan.end)
+        assertEquals(TerminalColors.System, contextSpan.item.color)
+        assertEquals(FontWeight.Bold, contextSpan.item.fontWeight)
+
+        val promptSpan = parsed.spanStyles[1]
+        assertEquals("/Movies/Sci-Fi\n".length, promptSpan.start)
+        assertEquals("/Movies/Sci-Fi\n$ ".length, promptSpan.end)
+        assertEquals(TerminalColors.Prompt, promptSpan.item.color)
+        assertEquals(FontWeight.Bold, promptSpan.item.fontWeight)
+
+        val cmdSpan = parsed.spanStyles[2]
+        assertEquals("/Movies/Sci-Fi\n$ ".length, cmdSpan.start)
+        assertEquals(commandLine.length, cmdSpan.end)
+        assertEquals(TerminalColors.TextPrimary, cmdSpan.item.color)
+    }
+
+    @Test
+    fun testParseCommandLineSingleLineWithoutPrompt() {
+        val singleCmd = "echo hello world"
+        val parsed = TerminalStyleParser.parseLine(singleCmd, TerminalLineType.COMMAND, theme)
+        assertEquals(singleCmd, parsed.text)
+        // 单行无 "\n$ " 的命令作为直通纯文本返回，零多余 SpanStyle
+        assertTrue(parsed.spanStyles.isEmpty())
+    }
+
+    @Test
+    fun testLocalTerminalThemeDefaults() {
+        assertNotNull(LocalTerminalTheme)
+    }
 }
+
