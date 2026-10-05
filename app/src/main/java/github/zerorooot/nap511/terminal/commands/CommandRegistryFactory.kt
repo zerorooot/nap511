@@ -1,12 +1,35 @@
 package github.zerorooot.nap511.terminal.commands
 
+import github.zerorooot.nap511.terminal.commands.cloud.DfCommand
+import github.zerorooot.nap511.terminal.commands.cloud.FindCommand
+import github.zerorooot.nap511.terminal.commands.cloud.OpenCommand
+import github.zerorooot.nap511.terminal.commands.cloud.StatCommand
+import github.zerorooot.nap511.terminal.commands.cloud.TrashCommand
+import github.zerorooot.nap511.terminal.commands.cloud.UnzipCommand
+import github.zerorooot.nap511.terminal.commands.file.CdCommand
+import github.zerorooot.nap511.terminal.commands.file.LsCommand
+import github.zerorooot.nap511.terminal.commands.file.MkdirCommand
+import github.zerorooot.nap511.terminal.commands.file.MvCommand
+import github.zerorooot.nap511.terminal.commands.file.PwdCommand
+import github.zerorooot.nap511.terminal.commands.file.RmCommand
+import github.zerorooot.nap511.terminal.commands.stream.EchoCommand
+import github.zerorooot.nap511.terminal.commands.stream.GrepCommand
+import github.zerorooot.nap511.terminal.commands.stream.HeadCommand
+import github.zerorooot.nap511.terminal.commands.stream.SortCommand
+import github.zerorooot.nap511.terminal.commands.stream.TailCommand
+import github.zerorooot.nap511.terminal.commands.stream.WcCommand
+import github.zerorooot.nap511.terminal.commands.stream.XargsCommand
+import github.zerorooot.nap511.terminal.commands.system.ClearCommand
+import github.zerorooot.nap511.terminal.commands.system.ExitCommand
+import github.zerorooot.nap511.terminal.commands.system.HelpCommand
+import github.zerorooot.nap511.terminal.commands.system.HistoryCommand
 import github.zerorooot.nap511.terminal.engine.CommandRegistry
 import github.zerorooot.nap511.terminal.engine.TerminalHistoryManager
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
 
 /**
  * 终端命令注册工厂
+ *
+ * 负责装配初始化所有的命令模块，构建并返回包含完整命令集的 CommandRegistry。
  */
 object CommandRegistryFactory {
 
@@ -22,36 +45,37 @@ object CommandRegistryFactory {
     ): CommandRegistry {
         val registry = CommandRegistry()
 
-        // 注册流式工具命令
-        StreamCommands.registerAll(registry)
-
-        // 注册网盘基础文件命令
-        FileCommands.registerAll(registry)
-
-        // 注册网盘特色命令
-        CloudCommands.registerAll(registry)
-
-        // 注册 history 命令 (支持流式输出、-c 清空与 <N> 最近记录截取)
-        registry.register("history") {
-            description = "查看命令历史记录"
-            usage = "history [-c | <N>]"
-            flag("-c", "清空持久化历史记录")
-            execute { _, args, _ ->
-                flow {
-                    if (args.contains("-c")) {
-                        historyManager.clearHistory()
-                        onClearMemoryHistory()
-                        emit("terminal: history cleared")
-                        return@flow
-                    }
-
-                    // 检查是否指定了数量截取 <N>，例如: history 20
-                    val limitArg = args.firstOrNull { it.toIntOrNull() != null }?.toIntOrNull()
-                    val limit = if (limitArg != null && limitArg > 0) limitArg else Int.MAX_VALUE
-
-                    emitAll(historyManager.streamHistory(limit))
-                }
-            }
+        val commands = arrayOf(
+            // 1. 注册流式工具及系统控制命令
+            EchoCommand(),
+            GrepCommand(),
+            WcCommand(),
+            HeadCommand(),
+            TailCommand(),
+            SortCommand(),
+            ClearCommand(),
+            HelpCommand { registry },
+            ExitCommand(),
+            XargsCommand { registry },
+            // 2. 注册网盘基础文件管理命令
+            LsCommand(),
+            CdCommand(),
+            PwdCommand(),
+            MkdirCommand(),
+            RmCommand(),
+            MvCommand(),
+            // 3. 注册 115 网盘特色命令
+            DfCommand(),
+            FindCommand(),
+            TrashCommand(),
+            StatCommand(),
+            UnzipCommand(),
+            OpenCommand(),
+            // 4. 注册历史记录命令 (通过独立 Command 类注入依赖)
+            HistoryCommand(historyManager, onClearMemoryHistory)
+        )
+        commands.forEach {
+            registry.register(it)
         }
 
         return registry
