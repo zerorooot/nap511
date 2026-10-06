@@ -4,8 +4,19 @@ import github.zerorooot.nap511.terminal.commands.stream.EchoCommand
 import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.commands.util.CommandFormatUtil
 import github.zerorooot.nap511.terminal.commands.util.SizeParser
-import github.zerorooot.nap511.terminal.context.TerminalContext
+import github.zerorooot.nap511.terminal.viewmodel.TerminalLineType
+import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitAnsi
+import github.zerorooot.nap511.terminal.viewmodel.emitError
+import github.zerorooot.nap511.terminal.viewmodel.emitFile
+import github.zerorooot.nap511.terminal.viewmodel.emitFindCategory
+import github.zerorooot.nap511.terminal.viewmodel.emitHelp
+import github.zerorooot.nap511.terminal.viewmodel.emitLongListing
+import github.zerorooot.nap511.terminal.viewmodel.emitPath
+import github.zerorooot.nap511.terminal.viewmodel.emitSystem
+import github.zerorooot.nap511.terminal.viewmodel.emitText
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -15,41 +26,53 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Locale
-import github.zerorooot.nap511.terminal.viewmodel.*
 
 /**
- * 终端命令高复用工具类及独立命令单元测试
+ * 终端命令工具类及数据载体底层单元测试
+ *
+ * 覆盖：
+ * 1. CommandArgs 命令行参数提取与解析器
+ * 2. SizeParser 文件大小解析器（支持 +100M, -10k, 500b 及匹配比较）
+ * 3. CommandFormatUtil 时间戳格式化工具
+ * 4. 低耦合命令直接执行（不依赖 Engine）
+ * 5. TerminalOutput 数据载体与 DSL 发射函数集
  */
 class CommandUtilsUnitTest {
 
+    /**
+     * 测试 CommandArgs 参数与选项提取解析器
+     */
     @Test
     fun testCommandArgsFlagAndOptions() {
         val args = CommandArgs(listOf("-l", "-a", "-n", "20", "-I{}", "--refresh", "file1.txt", "file2.txt"))
 
-        // 测试 Flag 判断
+        // 判断 Flag 存在性
         assertTrue(args.hasFlag("-l"))
         assertTrue(args.hasFlag("-a"))
         assertFalse(args.hasFlag("-v"))
         assertTrue(args.hasAny("-v", "-l"))
 
-        // 测试带值选项提取
+        // 提取带值选项与数值转换
         assertEquals("20", args.getOption("-n"))
         assertEquals(20, args.getIntOption("-n"))
         assertEquals(10, args.getIntOption("-x", default = 10))
 
-        // 测试紧贴选项提取（如 -I{}）
+        // 提取紧贴选项（如 -I{}）
         assertEquals("{}", args.getOption("-I"))
 
-        // 测试纯位置参数提取
+        // 提取纯位置参数
         val fileArgs = CommandArgs(listOf("-l", "file1.txt", "file2.txt"))
         assertEquals(listOf("file1.txt", "file2.txt"), fileArgs.positionalArgs)
         assertEquals("file1.txt", fileArgs.firstPositional)
         assertEquals("file1.txt file2.txt", fileArgs.joinPositional())
     }
 
+    /**
+     * 测试 SizeParser 大小解析器及尺寸匹配
+     */
     @Test
     fun testSizeParser() {
-        // 测试单位换算与操作符解析
+        // 大于模式 (+100M)
         val plus100M = SizeParser.parse("+100M")
         assertNotNull(plus100M)
         assertEquals('+', plus100M!!.operator)
@@ -57,6 +80,7 @@ class CommandUtilsUnitTest {
         assertTrue(SizeParser.matches(105L * 1024L * 1024L, plus100M))
         assertFalse(SizeParser.matches(90L * 1024L * 1024L, plus100M))
 
+        // 小于模式 (-10k)
         val minus10k = SizeParser.parse("-10k")
         assertNotNull(minus10k)
         assertEquals('-', minus10k!!.operator)
@@ -64,20 +88,24 @@ class CommandUtilsUnitTest {
         assertTrue(SizeParser.matches(1024L, minus10k))
         assertFalse(SizeParser.matches(20 * 1024L, minus10k))
 
+        // 精确匹配模式 (500b)
         val equal500 = SizeParser.parse("500b")
         assertNotNull(equal500)
         assertEquals('=', equal500!!.operator)
         assertEquals(500L, equal500.targetBytes)
         assertTrue(SizeParser.matches(500L, equal500))
 
-        // 非法格式返回 null
+        // 非法输入解析
         assertNull(SizeParser.parse(""))
         assertNull(SizeParser.parse("invalid"))
     }
 
+    /**
+     * 测试 CommandFormatUtil 时间戳格式化工具
+     */
     @Test
     fun testCommandFormatUtilTimestamp() {
-        // 测试秒级与毫秒级时间戳格式化
+        // 秒级时间戳格式化
         val secondTimestamp = "1672531199" // 2022-12-31 23:59:59 UTC
         val formatted = CommandFormatUtil.formatTimestamp(secondTimestamp, "yyyy-MM", Locale.US)
         assertFalse(formatted.isEmpty())
@@ -87,19 +115,24 @@ class CommandUtilsUnitTest {
         assertEquals("not_a_time", CommandFormatUtil.formatTimestamp("not_a_time"))
     }
 
+    /**
+     * 测试独立命令低耦合直接执行（无需 PipelineEngine 与 CommandRegistry）
+     */
     @Test
     fun testDirectCommandExecutionWithoutEngine() = runBlocking {
-        // 验证低耦合：直接实例化具体命令进行测试，无需借助 PipelineEngine 或 CommandRegistry
         val echoCmd = EchoCommand()
-        val ctx = TerminalContext()
+        val ctx = createTestContext()
         val result = echoCmd.execute(ctx, listOf("hello", "terminal", "refactor"), emptyFlow()).toList()
         assertEquals(listOf("hello terminal refactor"), result.map { it.text })
         assertEquals(TerminalLineType.Output.TEXT, result[0].type)
     }
 
+    /**
+     * 测试 TerminalOutput 数据载体与 FlowCollector DSL 扩展发射函数
+     */
     @Test
     fun testTerminalOutputDataCarrierAndDslEmitters() = runBlocking {
-        // 1. 验证 TerminalOutput 属性与 CharSequence 委托
+        // TerminalOutput 属性与 CharSequence 接口委托
         val output = TerminalOutput("hello world", TerminalLineType.Output.FILE_ENTRY)
         assertEquals("hello world", output.text)
         assertEquals(TerminalLineType.Output.FILE_ENTRY, output.type)
@@ -108,15 +141,15 @@ class CommandUtilsUnitTest {
         assertEquals("hello", output.subSequence(0, 5))
         assertEquals("hello world", output.toString())
 
-        // 2. 验证 equals 与 hashCode
+        // 值相等性与哈希校验
         val same = TerminalOutput("hello world", TerminalLineType.Output.FILE_ENTRY)
         val diffType = TerminalOutput("hello world", TerminalLineType.Output.TEXT)
         assertEquals(output, same)
         assertFalse(output == diffType)
         assertEquals(output.hashCode(), same.hashCode())
 
-        // 3. 验证全部 FlowCollector DSL 扩展发射函数
-        val emittedList = kotlinx.coroutines.flow.flow {
+        // FlowCollector DSL 扩展发射函数发射测试
+        val emittedList = flow {
             emitText("text")
             emitFile("file.txt")
             emitPath("/dir/file.txt")

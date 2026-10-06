@@ -1,112 +1,106 @@
 package github.zerorooot.nap511.terminal.commands
 
 import github.zerorooot.nap511.bean.CreateFolderMessage
-import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FilesBean
-import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.terminal.context.TerminalContext
-import github.zerorooot.nap511.terminal.engine.PipelineEngine
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * mkdir 命令测试用例集合
+ * 覆盖：目录创建校验与 -p 递归选项、路径转义与特殊字符处理、同名冲突及本地缓存即时更新
+ */
 class MkdirCommandTest {
 
-    private fun createMockRepo(): FileRepository {
-        return object : FileRepository() {
-            var counter = 1000
-            override suspend fun createFolder(pid: String, folderName: String): CreateFolderMessage {
-                val newId = (counter++).toString()
-                return CreateFolderMessage(state = true, cid = newId, fileId = newId, fileName = folderName)
-            }
-        }
-    }
-
+    /**
+     * 测试缺失参数与缺失父目录校验
+     */
     @Test
     fun testMkdirValidation() = runBlocking {
-        val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
-        val engine = PipelineEngine(registry)
-        val ctx = TerminalContext()
-        ctx.updateDirectory(listOf(PathBean("0", "根目录", "0")))
+        val engine = createTestEngine()
+        val ctx = createTestContext()
 
-        // M008: mkdir 缺失参数
+        // mkdir 缺失参数报错处理
         val mkdirEmpty = engine.executeStrings("mkdir", ctx)
         assertEquals(listOf("mkdir: missing operand"), mkdirEmpty)
 
-        // M025: mkdir 无 -p 时若父路径不存在报错
+        // mkdir 无 -p 选项且父路径不存在时报错处理
         val mkdirNoParent = engine.executeStrings("mkdir non_existent_dir/new_sub", ctx)
         assertTrue(mkdirNoParent[0].contains("cannot create directory 'non_existent_dir/new_sub': No such file or directory"))
     }
 
+    /**
+     * 测试已存在目录处理与 -p 选项模式
+     */
     @Test
     fun testMkdirExistingDirectoryAndFlagP() = runBlocking {
-        val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
-        val engine = PipelineEngine(registry)
-        val ctx = TerminalContext()
-        ctx.updateDirectory(listOf(PathBean("0", "根目录", "0")))
+        val engine = createTestEngine()
+        val ctx = createTestContext()
 
-        val existingFolder = FileBean(name = "docs", categoryId = "10", isFolder = true)
+        val existingFolder = createMockFolder("docs", "10")
         ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(existingFolder), cid = "0", count = 1, order = "", path = emptyList()))
 
-        // M004: 非 -p 模式创建已存在目录报错 File exists
+        // 非 -p 模式下创建已存在目录报错 File exists
         val outExist = engine.executeStrings("mkdir docs", ctx)
         assertEquals(listOf("mkdir: cannot create directory 'docs': File exists"), outExist)
 
-        // M005: -p 模式创建已存在目录正常返回成功
+        // -p 模式下创建已存在目录正常返回成功
         val outPExist = engine.executeStrings("mkdir -p docs", ctx)
         assertEquals(listOf("mkdir: created directory 'docs'"), outPExist)
     }
 
+    /**
+     * 测试基本目录创建与 -p 递归选项
+     */
     @Test
     fun testMkdirBasicAndOptions() = runBlocking {
-        val mockRepo = createMockRepo()
-        val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
-        val engine = PipelineEngine(registry)
-        val ctx = TerminalContext(fileRepository = mockRepo)
-        ctx.updateDirectory(listOf(PathBean("0", "根目录", "0")))
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
         ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(), cid = "0", count = 0, order = "", path = emptyList()))
 
-        // M002: 新建单目录
+        // 新建单个目录
         val outSingle = engine.executeStrings("mkdir dirA", ctx)
         assertEquals(listOf("mkdir: created directory 'dirA'"), outSingle)
 
-        // M003: 新建多目录
+        // 批量新建多个目录
         val outMulti = engine.executeStrings("mkdir dirB dirC", ctx)
         assertEquals(listOf("mkdir: created directory 'dirB'", "mkdir: created directory 'dirC'"), outMulti)
 
-        // M006 / M026: -p 递归创建
+        // -p 选项递归创建深层目录
         val outRec = engine.executeStrings("mkdir -p a/b/c", ctx)
         assertEquals(listOf("mkdir: created directory 'a/b/c'"), outRec)
 
-        // M036: 重复选项 -p -p
+        // 重复 -p 选项容错处理
         val outDupFlag = engine.executeStrings("mkdir -p -p dirE", ctx)
         assertEquals(listOf("mkdir: created directory 'dirE'"), outDupFlag)
     }
 
+    /**
+     * 测试路径转义与特殊字符文件名创建
+     */
     @Test
     fun testMkdirPathAndEscaping() = runBlocking {
-        val mockRepo = createMockRepo()
-        val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
-        val engine = PipelineEngine(registry)
-        val ctx = TerminalContext(fileRepository = mockRepo)
-        ctx.updateDirectory(listOf(PathBean("0", "根目录", "0")))
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
         ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(), cid = "0", count = 0, order = "", path = emptyList()))
 
-        // M011: 含空格未转义 -> 创建两个目录
+        // 路径包含空格未转义拆分为多个目录创建
         val outMultiSpace = engine.executeStrings("mkdir my dir", ctx)
         assertEquals(listOf("mkdir: created directory 'my'", "mkdir: created directory 'dir'"), outMultiSpace)
 
-        // M012: 含空格用双引号 -> 创建一个带空格的目录
+        // 路径包含空格使用双引号包裹
         val outQuotedSpace = engine.executeStrings("mkdir \"my dir\"", ctx)
         assertEquals(listOf("mkdir: created directory 'my dir'"), outQuotedSpace)
 
-        // M013: 含空格用反斜杠转义
+        // 路径包含空格使用反斜杠转义
         val outEscapedSpace = engine.executeStrings("mkdir my\\ dir2", ctx)
         assertEquals(listOf("mkdir: created directory 'my dir2'"), outEscapedSpace)
 
-        // M014-M020: 包含单双引号、美元符号、惊叹号、井号、中文及 Emoji
+        // 路径包含单双引号、美元符号、中文及 Emoji
         val outSpecial1 = engine.executeStrings("mkdir \"it's\"", ctx)
         assertEquals(listOf("mkdir: created directory 'it's'"), outSpecial1)
 
@@ -119,53 +113,55 @@ class MkdirCommandTest {
         val outEmoji = engine.executeStrings("mkdir '😀目录'", ctx)
         assertEquals(listOf("mkdir: created directory '😀目录'"), outEmoji)
 
-        // M024: 绝对路径
+        // 使用绝对路径创建目录
         val outAbs = engine.executeStrings("mkdir /根目录/absdir", ctx)
         assertEquals(listOf("mkdir: created directory '/根目录/absdir'"), outAbs)
 
-        // M029: 路径以 / 结尾
+        // 目标路径以 / 结尾
         val outSlash = engine.executeStrings("mkdir slashdir/", ctx)
         assertEquals(listOf("mkdir: created directory 'slashdir/'"), outSlash)
     }
 
+    /**
+     * 测试边界冲突与同名文件阻退
+     */
     @Test
     fun testMkdirBoundariesAndFileConflicts() = runBlocking {
-        val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
-        val engine = PipelineEngine(registry)
-        val ctx = TerminalContext()
-        ctx.updateDirectory(listOf(PathBean("0", "根目录", "0")))
+        val engine = createTestEngine()
+        val ctx = createTestContext()
 
-        val existingFile = FileBean(name = "f.txt", fileId = "100", isFolder = false)
+        val existingFile = createMockFile("f.txt", "100")
         ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(existingFile), cid = "0", count = 1, order = "", path = emptyList()))
 
-        // M031: 目标是已存在的文件
+        // 目标路径已存在同名文件报错
         val outConflict = engine.executeStrings("mkdir f.txt", ctx)
         assertEquals(listOf("mkdir: cannot create directory 'f.txt': File exists"), outConflict)
 
-        // M040: 已存在文件加 -p
+        // 已存在同名文件加 -p 选项仍报错
         val outConflictP = engine.executeStrings("mkdir -p f.txt", ctx)
         assertEquals(listOf("mkdir: cannot create directory 'f.txt': File exists"), outConflictP)
     }
 
+    /**
+     * 测试管道组合与下游验证
+     */
     @Test
     fun testMkdirPipelineAndCombinations() = runBlocking {
-        val mockRepo = createMockRepo()
-        val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
-        val engine = PipelineEngine(registry)
-        val ctx = TerminalContext(fileRepository = mockRepo)
-        ctx.updateDirectory(listOf(PathBean("0", "根目录", "0")))
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
         ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(), cid = "0", count = 0, order = "", path = emptyList()))
 
-        // M010 / M041: 创建目录后使用 ls | grep 查看（目录项在 ls 输出中带斜杠）
+        // 创建目录后使用 ls | grep 查看校验（目录项在 ls 输出中带斜杠）
         engine.executeStrings("mkdir pdir", ctx)
         val outGrep = engine.executeStrings("ls | grep pdir", ctx)
         assertEquals(listOf("pdir/"), outGrep)
 
-        // M048: mkdir 输出经由管道传输
+        // mkdir 提示信息经由管道输出传输
         val outPipeHead = engine.executeStrings("mkdir pdir2 | head -n 1", ctx)
         assertEquals(listOf("mkdir: created directory 'pdir2'"), outPipeHead)
 
-        // M050: 批量创建目录后通过 ls 验证
+        // 批量创建目录后通过 ls 查看验证
         engine.executeStrings("mkdir q1 q2 q3", ctx)
         val outLs = engine.executeStrings("ls", ctx)
         assertTrue(outLs.contains("q1/"))
@@ -173,6 +169,9 @@ class MkdirCommandTest {
         assertTrue(outLs.contains("q3/"))
     }
 
+    /**
+     * 测试创建目录后本地内存缓存即时拉新修改
+     */
     @Test
     fun testMkdirMutatesCacheInPlace() = runBlocking {
         val mockRepo = object : FileRepository() {
@@ -181,10 +180,8 @@ class MkdirCommandTest {
             }
         }
 
-        val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
-        val engine = PipelineEngine(registry)
-        val ctx = TerminalContext(fileRepository = mockRepo)
-        ctx.updateDirectory(listOf(PathBean("0", "根目录", "0")))
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
 
         ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(), cid = "0", count = 0, order = "", path = emptyList()))
 

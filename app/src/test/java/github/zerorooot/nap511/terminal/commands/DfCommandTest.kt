@@ -1,19 +1,20 @@
 package github.zerorooot.nap511.terminal.commands
 
-import github.zerorooot.nap511.terminal.context.TerminalContext
-import github.zerorooot.nap511.terminal.engine.PipelineEngine
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * df 命令测试用例集合
+ * 验证网盘空间查看帮助拦截与 -h 容量人性化选项的解析
+ */
 class DfCommandTest {
 
     @Test
     fun testDfCommandAndOptionH(): Unit = runBlocking {
-        val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
-        val engine = PipelineEngine(registry)
-        val ctx = TerminalContext()
+        val engine = createTestEngine()
+        val ctx = createTestContext()
 
         // 测试 df --help 输出帮助文档
         val helpOut = engine.executeStrings("df --help", ctx).joinToString("\n")

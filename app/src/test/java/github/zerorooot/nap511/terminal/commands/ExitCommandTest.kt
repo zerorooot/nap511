@@ -1,18 +1,19 @@
 package github.zerorooot.nap511.terminal.commands
 
-import github.zerorooot.nap511.terminal.context.TerminalContext
-import github.zerorooot.nap511.terminal.engine.PipelineEngine
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
+/**
+ * exit 命令测试用例集合
+ * 验证终端退出标记标志位的生成
+ */
 class ExitCommandTest {
 
     @Test
     fun testExitCommand() = runBlocking {
-        val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
-        val engine = PipelineEngine(registry)
-        val ctx = TerminalContext()
+        val engine = createTestEngine()
+        val ctx = createTestContext()
         val out = engine.executeStrings("exit", ctx)
         assertEquals(listOf("__TERMINAL_EXIT__"), out)
     }
