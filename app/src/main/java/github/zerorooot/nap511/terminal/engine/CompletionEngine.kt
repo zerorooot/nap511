@@ -206,17 +206,7 @@ object CompletionEngine {
 
         // 路径上下文：切分 parentPath 与前缀 prefix
         val unescapedToken = unescapePath(rawToken)
-        val lastSlashIndex = unescapedToken.lastIndexOf('/')
-        val parentPath = if (lastSlashIndex != -1) {
-            unescapedToken.substring(0, lastSlashIndex + 1)
-        } else {
-            ""
-        }
-        val prefix = if (lastSlashIndex != -1) {
-            unescapedToken.substring(lastSlashIndex + 1)
-        } else {
-            unescapedToken
-        }
+        val (parentPath, prefix) = github.zerorooot.nap511.terminal.context.TerminalPath.splitParentAndPrefix(unescapedToken)
 
         return ParsedContext(
             contextType = CompletionContextType.PATH,

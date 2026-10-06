@@ -87,12 +87,9 @@ class UnzipCommand : TerminalCommand {
         for (fileArg in fileArgs) {
             if (GlobMatcher.hasGlobWildcards(fileArg)) {
                 // 包含通配符，在当前目录（或指定父目录）按 GlobMatcher 匹配展开
-                val dirPath = if (fileArg.contains("/")) {
-                    val before = fileArg.substringBeforeLast("/")
-                    before.ifEmpty { "/" }
-                } else ""
-                val pattern =
-                    if (fileArg.contains("/")) fileArg.substringAfterLast("/") else fileArg
+                val parsed = github.zerorooot.nap511.terminal.context.TerminalPath.parse(fileArg)
+                val dirPath = parsed.parentPathString
+                val pattern = parsed.targetName
 
                 val searchCid = if (dirPath.isEmpty()) {
                     ctx.currentCid

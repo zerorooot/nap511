@@ -29,11 +29,11 @@ class CdCommand : TerminalCommand {
         val cmdArgs = CommandArgs(args)
         // 若缺省目标路径，默认切换至根目录 "/"
         val target = cmdArgs.firstPositional ?: "/"
-        val resolved = ctx.resolvePath(target)
+        val resolved = ctx.resolveDirectory(target)
         if (resolved == null) {
             emitError("cd: no such file or directory: $target")
             return@flow
         }
-        ctx.updateDirectory(resolved.first, resolved.second)
+        ctx.updateDirectory(resolved)
     }
 }

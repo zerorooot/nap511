@@ -1,7 +1,11 @@
 package github.zerorooot.nap511.terminal.commands.file
 
+import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.TerminalContext
+import github.zerorooot.nap511.terminal.context.TerminalPath
+import github.zerorooot.nap511.terminal.context.TerminalPathConstants
+import github.zerorooot.nap511.terminal.context.currentCid
 import github.zerorooot.nap511.terminal.engine.CommandFlag
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
@@ -43,8 +47,8 @@ class MkdirCommand : TerminalCommand {
         }
 
         for (rawName in folderNames) {
-            val cleanTarget = rawName.trim().trimEnd('/')
-            if (cleanTarget.isEmpty() || cleanTarget == "/" || cleanTarget == "/根目录") {
+            val parsed = TerminalPath.parse(rawName)
+            if (parsed.isRoot || parsed.targetName.isEmpty()) {
                 if (!isParents) {
                     emitError("mkdir: cannot create directory '$rawName': File exists")
                 }
@@ -53,29 +57,26 @@ class MkdirCommand : TerminalCommand {
 
             if (isParents) {
                 // -p 模式：支持逐层递归创建目录，若各层级已存在则直接沿用
-                val isAbsolute = cleanTarget.startsWith("/")
-                var rawSegments = cleanTarget.split("/").filter { it.isNotEmpty() && it != "." }
-                if (isAbsolute && rawSegments.firstOrNull() == "根目录") {
-                    rawSegments = rawSegments.drop(1)
+                val workingPathList = if (parsed.isAbsolute) {
+                    mutableListOf(TerminalPathConstants.ROOT_PATH_BEAN)
+                } else {
+                    ctx.currentPathList.toMutableList()
                 }
-                if (rawSegments.isEmpty()) continue
 
-                var curCid = if (isAbsolute) "0" else ctx.currentCid
                 var createSuccess = true
-
-                for (seg in rawSegments) {
+                for (seg in parsed.segments) {
                     if (seg == "..") {
-                        val resolved = ctx.resolvePath(seg)
-                        if (resolved != null) {
-                            curCid = resolved.first
+                        if (workingPathList.size > 1) {
+                            workingPathList.removeAt(workingPathList.size - 1)
                         }
                         continue
                     }
+                    val curCid = workingPathList.currentCid()
                     val existingFiles = ctx.listDirectory(curCid)
                     val existingFolder = existingFiles.firstOrNull { it.isFolder && it.name == seg }
                     if (existingFolder != null) {
                         // 目录已存在，步入该层级继续
-                        curCid = existingFolder.categoryId
+                        workingPathList.add(PathBean(cid = existingFolder.categoryId, name = seg, pid = curCid))
                     } else {
                         val existingFile = existingFiles.firstOrNull { !it.isFolder && it.name == seg }
                         if (existingFile != null) {
@@ -94,7 +95,7 @@ class MkdirCommand : TerminalCommand {
                                 if (nextCid.isNotEmpty()) {
                                     // 就地追加到父目录缓存并预埋新目录缓存，零额外网络请求
                                     ctx.addCachedFolder(parentCid = curCid, folderName = seg, newCid = nextCid)
-                                    curCid = nextCid
+                                    workingPathList.add(PathBean(cid = nextCid, name = seg, pid = curCid))
                                 } else {
                                     break
                                 }
@@ -117,21 +118,18 @@ class MkdirCommand : TerminalCommand {
             } else {
                 // 非 -p 模式：若带路径则必须在其已存在的父目录下创建
                 val parentCid: String
-                val folderName: String
+                val folderName: String = parsed.targetName
 
-                if (cleanTarget.contains("/")) {
-                    val parentPath = cleanTarget.substringBeforeLast('/')
-                    folderName = cleanTarget.substringAfterLast('/')
-                    val effectiveParentPath = parentPath.ifEmpty { "/" }
-                    val resolvedParent = ctx.resolvePath(effectiveParentPath)
+                if (parsed.isMultiSegment || (parsed.isAbsolute && parsed.segments.isNotEmpty())) {
+                    val parentTarget = parsed.parentPathString
+                    val resolvedParent = ctx.resolveDirectory(parentTarget)
                     if (resolvedParent == null) {
                         emitError("mkdir: cannot create directory '$rawName': No such file or directory")
                         continue
                     }
-                    parentCid = resolvedParent.first
+                    parentCid = resolvedParent.cid
                 } else {
                     parentCid = ctx.currentCid
-                    folderName = cleanTarget
                 }
 
                 // 校验父目录下是否已存在同名文件夹或文件

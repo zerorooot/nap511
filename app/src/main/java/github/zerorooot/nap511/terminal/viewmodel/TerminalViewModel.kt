@@ -14,6 +14,8 @@ import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.terminal.commands.CommandRegistryFactory
 import github.zerorooot.nap511.terminal.context.TerminalContext
+import github.zerorooot.nap511.terminal.context.TerminalPath
+import github.zerorooot.nap511.terminal.context.toDisplayPath
 import github.zerorooot.nap511.terminal.engine.AutosuggestionEngine
 import github.zerorooot.nap511.terminal.engine.CompletionCandidate
 import github.zerorooot.nap511.terminal.engine.CompletionContextType
@@ -53,6 +55,9 @@ class TerminalViewModel(
 ) : ViewModel() {
     private val uiDispatcher: CoroutineDispatcher
         get() = mainDispatcher ?: runCatching { Dispatchers.Main }.getOrDefault(Dispatchers.Default)
+
+    private val ioDispatcher: CoroutineDispatcher
+        get() = mainDispatcher ?: Dispatchers.IO
 
     // --- 独立高内聚子组件装配 ---
     val screenBuffer = TerminalScreenBuffer(TerminalScreenBuffer.DEFAULT_MAX_SCROLLBACK_LINES)
@@ -175,7 +180,7 @@ class TerminalViewModel(
     }
 
     private fun loadPersistentHistory() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             val loaded = historyManager.loadRecentHistory(1000)
             withContext(uiDispatcher) {
                 historyNavigator.load(loaded)

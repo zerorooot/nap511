@@ -22,13 +22,15 @@ sealed class ResolvedTarget {
      * @param parentCid 父级目录的分类 ID（用于 delete、move 等需要指定父目录的 API 操作）
      * @param name 目录名称（如 "sub"）
      * @param folderBean 该目录对应的 FileBean 元数据对象（若有）
+     * @param pathList 该目录对应的完整 PathBean 面包屑层级链表
      */
     data class Directory(
         val cid: String,
         val path: String,
         val parentCid: String? = null,
         val name: String = "",
-        val folderBean: FileBean? = null
+        val folderBean: FileBean? = null,
+        val pathList: List<PathBean> = emptyList()
     ) : ResolvedTarget()
 
     /**
@@ -37,9 +39,14 @@ sealed class ResolvedTarget {
      * @param file 文件元数据对象
      * @param parentCid 文件所在父级目录的分类 ID
      * @param fullPath 规范化后的完整路径
+     * @param parentPathList 文件所在父级目录的 PathBean 面包屑层级链表
      */
-    data class File(val file: FileBean, val parentCid: String, val fullPath: String) :
-        ResolvedTarget()
+    data class File(
+        val file: FileBean,
+        val parentCid: String,
+        val fullPath: String,
+        val parentPathList: List<PathBean> = emptyList()
+    ) : ResolvedTarget()
 }
 
 /**
@@ -47,7 +54,7 @@ sealed class ResolvedTarget {
  * 维护当前终端的工作目录、115网盘仓库层接口、缓存管理器、路径解析及交互回调
  */
 class TerminalContext(
-    initialCid: String = "0",
+    initialCid: String = TerminalPathConstants.ROOT_CID,
     initialPath: String = "/",
     initialPathList: List<PathBean> = emptyList(),
     val fileRepository: FileRepository = FileRepository.getInstance(),
@@ -64,8 +71,28 @@ class TerminalContext(
     var currentPath: String = initialPath
         private set
 
-    val pathList: List<PathBean>
-        field = initialPathList.toMutableList()
+    val pathList: MutableList<PathBean> = initialPathList.toMutableList()
+
+    init {
+        // 若初始面包屑为空，根据初始 CID 与初始路径启发式初始化
+        if (pathList.isEmpty()) {
+            if (initialCid == TerminalPathConstants.ROOT_CID) {
+                pathList.add(TerminalPathConstants.ROOT_PATH_BEAN)
+            } else {
+                pathList.addAll(synthesizePathList(initialCid, initialPath))
+            }
+        }
+    }
+
+    /**
+     * 当前工作目录的面包屑路径链表（保证非空且包含根节点）
+     */
+    val currentPathList: List<PathBean>
+        get() = if (pathList.isEmpty()) {
+            listOf(TerminalPathConstants.ROOT_PATH_BEAN)
+        } else {
+            pathList.toList()
+        }
 
     /**
      * 更新当前工作目录
@@ -73,7 +100,7 @@ class TerminalContext(
     fun updateDirectory(cid: String, path: String, newPathList: List<PathBean>? = null) {
         currentCid = cid
         currentPath = if (path.startsWith("/")) path else "/$path"
-        if (newPathList != null) {
+        if (newPathList != null && newPathList.isNotEmpty()) {
             pathList.clear()
             pathList.addAll(newPathList)
         } else {
@@ -87,10 +114,20 @@ class TerminalContext(
                 if (!cachedPath.isNullOrEmpty()) {
                     pathList.clear()
                     pathList.addAll(cachedPath)
+                } else {
+                    pathList.clear()
+                    pathList.addAll(synthesizePathList(cid, currentPath))
                 }
             }
         }
         onDirectoryChanged?.invoke(currentCid, currentPath)
+    }
+
+    /**
+     * 根据解析所得目录目标直接更新工作目录（保持 PathBean 面包屑链完整，无缝同步）
+     */
+    fun updateDirectory(target: ResolvedTarget.Directory) {
+        updateDirectory(target.cid, target.path, target.pathList)
     }
 
     /**
@@ -124,7 +161,6 @@ class TerminalContext(
             }
         }
 
-
     /**
      * 智能解析目标路径（支持识别普通文件与目录）
      * - 中间路径段必须全部为有效目录；
@@ -135,62 +171,57 @@ class TerminalContext(
      * @return 匹配成功返回 ResolvedTarget，不存在则返回 null
      */
     suspend fun resolveTarget(target: String): ResolvedTarget? = withContext(Dispatchers.IO) {
-        val res = resolveTargetInternal(target)
+        val parsed = TerminalPath.parse(target)
+        val res = resolveTargetInternal(parsed)
         if (res != null) return@withContext res
 
-        val trimmed = target.trim()
-        if (!trimmed.startsWith("/") && !trimmed.startsWith("~") && currentCid != "0") {
-            return@withContext resolveTargetInternal("/$trimmed")
+        // 回退机制：若在非根目录下相对解析未命中，尝试从网盘根目录解析（支持如跨目录寻址）
+        if (!parsed.isAbsolute && currentCid != TerminalPathConstants.ROOT_CID) {
+            val absParsed = TerminalPath.parse("/${target.trim()}")
+            return@withContext resolveTargetInternal(absParsed)
         }
         null
     }
 
-    private suspend fun resolveTargetInternal(target: String): ResolvedTarget? {
-        val trimmed = target.trim()
+    private suspend fun resolveTargetInternal(parsedPath: TerminalPath): ResolvedTarget? {
         // 空路径或 "." 表示当前工作目录
-        if (trimmed.isEmpty() || trimmed == ".") {
-            val name = if (currentPath == "/" || currentPath == "/根目录") "根目录" else currentPath.substringAfterLast('/')
-            return ResolvedTarget.Directory(currentCid, currentPath, parentCid = null, name = name)
-        }
-
-        // 根目录快捷表示
-        if (trimmed == "/" || trimmed == "~" || trimmed == "/根目录" || trimmed == "/根目录/") {
-            return ResolvedTarget.Directory("0", "/根目录", parentCid = null, name = "根目录")
-        }
-
-        val hasTrailingSlash = trimmed.endsWith("/")
-
-        // 路径切分并判断是否为绝对路径（以 "/"、"~" 或 "根目录" 开头）
-        val isAbsolute = trimmed.startsWith("/") || trimmed == "根目录" || trimmed.startsWith("根目录/")
-        var rawSegments = trimmed.split("/").filter { it.isNotEmpty() && it != "." }
-
-        // 如果第一段是 "根目录"，忽略该段（因为 CID "0" 对应网盘根目录）
-        if (rawSegments.firstOrNull() == "根目录") {
-            rawSegments = rawSegments.drop(1)
-        }
-
-        if (rawSegments.isEmpty()) {
-            val fallbackName = if (isAbsolute) "根目录" else (currentPath.split("/")
-                .lastOrNull { it.isNotEmpty() } ?: "根目录")
+        if (parsedPath.isCurrentDirectory) {
+            val name = if (currentPath == "/" || currentPath == "/根目录") {
+                TerminalPathConstants.ROOT_NAME
+            } else {
+                currentPath.substringAfterLast('/')
+            }
             return ResolvedTarget.Directory(
-                if (isAbsolute) "0" else currentCid,
-                if (isAbsolute) "/根目录" else currentPath,
-                parentCid = null,
-                name = fallbackName
+                cid = currentCid,
+                path = currentPath,
+                parentCid = currentPathList.parentCid(),
+                name = name,
+                folderBean = null,
+                pathList = currentPathList
             )
         }
 
-        val segments = rawSegments
-        var startCid = if (isAbsolute) "0" else currentCid
-        val currentSegments = if (isAbsolute) {
-            mutableListOf("根目录")
-        } else {
-            val list = currentPath.split("/").filter { it.isNotEmpty() }.toMutableList()
-            if (list.isEmpty()) mutableListOf("根目录") else list
+        // 根目录快捷表示
+        if (parsedPath.isRoot) {
+            val rootList = listOf(TerminalPathConstants.ROOT_PATH_BEAN)
+            return ResolvedTarget.Directory(
+                cid = TerminalPathConstants.ROOT_CID,
+                path = TerminalPathConstants.ROOT_DISPLAY_PATH,
+                parentCid = null,
+                name = TerminalPathConstants.ROOT_NAME,
+                folderBean = null,
+                pathList = rootList
+            )
         }
 
-        // 记录上一级的 CID 与最后一级的 FileBean，用于构造最终 Directory 对象的 parentCid 和 name
-        var lastParentCid: String? = null
+        // 初始化工作路径链：绝对路径以 root 开始，相对路径以当前目录副本开始
+        val workingPathList = if (parsedPath.isAbsolute) {
+            mutableListOf(TerminalPathConstants.ROOT_PATH_BEAN)
+        } else {
+            currentPathList.toMutableList()
+        }
+
+        val segments = parsedPath.segments
         var lastFolderBean: FileBean? = null
 
         for (i in segments.indices) {
@@ -199,68 +230,65 @@ class TerminalContext(
 
             if (segment == "..") {
                 // 返回上一级目录
-                if (currentSegments.size > 1) {
-                    currentSegments.removeAt(currentSegments.size - 1)
+                if (workingPathList.size > 1) {
+                    workingPathList.removeAt(workingPathList.size - 1)
                 }
-                startCid = if (currentSegments.isEmpty() || currentSegments == listOf("根目录")) {
-                    "0"
-                } else {
-                    findCidByPathSegments(currentSegments) ?: "0"
-                }
-                lastParentCid = null
                 lastFolderBean = null
                 if (isLast) {
-                    val resolvedPath = if (currentSegments.isEmpty() || currentSegments == listOf("根目录")) "/根目录" else "/" + currentSegments.joinToString("/")
                     return ResolvedTarget.Directory(
-                        cid = startCid,
-                        path = resolvedPath,
-                        parentCid = null,
-                        name = currentSegments.lastOrNull() ?: "根目录",
-                        folderBean = null
+                        cid = workingPathList.currentCid(),
+                        path = workingPathList.toDisplayPath(),
+                        parentCid = workingPathList.parentCid(),
+                        name = workingPathList.currentName(),
+                        folderBean = null,
+                        pathList = workingPathList.toList()
                     )
                 }
             } else {
-                val files = listDirectory(startCid)
-                if (isLast && !hasTrailingSlash) {
+                val curCid = workingPathList.currentCid()
+                val files = listDirectory(curCid)
+                if (isLast && !parsedPath.hasTrailingSlash) {
                     // 最后一级且未以 '/' 结尾：先匹配同名目录，若无则匹配同名文件
                     val folder = files.firstOrNull { it.isFolder && it.name == segment }
                     if (folder != null) {
-                        currentSegments.add(segment)
-                        val resolvedPath = if (currentSegments.isEmpty() || currentSegments == listOf("根目录")) "/根目录" else "/" + currentSegments.joinToString("/")
+                        workingPathList.add(PathBean(cid = folder.categoryId, name = folder.name, pid = curCid))
                         return ResolvedTarget.Directory(
                             cid = folder.categoryId,
-                            path = resolvedPath,
-                            parentCid = startCid,
+                            path = workingPathList.toDisplayPath(),
+                            parentCid = curCid,
                             name = folder.name,
-                            folderBean = folder
+                            folderBean = folder,
+                            pathList = workingPathList.toList()
                         )
                     }
                     val file = files.firstOrNull { !it.isFolder && it.name == segment }
                     if (file != null) {
-                        currentSegments.add(segment)
-                        val resolvedPath = if (currentSegments.isEmpty() || currentSegments == listOf("根目录")) "/根目录" else "/" + currentSegments.joinToString("/")
-                        return ResolvedTarget.File(file, startCid, resolvedPath)
+                        val fullPath = workingPathList.toDisplayPath() + "/" + file.name
+                        return ResolvedTarget.File(
+                            file = file,
+                            parentCid = curCid,
+                            fullPath = fullPath,
+                            parentPathList = workingPathList.toList()
+                        )
                     }
                     return null
                 } else {
                     // 中间层级或末尾带 '/'：必须严格匹配为目录
                     val folder = files.firstOrNull { it.isFolder && it.name == segment }
                         ?: return null
-                    lastParentCid = startCid
                     lastFolderBean = folder
-                    startCid = folder.categoryId
-                    currentSegments.add(segment)
+                    workingPathList.add(PathBean(cid = folder.categoryId, name = folder.name, pid = curCid))
                 }
             }
         }
 
-        val resolvedPath = if (currentSegments.isEmpty() || currentSegments == listOf("根目录")) "/根目录" else "/" + currentSegments.joinToString("/")
         return ResolvedTarget.Directory(
-            cid = startCid,
-            path = resolvedPath,
-            parentCid = lastParentCid,
-            name = lastFolderBean?.name ?: (currentSegments.lastOrNull() ?: "根目录"),
-            folderBean = lastFolderBean
+            cid = workingPathList.currentCid(),
+            path = workingPathList.toDisplayPath(),
+            parentCid = workingPathList.parentCid(),
+            name = lastFolderBean?.name ?: workingPathList.currentName(),
+            folderBean = lastFolderBean,
+            pathList = workingPathList.toList()
         )
     }
 
@@ -278,27 +306,15 @@ class TerminalContext(
         }
     }
 
-    private suspend fun findCidByPathSegments(segments: List<String>): String? {
-        if (segments.isEmpty() || segments == listOf("根目录")) {
-            return "0"
+    /**
+     * 解析目标目录并返回强类型 [ResolvedTarget.Directory]
+     * 若目标不存在或为普通文件，则返回 null
+     */
+    suspend fun resolveDirectory(target: String): ResolvedTarget.Directory? = withContext(Dispatchers.IO) {
+        when (val resolved = resolveTarget(target)) {
+            is ResolvedTarget.Directory -> resolved
+            else -> null
         }
-        if (segments.size <= pathList.size) {
-            val isMatch = segments.indices.all { i ->
-                if (i == 0 && segments[i] == "根目录") true
-                else pathList[i].name == segments[i]
-            }
-            if (isMatch) {
-                return pathList[segments.size - 1].cid
-            }
-        }
-        var cid = "0"
-        for (seg in segments) {
-            if (seg == "根目录") continue
-            val files = listDirectory(cid)
-            val folder = files.firstOrNull { it.isFolder && it.name == seg } ?: return null
-            cid = folder.categoryId
-        }
-        return cid
     }
 
     /**

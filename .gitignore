@@ -12,6 +12,7 @@
 .cxx
 local.properties
 .deepseek
+app/terminal_history.txt
 修复方案.md
 app/src/androidTest/
 app/src/test/*

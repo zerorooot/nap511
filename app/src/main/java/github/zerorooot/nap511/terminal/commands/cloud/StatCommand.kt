@@ -4,6 +4,8 @@ import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
+import github.zerorooot.nap511.terminal.context.TerminalPath
+import github.zerorooot.nap511.terminal.context.TerminalPathConstants
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
@@ -42,7 +44,7 @@ class StatCommand : TerminalCommand {
                 // 优先使用 resolveTarget 获取的完整 folderBean，若无则使用解析所得真实目录名，防止末尾斜杠导致截断为空
                 resolved.folderBean ?: FileBean(
                     name = resolved.name.ifEmpty {
-                        targetName.trimEnd('/').substringAfterLast('/').ifEmpty { "根目录" }
+                        TerminalPath.parse(targetName).targetName.ifEmpty { TerminalPathConstants.ROOT_NAME }
                     },
                     categoryId = resolved.cid,
                     isFolder = true

@@ -3,6 +3,7 @@ package github.zerorooot.nap511.terminal.commands.file
 import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
+import github.zerorooot.nap511.terminal.context.TerminalPath
 import github.zerorooot.nap511.terminal.engine.CommandFlag
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
@@ -45,7 +46,6 @@ class RmCommand : TerminalCommand {
             return@flow
         }
 
-
         for (target in targetNames) {
             val resolved = ctx.resolveTarget(target)
             if (resolved == null) {
@@ -84,7 +84,7 @@ class RmCommand : TerminalCommand {
                     actualFid = resolved.cid
                     parentCid = resolved.parentCid
                     displayName = resolved.name.ifEmpty {
-                        target.trimEnd('/').substringAfterLast('/')
+                        TerminalPath.parse(target).targetName
                     }
                     isFolder = true
                 }

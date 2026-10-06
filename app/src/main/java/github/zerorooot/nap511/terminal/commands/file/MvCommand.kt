@@ -3,6 +3,7 @@ package github.zerorooot.nap511.terminal.commands.file
 import github.zerorooot.nap511.bean.RenameBean
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
+import github.zerorooot.nap511.terminal.context.TerminalPath
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
@@ -57,24 +58,24 @@ class MvCommand : TerminalCommand {
         val destination = targets.last()
         val sources = targets.dropLast(1)
         val currentFiles = ctx.listDirectory(ctx.currentCid)
+        val destParsed = TerminalPath.parse(destination)
 
         // 解析源文件/目录信息封装体（包含其原本所在目录的 parentCid）
         data class ResolvedSource(val fid: String, val name: String, val parentCid: String?)
 
         suspend fun resolveSourceItem(rawSrc: String): ResolvedSource? {
-            val cleanSrc = rawSrc.trim().trimEnd('/')
-            val localFile =
-                currentFiles.firstOrNull { it.name == cleanSrc || it.name == rawSrc.trim() }
-            if (localFile != null) {
+            val srcParsed = TerminalPath.parse(rawSrc)
+            val localFile = currentFiles.firstOrNull { it.name == srcParsed.targetName || it.name == rawSrc.trim() }
+            if (localFile != null && !srcParsed.isMultiSegment && !srcParsed.isAbsolute) {
                 val fid = if (localFile.isFolder) localFile.categoryId else localFile.fileId
                 return ResolvedSource(fid, localFile.name, ctx.currentCid)
             }
 
             // 尝试路径解析（支持绝对路径与相对路径）
-            return when (val resolved = ctx.resolveTarget(cleanSrc)) {
+            return when (val resolved = ctx.resolveTarget(rawSrc)) {
                 is ResolvedTarget.Directory -> ResolvedSource(
                     resolved.cid,
-                    resolved.name.ifEmpty { cleanSrc.substringAfterLast('/').ifEmpty { "/" } },
+                    resolved.name.ifEmpty { srcParsed.targetName.ifEmpty { "/" } },
                     resolved.parentCid
                 )
 
@@ -91,21 +92,16 @@ class MvCommand : TerminalCommand {
         // 判断目标是否为目录（支持当前目录下文件夹、上级目录 .. / ../、绝对路径或 ~）
         var targetDestCid: String? = null
         var destDisplayName = destination
-        val cleanDest = destination.trim().trimEnd('/')
 
-        val destFolder =
-            currentFiles.firstOrNull { it.isFolder && (it.name == cleanDest || it.name == destination.trim()) }
-        if (destFolder != null) {
+        val destFolder = currentFiles.firstOrNull { it.isFolder && (it.name == destParsed.targetName || it.name == destination.trim()) }
+        if (destFolder != null && !destParsed.isMultiSegment && !destParsed.isAbsolute && !destParsed.isRoot && !destParsed.isCurrentDirectory) {
             targetDestCid = destFolder.categoryId
             destDisplayName = destFolder.name
-        } else if (cleanDest == ".." || cleanDest == "." || cleanDest == "~" || cleanDest.startsWith(
-                "/"
-            ) || cleanDest.contains("/")
-        ) {
-            val resolvedPath = ctx.resolvePath(destination)
-            if (resolvedPath != null) {
-                targetDestCid = resolvedPath.first
-                destDisplayName = resolvedPath.second
+        } else {
+            val resolvedDestDir = ctx.resolveDirectory(destination)
+            if (resolvedDestDir != null) {
+                targetDestCid = resolvedDestDir.cid
+                destDisplayName = resolvedDestDir.path
             }
         }
 
@@ -138,7 +134,7 @@ class MvCommand : TerminalCommand {
             }
         } else if (sources.size == 1) {
             // 单源且目标不是现有目录：执行重命名
-            if (destination.endsWith("/")) {
+            if (destParsed.hasTrailingSlash) {
                 emitError("mv: target '$destination' is not a directory")
                 return@flow
             }
@@ -149,7 +145,7 @@ class MvCommand : TerminalCommand {
                 return@flow
             }
             // 截取纯文件名，防止将路径名误作为文件名传入 rename API
-            val newName = destination.trimEnd('/').substringAfterLast('/')
+            val newName = destParsed.targetName
             try {
                 val renameBean = RenameBean(resolvedSrc.fid, newName)
                 val res = ctx.fileRepository.rename(renameBean.toRequestBody())

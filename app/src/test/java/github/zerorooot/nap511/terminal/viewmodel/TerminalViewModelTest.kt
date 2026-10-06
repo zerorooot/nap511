@@ -28,6 +28,7 @@ class TerminalViewModelTest {
 
     @Before
     fun setup() {
+        github.zerorooot.nap511.terminal.engine.TerminalHistoryManager().historyFile.delete()
         java.io.File(System.getProperty("java.io.tmpdir"), "terminal_history.txt").delete()
         Dispatchers.setMain(testDispatcher)
         val avatar = AvatarBean(
