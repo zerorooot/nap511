@@ -160,20 +160,48 @@ fun TerminalScreen(
     // 虚拟辅助栏动作聚合
     val accessoryActions = remember(viewModel, scrollController) {
         TerminalAccessoryActions(
-            onTab = { viewModel.handleTabPress() },
+            onTab = {
+                scrollController.autoScrollToBottom = true
+                viewModel.handleTabPress()
+                scrollController.coroutineScope.launchSafeScroll(scrollController)
+            },
             onCtrlToggle = { viewModel.toggleCtrl() },
-            onSlash = { viewModel.insertCharacter("/") },
-            onDash = { viewModel.insertCharacter("-") },
+            onSlash = {
+                scrollController.autoScrollToBottom = true
+                viewModel.insertCharacter("/")
+                scrollController.coroutineScope.launchSafeScroll(scrollController)
+            },
+            onDash = {
+                scrollController.autoScrollToBottom = true
+                viewModel.insertCharacter("-")
+                scrollController.coroutineScope.launchSafeScroll(scrollController)
+            },
             onHome = { viewModel.moveCursorHome() },
-            onArrowUp = { viewModel.navigateHistoryUp() },
+            onArrowUp = {
+                scrollController.autoScrollToBottom = true
+                viewModel.navigateHistoryUp()
+                scrollController.coroutineScope.launchSafeScroll(scrollController)
+            },
             onEnd = { viewModel.moveCursorEnd() },
             onPageUp = { scrollController.scrollPageUp() },
             onMenu = { showMenuSheet = true },
             onAltToggle = { viewModel.toggleAlt() },
-            onPipe = { viewModel.insertCharacter("|") },
-            onStar = { viewModel.insertCharacter("*") },
+            onPipe = {
+                scrollController.autoScrollToBottom = true
+                viewModel.insertCharacter("|")
+                scrollController.coroutineScope.launchSafeScroll(scrollController)
+            },
+            onStar = {
+                scrollController.autoScrollToBottom = true
+                viewModel.insertCharacter("*")
+                scrollController.coroutineScope.launchSafeScroll(scrollController)
+            },
             onArrowLeft = { viewModel.moveCursorLeft() },
-            onArrowDown = { viewModel.navigateHistoryDown() },
+            onArrowDown = {
+                scrollController.autoScrollToBottom = true
+                viewModel.navigateHistoryDown()
+                scrollController.coroutineScope.launchSafeScroll(scrollController)
+            },
             onArrowRight = { viewModel.moveCursorRight() },
             onPageDown = { scrollController.scrollPageDown() }
         )
@@ -218,17 +246,46 @@ fun TerminalScreen(
             focusRequester = focusRequester,
             hardwareKeyActions = hardwareActions,
             accessoryActions = accessoryActions,
-            onInputChange = { viewModel.onInputChange(it) },
+            onInputChange = { newValue ->
+                // 当用户输入或修改文本（如在行首输入字符）时，恢复自动吸底并滚到底部，确保最新输入内容可见
+                if (newValue.text != viewModel.inputState.text) {
+                    scrollController.autoScrollToBottom = true
+                    scrollController.coroutineScope.launchSafeScroll(scrollController)
+                }
+                viewModel.onInputChange(newValue)
+            },
             onSubmit = {
                 scrollController.autoScrollToBottom = true
                 viewModel.submitInput()
                 scrollController.coroutineScope.launchSafeScroll(scrollController)
             },
-            onTab = { viewModel.handleTabPress() },
-            onAcceptGhostText = { viewModel.acceptGhostText() },
-            onArrowUp = { viewModel.navigateHistoryUp() },
-            onArrowDown = { viewModel.navigateHistoryDown() },
-            onSelectCandidate = { viewModel.selectCandidate(it) },
+            onTab = {
+                scrollController.autoScrollToBottom = true
+                viewModel.handleTabPress()
+                scrollController.coroutineScope.launchSafeScroll(scrollController)
+            },
+            onAcceptGhostText = {
+                scrollController.autoScrollToBottom = true
+                viewModel.acceptGhostText()
+                scrollController.coroutineScope.launchSafeScroll(scrollController)
+            },
+            onArrowUp = {
+                // 历史记录向上漫游时恢复吸底，保证输入区域展现
+                scrollController.autoScrollToBottom = true
+                viewModel.navigateHistoryUp()
+                scrollController.coroutineScope.launchSafeScroll(scrollController)
+            },
+            onArrowDown = {
+                // 历史记录向下漫游时恢复吸底，保证输入区域展现
+                scrollController.autoScrollToBottom = true
+                viewModel.navigateHistoryDown()
+                scrollController.coroutineScope.launchSafeScroll(scrollController)
+            },
+            onSelectCandidate = { candidate ->
+                scrollController.autoScrollToBottom = true
+                viewModel.selectCandidate(candidate)
+                scrollController.coroutineScope.launchSafeScroll(scrollController)
+            },
             onDismissCompletionBar = { viewModel.dismissCompletionBar() },
             onBack = handleBack,
             onClearScreen = {

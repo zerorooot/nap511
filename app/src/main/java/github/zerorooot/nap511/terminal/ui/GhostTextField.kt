@@ -296,7 +296,13 @@ fun GhostTextField(
                 // 输入框：支持多行自然折行排版 (maxLines = 5)，避免超长命令截断无法查看
                 BasicTextField(
                     value = value,
-                    onValueChange = onValueChange,
+                    onValueChange = { newValue ->
+                        // 当用户输入或修改文本时（如在行首输入字符），触发外部滚动逻辑，恢复吸底并滚到底部
+                        if (newValue.text != value.text) {
+                            onRequestScrollToBottom()
+                        }
+                        onValueChange(newValue)
+                    },
                     textStyle = textStyle,
                     cursorBrush = SolidColor(TerminalColors.Prompt),
                     singleLine = false,
