@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -23,6 +24,37 @@ class EngineUnitTest {
         assertEquals("My Documents", tokens[2])
         assertEquals("Another Folder", tokens[3])
         assertEquals("file with space.txt", tokens[4])
+    }
+
+    @Test
+    fun testLexerQuoteState() {
+        val input = """find -name '*.txt' *.mp4 "quoted_arg""""
+        val tokenNodes = Lexer.tokenizeWithQuoteInfo(input)
+        assertEquals(5, tokenNodes.size)
+        assertEquals("find", tokenNodes[0].text)
+        assertFalse(tokenNodes[0].isQuoted)
+
+        assertEquals("-name", tokenNodes[1].text)
+        assertFalse(tokenNodes[1].isQuoted)
+
+        assertEquals("*.txt", tokenNodes[2].text)
+        assertTrue("带单引号的通配符应当被标记为 isQuoted = true", tokenNodes[2].isQuoted)
+
+        assertEquals("*.mp4", tokenNodes[3].text)
+        assertFalse("未带引号的通配符应当被标记为 isQuoted = false", tokenNodes[3].isQuoted)
+
+        assertEquals("quoted_arg", tokenNodes[4].text)
+        assertTrue("带双引号的参数应当被标记为 isQuoted = true", tokenNodes[4].isQuoted)
+
+        // 测试空双引号/单引号参数（'' 与 ""）不丢失
+        val emptyTokens = Lexer.tokenizeWithQuoteInfo("find -name '' \"\"")
+        assertEquals(4, emptyTokens.size)
+        assertEquals("find", emptyTokens[0].text)
+        assertEquals("-name", emptyTokens[1].text)
+        assertEquals("", emptyTokens[2].text)
+        assertTrue(emptyTokens[2].isQuoted)
+        assertEquals("", emptyTokens[3].text)
+        assertTrue(emptyTokens[3].isQuoted)
     }
 
     @Test

@@ -158,11 +158,20 @@ class FindCommand : TerminalCommand {
                     }
                 }
                 if (namePattern != null) {
-                    list = list.filter {
-                        GlobMatcher.matches(
-                            namePattern,
-                            it.name
-                        ) || it.name.contains(namePattern, ignoreCase = true)
+                    // 【问题修复说明】：
+                    // - 背景：用户执行 `find -name ''` 传入空匹配模式进行检索。
+                    // - 经过：此前代码直接使用 `it.name.contains("")` 兜底比对，但在 Java/Kotlin 中任意非空字符串调用 `.contains("")` 均恒为 true。
+                    // - 结果：导致 `find -name ''` 误泛配并输出了全部文件，引发单元测试断言失败。
+                    // - 为什么这么改：显式判定 `namePattern.isEmpty()`，在模式为空时直接返回空列表，阻止空字符串包含判定导致的泛配现象。
+                    list = if (namePattern.isEmpty()) {
+                        emptyList()
+                    } else {
+                        list.filter {
+                            GlobMatcher.matches(
+                                namePattern,
+                                it.name
+                            ) || it.name.contains(namePattern, ignoreCase = true)
+                        }
                     }
                 }
                 if (sizeFilter != null) {
@@ -282,7 +291,15 @@ class FindCommand : TerminalCommand {
                     if (!ext.equals(suffixFilter, ignoreCase = true)) matches = false
                 }
                 if (namePattern != null) {
-                    if (!GlobMatcher.matches(
+                    // 【问题修复说明】：
+                    // - 背景：用户执行 `find -name ''` 传入空匹配模式递归检索目录树。
+                    // - 经过：此前代码使用 `!GlobMatcher.matches(...) && !file.name.contains(...)` 判断不匹配，但在 `namePattern` 为空字符串 `""` 时，
+                    //   任意文件名的 `.contains("")` 均恒为 true，使得 `!file.name.contains("")` 恒为 false，避开了 `matches = false` 的设值。
+                    // - 结果：导致 `find -name ''` 误将当前目录树下的全部文件当作匹配项输出，导致断言失败。
+                    // - 为什么这么改：优先检查 `namePattern.isEmpty()`，在匹配模式为空时直接置 `matches = false`，杜绝空字符串全局泛配风险。
+                    if (namePattern.isEmpty()) {
+                        matches = false
+                    } else if (!GlobMatcher.matches(
                             namePattern,
                             file.name
                         ) && !file.name.contains(namePattern, ignoreCase = true)

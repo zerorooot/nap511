@@ -39,9 +39,11 @@ class PipelineEngine(
             return emptyFlow()
         }
 
-        // 仅在参数列表中确实包含 Glob 通配符（* 和 ?）时才按需查询目录候选集，避免无谓的网络与缓存开销
-        val hasWildcards = stages.any { stage -> stage.args.any { GlobMatcher.hasGlobWildcards(it) } }
-        val candidates = if (hasWildcards) {
+        // 仅在存在未经引号包裹的 Glob 通配符（* 和 ?）时才按需查询目录候选集，避免无谓的网络与缓存开销
+        val hasUnquotedWildcards = stages.any { stage ->
+            stage.tokens.any { token -> !token.isQuoted && GlobMatcher.hasGlobWildcards(token.text) }
+        }
+        val candidates = if (hasUnquotedWildcards) {
             runCatching {
                 ctx.listDirectory(ctx.currentCid).map { it.name }
             }.getOrDefault(emptyList())
@@ -58,13 +60,14 @@ class PipelineEngine(
                 emit(TerminalOutput("输入 '?' 或 'help' 可查看所有支持的命令", TerminalLineType.System.HELP))
             }
 
-            // 对参数列表中的 Glob 通配符（*.mp4 等）进行自动展开
+            // 对参数列表中未用引号包裹的 Glob 通配符（如未加引号的 *.mp4）进行 POSIX Shell 规范自动展开；
+            // 对于用单/双引号包裹的通配符参数（如 'a*.txt' 或 "-name '*.pdf'"），保留字面量不予展开，原样传递给目标命令处理。
             val expandedArgs = mutableListOf<String>()
-            for (arg in stage.args) {
-                if (GlobMatcher.hasGlobWildcards(arg)) {
-                    expandedArgs.addAll(GlobMatcher.expand(arg, candidates))
+            for (token in stage.tokens) {
+                if (!token.isQuoted && GlobMatcher.hasGlobWildcards(token.text)) {
+                    expandedArgs.addAll(GlobMatcher.expand(token.text, candidates))
                 } else {
-                    expandedArgs.add(arg)
+                    expandedArgs.add(token.text)
                 }
             }
 
@@ -75,11 +78,11 @@ class PipelineEngine(
             lastStdout = stageStdout
 
             // 将当前阶段的输出转换为纯文本行流供给下一阶段作为 stdin
-            // 【核心通道隔离机制】：仅 Output 数据类型流入下一级管道 stdin；
-            // System 提示、诊断头、错误信息自动隔离在当前屏幕展示，绝不污染下游数据流。
+            // 【核心通道隔离与流转机制】：仅声明 isPipeableData == true 的数据类型（标准数据输出 Output 及 System.HELP 帮助说明）流入下一阶段 stdin；
+            // 错误提示 (ERROR)、交互确认 (PROMPT) 与系统通知 (INFO) 自动隔离在当前屏幕展示，绝不污染下游数据管道。
             currentStdin = flow {
                 stageStdout.collect { output ->
-                    if (output.type is TerminalLineType.Output) {
+                    if (output.type.isPipeableData) {
                         for (subLine in output.text.split('\n')) {
                             if (subLine.isNotEmpty()) {
                                 emit(subLine)

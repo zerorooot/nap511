@@ -22,7 +22,12 @@ sealed interface TerminalLineType {
         data object INFO : System        // 系统提示、操作回显、欢迎信息（青色单色高亮）
         data object COMMAND : System     // 用户输入的历史命令行（路径+提示符复合高亮）
         data object PROMPT : System      // 交互式输入确认提示（如 rm/find 确认，黄色警告色）
-        data object HELP : System        // 帮助文档与快捷键指南
+
+        /** 帮助文档与快捷键指南（对应 Linux stdout 帮助说明，允许作为标准数据流流入管道） */
+        data object HELP : System {
+            override val isPipeableData: Boolean get() = true
+        }
+
         data object ERROR : System       // 命令或系统报错信息（红色高亮）
     }
 
