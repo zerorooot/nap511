@@ -46,7 +46,7 @@ object CommandRegistryFactory {
     ): CommandRegistry {
         val registry = CommandRegistry()
 
-        val commands = arrayOf<TerminalCommand>(
+        registry.registerAll(
             // 1. 注册流式工具及系统控制命令
             EchoCommand(),
             GrepCommand(),
@@ -75,9 +75,6 @@ object CommandRegistryFactory {
             // 4. 注册历史记录命令 (通过独立 Command 类注入依赖)
             HistoryCommand(historyManager, onClearMemoryHistory)
         )
-        commands.forEach {
-            registry.register(it)
-        }
 
         return registry
     }

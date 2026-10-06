@@ -4,8 +4,9 @@ import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.ast.CommandAstParser
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.engine.ast.PositionalArgumentNode
-import github.zerorooot.nap511.terminal.viewmodel.TerminalLineType
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitError
+import github.zerorooot.nap511.terminal.viewmodel.emitHelp
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.emptyFlow
@@ -56,22 +57,31 @@ class PipelineEngine(
         var lastStdout: Flow<TerminalOutput> = emptyFlow()
 
         for (stage in stages) {
-            val commandDef = registry.get(stage.command) ?: return flow {
-                emit(TerminalOutput("terminal: command not found: ${stage.command}", TerminalLineType.System.ERROR))
-                emit(TerminalOutput("输入 '?' 或 'help' 可查看所有支持的命令", TerminalLineType.System.HELP))
+            val command = registry.get(stage.command) ?: return flow {
+                emitError("terminal: command not found: ${stage.command}")
+                emitHelp("输入 '?' 或 'help' 可查看所有支持的命令")
             }
 
             // 1. 在引擎层直接完成命令 AST 语法树构建（消灭所有下游命令对 CommandArgs 的依赖）
-            val rawAst = CommandAstParser.parse(stage.command, stage.tokens, commandDef.valueOptions)
+            val rawAst = CommandAstParser.parse(stage.command, stage.tokens, command.valueOptions)
 
             // 2. 安全 Glob 展开：仅对未加引号的位置参数（路径/文件名）执行通配符展开；
             // 选项名称与选项参数值严格禁止展开，从源头杜绝参数注入。
             val expandedPositional = mutableListOf<PositionalArgumentNode>()
             for (posNode in rawAst.positionalArgs) {
-                if (!posNode.isQuoted && !posNode.fromDelimiter && GlobMatcher.hasGlobWildcards(posNode.text)) {
+                if (!posNode.isQuoted && !posNode.fromDelimiter && GlobMatcher.hasGlobWildcards(
+                        posNode.text
+                    )
+                ) {
                     val expanded = GlobMatcher.expand(posNode.text, candidates)
                     for (item in expanded) {
-                        expandedPositional.add(PositionalArgumentNode(item, isQuoted = false, fromDelimiter = false))
+                        expandedPositional.add(
+                            PositionalArgumentNode(
+                                item,
+                                isQuoted = false,
+                                fromDelimiter = false
+                            )
+                        )
                     }
                 } else {
                     expandedPositional.add(posNode)
@@ -82,7 +92,7 @@ class PipelineEngine(
             // 【关键机制 - 不可变局部变量绑定】：
             // 使用局部只读 val stageStdout 接收当前阶段的输出流，保证随后赋值给 currentStdin 的流闭包
             // 严格捕获上一级的只读引用，绝不会因为外层 var 变量被下一轮循环重写而导致死锁。
-            val stageStdout = executeStage(commandDef, ctx, finalAst, currentStdin)
+            val stageStdout = executeStage(command, ctx, finalAst, currentStdin)
             lastStdout = stageStdout
 
             // 将当前阶段的输出转换为纯文本行流供给下一阶段作为 stdin
@@ -105,14 +115,27 @@ class PipelineEngine(
     /**
      * 管道命令阶段执行：结合 lineStream.buffer() 隔离输入流，确保各级命令协作流畅流动，避免死锁；
      * 输出端采用同步直通 Flow，保障交互确认与日志跟踪严格保序。
+     *
+     * 【引擎级帮助参数拦截机制】：
+     * 统一在此处拦截 `--help` 与 `-h`（若该命令自身未定义 `-h` 功能选项）。
+     * 保证所有命令遵循一致的 POSIX 帮助规范，而无需在每个具体命令中重复编写帮助逻辑。
      */
     private fun executeStage(
-        commandDef: CommandDefinition,
+        command: TerminalCommand,
         ctx: TerminalContext,
         ast: CommandInvocationAst,
         stdin: Flow<String>
     ): Flow<TerminalOutput> = flow {
         try {
+            // 拦截 --help 与 -h 帮助输出（若命令自身未占用 -h 作为功能选项）
+            val hasHOption = command.flags.any { it.optionName == "-h" }
+            if (ast.hasFlag("--help") || (!hasHOption && ast.hasFlag("-h"))) {
+                for (subLine in command.buildHelpMessage().split('\n')) {
+                    emitHelp(subLine)
+                }
+                return@flow
+            }
+
             // 管道流按行规范化展开，确保包含 \n 的输出在下游以独立单行流转
             val lineStream = flow {
                 stdin.collect { chunk ->
@@ -121,12 +144,12 @@ class PipelineEngine(
                     }
                 }
             }
-            val stdoutFlow = commandDef.execute(ctx, ast, lineStream.buffer())
+            val stdoutFlow = command.execute(ctx, ast, lineStream.buffer())
             stdoutFlow.collect { output ->
                 emit(output)
             }
         } catch (e: Exception) {
-            emit(TerminalOutput("${commandDef.name}: error: ${e.message ?: e.javaClass.simpleName}", TerminalLineType.System.ERROR))
+            emitError("${command.name}: error: ${e.message ?: e.javaClass.simpleName}")
         }
     }
 }

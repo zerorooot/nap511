@@ -85,25 +85,28 @@ class EngineUnitTest {
     }
 
     @Test
-    fun testCommandDslAndHelp() = runBlocking {
+    fun testCommandRegistrationAndHelp() = runBlocking {
         val registry = CommandRegistry()
-        registry.register("testcmd") {
-            description = "测试命令"
-            usage = "testcmd [options]"
-            flag("-a", "全部")
-            flag("-b", "选项B")
-            execute { _, _, _ ->
-                flow { emit(TerminalOutput("done")) }
-            }
+        val testCmd = simpleCommand(
+            name = "testcmd",
+            description = "测试命令",
+            usage = "testcmd [options]",
+            flags = listOf(
+                CommandFlag("-a", "全部"),
+                CommandFlag("-b", "选项B")
+            )
+        ) { _, _, _ ->
+            flow { emit(TerminalOutput("done")) }
         }
+        registry.register(testCmd)
 
-        val def = registry.get("testcmd")
-        assertNotNull(def)
+        val cmd = registry.get("testcmd")
+        assertNotNull(cmd)
 
-        // 测试自动 -h
+        // 测试引擎级自动 -h
+        val engine = PipelineEngine(registry)
         val ctx = TerminalContext()
-        val ast = CommandAstParser.parse(def!!.name, listOf(Token("-h")))
-        val helpOutput = def.execute(ctx, ast, kotlinx.coroutines.flow.emptyFlow()).toList()
+        val helpOutput = engine.execute("testcmd -h", ctx).toList()
         assertEquals(TerminalLineType.System.HELP, helpOutput.first().type)
         val fullHelpText = helpOutput.joinToString("\n") { it.text }
         assertTrue(fullHelpText.contains("测试命令"))
@@ -118,25 +121,19 @@ class EngineUnitTest {
     @Test
     fun testPipelineFlowExecution() = runBlocking {
         val registry = CommandRegistry()
-        registry.register("echo") {
-            description = "回显"
-            execute { _, ast, _ ->
-                flow { emit(TerminalOutput(ast.rawPositionalValues.joinToString(" "))) }
-            }
-        }
-        registry.register("grep") {
-            description = "过滤"
-            execute { _, ast, stdin ->
-                flow {
-                    val pattern = ast.firstPositional ?: ""
-                    stdin.collect { line ->
-                        if (line.contains(pattern)) {
-                            emit(TerminalOutput(line))
-                        }
+        registry.register(simpleCommand("echo", "回显") { _, ast, _ ->
+            flow { emit(TerminalOutput(ast.rawPositionalValues.joinToString(" "))) }
+        })
+        registry.register(simpleCommand("grep", "过滤") { _, ast, stdin ->
+            flow {
+                val pattern = ast.firstPositional ?: ""
+                stdin.collect { line ->
+                    if (line.contains(pattern)) {
+                        emit(TerminalOutput(line))
                     }
                 }
             }
-        }
+        })
 
         val engine = PipelineEngine(registry)
         val ctx = TerminalContext()
@@ -292,35 +289,26 @@ class EngineUnitTest {
     @Test
     fun testPipelineThreeStages() = runBlocking {
         val registry = CommandRegistry()
-        registry.register("echo") {
-            description = "回显"
-            execute { _, ast, _ ->
-                flow { emit(TerminalOutput(ast.rawPositionalValues.joinToString(" "))) }
-            }
-        }
-        registry.register("grep") {
-            description = "过滤"
-            execute { _, ast, stdin ->
-                flow {
-                    val pattern = ast.firstPositional ?: ""
-                    stdin.collect { line ->
-                        if (line.contains(pattern)) {
-                            emit(TerminalOutput(line))
-                        }
+        registry.register(simpleCommand("echo", "回显") { _, ast, _ ->
+            flow { emit(TerminalOutput(ast.rawPositionalValues.joinToString(" "))) }
+        })
+        registry.register(simpleCommand("grep", "过滤") { _, ast, stdin ->
+            flow {
+                val pattern = ast.firstPositional ?: ""
+                stdin.collect { line ->
+                    if (line.contains(pattern)) {
+                        emit(TerminalOutput(line))
                     }
                 }
             }
-        }
-        registry.register("wc") {
-            description = "统计"
-            execute { _, _, stdin ->
-                flow {
-                    var count = 0
-                    stdin.collect { count++ }
-                    emit(TerminalOutput(count.toString()))
-                }
+        })
+        registry.register(simpleCommand("wc", "统计") { _, _, stdin ->
+            flow {
+                var count = 0
+                stdin.collect { count++ }
+                emit(TerminalOutput(count.toString()))
             }
-        }
+        })
 
         val engine = PipelineEngine(registry)
         val ctx = TerminalContext()
@@ -354,5 +342,27 @@ class EngineUnitTest {
 
         assertTrue(engine.execute("", ctx).toList().isEmpty())
         assertTrue(engine.execute("    ", ctx).toList().isEmpty())
+    }
+
+    private fun simpleCommand(
+        name: String,
+        description: String = "",
+        usage: String? = null,
+        flags: List<CommandFlag> = emptyList(),
+        aliases: List<String> = emptyList(),
+        valueOptions: Set<String> = emptySet(),
+        handler: suspend (ctx: TerminalContext, ast: github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst, stdin: kotlinx.coroutines.flow.Flow<String>) -> kotlinx.coroutines.flow.Flow<TerminalOutput>
+    ): TerminalCommand = object : TerminalCommand {
+        override val name = name
+        override val description = description
+        override val usage = usage
+        override val flags = flags
+        override val aliases = aliases
+        override val valueOptions = valueOptions
+        override suspend fun execute(
+            ctx: TerminalContext,
+            ast: github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst,
+            stdin: kotlinx.coroutines.flow.Flow<String>
+        ) = handler(ctx, ast, stdin)
     }
 }

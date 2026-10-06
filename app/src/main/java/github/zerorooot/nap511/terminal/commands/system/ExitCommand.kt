@@ -6,6 +6,7 @@ import github.zerorooot.nap511.terminal.engine.TerminalControlTokens
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalLineType
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.viewmodel.emitSystem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -29,6 +30,6 @@ class ExitCommand : TerminalCommand {
         stdin: Flow<String>
     ): Flow<TerminalOutput> = flow {
         // 输出统一控制标记通知终端会话退出
-        emit(TerminalOutput(TerminalControlTokens.EXIT, TerminalLineType.System.INFO))
+        emitSystem(TerminalControlTokens.EXIT)
     }
 }

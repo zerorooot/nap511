@@ -55,8 +55,8 @@ class XargsCommand(
         val targetCommandName = commandTokens.firstOrNull() ?: "echo"
         val initialArgs = commandTokens.drop(1)
 
-        val targetCommandDef = registrySupplier().get(targetCommandName)
-        if (targetCommandDef == null) {
+        val targetCommand = registrySupplier().get(targetCommandName)
+        if (targetCommand == null) {
             emitError("xargs: $targetCommandName: command not found")
             return@flow
         }
@@ -77,8 +77,8 @@ class XargsCommand(
                     }
 
                     val subTokens = substitutedArgs.map { Token(it, isQuoted = false) }
-                    val subAst = CommandAstParser.parse(targetCommandName, subTokens, targetCommandDef.valueOptions)
-                    val resultFlow = targetCommandDef.execute(ctx, subAst, emptyFlow())
+                    val subAst = CommandAstParser.parse(targetCommandName, subTokens, targetCommand.valueOptions)
+                    val resultFlow = targetCommand.execute(ctx, subAst, emptyFlow())
                     resultFlow.collect { emit(it) }
                 }
             }
@@ -106,8 +106,8 @@ class XargsCommand(
                     emitText("+ $targetCommandName ${finalArgs.joinToString(" ")}")
                 }
                 val batchTokens = finalArgs.map { Token(it, isQuoted = false) }
-                val batchAst = CommandAstParser.parse(targetCommandName, batchTokens, targetCommandDef.valueOptions)
-                val resultFlow = targetCommandDef.execute(ctx, batchAst, emptyFlow())
+                val batchAst = CommandAstParser.parse(targetCommandName, batchTokens, targetCommand.valueOptions)
+                val resultFlow = targetCommand.execute(ctx, batchAst, emptyFlow())
                 resultFlow.collect { emit(it) }
             }
         }
