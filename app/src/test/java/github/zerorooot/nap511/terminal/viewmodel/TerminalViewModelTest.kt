@@ -3,6 +3,8 @@ package github.zerorooot.nap511.terminal.viewmodel
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import github.zerorooot.nap511.bean.AvatarBean
+import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
@@ -441,5 +443,106 @@ class TerminalViewModelTest {
         assertEquals("", viewModel.inputState.text)
         viewModel.navigateHistoryUp()
         assertEquals("pwd", viewModel.inputState.text)
+    }
+
+    @Test
+    fun testPipelineInteractiveConfirmationStrictOrder() = runBlocking {
+        val f1 = FileBean(name = "file1.zip", fileId = "101", isFolder = false)
+        val f2 = FileBean(name = "file2.zip", fileId = "102", isFolder = false)
+
+        val testRepo = object : FileRepository() {
+            override suspend fun getFiles(
+                cid: String,
+                showDir: Int,
+                aid: Int,
+                asc: Int,
+                naturalSort: Int,
+                order: String,
+                limit: Int,
+                format: String
+            ): FilesBean {
+                return FilesBean(
+                    fileBeanList = arrayListOf(f1, f2),
+                    cid = "0",
+                    count = 2,
+                    order = "",
+                    path = emptyList()
+                )
+            }
+        }
+
+        val vm = TerminalViewModel(
+            fileRepository = testRepo,
+            mainDispatcher = testDispatcher
+        )
+        vm.context.fileCacheManager.put(
+            "0",
+            FilesBean(fileBeanList = arrayListOf(f1, f2), cid = "0", count = 2, order = "", path = emptyList())
+        )
+
+        // 提交命令: ls | grep zip | xargs -t -I _ rm _
+        vm.onInputChange(TextFieldValue("ls | grep zip | xargs -t -I _ rm _"))
+        vm.submitInput()
+
+        // 等待后台 IO 协程执行到达确认挂起点
+        val start = System.currentTimeMillis()
+        while (!vm.isWaitingConfirmation && System.currentTimeMillis() - start < 2000) {
+            kotlinx.coroutines.delay(20)
+        }
+
+        // 第一次挂起交互确认 (针对 file1.zip)
+        assertTrue(vm.isWaitingConfirmation)
+        val linesAfterFirstPrompt = vm.lines.map { it.text }
+        // 关键验证：+ rm file1.zip 必须严格出现在 确认提示 之前
+        val indexOfEcho1 = linesAfterFirstPrompt.indexOfFirst { it.contains("+ rm file1.zip") }
+        val indexOfPrompt1 = linesAfterFirstPrompt.indexOfFirst { it.contains("rm: 是否确认删除 'file1.zip'?") }
+        assertTrue("indexOfEcho1 should be found", indexOfEcho1 >= 0)
+        assertTrue("indexOfPrompt1 should be found", indexOfPrompt1 >= 0)
+        assertTrue("+ rm file1.zip 必须排在 prompt1 之前", indexOfEcho1 < indexOfPrompt1)
+
+        // 用户输入 n 取消
+        vm.onInputChange(TextFieldValue("n"))
+        vm.submitInput()
+
+        // 等待后台 IO 协程执行到达第二次确认挂起点
+        val start2 = System.currentTimeMillis()
+        while (!vm.isWaitingConfirmation && System.currentTimeMillis() - start2 < 2000) {
+            kotlinx.coroutines.delay(20)
+        }
+
+        // 第二次挂起交互确认 (针对 file2.zip)
+        assertTrue(vm.isWaitingConfirmation)
+        val linesAfterSecondPrompt = vm.lines.map { it.text }
+        val indexOfCancel1 = linesAfterSecondPrompt.indexOfFirst { it.contains("rm: 已取消删除 'file1.zip'") }
+        val indexOfEcho2 = linesAfterSecondPrompt.indexOfFirst { it.contains("+ rm file2.zip") }
+        val indexOfPrompt2 = linesAfterSecondPrompt.indexOfFirst { it.contains("rm: 是否确认删除 'file2.zip'?") }
+
+        assertTrue("indexOfCancel1 should be found", indexOfCancel1 >= 0)
+        assertTrue("indexOfEcho2 should be found", indexOfEcho2 >= 0)
+        assertTrue("indexOfPrompt2 should be found", indexOfPrompt2 >= 0)
+
+        // 严格时序保证：prompt1 < n < cancel1 < echo2 < prompt2
+        assertTrue("cancel1 必须排在 prompt1 之后", indexOfPrompt1 < indexOfCancel1)
+        assertTrue("echo2 必须排在 cancel1 之后", indexOfCancel1 < indexOfEcho2)
+        assertTrue("prompt2 必须排在 echo2 之后", indexOfEcho2 < indexOfPrompt2)
+
+        // 用户再次输入 n 取消
+        vm.onInputChange(TextFieldValue("n"))
+        vm.submitInput()
+
+        // 等待命令完全执行完毕
+        val start3 = System.currentTimeMillis()
+        while (vm.isExecuting && System.currentTimeMillis() - start3 < 2000) {
+            kotlinx.coroutines.delay(20)
+        }
+
+        // 执行结束
+        assertFalse(vm.isWaitingConfirmation)
+        assertFalse(vm.isExecuting)
+
+        val finalLines = vm.lines.map { it.text }
+        val indexOfCancel2 = finalLines.indexOfFirst { it.contains("rm: 已取消删除 'file2.zip'") }
+        assertTrue("indexOfCancel2 should be found", indexOfCancel2 >= 0)
+        assertTrue("cancel2 必须排在 prompt2 之后", indexOfPrompt2 < indexOfCancel2)
     }
 }

@@ -168,7 +168,8 @@ class TerminalViewModel(
     private val commandExecutor = TerminalCommandExecutor(
         engine = engine,
         screenBuffer = screenBuffer,
-        uiDispatcher = uiDispatcher
+        uiDispatcher = uiDispatcher,
+        ioDispatcher = ioDispatcher
     )
 
     init {

@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.flowOn
 /**
  * 协程与 Flow 管道命令执行引擎
  *
- * 遵循强类型流模型规范（方案 A）：
+ * 遵循强类型流模型规范：
  * 1. 管道中继传递纯文本 (Flow<String>) 保证 Unix 流式计算互操作性；
  * 2. 管道终点输出保留强类型语义 (Flow<TerminalOutput>) 供给上层 ViewModel 精准渲染。
  */
@@ -94,14 +94,15 @@ class PipelineEngine(
     }
 
     /**
-     * 使用 ChannelFlow 与 Buffer 隔离管道阶段，确保各级命令并发流畅流动，避免死锁
+     * 管道命令阶段执行：结合 lineStream.buffer() 隔离输入流，确保各级命令协作流畅流动，避免死锁；
+     * 输出端采用同步直通 Flow，保障交互确认与日志跟踪严格保序。
      */
     private fun executeStage(
         commandDef: CommandDefinition,
         ctx: TerminalContext,
         args: List<String>,
         stdin: Flow<String>
-    ): Flow<TerminalOutput> = channelFlow {
+    ): Flow<TerminalOutput> = flow {
         try {
             // 管道流按行规范化展开，确保包含 \n 的输出在下游以独立单行流转
             val lineStream = flow {
@@ -113,10 +114,10 @@ class PipelineEngine(
             }
             val stdoutFlow = commandDef.execute(ctx, args, lineStream.buffer())
             stdoutFlow.collect { output ->
-                send(output)
+                emit(output)
             }
         } catch (e: Exception) {
-            send(TerminalOutput("${commandDef.name}: error: ${e.message ?: e.javaClass.simpleName}", TerminalLineType.System.ERROR))
+            emit(TerminalOutput("${commandDef.name}: error: ${e.message ?: e.javaClass.simpleName}", TerminalLineType.System.ERROR))
         }
-    }.flowOn(Dispatchers.IO)
+    }
 }

@@ -22,9 +22,15 @@ import kotlinx.coroutines.withContext
  * 1. 管理命令执行协程 Job 与后台执行状态 (`isExecuting`)。
  * 2. 管理交互式确认对话框挂起与恢复 (`isWaitingConfirmation`, `CompletableDeferred`)。
  * 3. 调度管道微批次刷屏缓冲（满 50 行或间隔 32ms 刷屏），保障海量输出流畅度。
- * 4. 关键机制：保证在主线程 `uiDispatcher` 调度更新 Compose 的 SnapshotStateList，防止并发状态竞争崩溃。
- * 5. 拦截并响应终端带外控制令牌 (`CLEAR_SCREEN`、`EXIT`)。
- * 6. 支持 Ctrl+C 协程安全中断与资源清理。
+ * 4. 交互冲刷屏障 (Flush Barrier)：在发起二次确认请求前，强制将微批次缓冲区中所有在途日志先全部刷屏，杜绝命令输出与交互提示乱序串行。
+ * 5. 关键安全机制：保证在主线程 `uiDispatcher` 调度更新 Compose 的 SnapshotStateList，防止并发状态竞争导致 LazyColumn 内部 itemProvider 抛出 IndexOutOfBoundsException 崩溃。
+ * 6. 拦截并响应终端带外控制令牌 (`CLEAR_SCREEN`、`EXIT`)。
+ * 7. 支持 Ctrl+C 协程安全中断与资源清理。
+ *
+ * @param engine 管道解析与执行引擎
+ * @param screenBuffer 屏幕终端行渲染缓冲区
+ * @param uiDispatcher 主线程协程调度器，用于安全更新 Compose 状态
+ * @param ioDispatcher 后台 I/O 协程调度器，用于执行耗时命令与网络操作
  */
 class TerminalCommandExecutor(
     private val engine: PipelineEngine,
@@ -48,12 +54,46 @@ class TerminalCommandExecutor(
     private var confirmDeferred: CompletableDeferred<Boolean>? = null
     private var currentExecutionJob: Job? = null
 
+    // 内部微批次聚合输出缓冲区及同步锁
+    private val pendingBuffer = mutableListOf<TerminalLine>()
+    private val bufferLock = Any()
+    private var lastFlushTime = 0L
+
+    /**
+     * 立即将暂存在微批次缓冲区中的所有输出行在主线程刷入屏幕 (Flush Barrier)
+     */
+    suspend fun flushPendingBuffer() {
+        val toAdd = synchronized(bufferLock) {
+            if (pendingBuffer.isEmpty()) return@synchronized emptyList()
+            val copy = pendingBuffer.toList()
+            pendingBuffer.clear()
+            copy
+        }
+        if (toAdd.isNotEmpty()) {
+            // 【关键机制 - 请勿移除 withContext(uiDispatcher)】：
+            // 必须在主线程调度更新 Compose 的 SnapshotStateList（lines）。
+            // 若在 Dispatchers.IO 后台线程直接修改 lines，会与 Compose 主线程测量/布局发生并发状态竞争，
+            // 导致 LazyColumn 内部 itemProvider 数量出现帧不同步并抛出 IndexOutOfBoundsException 崩溃。
+            withContext(uiDispatcher) {
+                screenBuffer.appendLines(toAdd)
+            }
+        }
+    }
+
     /**
      * 发起交互式确认请求并挂起等待用户输入
      */
     suspend fun requestConfirmation(prompt: String): Boolean {
-        isWaitingConfirmation = true
-        screenBuffer.appendLine(TerminalLine(prompt, TerminalLineType.System.PROMPT))
+        // 1. 屏障：优先清空所有累积的待刷屏输出，确保在提问前所有前置日志（如 xargs -t 的跟踪行）均已上屏
+        flushPendingBuffer()
+
+        // 2. 在 UI 调度器中原子地将提示信息追加到屏幕末尾并标记挂起状态
+        withContext(uiDispatcher) {
+            screenBuffer.appendLine(TerminalLine(prompt, TerminalLineType.System.PROMPT))
+            isWaitingConfirmation = true
+        }
+
+        // 3. 挂起等待用户响应 (y/n)
         val deferred = CompletableDeferred<Boolean>()
         confirmDeferred = deferred
         return deferred.await()
@@ -85,6 +125,14 @@ class TerminalCommandExecutor(
             currentExecutionJob?.cancel()
             currentExecutionJob = null
             isExecuting = false
+            if (isWaitingConfirmation) {
+                isWaitingConfirmation = false
+                confirmDeferred?.cancel()
+                confirmDeferred = null
+            }
+            synchronized(bufferLock) {
+                pendingBuffer.clear()
+            }
             return true
         }
         return false
@@ -109,56 +157,51 @@ class TerminalCommandExecutor(
         if (isExecuting) return
 
         isExecuting = true
+        synchronized(bufferLock) {
+            pendingBuffer.clear()
+            lastFlushTime = System.currentTimeMillis()
+        }
+
         currentExecutionJob = scope.launch(ioDispatcher) {
             try {
                 val flow = engine.execute(command, context)
-                // 采用微批次聚合输出机制（缓冲区满 50 行或间隔 32ms 即刷屏），保障大量输出时的高帧率渲染
-                val buffer = mutableListOf<TerminalLine>()
-                var lastFlushTime = System.currentTimeMillis()
-
-                // 【关键机制 - 请勿移除 withContext(Dispatchers.Main)】：
-                // 必须在主线程调度更新 Compose 的 SnapshotStateList（lines）。
-                // 若在 Dispatchers.IO 后台线程直接修改 lines，会与 Compose 主线程测量/布局发生并发状态竞争，
-                // 导致 LazyColumn 内部 itemProvider 数量出现帧不同步并抛出 IndexOutOfBoundsException 崩溃。
-                suspend fun flushBuffer() {
-                    if (buffer.isNotEmpty()) {
-                        val toAdd = buffer.toList()
-                        buffer.clear()
-                        withContext(uiDispatcher) {
-                            screenBuffer.appendLines(toAdd)
-                        }
-                    }
-                }
 
                 flow.collect { output ->
                     if (output.text == TerminalControlTokens.CLEAR_SCREEN) {
-                        flushBuffer()
+                        flushPendingBuffer()
                         withContext(uiDispatcher) {
                             screenBuffer.clear()
                         }
                     } else if (output.text == TerminalControlTokens.EXIT) {
-                        flushBuffer()
+                        flushPendingBuffer()
                         withContext(uiDispatcher) {
                             onExit()
                         }
                     } else {
                         // 兼容处理可能包含换行符的输出，拆分为独立行并继承源头赋予的语义类型
-                        if (output.text.contains('\n')) {
-                            for (subLine in output.text.split('\n')) {
-                                buffer.add(TerminalLine(subLine, output.type))
-                            }
+                        val linesToAdd = if (output.text.contains('\n')) {
+                            output.text.split('\n').map { TerminalLine(it, output.type) }
                         } else {
-                            buffer.add(TerminalLine(output.text, output.type))
+                            listOf(TerminalLine(output.text, output.type))
                         }
 
-                        val now = System.currentTimeMillis()
-                        if (buffer.size >= 50 || now - lastFlushTime >= 32) {
-                            flushBuffer()
-                            lastFlushTime = now
+                        val shouldFlush = synchronized(bufferLock) {
+                            pendingBuffer.addAll(linesToAdd)
+                            val now = System.currentTimeMillis()
+                            if (pendingBuffer.size >= 50 || now - lastFlushTime >= 32) {
+                                lastFlushTime = now
+                                true
+                            } else {
+                                false
+                            }
+                        }
+
+                        if (shouldFlush) {
+                            flushPendingBuffer()
                         }
                     }
                 }
-                flushBuffer()
+                flushPendingBuffer()
             } catch (e: CancellationException) {
                 // 协程被 Ctrl+C 中断正常退出，不作为异常打印
             } catch (e: Exception) {
@@ -168,8 +211,11 @@ class TerminalCommandExecutor(
                     )
                 }
             } finally {
+                flushPendingBuffer()
                 withContext(uiDispatcher) {
                     isExecuting = false
+                    isWaitingConfirmation = false
+                    confirmDeferred = null
                     currentExecutionJob = null
                 }
                 onComplete()
