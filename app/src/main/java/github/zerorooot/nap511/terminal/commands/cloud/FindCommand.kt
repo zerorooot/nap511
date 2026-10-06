@@ -4,6 +4,7 @@ import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
 import github.zerorooot.nap511.terminal.viewmodel.emitPath
@@ -60,11 +61,11 @@ class FindCommand : TerminalCommand {
 
     override suspend fun execute(
         ctx: TerminalContext,
-        args: List<String>,
+        ast: CommandInvocationAst,
         stdin: Flow<String>
     ): Flow<TerminalOutput> = flow {
         // 1. 词法与语法解析，将命令行参数切分为控制参数与 AST 条件表达式树
-        val parseResult = FindCommandArgsParser.parse(args)
+        val parseResult = FindCommandArgsParser.parse(ast.rawArgs)
         if (parseResult.isFailure) {
             val errorMsg = parseResult.exceptionOrNull()?.message ?: "find: 参数解析失败"
             emitError(errorMsg)

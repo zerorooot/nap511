@@ -1,29 +1,41 @@
 package github.zerorooot.nap511.terminal.commands.file
 
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
-import github.zerorooot.nap511.terminal.commands.util.CommandArgs
+import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.terminal.commands.util.CommandFormatUtil
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
+import github.zerorooot.nap511.terminal.engine.archetype.EntityListingCommand
+import github.zerorooot.nap511.terminal.engine.archetype.ListingPlan
+import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
-import github.zerorooot.nap511.terminal.viewmodel.emitError
 import github.zerorooot.nap511.terminal.viewmodel.emitFile
 import github.zerorooot.nap511.terminal.viewmodel.emitLongListing
 import github.zerorooot.nap511.terminal.viewmodel.emitPath
 import github.zerorooot.nap511.terminal.viewmodel.emitText
 import github.zerorooot.nap511.util.formatFileSize
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.FlowCollector
 import java.util.Locale
+
+/**
+ * 列表项封装实体，携带目标路径与单文件标记
+ */
+data class LsEntry(
+    val file: FileBean,
+    val isSingleTarget: Boolean = false,
+    val queryPath: String? = null
+)
 
 /**
  * 目录与文件列表查看命令（ls）
  *
- * 列出当前目录或目标路径下的文件与文件夹。
- * 支持详细视图（-l）、包含隐藏文件（-a）、多维度排序（-t修改时间, -u访问时间, -S大小, -X后缀, -r反转）及强制缓存刷新（--refresh）。
+ * 继承 [EntityListingCommand]，将 8 个命令行选项及多维排序在编译期解析为静态不可变的 [ListingPlan]：
+ * 1. 过滤流：根据 `-a` 选项编译隐藏文件过滤断言；
+ * 2. 排序流：在编译期一次性合成时间/大小/扩展名字典序比较器与逆序修饰；
+ * 3. 展现流：编译期绑定长列表（-l）或紧凑列表渲染器；
+ * 彻底消灭数据遍历过程中的 `hasFlag` 反复查询与多重 `when` 分支。
  */
-class LsCommand : TerminalCommand {
+class LsCommand : EntityListingCommand<LsEntry>() {
 
     override val name: String = "ls"
 
@@ -42,112 +54,130 @@ class LsCommand : TerminalCommand {
         CommandFlag("--refresh", "强制从网盘拉取最新数据并刷新本地缓存")
     )
 
-    override suspend fun execute(
-        ctx: TerminalContext,
-        args: List<String>,
-        stdin: Flow<String>
-    ): Flow<TerminalOutput> = flow {
-        val cmdArgs = CommandArgs(args)
-        val isLong = cmdArgs.hasFlag("-l")
-        val isAll = cmdArgs.hasFlag("-a")
-        val sortByMtime = cmdArgs.hasFlag("-t")
-        val sortByAtime = cmdArgs.hasFlag("-u")
-        val sortBySize = cmdArgs.hasFlag("-S")
-        val sortByExt = cmdArgs.hasFlag("-X")
-        val reverse = cmdArgs.hasFlag("-r")
-        val forceRefresh = cmdArgs.hasFlag("--refresh")
+    override fun compilePlan(ast: CommandInvocationAst): Result<ListingPlan<LsEntry>> {
+        val isLong = ast.hasFlag("-l")
+        val isAll = ast.hasFlag("-a")
+        val sortByMtime = ast.hasFlag("-t")
+        val sortByAtime = ast.hasFlag("-u")
+        val sortBySize = ast.hasFlag("-S")
+        val sortByExt = ast.hasFlag("-X")
+        val reverse = ast.hasFlag("-r")
+        val forceRefresh = ast.hasFlag("--refresh")
+        val targetPath = ast.firstPositional
 
-        // 提取目标路径参数（第一个非选项参数）
-        val targetPath = cmdArgs.firstPositional
+        // 1. 编译过滤断言：若未指定 -a，过滤以 . 开头的隐藏文件（单个显式指定的目标文件除外）
+        val filter: (LsEntry) -> Boolean = if (isAll) {
+            { true }
+        } else {
+            { entry -> entry.isSingleTarget || !entry.file.name.startsWith(".") }
+        }
 
-        // 1. 根据路径解析待展示的文件集合
-        val (candidateFiles, isSingleFile) = if (targetPath != null) {
-            val resolved = ctx.resolveTarget(targetPath)
-            if (resolved == null) {
-                // 源头直接标注错误类型
-                emitError("ls: cannot access '$targetPath': No such file or directory")
-                return@flow
+        // 2. 编译期比较器合成
+        val baseComparator: Comparator<LsEntry> = when {
+            sortByMtime -> Comparator { a, b ->
+                val timeA = a.file.modifiedTime.toLongOrNull() ?: 0L
+                val timeB = b.file.modifiedTime.toLongOrNull() ?: 0L
+                timeB.compareTo(timeA) // 降序
             }
-            when (resolved) {
+            sortByAtime -> Comparator { a, b ->
+                val timeA = a.file.updateTime.toLongOrNull() ?: 0L
+                val timeB = b.file.updateTime.toLongOrNull() ?: 0L
+                timeB.compareTo(timeA) // 降序
+            }
+            sortBySize -> Comparator { a, b ->
+                val sizeA = a.file.size.toLongOrNull() ?: 0L
+                val sizeB = b.file.size.toLongOrNull() ?: 0L
+                sizeB.compareTo(sizeA) // 降序
+            }
+            sortByExt -> Comparator { a, b ->
+                val extA = a.file.name.substringAfterLast(".", "")
+                val extB = b.file.name.substringAfterLast(".", "")
+                extA.compareTo(extB) // 升序
+            }
+            else -> Comparator { _, _ -> 0 } // 保持拉取时的原始稳定顺序
+        }
+
+        val finalComparator = if (reverse) baseComparator.reversed() else baseComparator
+
+        // 3. 编译期渲染器组装
+        val renderer: suspend FlowCollector<TerminalOutput>.(List<LsEntry>) -> Unit = if (isLong) {
+            { entries ->
+                val isSingleFile = entries.size == 1 && entries.first().isSingleTarget
+                if (!isSingleFile) {
+                    emitText("total ${entries.size}")
+                }
+                for (entry in entries) {
+                    val file = entry.file
+                    val typeChar = if (file.isFolder) "d" else "-"
+                    val perm = "${typeChar}rwxr-xr-x"
+                    val sizeStr = if (file.isFolder) "-" else (file.size.toLongOrNull() ?: 0L).formatFileSize()
+                    val timeStr = CommandFormatUtil.formatTimestamp(file.modifiedTime)
+                    val nameStr = if (entry.isSingleTarget && entry.queryPath != null) {
+                        if (file.isFolder && !entry.queryPath.endsWith("/")) "${entry.queryPath}/" else entry.queryPath
+                    } else {
+                        if (file.isFolder) "${file.name}/" else file.name
+                    }
+                    val formattedRow = String.format(
+                        Locale.getDefault(),
+                        "%-11s %10s %16s %s",
+                        perm,
+                        sizeStr,
+                        timeStr,
+                        nameStr
+                    )
+                    emitLongListing(formattedRow)
+                }
+            }
+        } else {
+            { entries ->
+                for (entry in entries) {
+                    val file = entry.file
+                    val displayName = if (entry.isSingleTarget && entry.queryPath != null) {
+                        if (file.isFolder && !entry.queryPath.endsWith("/")) "${entry.queryPath}/" else entry.queryPath
+                    } else {
+                        if (file.isFolder) "${file.name}/" else file.name
+                    }
+                    if (displayName.trimEnd('/').contains('/')) {
+                        emitPath(displayName)
+                    } else {
+                        emitFile(displayName)
+                    }
+                }
+            }
+        }
+
+        return Result.success(
+            ListingPlan(
+                targetPath = targetPath,
+                forceRefresh = forceRefresh,
+                filter = filter,
+                comparator = finalComparator,
+                renderer = renderer
+            )
+        )
+    }
+
+    override suspend fun fetchEntities(
+        ctx: TerminalContext,
+        targetPath: String?,
+        forceRefresh: Boolean
+    ): Result<List<LsEntry>> {
+        if (targetPath != null) {
+            val resolved = ctx.resolveTarget(targetPath)
+                ?: return Result.failure(Exception("ls: cannot access '$targetPath': No such file or directory"))
+
+            return when (resolved) {
                 is ResolvedTarget.Directory -> {
                     val files = ctx.listDirectory(resolved.cid, forceRefresh)
-                    val filtered = if (isAll) files else files.filter { !it.name.startsWith(".") }
-                    Pair(filtered, false)
+                    Result.success(files.map { LsEntry(it, isSingleTarget = false, queryPath = targetPath) })
                 }
-
                 is ResolvedTarget.File -> {
-                    Pair(listOf(resolved.file), true)
-                }
-            }
-        } else {
-            val files = ctx.listDirectory(ctx.currentCid, forceRefresh)
-            val filtered = if (isAll) files else files.filter { !it.name.startsWith(".") }
-            Pair(filtered, false)
-        }
-
-        // 2. 排序处理：默认完全保持接口请求/缓存中的原始顺序；仅在显式传入选项时重排
-        var sorted = when {
-            sortByMtime -> candidateFiles.sortedByDescending {
-                it.modifiedTime.toLongOrNull() ?: 0L
-            }
-
-            sortByAtime -> candidateFiles.sortedByDescending {
-                it.updateTime.toLongOrNull() ?: 0L
-            }
-
-            sortBySize -> candidateFiles.sortedByDescending {
-                it.size.toLongOrNull() ?: 0L
-            }
-
-            sortByExt -> candidateFiles.sortedBy { it.name.substringAfterLast(".", "") }
-            else -> candidateFiles
-        }
-
-        if (reverse) {
-            sorted = sorted.reversed()
-        }
-
-        // 3. 格式化输出：源头显式赋予对应的 TerminalLineType 语义
-        if (isLong) {
-            if (!isSingleFile) {
-                // "total X" 属于普通文本信息
-                emitText("total ${sorted.size}")
-            }
-            for (file in sorted) {
-                val typeChar = if (file.isFolder) "d" else "-"
-                val perm = "${typeChar}rwxr-xr-x"
-                val sizeStr = if (file.isFolder) "-" else (file.size.toLongOrNull() ?: 0L).formatFileSize()
-                val timeStr = CommandFormatUtil.formatTimestamp(file.modifiedTime)
-                val nameStr = if (isSingleFile && targetPath != null) {
-                    if (file.isFolder && !targetPath.endsWith("/")) "$targetPath/" else targetPath
-                } else {
-                    if (file.isFolder) "${file.name}/" else file.name
-                }
-                val formattedRow = String.format(
-                    Locale.getDefault(),
-                    "%-11s %10s %16s %s",
-                    perm,
-                    sizeStr,
-                    timeStr,
-                    nameStr
-                )
-                // 源头直接标注为 OUTPUT_LONG_LISTING
-                emitLongListing(formattedRow)
-            }
-        } else {
-            for (file in sorted) {
-                val displayName = if (isSingleFile && targetPath != null) {
-                    if (file.isFolder && !targetPath.endsWith("/")) "$targetPath/" else targetPath
-                } else {
-                    if (file.isFolder) "${file.name}/" else file.name
-                }
-                // 若包含多级斜杠路径，发射 OUTPUT_PATH_ENTRY；单文件/文件夹发射 OUTPUT_FILE_ENTRY
-                if (displayName.trimEnd('/').contains('/')) {
-                    emitPath(displayName)
-                } else {
-                    emitFile(displayName)
+                    Result.success(listOf(LsEntry(resolved.file, isSingleTarget = true, queryPath = targetPath)))
                 }
             }
         }
+
+        val files = ctx.listDirectory(ctx.currentCid, forceRefresh)
+        return Result.success(files.map { LsEntry(it, isSingleTarget = false, queryPath = null) })
     }
 }

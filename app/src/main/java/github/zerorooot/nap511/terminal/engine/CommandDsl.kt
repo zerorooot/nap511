@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.terminal.engine
 
 import github.zerorooot.nap511.terminal.context.TerminalContext
+import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalLineType
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import kotlinx.coroutines.flow.Flow
@@ -22,28 +23,31 @@ data class CommandFlag(
 
 /**
  * 命令定义体
+ *
+ * 包装命令元数据及已具备 AST 语法树驱动能力的异步流式执行体。
+ * 统一拦截 --help 与 -h 帮助输出，确保 POSIX 规范与帮助文本输出保序一致。
  */
 class CommandDefinition(
     val name: String,
     val description: String,
     val flags: List<CommandFlag>,
     val usageExample: String?,
-    private val executor: suspend (ctx: TerminalContext, args: List<String>, stdin: Flow<String>) -> Flow<TerminalOutput>
+    val valueOptions: Set<String> = emptySet(),
+    private val astExecutor: suspend (ctx: TerminalContext, ast: CommandInvocationAst, stdin: Flow<String>) -> Flow<TerminalOutput>
 ) {
-    suspend fun execute(ctx: TerminalContext, args: List<String>, stdin: Flow<String>): Flow<TerminalOutput> {
-        // 当使用 --help 或 (当命令本身未定义 -h 选项且参数包含 -h) 时自动拦截输出参数说明与用法（需遵守 "--" 选项结束符规范）
-        val delimiterIndex = args.indexOf("--")
-        val optionTokens = if (delimiterIndex >= 0) args.subList(0, delimiterIndex) else args
+    /**
+     * 主执行入口：直接接收已在引擎源头解析完成的结构化 AST
+     */
+    suspend fun execute(ctx: TerminalContext, ast: CommandInvocationAst, stdin: Flow<String>): Flow<TerminalOutput> {
         val hasHOption = flags.any { it.optionName == "-h" }
-        if (optionTokens.contains("--help") || (!hasHOption && optionTokens.contains("-h"))) {
+        if (ast.hasFlag("--help") || (!hasHOption && ast.hasFlag("-h"))) {
             return flow {
-                // 源头直接发射带有 TerminalLineType.System.HELP 语义类型的帮助文档行
                 for (subLine in buildHelpMessage().split('\n')) {
                     emit(TerminalOutput(subLine, TerminalLineType.System.HELP))
                 }
             }
         }
-        return executor(ctx, args, stdin)
+        return astExecutor(ctx, ast, stdin)
     }
 
     fun buildHelpMessage(): String {
@@ -69,8 +73,9 @@ class CommandDefinition(
 class CommandBuilder(val name: String) {
     var description: String = ""
     var usage: String? = null
+    var valueOptions: Set<String> = emptySet()
     private val flags = mutableListOf<CommandFlag>()
-    private var executor: (suspend (ctx: TerminalContext, args: List<String>, stdin: Flow<String>) -> Flow<TerminalOutput>)? = null
+    private var astExecutor: (suspend (ctx: TerminalContext, ast: CommandInvocationAst, stdin: Flow<String>) -> Flow<TerminalOutput>)? = null
 
     /**
      * 声明命令支持的 Flag 参数选项
@@ -80,20 +85,28 @@ class CommandBuilder(val name: String) {
     }
 
     /**
-     * 声明命令的执行体
+     * 声明基于强类型 AST 语法树的命令执行体
      */
-    fun execute(block: suspend (ctx: TerminalContext, args: List<String>, stdin: Flow<String>) -> Flow<TerminalOutput>) {
-        this.executor = block
+    fun executeAst(block: suspend (ctx: TerminalContext, ast: CommandInvocationAst, stdin: Flow<String>) -> Flow<TerminalOutput>) {
+        this.astExecutor = block
+    }
+
+    /**
+     * 声明基于强类型 AST 语法树的命令执行体（标准 DSL 执行函数）
+     */
+    fun execute(block: suspend (ctx: TerminalContext, ast: CommandInvocationAst, stdin: Flow<String>) -> Flow<TerminalOutput>) {
+        this.astExecutor = block
     }
 
     fun build(): CommandDefinition {
-        val exec = executor ?: { _, _, _ -> flow { emit(TerminalOutput("命令 $name 未定义实现", TerminalLineType.System.ERROR)) } }
+        val exec = astExecutor ?: { _, _, _ -> flow { emit(TerminalOutput("命令 $name 未定义实现", TerminalLineType.System.ERROR)) } }
         return CommandDefinition(
             name = name,
             description = description,
             flags = flags,
             usageExample = usage,
-            executor = exec
+            valueOptions = valueOptions,
+            astExecutor = exec
         )
     }
 }
@@ -119,8 +132,7 @@ class CommandRegistry {
     /**
      * 原生注册面向对象的 TerminalCommand 命令对象（及其所有别名）
      *
-     * 将命令的声明式元数据（名称、描述、用法、Flags）和执行体挂载到注册中心，
-     * 自动支持帮助拦截与 Tab 补全提示。
+     * 将命令声明式元数据和 AST 执行体直接挂载到注册中心
      *
      * @param command 遵循统一规范的终端命令实例
      * @return 注册生成的 CommandDefinition 列表（主命令 + 别名）
@@ -133,9 +145,10 @@ class CommandRegistry {
             val def = register(cmdName) {
                 description = command.description
                 usage = command.usage
+                valueOptions = command.valueOptions
                 command.flags.forEach { flag(it.name, it.description) }
-                execute { ctx, args, stdin ->
-                    command.execute(ctx, args, stdin)
+                executeAst { ctx, ast, stdin ->
+                    command.execute(ctx, ast, stdin)
                 }
             }
             registeredDefinitions.add(def)

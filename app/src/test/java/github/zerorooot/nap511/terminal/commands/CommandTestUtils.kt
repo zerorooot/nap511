@@ -65,14 +65,14 @@ internal fun createTestEngine(
     historyList: List<String> = emptyList(),
     onMemoryClear: (() -> Unit)? = null
 ): PipelineEngine {
-    val registry = when {
-        historyManager != null -> {
-            CommandRegistryFactory.createDefaultRegistry(historyManager, onMemoryClear ?: {})
+    val hm = historyManager ?: run {
+        val tempFile = java.io.File.createTempFile("test_history", ".txt").apply {
+            deleteOnExit()
+            historyList.forEach { appendText("$it\n") }
         }
-        else -> {
-            CommandRegistryFactory.createDefaultRegistry { historyList }
-        }
+        TerminalHistoryManager(tempFile)
     }
+    val registry = CommandRegistryFactory.createDefaultRegistry(hm, onMemoryClear ?: {})
     return PipelineEngine(registry)
 }
 

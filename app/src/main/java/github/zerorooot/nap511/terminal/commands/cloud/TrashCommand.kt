@@ -1,25 +1,36 @@
 package github.zerorooot.nap511.terminal.commands.cloud
 
 import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.engine.archetype.ActionDispatchCommand
+import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
 import github.zerorooot.nap511.terminal.viewmodel.emitSystem
 import github.zerorooot.nap511.terminal.viewmodel.emitText
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.FlowCollector
 import java.util.Locale
+
+/**
+ * 回收站操作密封类定义
+ */
+sealed interface TrashAction {
+    /** 还原指定文件或 RID */
+    data class Revert(val ridOrName: String) : TrashAction
+    /** 清空回收站全部文件 */
+    data object Clean : TrashAction
+    /** 查看回收站列表 */
+    data object List : TrashAction
+}
 
 /**
  * 网盘回收站管理命令（trash）
  *
- * 支持列出回收站待清理文件（-l 或缺省）、通过文件专属 rid 或文件名进行原位还原（-r <rid|name>），
- * 以及带有交互式确认的清空回收站操作（-c）。
+ * 继承 [ActionDispatchCommand]，在编译期根据参数静态决议为 [TrashAction] 强类型密封动作，
+ * 执行期通过 exhaustive when 完成动作分发，彻底消除交叉嵌套的 if-else 判定。
  */
-class TrashCommand : TerminalCommand {
+class TrashCommand : ActionDispatchCommand<TrashAction>() {
 
     override val name: String = "trash"
 
@@ -33,107 +44,128 @@ class TrashCommand : TerminalCommand {
         CommandFlag("-c", "清空回收站全部文件")
     )
 
-    override suspend fun execute(
-        ctx: TerminalContext,
-        args: List<String>,
-        stdin: Flow<String>
-    ): Flow<TerminalOutput> = flow {
-        val cmdArgs = CommandArgs(args)
-        val isList = cmdArgs.hasFlag("-l") || args.isEmpty()
-        val ridToRevert = cmdArgs.getOption("-r")
-        val isClean = cmdArgs.hasFlag("-c")
+    override val valueOptions: Set<String> = setOf("-r")
 
-        // 1. 还原特定 RID 或文件名的回收站项
+    override fun compileAction(ast: CommandInvocationAst): Result<TrashAction> {
+        val ridToRevert = ast.getOption("-r")
         if (ridToRevert != null) {
-            try {
-                val recycleList = runCatching { ctx.fileRepository.recycleList().recycleBeanList }.getOrDefault(emptyList())
-                val matchedItem = recycleList.firstOrNull { it.fileName.equals(ridToRevert, ignoreCase = true) }
-                val actualRid: String
-                val successMessage: String
-
-                if (matchedItem != null) {
-                    actualRid = matchedItem.id
-                    successMessage = "trash: 已还原 '${matchedItem.fileName}' (rid: $actualRid)"
-                } else if (ridToRevert.toLongOrNull() != null) {
-                    actualRid = ridToRevert
-                    successMessage = "trash: 已还原 '$actualRid'"
-                } else {
-                    emitError("trash: 未在回收站中找到 '$ridToRevert'")
-                    return@flow
-                }
-
-                val res = ctx.fileRepository.revert(actualRid)
-                if (res.state) {
-                    if (matchedItem != null && matchedItem.cid.isNotEmpty()) {
-                        val isFolder = matchedItem.isFolder || matchedItem.type.equals("folder", ignoreCase = true)
-                        if (isFolder) {
-                            ctx.addCachedFolder(matchedItem.cid, matchedItem.fileName, matchedItem.id)
-                        } else {
-                            val restoredBean = FileBean(
-                                fileId = matchedItem.id,
-                                categoryId = matchedItem.cid,
-                                name = matchedItem.fileName,
-                                size = matchedItem.fileSize,
-                                isFolder = false,
-                                icoString = matchedItem.ico
-                            )
-                            ctx.addCachedFile(matchedItem.cid, restoredBean)
-                        }
-                    }
-                    emitSystem(successMessage)
-                } else {
-                    emitError("trash: 还原失败: ${res.error.ifEmpty { res.message }}")
-                }
-            } catch (e: Exception) {
-                emitError("trash: 还原异常: ${e.message}")
-            }
-            return@flow
+            return Result.success(TrashAction.Revert(ridToRevert))
         }
-
-        // 2. 清空回收站（二次危险确认）
-        if (isClean) {
-            val confirmed =
-                ctx.confirm("trash: 警告！确定要清空回收站中的全部文件吗？(yes/no): ")
-            if (!confirmed) {
-                emitSystem("trash: 已取消清空操作")
-                return@flow
-            }
-            try {
-                val res = ctx.fileRepository.recycleCleanAll("")
-                if (res.state) {
-                    emitSystem("trash: 回收站已成功清空")
-                } else {
-                    emitError("trash: 清空失败: ${res.error}")
-                }
-            } catch (e: Exception) {
-                emitError("trash: 清空异常: ${e.message}")
-            }
-            return@flow
+        if (ast.hasFlag("-c")) {
+            return Result.success(TrashAction.Clean)
         }
+        return Result.success(TrashAction.List)
+    }
 
-        // 3. 列出回收站列表
-        if (isList) {
-            try {
-                val list = ctx.fileRepository.recycleList()
-                if (list.recycleBeanList.isEmpty()) {
-                    emitSystem("trash: 回收站为空")
-                } else {
-                    emitSystem("回收站项目列表（共 ${list.recycleBeanList.size} 项）：")
-                    for (item in list.recycleBeanList) {
-                        emitText(
-                            String.format(
-                                Locale.getDefault(),
-                                "rid: %-15s %s (%s)",
-                                item.id,
-                                item.fileName,
-                                item.fileSize
-                            )
+    override suspend fun dispatch(
+        ctx: TerminalContext,
+        action: TrashAction,
+        collector: FlowCollector<TerminalOutput>
+    ) {
+        when (action) {
+            is TrashAction.Revert -> handleRevert(ctx, action.ridOrName, collector)
+            is TrashAction.Clean -> handleClean(ctx, collector)
+            is TrashAction.List -> handleList(ctx, collector)
+        }
+    }
+
+    private suspend fun handleRevert(
+        ctx: TerminalContext,
+        ridToRevert: String,
+        collector: FlowCollector<TerminalOutput>
+    ) {
+        try {
+            val recycleList = runCatching {
+                ctx.fileRepository.recycleList().recycleBeanList
+            }.getOrDefault(emptyList())
+
+            val matchedItem = recycleList.firstOrNull { it.fileName.equals(ridToRevert, ignoreCase = true) }
+            val actualRid: String
+            val successMessage: String
+
+            if (matchedItem != null) {
+                actualRid = matchedItem.id
+                successMessage = "trash: 已还原 '${matchedItem.fileName}' (rid: $actualRid)"
+            } else if (ridToRevert.toLongOrNull() != null) {
+                actualRid = ridToRevert
+                successMessage = "trash: 已还原 '$actualRid'"
+            } else {
+                collector.emitError("trash: 未在回收站中找到 '$ridToRevert'")
+                return
+            }
+
+            val res = ctx.fileRepository.revert(actualRid)
+            if (res.state) {
+                if (matchedItem != null && matchedItem.cid.isNotEmpty()) {
+                    val isFolder = matchedItem.isFolder || matchedItem.type.equals("folder", ignoreCase = true)
+                    if (isFolder) {
+                        ctx.addCachedFolder(matchedItem.cid, matchedItem.fileName, matchedItem.id)
+                    } else {
+                        val restoredBean = FileBean(
+                            fileId = matchedItem.id,
+                            categoryId = matchedItem.cid,
+                            name = matchedItem.fileName,
+                            size = matchedItem.fileSize,
+                            isFolder = false,
+                            icoString = matchedItem.ico
                         )
+                        ctx.addCachedFile(matchedItem.cid, restoredBean)
                     }
                 }
-            } catch (e: Exception) {
-                emitError("trash: 获取回收站列表失败: ${e.message}")
+                collector.emitSystem(successMessage)
+            } else {
+                collector.emitError("trash: 还原失败: ${res.error.ifEmpty { res.message }}")
             }
+        } catch (e: Exception) {
+            collector.emitError("trash: 还原异常: ${e.message}")
+        }
+    }
+
+    private suspend fun handleClean(
+        ctx: TerminalContext,
+        collector: FlowCollector<TerminalOutput>
+    ) {
+        val confirmed = ctx.confirm("trash: 警告！确定要清空回收站中的全部文件吗？(yes/no): ")
+        if (!confirmed) {
+            collector.emitSystem("trash: 已取消清空操作")
+            return
+        }
+        try {
+            val res = ctx.fileRepository.recycleCleanAll("")
+            if (res.state) {
+                collector.emitSystem("trash: 回收站已成功清空")
+            } else {
+                collector.emitError("trash: 清空失败: ${res.error}")
+            }
+        } catch (e: Exception) {
+            collector.emitError("trash: 清空异常: ${e.message}")
+        }
+    }
+
+    private suspend fun handleList(
+        ctx: TerminalContext,
+        collector: FlowCollector<TerminalOutput>
+    ) {
+        try {
+            val list = ctx.fileRepository.recycleList()
+            if (list.recycleBeanList.isEmpty()) {
+                collector.emitSystem("trash: 回收站为空")
+            } else {
+                collector.emitSystem("回收站项目列表（共 ${list.recycleBeanList.size} 项）：")
+                for (item in list.recycleBeanList) {
+                    collector.emitText(
+                        String.format(
+                            Locale.getDefault(),
+                            "rid: %-15s %s (%s)",
+                            item.id,
+                            item.fileName,
+                            item.fileSize
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            collector.emitError("trash: 获取回收站列表失败: ${e.message}")
         }
     }
 }

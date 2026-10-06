@@ -1,24 +1,36 @@
 package github.zerorooot.nap511.terminal.commands.file
 
-import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.context.TerminalPath
 import github.zerorooot.nap511.terminal.engine.CommandFlag
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.engine.archetype.ConfirmPolicy
+import github.zerorooot.nap511.terminal.engine.archetype.MutationCommand
+import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
 import github.zerorooot.nap511.terminal.viewmodel.emitText
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.FlowCollector
+
+/**
+ * 删除操作执行计划
+ *
+ * @property confirmPolicy 确认策略（FORCE 免确认或 INTERACTIVE 交互确认）
+ * @property targets 待删除的目标路径列表
+ */
+data class RmPlan(
+    val confirmPolicy: ConfirmPolicy,
+    val targets: List<String>
+)
 
 /**
  * 删除文件或目录至回收站命令（rm）
  *
- * 支持多目标批量删除、绝对/相对路径解析及末尾斜杠安全处理。
- * 针对危险操作执行前置安全校验（禁止删除根目录、禁止删除当前工作目录），默认触发交互式二次确认（支持 -y / -f 免确认）。
+ * 继承 [MutationCommand]，在编译期根据 `-f` / `-rf` 开关提取安全确认策略，校验待删除操作数。
+ * 针对危险操作执行前置安全校验（禁止删除根目录、禁止删除当前工作目录），默认触发交互式二次确认。
  */
-class RmCommand : TerminalCommand {
+class RmCommand : MutationCommand<RmPlan>() {
 
     override val name: String = "rm"
 
@@ -31,25 +43,31 @@ class RmCommand : TerminalCommand {
         CommandFlag("-r", "支持递归删除目录")
     )
 
-    override suspend fun execute(
-        ctx: TerminalContext,
-        args: List<String>,
+    override suspend fun compilePlan(
+        ast: CommandInvocationAst,
         stdin: Flow<String>
-    ): Flow<TerminalOutput> = flow {
-        val cmdArgs = CommandArgs(args)
-        // 支持 -y、-f 以及复合开关 -rf / -fr 免确认参数
-        val autoConfirm = cmdArgs.hasAny("-f", "-rf", "-fr")
-        val targetNames = cmdArgs.positionalArgs
-
-        if (targetNames.isEmpty()) {
-            emitError("rm: missing operand")
-            return@flow
+    ): Result<RmPlan> {
+        val targets = ast.rawPositionalValues
+        if (targets.isEmpty()) {
+            return Result.failure(Exception("missing operand"))
         }
 
-        for (target in targetNames) {
+        // 支持 -y、-f 以及复合开关 -rf / -fr 免确认参数
+        val autoConfirm = ast.hasAny("-f", "-rf", "-fr")
+        val policy = if (autoConfirm) ConfirmPolicy.FORCE else ConfirmPolicy.INTERACTIVE
+
+        return Result.success(RmPlan(confirmPolicy = policy, targets = targets))
+    }
+
+    override suspend fun executePlan(
+        ctx: TerminalContext,
+        plan: RmPlan,
+        collector: FlowCollector<TerminalOutput>
+    ) {
+        for (target in plan.targets) {
             val resolved = ctx.resolveTarget(target)
             if (resolved == null) {
-                emitError("rm: cannot remove '$target': No such file or directory")
+                collector.emitError("rm: cannot remove '$target': No such file or directory")
                 continue
             }
 
@@ -69,16 +87,16 @@ class RmCommand : TerminalCommand {
                 is ResolvedTarget.Directory -> {
                     // 安全校验 1：严禁删除根目录
                     if (resolved.cid == "0") {
-                        emitError("rm: cannot remove '$target': Cannot remove root directory")
+                        collector.emitError("rm: cannot remove '$target': Cannot remove root directory")
                         continue
                     }
                     // 安全校验 2：禁止删除当前工作目录自身
                     if (resolved.cid == ctx.currentCid) {
-                        emitError("rm: cannot remove '$target': Cannot remove current working directory")
+                        collector.emitError("rm: cannot remove '$target': Cannot remove current working directory")
                         continue
                     }
                     if (resolved.parentCid == null) {
-                        emitError("rm: cannot remove '$target': Cannot determine parent directory")
+                        collector.emitError("rm: cannot remove '$target': Cannot determine parent directory")
                         continue
                     }
                     actualFid = resolved.cid
@@ -91,10 +109,10 @@ class RmCommand : TerminalCommand {
             }
 
             // 若未开启免确认，向终端触发交互确认
-            if (!autoConfirm) {
+            if (plan.confirmPolicy == ConfirmPolicy.INTERACTIVE) {
                 val confirmed = ctx.confirm("rm: 是否确认删除 '$displayName'? (yes/no): ")
                 if (!confirmed) {
-                    emitText("rm: 已取消删除 '$displayName'")
+                    collector.emitText("rm: 已取消删除 '$displayName'")
                     continue
                 }
             }
@@ -105,13 +123,13 @@ class RmCommand : TerminalCommand {
                 if (res.state) {
                     // 就地从父目录缓存中剔除并级联清理文件夹缓存，无需网络重新拉取
                     ctx.removeCachedFile(parentCid = parentCid, fid = actualFid, isFolder = isFolder)
-                    emitText("rm: 已移入回收站 '$displayName'")
+                    collector.emitText("rm: 已移入回收站 '$displayName'")
                 } else {
                     val err = res.error.ifEmpty { res.message }
-                    emitError("rm: 删除失败 '$displayName': $err")
+                    collector.emitError("rm: 删除失败 '$displayName': $err")
                 }
             } catch (e: Exception) {
-                emitError("rm: 删除失败 '$displayName': ${e.message}")
+                collector.emitError("rm: 删除失败 '$displayName': ${e.message}")
             }
         }
     }

@@ -3,6 +3,7 @@ package github.zerorooot.nap511.terminal.commands.system
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.engine.TerminalControlTokens
+import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalLineType
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import kotlinx.coroutines.flow.Flow
@@ -24,7 +25,7 @@ class ClearCommand : TerminalCommand {
 
     override suspend fun execute(
         ctx: TerminalContext,
-        args: List<String>,
+        ast: CommandInvocationAst,
         stdin: Flow<String>
     ): Flow<TerminalOutput> = flow {
         // 输出统一控制标记通知终端视图清屏

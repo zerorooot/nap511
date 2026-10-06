@@ -1,12 +1,12 @@
 package github.zerorooot.nap511.terminal.commands.cloud
 
 import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.context.TerminalPath
 import github.zerorooot.nap511.terminal.context.TerminalPathConstants
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
 import github.zerorooot.nap511.terminal.viewmodel.emitText
@@ -28,11 +28,10 @@ class StatCommand : TerminalCommand {
 
     override suspend fun execute(
         ctx: TerminalContext,
-        args: List<String>,
+        ast: CommandInvocationAst,
         stdin: Flow<String>
     ): Flow<TerminalOutput> = flow {
-        val cmdArgs = CommandArgs(args)
-        val targetName = cmdArgs.firstPositional
+        val targetName = ast.firstPositional
         if (targetName == null) {
             emitError("stat: missing operand")
             return@flow

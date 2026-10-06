@@ -1,20 +1,18 @@
 package github.zerorooot.nap511.terminal.commands.stream
 
-import github.zerorooot.nap511.terminal.commands.util.CommandArgs
-import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
-import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.engine.archetype.StreamPipelineCommand
+import github.zerorooot.nap511.terminal.engine.archetype.StreamPlan
+import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.emitText
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 
 /**
  * 文本过滤匹配命令（grep）
  *
- * 从管道上游标准输入逐行读取文本，支持模式匹配、大小写忽略（-i）、反向过滤（-v）以及行数统计（-c）。
+ * 继承 [StreamPipelineCommand]，在编译期将模式匹配与开关选项静态装配为不可变 [StreamPlan]。
+ * 消除数据处理热循环中的分支判断（无 hasFlag、无 if(countOnly)、无 if(invertMatch)），实现高性能流式过滤。
  */
-class GrepCommand : TerminalCommand {
+class GrepCommand : StreamPipelineCommand() {
 
     override val name: String = "grep"
 
@@ -28,51 +26,57 @@ class GrepCommand : TerminalCommand {
         CommandFlag("-c", "仅输出匹配行的总数")
     )
 
-    override suspend fun execute(
-        ctx: TerminalContext,
-        args: List<String>,
-        stdin: Flow<String>
-    ): Flow<TerminalOutput> = flow {
-        val cmdArgs = CommandArgs(args)
-        val ignoreCase = cmdArgs.hasFlag("-i")
-        val invertMatch = cmdArgs.hasFlag("-v")
-        val countOnly = cmdArgs.hasFlag("-c")
+    override fun compilePlan(ast: CommandInvocationAst): Result<StreamPlan> {
+        val ignoreCase = ast.hasFlag("-i")
+        val invertMatch = ast.hasFlag("-v")
+        val countOnly = ast.hasFlag("-c")
 
-        // 提取模式匹配字符串（第一个非选项参数）
-        val pattern = cmdArgs.firstPositional ?: ""
+        // 提取模式匹配字符串（首个位置参数，若无则默认为空串匹配全部）
+        val pattern = ast.firstPositional ?: ""
 
         // 构建正则表达式选项（如忽略大小写）
         val regexOptions = if (ignoreCase) setOf(RegexOption.IGNORE_CASE) else emptySet()
 
-        // 尝试将 POSIX BRE 模式转换为 Kotlin 标准正则表达式并编译；若语法非法则降级为 null
+        // 尝试将 POSIX BRE 模式转换为 Kotlin 标准正则表达式并编译；若语法非法则降级为普通字符串包含
         val regex = runCatching {
             Regex(convertBreToRegexPattern(pattern), regexOptions)
         }.getOrNull()
 
-        var matchCount = 0
-        stdin.collect { line ->
-            // 优先使用编译成功的正则表达式进行模式匹配；若正则编译失败，则降级使用普通字符串包含判断
-            val matched = regex?.containsMatchIn(line)
-                ?: if (ignoreCase) {
-                    line.contains(pattern, ignoreCase = true)
-                } else {
-                    line.contains(pattern)
-                }
+        // 编译期合成单体判定闭包：将正向/反向、正则/普通字符串包含预先组合
+        val rawPredicate: (String) -> Boolean = if (regex != null) {
+            { line -> regex.containsMatchIn(line) }
+        } else {
+            { line -> line.contains(pattern, ignoreCase = ignoreCase) }
+        }
 
-            // 支持 -v 反向匹配逻辑：匹配成功且非反向，或匹配失败且反向
-            val isSuccess = if (invertMatch) !matched else matched
-            if (isSuccess) {
-                matchCount++
-                if (!countOnly) {
-                    emitText(line)
+        val matchPredicate: (String) -> Boolean = if (invertMatch) {
+            { line -> !rawPredicate(line) }
+        } else {
+            rawPredicate
+        }
+
+        // 编译期分离计划实现，彻底避免热循环内 if (countOnly) 分支判断
+        val plan = if (countOnly) {
+            StreamPlan { stdin, collector ->
+                var matchCount = 0
+                stdin.collect { line ->
+                    if (matchPredicate(line)) {
+                        matchCount++
+                    }
+                }
+                collector.emitText(matchCount.toString())
+            }
+        } else {
+            StreamPlan { stdin, collector ->
+                stdin.collect { line ->
+                    if (matchPredicate(line)) {
+                        collector.emitText(line)
+                    }
                 }
             }
         }
 
-        // 若开启 -c 选项，仅输出匹配总行数
-        if (countOnly) {
-            emitText(matchCount.toString())
-        }
+        return Result.success(plan)
     }
 
     /**

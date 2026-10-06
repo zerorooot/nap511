@@ -1,25 +1,37 @@
 package github.zerorooot.nap511.terminal.commands.file
 
 import github.zerorooot.nap511.bean.RenameBean
-import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.context.TerminalPath
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.engine.archetype.MutationCommand
+import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
 import github.zerorooot.nap511.terminal.viewmodel.emitText
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.FlowCollector
+
+/**
+ * 移动与重命名执行计划
+ *
+ * @property sources 待移动的源路径集合
+ * @property destination 目标文件或目录路径
+ */
+data class MvPlan(
+    val sources: List<String>,
+    val destination: String
+)
 
 /**
  * 移动文件或重命名命令（mv）
  *
+ * 继承 [MutationCommand]，在编译期提取位置参数与管道 stdin 输入，组装为不可变 [MvPlan]。
  * 支持双模式操作：
  * 1. 移动模式：当目标为已存在的目录时，支持单个或批量移动源文件至目标目录；亦支持从标准输入（stdin）管道读取待移动源文件列表。
  * 2. 重命名模式：当仅有一个源文件且目标非目录时，执行文件重命名操作。
  */
-class MvCommand : TerminalCommand {
+class MvCommand : MutationCommand<MvPlan>() {
 
     override val name: String = "mv"
 
@@ -27,12 +39,11 @@ class MvCommand : TerminalCommand {
 
     override val usage: String = "mv <source...> <target>"
 
-    override suspend fun execute(
-        ctx: TerminalContext,
-        args: List<String>,
+    override suspend fun compilePlan(
+        ast: CommandInvocationAst,
         stdin: Flow<String>
-    ): Flow<TerminalOutput> = flow {
-        val targets = CommandArgs(args).positionalArgs.toMutableList()
+    ): Result<MvPlan> {
+        val targets = ast.rawPositionalValues.toMutableList()
 
         // 管道支持：若命令行参数仅提供了 1 个目标目录（例如 find ... | mv ../），且上游管道存在输入，智能从 stdin 获取源列表
         if (targets.size < 2) {
@@ -52,12 +63,21 @@ class MvCommand : TerminalCommand {
         }
 
         if (targets.size < 2) {
-            emitError("mv: missing file operand")
-            return@flow
+            return Result.failure(Exception("missing file operand"))
         }
 
         val destination = targets.last()
         val sources = targets.dropLast(1)
+        return Result.success(MvPlan(sources = sources, destination = destination))
+    }
+
+    override suspend fun executePlan(
+        ctx: TerminalContext,
+        plan: MvPlan,
+        collector: FlowCollector<TerminalOutput>
+    ) {
+        val destination = plan.destination
+        val sources = plan.sources
         val currentFiles = ctx.listDirectory(ctx.currentCid)
         val destParsed = TerminalPath.parse(destination)
 
@@ -111,7 +131,7 @@ class MvCommand : TerminalCommand {
             for (src in sources) {
                 val resolvedSrc = resolveSourceItem(src)
                 if (resolvedSrc == null) {
-                    emitError("mv: cannot stat '$src': No such file or directory")
+                    collector.emitError("mv: cannot stat '$src': No such file or directory")
                     continue
                 }
                 try {
@@ -123,27 +143,27 @@ class MvCommand : TerminalCommand {
                         // 就地完成缓存移动：从源父目录移出，并添加到目标目录缓存中
                         val srcParentCid = resolvedSrc.parentCid ?: ctx.currentCid
                         ctx.moveCachedFile(srcParentCid = srcParentCid, targetCid = targetDestCid, fid = resolvedSrc.fid)
-                        emitText("mv: '$src' -> '$destDisplayName/'")
+                        collector.emitText("mv: '$src' -> '$destDisplayName/'")
                     } else {
                         val err =
                             res.error.ifEmpty { res.errorMsg.ifEmpty { res.message } }
-                        emitError("mv: 移动 '$src' 失败: $err")
+                        collector.emitError("mv: 移动 '$src' 失败: $err")
                     }
                 } catch (e: Exception) {
-                    emitError("mv: 移动 '$src' 失败: ${e.message}")
+                    collector.emitError("mv: 移动 '$src' 失败: ${e.message}")
                 }
             }
         } else if (sources.size == 1) {
             // 单源且目标不是现有目录：执行重命名
             if (destParsed.hasTrailingSlash) {
-                emitError("mv: target '$destination' is not a directory")
-                return@flow
+                collector.emitError("mv: target '$destination' is not a directory")
+                return
             }
             val src = sources[0]
             val resolvedSrc = resolveSourceItem(src)
             if (resolvedSrc == null) {
-                emitError("mv: cannot stat '$src': No such file or directory")
-                return@flow
+                collector.emitError("mv: cannot stat '$src': No such file or directory")
+                return
             }
             // 截取纯文件名，防止将路径名误作为文件名传入 rename API
             val newName = destParsed.targetName
@@ -154,16 +174,16 @@ class MvCommand : TerminalCommand {
                     val parentCid = resolvedSrc.parentCid ?: ctx.currentCid
                     // 就地在父目录缓存中重命名该文件/文件夹（对齐 FileViewModel 的 rename 逻辑）
                     ctx.renameCachedFile(parentCid = parentCid, fid = resolvedSrc.fid, newName = newName)
-                    emitText("mv: '$src' renamed to '$newName'")
+                    collector.emitText("mv: '$src' renamed to '$newName'")
                 } else {
                     val err = res.error.ifEmpty { res.errorMsg.ifEmpty { res.message } }
-                    emitError("mv: 重命名失败: $err")
+                    collector.emitError("mv: 重命名失败: $err")
                 }
             } catch (e: Exception) {
-                emitError("mv: 重命名失败: ${e.message}")
+                collector.emitError("mv: 重命名失败: ${e.message}")
             }
         } else {
-            emitError("mv: target '$destination' is not a directory")
+            collector.emitError("mv: target '$destination' is not a directory")
         }
     }
 }

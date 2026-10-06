@@ -3,6 +3,7 @@ package github.zerorooot.nap511.terminal.commands.system
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandRegistry
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalLineType
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import kotlinx.coroutines.flow.Flow
@@ -29,7 +30,7 @@ class HelpCommand(
 
     override suspend fun execute(
         ctx: TerminalContext,
-        args: List<String>,
+        ast: CommandInvocationAst,
         stdin: Flow<String>
     ): Flow<TerminalOutput> = flow {
         // 调用注册表的 buildAllHelpMessage 汇总全部已注册命令及按键帮助，源头直接赋予 TerminalLineType.System.HELP

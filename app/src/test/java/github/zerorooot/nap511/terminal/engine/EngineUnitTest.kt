@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.terminal.engine
 
 import github.zerorooot.nap511.terminal.context.TerminalContext
+import github.zerorooot.nap511.terminal.engine.ast.CommandAstParser
 import github.zerorooot.nap511.terminal.viewmodel.TerminalLineType
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import kotlinx.coroutines.flow.flow
@@ -101,7 +102,8 @@ class EngineUnitTest {
 
         // 测试自动 -h
         val ctx = TerminalContext()
-        val helpOutput = def!!.execute(ctx, listOf("-h"), kotlinx.coroutines.flow.emptyFlow()).toList()
+        val ast = CommandAstParser.parse(def!!.name, listOf(Token("-h")))
+        val helpOutput = def.execute(ctx, ast, kotlinx.coroutines.flow.emptyFlow()).toList()
         assertEquals(TerminalLineType.System.HELP, helpOutput.first().type)
         val fullHelpText = helpOutput.joinToString("\n") { it.text }
         assertTrue(fullHelpText.contains("测试命令"))
@@ -118,15 +120,15 @@ class EngineUnitTest {
         val registry = CommandRegistry()
         registry.register("echo") {
             description = "回显"
-            execute { _, args, _ ->
-                flow { emit(TerminalOutput(args.joinToString(" "))) }
+            execute { _, ast, _ ->
+                flow { emit(TerminalOutput(ast.rawPositionalValues.joinToString(" "))) }
             }
         }
         registry.register("grep") {
             description = "过滤"
-            execute { _, args, stdin ->
+            execute { _, ast, stdin ->
                 flow {
-                    val pattern = args.firstOrNull() ?: ""
+                    val pattern = ast.firstPositional ?: ""
                     stdin.collect { line ->
                         if (line.contains(pattern)) {
                             emit(TerminalOutput(line))
@@ -292,15 +294,15 @@ class EngineUnitTest {
         val registry = CommandRegistry()
         registry.register("echo") {
             description = "回显"
-            execute { _, args, _ ->
-                flow { emit(TerminalOutput(args.joinToString(" "))) }
+            execute { _, ast, _ ->
+                flow { emit(TerminalOutput(ast.rawPositionalValues.joinToString(" "))) }
             }
         }
         registry.register("grep") {
             description = "过滤"
-            execute { _, args, stdin ->
+            execute { _, ast, stdin ->
                 flow {
-                    val pattern = args.firstOrNull() ?: ""
+                    val pattern = ast.firstPositional ?: ""
                     stdin.collect { line ->
                         if (line.contains(pattern)) {
                             emit(TerminalOutput(line))
@@ -311,7 +313,7 @@ class EngineUnitTest {
         }
         registry.register("wc") {
             description = "统计"
-            execute { _, args, stdin ->
+            execute { _, _, stdin ->
                 flow {
                     var count = 0
                     stdin.collect { count++ }

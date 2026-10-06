@@ -1,22 +1,23 @@
 package github.zerorooot.nap511.terminal.engine
 
 import github.zerorooot.nap511.terminal.context.TerminalContext
+import github.zerorooot.nap511.terminal.engine.ast.CommandAstParser
+import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
+import github.zerorooot.nap511.terminal.engine.ast.PositionalArgumentNode
 import github.zerorooot.nap511.terminal.viewmodel.TerminalLineType
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
-import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
 
 /**
  * 协程与 Flow 管道命令执行引擎
  *
  * 遵循强类型流模型规范：
  * 1. 管道中继传递纯文本 (Flow<String>) 保证 Unix 流式计算互操作性；
- * 2. 管道终点输出保留强类型语义 (Flow<TerminalOutput>) 供给上层 ViewModel 精准渲染。
+ * 2. 管道终点输出保留强类型语义 (Flow<TerminalOutput>) 供给上层 ViewModel 精准渲染；
+ * 3. 引擎直接解析生成 CommandInvocationAst 抽象语法树，严格控制 Glob 仅对位置参数生效。
  */
 class PipelineEngine(
     val registry: CommandRegistry
@@ -60,25 +61,32 @@ class PipelineEngine(
                 emit(TerminalOutput("输入 '?' 或 'help' 可查看所有支持的命令", TerminalLineType.System.HELP))
             }
 
-            // 对参数列表中未用引号包裹的 Glob 通配符（如未加引号的 *.mp4）进行 POSIX Shell 规范自动展开；
-            // 对于用单/双引号包裹的通配符参数（如 'a*.txt' 或 "-name '*.pdf'"），保留字面量不予展开，原样传递给目标命令处理。
-            val expandedArgs = mutableListOf<String>()
-            for (token in stage.tokens) {
-                if (!token.isQuoted && GlobMatcher.hasGlobWildcards(token.text)) {
-                    expandedArgs.addAll(GlobMatcher.expand(token.text, candidates))
+            // 1. 在引擎层直接完成命令 AST 语法树构建（消灭所有下游命令对 CommandArgs 的依赖）
+            val rawAst = CommandAstParser.parse(stage.command, stage.tokens, commandDef.valueOptions)
+
+            // 2. 安全 Glob 展开：仅对未加引号的位置参数（路径/文件名）执行通配符展开；
+            // 选项名称与选项参数值严格禁止展开，从源头杜绝参数注入。
+            val expandedPositional = mutableListOf<PositionalArgumentNode>()
+            for (posNode in rawAst.positionalArgs) {
+                if (!posNode.isQuoted && !posNode.fromDelimiter && GlobMatcher.hasGlobWildcards(posNode.text)) {
+                    val expanded = GlobMatcher.expand(posNode.text, candidates)
+                    for (item in expanded) {
+                        expandedPositional.add(PositionalArgumentNode(item, isQuoted = false, fromDelimiter = false))
+                    }
                 } else {
-                    expandedArgs.add(token.text)
+                    expandedPositional.add(posNode)
                 }
             }
+            val finalAst = rawAst.copy(positionalArgs = expandedPositional)
 
             // 【关键机制 - 不可变局部变量绑定】：
             // 使用局部只读 val stageStdout 接收当前阶段的输出流，保证随后赋值给 currentStdin 的流闭包
-            // 严格捕获上一级的只读引用，绝不会因为外层 var 变量被下一轮循环重写而导致将自己作为自己的 stdin 陷入自循环死锁。
-            val stageStdout = executeStage(commandDef, ctx, expandedArgs, currentStdin)
+            // 严格捕获上一级的只读引用，绝不会因为外层 var 变量被下一轮循环重写而导致死锁。
+            val stageStdout = executeStage(commandDef, ctx, finalAst, currentStdin)
             lastStdout = stageStdout
 
             // 将当前阶段的输出转换为纯文本行流供给下一阶段作为 stdin
-            // 【核心通道隔离与流转机制】：仅声明 isPipeableData == true 的数据类型（标准数据输出 Output 及 System.HELP 帮助说明）流入下一阶段 stdin；
+            // 【核心通道隔离与流转机制】：仅声明 isPipeableData == true 的数据类型流入下一阶段 stdin；
             // 错误提示 (ERROR)、交互确认 (PROMPT) 与系统通知 (INFO) 自动隔离在当前屏幕展示，绝不污染下游数据管道。
             currentStdin = flow {
                 stageStdout.collect { output ->
@@ -101,7 +109,7 @@ class PipelineEngine(
     private fun executeStage(
         commandDef: CommandDefinition,
         ctx: TerminalContext,
-        args: List<String>,
+        ast: CommandInvocationAst,
         stdin: Flow<String>
     ): Flow<TerminalOutput> = flow {
         try {
@@ -113,7 +121,7 @@ class PipelineEngine(
                     }
                 }
             }
-            val stdoutFlow = commandDef.execute(ctx, args, lineStream.buffer())
+            val stdoutFlow = commandDef.execute(ctx, ast, lineStream.buffer())
             stdoutFlow.collect { output ->
                 emit(output)
             }

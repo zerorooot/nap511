@@ -1,21 +1,22 @@
 package github.zerorooot.nap511.terminal.commands.stream
 
-import github.zerorooot.nap511.terminal.commands.util.CommandArgs
-import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
-import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.engine.archetype.StreamPipelineCommand
+import github.zerorooot.nap511.terminal.engine.archetype.StreamPlan
+import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.emitText
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import java.util.Locale
 
 /**
  * 文本字数统计命令（wc）
  *
- * 统计标准输入中的行数（-l）、单词数（-w）及字符数（-c）。
+ * 继承 [StreamPipelineCommand]，在编译期根据选项直接生成专用收集计划：
+ * - 纯行数统计（-l）：跳过开销昂贵的正则表达式单词切分与字符统计，极致提升流式处理性能；
+ * - 纯单词数统计（-w）：只进行单词正则切分；
+ * - 纯字符数统计（-c）：只累加字符长度；
+ * - 复合或全量统计：汇总输出完整的三列指标。
  */
-class WcCommand : TerminalCommand {
+class WcCommand : StreamPipelineCommand() {
 
     override val name: String = "wc"
 
@@ -29,34 +30,53 @@ class WcCommand : TerminalCommand {
         CommandFlag("-c", "仅统计字符/字节数")
     )
 
-    override suspend fun execute(
-        ctx: TerminalContext,
-        args: List<String>,
-        stdin: Flow<String>
-    ): Flow<TerminalOutput> = flow {
-        val cmdArgs = CommandArgs(args)
-        val linesOnly = cmdArgs.hasFlag("-l")
-        val wordsOnly = cmdArgs.hasFlag("-w")
-        val charsOnly = cmdArgs.hasFlag("-c")
+    override fun compilePlan(ast: CommandInvocationAst): Result<StreamPlan> {
+        val linesOnly = ast.hasFlag("-l")
+        val wordsOnly = ast.hasFlag("-w")
+        val charsOnly = ast.hasFlag("-c")
 
-        var lineCount = 0
-        var wordCount = 0
-        var charCount = 0
+        val plan = when {
+            // 专有高效路径：仅统计行数，跳过正则与字符串长度计算
+            linesOnly && !wordsOnly && !charsOnly -> StreamPlan { stdin, collector ->
+                var lineCount = 0
+                stdin.collect { lineCount++ }
+                collector.emitText(lineCount.toString())
+            }
 
-        stdin.collect { line ->
-            lineCount++
-            charCount += line.length + 1 // 模拟换行符字符数
-            wordCount += line.split(Regex("\\s+")).filter { it.isNotEmpty() }.size
-        }
+            // 专有路径：仅统计字符数
+            charsOnly && !linesOnly && !wordsOnly -> StreamPlan { stdin, collector ->
+                var charCount = 0
+                stdin.collect { line ->
+                    charCount += line.length + 1
+                }
+                collector.emitText(charCount.toString())
+            }
 
-        // 根据选项过滤输出，若未单独指定某个维度则格式化输出全部三列
-        when {
-            linesOnly && !wordsOnly && !charsOnly -> emitText(lineCount.toString())
-            wordsOnly && !linesOnly && !charsOnly -> emitText(wordCount.toString())
-            charsOnly && !linesOnly && !wordsOnly -> emitText(charCount.toString())
-            else -> {
-                emitText("   Lines    Words    Chars")
-                emitText(
+            // 专有路径：仅统计单词数
+            wordsOnly && !linesOnly && !charsOnly -> StreamPlan { stdin, collector ->
+                val whitespaceRegex = Regex("\\s+")
+                var wordCount = 0
+                stdin.collect { line ->
+                    wordCount += line.split(whitespaceRegex).filter { it.isNotEmpty() }.size
+                }
+                collector.emitText(wordCount.toString())
+            }
+
+            // 全量或多维度路径
+            else -> StreamPlan { stdin, collector ->
+                val whitespaceRegex = Regex("\\s+")
+                var lineCount = 0
+                var wordCount = 0
+                var charCount = 0
+
+                stdin.collect { line ->
+                    lineCount++
+                    charCount += line.length + 1
+                    wordCount += line.split(whitespaceRegex).filter { it.isNotEmpty() }.size
+                }
+
+                collector.emitText("   Lines    Words    Chars")
+                collector.emitText(
                     String.format(
                         Locale.getDefault(),
                         "%8d %8d %8d",
@@ -67,5 +87,7 @@ class WcCommand : TerminalCommand {
                 )
             }
         }
+
+        return Result.success(plan)
     }
 }

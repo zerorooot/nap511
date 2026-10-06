@@ -1,21 +1,19 @@
 package github.zerorooot.nap511.terminal.commands.stream
 
-import github.zerorooot.nap511.terminal.commands.util.CommandArgs
-import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
-import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
+import github.zerorooot.nap511.terminal.engine.archetype.StreamPipelineCommand
+import github.zerorooot.nap511.terminal.engine.archetype.StreamPlan
+import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.emitText
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
 
 /**
  * 文本行排序命令（sort）
  *
- * 支持字符字典序或数值排序（-n）、逆序排序（-r）以及重复行过滤（-u）。
+ * 继承 [StreamPipelineCommand]，在编译期根据 `-n` 与 `-r` 一次性构建静态不可变的比较器 Comparator，
+ * 执行期无条件复用已编译好的比较器，完全消除比较过程中的分支判断与动态标志判定。
  */
-class SortCommand : TerminalCommand {
+class SortCommand : StreamPipelineCommand() {
 
     override val name: String = "sort"
 
@@ -29,34 +27,31 @@ class SortCommand : TerminalCommand {
         CommandFlag("-u", "去重（唯一输出）")
     )
 
-    override suspend fun execute(
-        ctx: TerminalContext,
-        args: List<String>,
-        stdin: Flow<String>
-    ): Flow<TerminalOutput> = flow {
-        val cmdArgs = CommandArgs(args)
-        val reverse = cmdArgs.hasFlag("-r")
-        val numeric = cmdArgs.hasFlag("-n")
-        val unique = cmdArgs.hasFlag("-u")
+    override fun compilePlan(ast: CommandInvocationAst): Result<StreamPlan> {
+        val reverse = ast.hasFlag("-r")
+        val numeric = ast.hasFlag("-n")
+        val unique = ast.hasFlag("-u")
 
-        val lines = stdin.toList()
-        val comparator = Comparator<String> { a, b ->
-            if (numeric) {
+        // 编译期合成比较器：如果是数值比较则按浮点数值转换，否则按纯字典序
+        val baseComparator: Comparator<String> = if (numeric) {
+            Comparator { a, b ->
                 val numA = a.trim().toDoubleOrNull() ?: 0.0
                 val numB = b.trim().toDoubleOrNull() ?: 0.0
                 numA.compareTo(numB)
-            } else {
-                a.compareTo(b)
             }
-        }
-
-        val sorted = if (reverse) {
-            lines.sortedWith(comparator.reversed())
         } else {
-            lines.sortedWith(comparator)
+            Comparator { a, b -> a.compareTo(b) }
         }
 
-        val finalLines = if (unique) sorted.distinct() else sorted
-        finalLines.forEach { emitText(it) }
+        val finalComparator = if (reverse) baseComparator.reversed() else baseComparator
+
+        val plan = StreamPlan { stdin, collector ->
+            val lines = stdin.toList()
+            val sorted = lines.sortedWith(finalComparator)
+            val finalLines = if (unique) sorted.distinct() else sorted
+            finalLines.forEach { collector.emitText(it) }
+        }
+
+        return Result.success(plan)
     }
 }

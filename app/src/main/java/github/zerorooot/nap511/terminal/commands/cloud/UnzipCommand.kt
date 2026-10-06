@@ -16,6 +16,7 @@ import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
 import github.zerorooot.nap511.terminal.engine.GlobMatcher
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
 import github.zerorooot.nap511.terminal.viewmodel.emitText
@@ -47,39 +48,16 @@ class UnzipCommand : TerminalCommand {
         CommandFlag("-p <password>", "设置解压密码")
     )
 
+    override val valueOptions: Set<String> = setOf("-p")
+
     override suspend fun execute(
         ctx: TerminalContext,
-        args: List<String>,
+        ast: CommandInvocationAst,
         stdin: Flow<String>
     ): Flow<TerminalOutput> = flow {
-        var isList = false
-        var password = ""
-        val fileArgs = mutableListOf<String>()
-
-        var idx = 0
-        while (idx < args.size) {
-            when (val arg = args[idx]) {
-                "--" -> {
-                    for (k in (idx + 1) until args.size) {
-                        fileArgs.add(args[k])
-                    }
-                    break
-                }
-                "-l" -> isList = true
-                "-p" -> {
-                    if (idx + 1 < args.size) {
-                        password = args[++idx]
-                    }
-                }
-
-                else -> {
-                    if (!arg.startsWith("-")) {
-                        fileArgs.add(arg)
-                    }
-                }
-            }
-            idx++
-        }
+        val isList = ast.hasFlag("-l")
+        val password = ast.getOption("-p") ?: ""
+        val fileArgs = ast.rawPositionalValues
 
         if (fileArgs.isEmpty()) {
             emitError("unzip: missing file operand")

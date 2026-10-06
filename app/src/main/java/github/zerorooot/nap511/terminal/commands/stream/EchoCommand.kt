@@ -3,6 +3,7 @@ package github.zerorooot.nap511.terminal.commands.stream
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitAnsi
 import github.zerorooot.nap511.terminal.viewmodel.emitText
@@ -34,9 +35,10 @@ class EchoCommand : TerminalCommand {
 
     override suspend fun execute(
         ctx: TerminalContext,
-        args: List<String>,
+        ast: CommandInvocationAst,
         stdin: Flow<String>
     ): Flow<TerminalOutput> = flow {
+        val args = ast.rawArgs
         var noNewline = false
         var enableEscapes = false
         var textStartIndex = 0

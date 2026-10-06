@@ -81,16 +81,4 @@ object CommandRegistryFactory {
 
         return registry
     }
-
-    /**
-     * 兼容性构造方法
-     */
-    fun createDefaultRegistry(historyProvider: () -> List<String>): CommandRegistry {
-        val tempFile = java.io.File.createTempFile("legacy_history", ".txt").apply {
-            deleteOnExit()
-            val list = runCatching { historyProvider() }.getOrDefault(emptyList())
-            list.forEach { appendText("$it\n") }
-        }
-        return createDefaultRegistry(TerminalHistoryManager(tempFile))
-    }
 }

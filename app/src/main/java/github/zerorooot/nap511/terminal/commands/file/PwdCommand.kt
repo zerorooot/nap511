@@ -2,6 +2,7 @@ package github.zerorooot.nap511.terminal.commands.file
 
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitPath
 import kotlinx.coroutines.flow.Flow
@@ -22,7 +23,7 @@ class PwdCommand : TerminalCommand {
 
     override suspend fun execute(
         ctx: TerminalContext,
-        args: List<String>,
+        ast: CommandInvocationAst,
         stdin: Flow<String>
     ): Flow<TerminalOutput> = flow {
         emitPath(ctx.currentPath)

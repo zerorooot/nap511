@@ -1,9 +1,10 @@
 package github.zerorooot.nap511.terminal.commands
 
 import github.zerorooot.nap511.terminal.commands.stream.EchoCommand
-import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.commands.util.CommandFormatUtil
 import github.zerorooot.nap511.terminal.commands.util.SizeParser
+import github.zerorooot.nap511.terminal.engine.Token
+import github.zerorooot.nap511.terminal.engine.ast.CommandAstParser
 import github.zerorooot.nap511.terminal.viewmodel.TerminalLineType
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitAnsi
@@ -31,87 +32,95 @@ import java.util.Locale
  * 终端命令工具类及数据载体底层单元测试
  *
  * 覆盖：
- * 1. CommandArgs 命令行参数提取与解析器
+ * 1. CommandAstParser 与 CommandInvocationAst 抽象语法树解析与提取器
  * 2. SizeParser 文件大小解析器（支持 +100M, -10k, 500b 及匹配比较）
  * 3. CommandFormatUtil 时间戳格式化工具
- * 4. 低耦合命令直接执行（不依赖 Engine）
+ * 4. 纯 AST 命令直接执行（不依赖 Engine）
  * 5. TerminalOutput 数据载体与 DSL 发射函数集
  */
 class CommandUtilsUnitTest {
 
+    private fun tokensOf(vararg texts: String): List<Token> = texts.map { Token(it) }
+
     /**
-     * 测试 CommandArgs 参数与选项提取解析器
+     * 测试 CommandAstParser 参数与选项提取解析器
      */
     @Test
-    fun testCommandArgsFlagAndOptions() {
-        val args = CommandArgs(listOf("-l", "-a", "-n", "20", "-I{}", "--refresh", "file1.txt", "file2.txt"))
+    fun testCommandAstParserFlagAndOptions() {
+        val ast = CommandAstParser.parse(
+            "test",
+            tokensOf("-l", "-a", "-n", "20", "-I{}", "--refresh", "file1.txt", "file2.txt"),
+            allowedValueOptions = setOf("-n", "-I")
+        )
 
         // 判断 Flag 存在性
-        assertTrue(args.hasFlag("-l"))
-        assertTrue(args.hasFlag("-a"))
-        assertFalse(args.hasFlag("-v"))
-        assertTrue(args.hasAny("-v", "-l"))
+        assertTrue(ast.hasFlag("-l"))
+        assertTrue(ast.hasFlag("-a"))
+        assertFalse(ast.hasFlag("-v"))
+        assertTrue(ast.hasAny("-v", "-l"))
+        assertTrue(ast.hasFlag("--refresh"))
 
         // 提取带值选项与数值转换
-        assertEquals("20", args.getOption("-n"))
-        assertEquals(20, args.getIntOption("-n"))
-        assertEquals(10, args.getIntOption("-x", default = 10))
+        assertEquals("20", ast.getOption("-n"))
+        assertEquals(20, ast.getIntOption("-n"))
+        assertEquals(10, ast.getIntOption("-x", default = 10))
 
         // 提取紧贴选项（如 -I{}）
-        assertEquals("{}", args.getOption("-I"))
+        assertEquals("{}", ast.getOption("-I"))
 
         // 提取纯位置参数
-        val fileArgs = CommandArgs(listOf("-l", "file1.txt", "file2.txt"))
-        assertEquals(listOf("file1.txt", "file2.txt"), fileArgs.positionalArgs)
-        assertEquals("file1.txt", fileArgs.firstPositional)
-        assertEquals("file1.txt file2.txt", fileArgs.joinPositional())
+        val fileAst = CommandAstParser.parse("ls", tokensOf("-l", "file1.txt", "file2.txt"))
+        assertEquals(listOf("file1.txt", "file2.txt"), fileAst.rawPositionalValues)
+        assertEquals("file1.txt", fileAst.firstPositional)
+        assertEquals("file1.txt file2.txt", fileAst.rawPositionalValues.joinToString(" "))
     }
 
     /**
-     * 测试 CommandArgs 对 "--"（选项结束符）的标准 POSIX 支持
+     * 测试 CommandAstParser 对 "--"（选项结束符）的标准 POSIX 支持
      */
     @Test
-    fun testCommandArgsEndOptionsDelimiter() {
+    fun testCommandAstParserEndOptionsDelimiter() {
         // 1. 基本 "--" 分隔：之前是选项，之后即使以 "-" 开头也是位置参数
-        val args1 = CommandArgs(listOf("-l", "-a", "--", "-f", "-n", "20", "file.txt"))
-        assertTrue(args1.hasDelimiter)
-        assertEquals(2, args1.delimiterIndex)
-        assertTrue(args1.hasFlag("-l"))
-        assertTrue(args1.hasFlag("-a"))
+        val ast1 = CommandAstParser.parse(
+            "test",
+            tokensOf("-l", "-a", "--", "-f", "-n", "20", "file.txt"),
+            allowedValueOptions = setOf("-n")
+        )
+        assertTrue(ast1.hasDelimiter)
+        assertTrue(ast1.hasFlag("-l"))
+        assertTrue(ast1.hasFlag("-a"))
         // "--" 之后的 -f 不应被识别为 Flag，-n 不应被识别为 Option
-        assertFalse(args1.hasFlag("-f"))
-        assertFalse(args1.hasAny("-f", "-rf"))
-        assertNull(args1.getOption("-n"))
+        assertFalse(ast1.hasFlag("-f"))
+        assertFalse(ast1.hasAny("-f", "-rf"))
+        assertNull(ast1.getOption("-n"))
         // 选项结束符之后的所有参数均作为位置参数保留，"--" 本身被剔除
-        assertEquals(listOf("-f", "-n", "20", "file.txt"), args1.positionalArgs)
-        assertEquals("-f", args1.firstPositional)
-        assertEquals("-f -n 20 file.txt", args1.joinPositional())
+        assertEquals(listOf("-f", "-n", "20", "file.txt"), ast1.rawPositionalValues)
+        assertEquals("-f", ast1.firstPositional)
+        assertEquals("-f -n 20 file.txt", ast1.rawPositionalValues.joinToString(" "))
 
         // 2. "--" 之前包含位置参数，"--" 之后也包含位置参数
-        val args2 = CommandArgs(listOf("src", "--", "-dest"))
-        assertTrue(args2.hasDelimiter)
-        assertEquals(listOf("src", "-dest"), args2.positionalArgs)
-        assertEquals("src", args2.firstPositional)
+        val ast2 = CommandAstParser.parse("mv", tokensOf("src", "--", "-dest"))
+        assertTrue(ast2.hasDelimiter)
+        assertEquals(listOf("src", "-dest"), ast2.rawPositionalValues)
+        assertEquals("src", ast2.firstPositional)
 
         // 3. 仅有 "--" 选项结束符
-        val args3 = CommandArgs(listOf("--"))
-        assertTrue(args3.hasDelimiter)
-        assertEquals(0, args3.delimiterIndex)
-        assertTrue(args3.positionalArgs.isEmpty())
-        assertNull(args3.firstPositional)
+        val ast3 = CommandAstParser.parse("test", tokensOf("--"))
+        assertTrue(ast3.hasDelimiter)
+        assertTrue(ast3.positionalArgs.isEmpty())
+        assertNull(ast3.firstPositional)
 
         // 4. 重复 "--"：第一个作为选项结束符，后续 "--" 作为位置参数
-        val args4 = CommandArgs(listOf("-l", "--", "--", "-a"))
-        assertTrue(args4.hasFlag("-l"))
-        assertFalse(args4.hasFlag("-a"))
-        assertEquals(listOf("--", "-a"), args4.positionalArgs)
+        val ast4 = CommandAstParser.parse("test", tokensOf("-l", "--", "--", "-a"))
+        assertTrue(ast4.hasFlag("-l"))
+        assertFalse(ast4.hasFlag("-a"))
+        assertEquals(listOf("--", "-a"), ast4.rawPositionalValues)
 
-        // 5. 不包含 "--" 时的兼容性
-        val args5 = CommandArgs(listOf("-l", "file.txt"))
-        assertFalse(args5.hasDelimiter)
-        assertEquals(-1, args5.delimiterIndex)
-        assertTrue(args5.hasFlag("-l"))
-        assertEquals(listOf("file.txt"), args5.positionalArgs)
+        // 5. 不包含 "--" 时的正常解析
+        val ast5 = CommandAstParser.parse("ls", tokensOf("-l", "file.txt"))
+        assertFalse(ast5.hasDelimiter)
+        assertTrue(ast5.hasFlag("-l"))
+        assertEquals(listOf("file.txt"), ast5.rawPositionalValues)
     }
 
     /**
@@ -163,13 +172,17 @@ class CommandUtilsUnitTest {
     }
 
     /**
-     * 测试独立命令低耦合直接执行（无需 PipelineEngine 与 CommandRegistry）
+     * 测试独立命令低耦合直接执行（纯 AST 调用，无需 PipelineEngine 与 CommandRegistry）
      */
     @Test
     fun testDirectCommandExecutionWithoutEngine() = runBlocking {
         val echoCmd = EchoCommand()
         val ctx = createTestContext()
-        val result = echoCmd.execute(ctx, listOf("hello", "terminal", "refactor"), emptyFlow()).toList()
+        val ast = CommandAstParser.parse(
+            echoCmd.name,
+            tokensOf("hello", "terminal", "refactor")
+        )
+        val result = echoCmd.execute(ctx, ast, emptyFlow()).toList()
         assertEquals(listOf("hello terminal refactor"), result.map { it.text })
         assertEquals(TerminalLineType.Output.TEXT, result[0].type)
     }

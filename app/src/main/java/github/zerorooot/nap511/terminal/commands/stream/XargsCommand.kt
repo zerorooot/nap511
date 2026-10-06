@@ -4,6 +4,9 @@ import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
 import github.zerorooot.nap511.terminal.engine.CommandRegistry
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.engine.Token
+import github.zerorooot.nap511.terminal.engine.ast.CommandAstParser
+import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
 import github.zerorooot.nap511.terminal.viewmodel.emitText
@@ -15,6 +18,7 @@ import kotlinx.coroutines.flow.flow
  * 管道参数转换与子命令批量执行工具（xargs）
  *
  * 从标准输入读取数据，切分 token 或逐行解析，并将数据作为参数调用指定目标命令。
+ * 基于强类型 [CommandInvocationAst] 解析 `-I`、`-n`、`-t` 等选项与目标子命令参数。
  *
  * @param registrySupplier 获取命令注册表的函数引用，用于动态查找目标命令的定义与执行体
  */
@@ -34,51 +38,18 @@ class XargsCommand(
         CommandFlag("-t", "在执行前在屏幕打印即将运行的命令")
     )
 
+    override val valueOptions: Set<String> = setOf("-I", "-n")
+
     override suspend fun execute(
         ctx: TerminalContext,
-        args: List<String>,
+        ast: CommandInvocationAst,
         stdin: Flow<String>
     ): Flow<TerminalOutput> = flow {
-        var replaceStr: String? = null
-        var maxArgs: Int? = null
-        var verbose = false
+        val replaceStr = ast.getOption("-I")
+        val maxArgs = ast.getIntOption("-n")
+        val verbose = ast.hasFlag("-t")
 
-        val commandTokens = mutableListOf<String>()
-        var i = 0
-        while (i < args.size) {
-            val arg = args[i]
-            when {
-                arg == "--" -> {
-                    for (k in (i + 1) until args.size) {
-                        commandTokens.add(args[k])
-                    }
-                    break
-                }
-                arg == "-I" -> {
-                    if (i + 1 < args.size) {
-                        replaceStr = args[++i]
-                    }
-                }
-                arg.startsWith("-I") && arg.length > 2 -> {
-                    replaceStr = arg.substring(2)
-                }
-                arg == "-n" -> {
-                    if (i + 1 < args.size) {
-                        maxArgs = args[++i].toIntOrNull()
-                    }
-                }
-                arg.startsWith("-n") && arg.length > 2 -> {
-                    maxArgs = arg.substring(2).toIntOrNull()
-                }
-                arg == "-t" -> {
-                    verbose = true
-                }
-                else -> {
-                    commandTokens.add(arg)
-                }
-            }
-            i++
-        }
+        val commandTokens = ast.rawPositionalValues
 
         // 默认目标命令为 echo
         val targetCommandName = commandTokens.firstOrNull() ?: "echo"
@@ -105,7 +76,9 @@ class XargsCommand(
                         emitText("+ $targetCommandName ${substitutedArgs.joinToString(" ")}")
                     }
 
-                    val resultFlow = targetCommandDef.execute(ctx, substitutedArgs, emptyFlow())
+                    val subTokens = substitutedArgs.map { Token(it, isQuoted = false) }
+                    val subAst = CommandAstParser.parse(targetCommandName, subTokens, targetCommandDef.valueOptions)
+                    val resultFlow = targetCommandDef.execute(ctx, subAst, emptyFlow())
                     resultFlow.collect { emit(it) }
                 }
             }
@@ -132,7 +105,9 @@ class XargsCommand(
                 if (verbose) {
                     emitText("+ $targetCommandName ${finalArgs.joinToString(" ")}")
                 }
-                val resultFlow = targetCommandDef.execute(ctx, finalArgs, emptyFlow())
+                val batchTokens = finalArgs.map { Token(it, isQuoted = false) }
+                val batchAst = CommandAstParser.parse(targetCommandName, batchTokens, targetCommandDef.valueOptions)
+                val resultFlow = targetCommandDef.execute(ctx, batchAst, emptyFlow())
                 resultFlow.collect { emit(it) }
             }
         }
