@@ -9,7 +9,6 @@ object TerminalPathConstants {
     const val ROOT_CID = "0"
     const val ROOT_NAME = "根目录"
     const val ROOT_DISPLAY_PATH = "/根目录"
-    const val PATH_SEPARATOR = "/"
 
     /**
      * 115 网盘顶级根目录节点标准 PathBean
@@ -57,12 +56,6 @@ data class TerminalPath(
     val isMultiSegment: Boolean
         get() = segments.size > 1
 
-    /**
-     * 是否显式要求为目录（末尾带斜杠、或指向根目录、或指向当前目录）
-     */
-    val isExplicitDirectory: Boolean
-        get() = hasTrailingSlash || isRoot || isCurrentDirectory
-
     companion object {
         /**
          * 解析用户输入的任意路径字符串为结构化 [TerminalPath]
@@ -92,9 +85,10 @@ data class TerminalPath(
             }
 
             val hasTrailing = trimmed.endsWith("/")
-            val isAbs = trimmed.startsWith("/") || trimmed == "~" || trimmed.startsWith("~/") ||
-                    trimmed == TerminalPathConstants.ROOT_NAME ||
-                    trimmed.startsWith("${TerminalPathConstants.ROOT_NAME}/")
+            val isAbs =
+                trimmed.startsWith("/") || trimmed.startsWith("~/") || trimmed == TerminalPathConstants.ROOT_NAME || trimmed.startsWith(
+                    "${TerminalPathConstants.ROOT_NAME}/"
+                )
 
             var rawSegments = trimmed.split("/").filter { it.isNotEmpty() && it != "." }
             // 如果是绝对路径且首段为 "根目录" 或 "~"，剥离该冗余标识（因为 CID "0" 即代表根目录）
@@ -105,12 +99,16 @@ data class TerminalPath(
                 rawSegments = rawSegments.drop(1)
             }
 
-            val target = rawSegments.lastOrNull() ?: if (isAbs) TerminalPathConstants.ROOT_NAME else ""
+            val target =
+                rawSegments.lastOrNull() ?: if (isAbs) TerminalPathConstants.ROOT_NAME else ""
             val parentSegments = if (rawSegments.size > 1) rawSegments.dropLast(1) else emptyList()
             val parentPathStr = when {
                 parentSegments.isEmpty() && isAbs -> TerminalPathConstants.ROOT_DISPLAY_PATH
                 parentSegments.isEmpty() -> ""
-                isAbs -> TerminalPathConstants.ROOT_DISPLAY_PATH + "/" + parentSegments.joinToString("/")
+                isAbs -> TerminalPathConstants.ROOT_DISPLAY_PATH + "/" + parentSegments.joinToString(
+                    "/"
+                )
+
                 else -> parentSegments.joinToString("/")
             }
 
@@ -136,17 +134,6 @@ data class TerminalPath(
                 Pair("", input)
             }
         }
-
-        /**
-         * 规范化显示路径字符串（保证以 '/' 开头且根目录呈现为 "/根目录"）
-         */
-        fun normalizeDisplayPath(path: String): String {
-            val trimmed = path.trim()
-            if (trimmed.isEmpty() || trimmed == "/" || trimmed == "~") {
-                return TerminalPathConstants.ROOT_DISPLAY_PATH
-            }
-            return if (trimmed.startsWith("/")) trimmed else "/$trimmed"
-        }
     }
 }
 
@@ -159,17 +146,6 @@ fun List<PathBean>.toDisplayPath(): String {
     val names = map { it.name }.filter { it.isNotEmpty() }
     if (names.isEmpty()) return "/"
     return "/" + names.joinToString("/")
-}
-
-/**
- * 确保路径链表至少包含顶级根目录节点
- */
-fun List<PathBean>.ensureRoot(): List<PathBean> {
-    if (isEmpty()) return listOf(TerminalPathConstants.ROOT_PATH_BEAN)
-    if (first().cid != TerminalPathConstants.ROOT_CID) {
-        return listOf(TerminalPathConstants.ROOT_PATH_BEAN) + this
-    }
-    return this
 }
 
 /**
