@@ -28,6 +28,7 @@ class TerminalViewModelTest {
 
     @Before
     fun setup() {
+        java.io.File(System.getProperty("java.io.tmpdir"), "terminal_history.txt").delete()
         Dispatchers.setMain(testDispatcher)
         val avatar = AvatarBean(
             face = "",
@@ -411,5 +412,36 @@ class TerminalViewModelTest {
         assertTrue(completions.isUniqueMatch)
         assertEquals(1, completions.candidates.size)
         assertEquals("document_in_trash.pdf", completions.candidates.first().name)
+    }
+
+    @Test
+    fun testHistoryPointerResetOnCtrlCAndResetSession() {
+        viewModel.historyNavigator.clear()
+        viewModel.historyNavigator.add("help")
+        viewModel.historyNavigator.add("pwd")
+
+        // 向上漫游一次（此时应显示 pwd）
+        viewModel.navigateHistoryUp()
+        assertEquals("pwd", viewModel.inputState.text)
+
+        // 再次向上漫游（显示 help）
+        viewModel.navigateHistoryUp()
+        assertEquals("help", viewModel.inputState.text)
+
+        // 执行 Ctrl+C 取消行，历史指针应被重置
+        viewModel.handleCtrlC()
+        assertEquals("", viewModel.inputState.text)
+
+        // 重新按向上漫游，应该重新从最后一条命令 "pwd" 开始，而非留在 "help"
+        viewModel.navigateHistoryUp()
+        assertEquals("pwd", viewModel.inputState.text)
+
+        // 测试 resetSession 后漫游指针重置
+        viewModel.navigateHistoryUp()
+        assertEquals("help", viewModel.inputState.text)
+        viewModel.resetSession()
+        assertEquals("", viewModel.inputState.text)
+        viewModel.navigateHistoryUp()
+        assertEquals("pwd", viewModel.inputState.text)
     }
 }

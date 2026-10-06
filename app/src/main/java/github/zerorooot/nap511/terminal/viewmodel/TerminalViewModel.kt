@@ -1,10 +1,9 @@
 package github.zerorooot.nap511.terminal.viewmodel
 
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
@@ -12,7 +11,6 @@ import androidx.lifecycle.viewModelScope
 import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.PathBean
-import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.terminal.commands.CommandRegistryFactory
 import github.zerorooot.nap511.terminal.context.TerminalContext
@@ -21,20 +19,28 @@ import github.zerorooot.nap511.terminal.engine.CompletionCandidate
 import github.zerorooot.nap511.terminal.engine.CompletionContextType
 import github.zerorooot.nap511.terminal.engine.CompletionEngine
 import github.zerorooot.nap511.terminal.engine.CompletionResult
-import github.zerorooot.nap511.terminal.engine.ParsedContext
 import github.zerorooot.nap511.terminal.engine.PipelineEngine
-import github.zerorooot.nap511.terminal.engine.TerminalControlTokens
 import github.zerorooot.nap511.terminal.engine.TerminalHistoryManager
 import github.zerorooot.nap511.terminal.engine.TerminalLineEditor
 import github.zerorooot.nap511.util.FileOpener
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * 终端核心 ViewModel (TerminalViewModel)
+ *
+ * 采用外观模式 (Facade Pattern) 与组件化委托设计：
+ * 将原本单一庞大的终端逻辑分解为高内聚、低耦合的专业子组件：
+ * 1. [screenBuffer] ([TerminalScreenBuffer])：管理展示行缓冲区与回滚上限截断。
+ * 2. [modifiers] ([TerminalKeyModifiers])：管理 Termux 风格粘滞修饰键 (Ctrl / Alt) 状态机与按键分发。
+ * 3. [historyNavigator] ([TerminalHistoryNavigator])：管理命令历史栈漫游与输入草稿暂存。
+ * 4. [completionCoordinator] ([TerminalCompletionCoordinator])：管理补全候选栏状态与候选轮询/级联。
+ * 5. [commandExecutor] ([TerminalCommandExecutor])：管理管道命令协程执行、微批次刷屏与确认挂起。
+ *
+ * 本 ViewModel 负责统筹以上子组件，对外保持 100% 的公开 API 与 Compose 状态观察兼容。
+ */
 class TerminalViewModel(
     initialCid: String = "0",
     initialPath: String = "/",
@@ -47,6 +53,17 @@ class TerminalViewModel(
 ) : ViewModel() {
     private val uiDispatcher: CoroutineDispatcher
         get() = mainDispatcher ?: runCatching { Dispatchers.Main }.getOrDefault(Dispatchers.Default)
+
+    // --- 独立高内聚子组件装配 ---
+    val screenBuffer = TerminalScreenBuffer(TerminalScreenBuffer.DEFAULT_MAX_SCROLLBACK_LINES)
+    val modifiers = TerminalKeyModifiers()
+    val historyNavigator = TerminalHistoryNavigator()
+    val completionCoordinator = TerminalCompletionCoordinator()
+
+    /**
+     * 响应式终端屏幕输出行列表，供 Compose 直接观察，保持向下兼容
+     */
+    val lines: SnapshotStateList<TerminalLine> = screenBuffer.lines
 
     var avatarBean by mutableStateOf(avatarBean)
     var fileOpener: FileOpener? by mutableStateOf(fileOpener)
@@ -66,7 +83,7 @@ class TerminalViewModel(
             currentCid = cid
             currentPath = if (path.startsWith("/")) path else "/$path"
             context.updateDirectory(cid, path, pathList)
-            lines.clear()
+            screenBuffer.clear()
             printWelcomeBanner()
             refreshCachedEntries(cid)
         }
@@ -74,43 +91,24 @@ class TerminalViewModel(
 
     fun resetSession() {
         isSessionInitialized = false
-        lines.clear()
+        screenBuffer.clear()
         inputState = TextFieldValue("")
         ghostText = ""
         lastSubmittedText = ""
         resetModifiers()
         dismissCompletionBar()
+        historyNavigator.resetPointer()
     }
-
-    val lines = mutableStateListOf<TerminalLine>()
-    private val history = mutableListOf<String>()
-    private var historyPointer = -1
-    private var savedDraftInput = ""
 
     var onExitAction: (() -> Unit)? = null
-    private var currentExecutionJob: Job? = null
 
     // Termux 风格粘滞修饰键状态 (CTRL / ALT)
-    var isCtrlActive by mutableStateOf(false)
-        private set
+    val isCtrlActive: Boolean get() = modifiers.isCtrlActive
+    val isAltActive: Boolean get() = modifiers.isAltActive
 
-    var isAltActive by mutableStateOf(false)
-        private set
-
-    fun toggleCtrl() {
-        isCtrlActive = !isCtrlActive
-        if (isCtrlActive) isAltActive = false
-    }
-
-    fun toggleAlt() {
-        isAltActive = !isAltActive
-        if (isAltActive) isCtrlActive = false
-    }
-
-    fun resetModifiers() {
-        isCtrlActive = false
-        isAltActive = false
-    }
+    fun toggleCtrl() = modifiers.toggleCtrl()
+    fun toggleAlt() = modifiers.toggleAlt()
+    fun resetModifiers() = modifiers.reset()
 
     var inputState by mutableStateOf(TextFieldValue(""))
         private set
@@ -120,8 +118,7 @@ class TerminalViewModel(
     var ghostText by mutableStateOf("")
         private set
 
-    var isExecuting by mutableStateOf(false)
-        private set
+    val isExecuting: Boolean get() = commandExecutor.isExecuting
 
     var currentPath by mutableStateOf(if (initialPath.startsWith("/")) initialPath else "/$initialPath")
         private set
@@ -129,22 +126,12 @@ class TerminalViewModel(
     var currentCid by mutableStateOf(initialCid)
         private set
 
-    var isWaitingConfirmation by mutableStateOf(false)
-        private set
-
-    private var confirmDeferred: CompletableDeferred<Boolean>? = null
+    val isWaitingConfirmation: Boolean get() = commandExecutor.isWaitingConfirmation
 
     // 自动补全候选条状态
-    val completionCandidates = mutableStateListOf<CompletionCandidate>()
-
-    var isCompletionBarVisible by mutableStateOf(false)
-        private set
-
-    var activeCandidateIndex by mutableIntStateOf(-1)
-        private set
-
-    private var baseInputText = ""
-    private var baseParsedContext: ParsedContext? = null
+    val completionCandidates: SnapshotStateList<CompletionCandidate> = completionCoordinator.candidates
+    val isCompletionBarVisible: Boolean get() = completionCoordinator.isVisible
+    val activeCandidateIndex: Int get() = completionCoordinator.activeIndex
 
     // 缓存当前目录下的文件名，用于快速预测补全
     private val cachedDirectoryEntries = mutableListOf<String>()
@@ -155,11 +142,7 @@ class TerminalViewModel(
         initialPathList = initialPathList,
         fileRepository = fileRepository,
         onConfirmRequest = { prompt ->
-            isWaitingConfirmation = true
-            appendTerminalLine(TerminalLine(prompt, TerminalLineType.System.PROMPT))
-            val deferred = CompletableDeferred<Boolean>()
-            confirmDeferred = deferred
-            deferred.await()
+            commandExecutor.requestConfirmation(prompt)
         },
         onDirectoryChanged = { cid, path ->
             currentCid = cid
@@ -173,11 +156,16 @@ class TerminalViewModel(
     private val registry = CommandRegistryFactory.createDefaultRegistry(
         historyManager = historyManager,
         onClearMemoryHistory = {
-            history.clear()
-            historyPointer = -1
+            historyNavigator.clear()
         }
     )
     private val engine = PipelineEngine(registry)
+
+    private val commandExecutor = TerminalCommandExecutor(
+        engine = engine,
+        screenBuffer = screenBuffer,
+        uiDispatcher = uiDispatcher
+    )
 
     init {
         // 打印终端欢迎信息与快捷指引
@@ -190,9 +178,7 @@ class TerminalViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             val loaded = historyManager.loadRecentHistory(1000)
             withContext(uiDispatcher) {
-                history.clear()
-                history.addAll(loaded)
-                historyPointer = -1
+                historyNavigator.load(loaded)
                 updateGhostText(inputState.text, inputState.selection.end)
             }
         }
@@ -203,36 +189,21 @@ class TerminalViewModel(
          * 终端屏幕输出最大保留行数上限 (Scrollback Limit)
          * 避免长时间运行或海量输出导致内存暴涨与掉帧
          */
-        const val MAX_SCROLLBACK_LINES = 2000
+        const val MAX_SCROLLBACK_LINES = TerminalScreenBuffer.DEFAULT_MAX_SCROLLBACK_LINES
     }
 
     /**
      * 安全向终端输出追加单行，带最大回滚行数截断保护，防止长期运行导致内存膨胀
      */
     fun appendTerminalLine(line: TerminalLine) {
-        if (lines.size >= MAX_SCROLLBACK_LINES) {
-            val removeCount = (lines.size - MAX_SCROLLBACK_LINES + 1).coerceAtLeast(1)
-            lines.subList(0, removeCount.coerceAtMost(lines.size)).clear()
-        }
-        lines.add(line)
+        screenBuffer.appendLine(line)
     }
 
     /**
      * 批量追加终端输出，降低 Compose 重组频率，保证海量输出流畅度
      */
     fun appendTerminalLines(newLines: List<TerminalLine>) {
-        if (newLines.isEmpty()) return
-        val effectiveNewLines = if (newLines.size > MAX_SCROLLBACK_LINES) {
-            newLines.takeLast(MAX_SCROLLBACK_LINES)
-        } else {
-            newLines
-        }
-        val total = lines.size + effectiveNewLines.size
-        if (total > MAX_SCROLLBACK_LINES) {
-            val removeCount = (total - MAX_SCROLLBACK_LINES).coerceAtLeast(1)
-            lines.subList(0, removeCount.coerceAtMost(lines.size)).clear()
-        }
-        lines.addAll(effectiveNewLines)
+        screenBuffer.appendLines(newLines)
     }
 
     private fun printWelcomeBanner() {
@@ -276,10 +247,33 @@ class TerminalViewModel(
             val entries = runCatching {
                 context.listDirectory(cid).map { it.name }
             }.getOrDefault(emptyList())
-            cachedDirectoryEntries.clear()
-            cachedDirectoryEntries.addAll(entries)
-            updateGhostText(inputState.text, inputState.selection.end)
+            synchronized(cachedDirectoryEntries) {
+                cachedDirectoryEntries.clear()
+                cachedDirectoryEntries.addAll(entries)
+            }
+            withContext(uiDispatcher) {
+                updateGhostText(inputState.text, inputState.selection.end)
+            }
         }
+    }
+
+    /**
+     * 修饰键动作委托派发契约实现
+     */
+    private val modifierActionHandler = object : TerminalModifierActionHandler {
+        override fun onCtrlC() = handleCtrlC()
+        override fun onCtrlU() = handleCtrlU()
+        override fun onCtrlK() = handleCtrlK()
+        override fun onCtrlW() = handleCtrlW()
+        override fun onCtrlL() = handleCtrlL()
+        override fun onCtrlA() = handleCtrlA()
+        override fun onCtrlE() = handleCtrlE()
+        override fun onCtrlD() = handleCtrlD(onExitAction ?: {})
+        override fun onAltB() = handleAltB()
+        override fun onAltF() = handleAltF()
+        override fun onAltD() = handleAltD()
+        override fun onAltBackspace() = handleAltBackspace()
+        override fun onAltDot() = handleAltDot()
     }
 
     fun onInputChange(newValue: TextFieldValue) {
@@ -302,15 +296,15 @@ class TerminalViewModel(
             if (newText.length == oldText.length + 1) {
                 val typedChar = TerminalLineEditor.findSingleInsertedChar(oldText, newText)
                 if (typedChar != null) {
-                    val handled = handleModifierChar(typedChar)
+                    val handled = modifiers.dispatchChar(typedChar, modifierActionHandler)
                     if (handled) return
                 }
             }
 
             // 2. 软键盘退格删除（Alt + Backspace 组合场景）
             if (isAltActive && newText.length < oldText.length) {
-                handleAltBackspace()
-                return
+                val handled = modifiers.dispatchBackspace { handleAltBackspace() }
+                if (handled) return
             }
 
             // 如果未能匹配对应快捷键，重置修饰键并按常规输入处理
@@ -325,53 +319,18 @@ class TerminalViewModel(
         updateGhostText(newValue.text, newValue.selection.end)
     }
 
-    /**
-     * 软键盘修饰键字符分发处理
-     */
-    private fun handleModifierChar(char: Char): Boolean {
-        if (isCtrlActive) {
-            when (char.lowercaseChar()) {
-                'c' -> handleCtrlC()
-                'u' -> handleCtrlU()
-                'k' -> handleCtrlK()
-                'w' -> handleCtrlW()
-                'l' -> handleCtrlL()
-                'a' -> handleCtrlA()
-                'e' -> handleCtrlE()
-                'd' -> handleCtrlD(onExitAction ?: {})
-                else -> {
-                    resetModifiers()
-                    return false
-                }
-            }
-            return true
-        } else if (isAltActive) {
-            when {
-                char.equals('b', ignoreCase = true) -> handleAltB()
-                char.equals('f', ignoreCase = true) -> handleAltF()
-                char.equals('d', ignoreCase = true) -> handleAltD()
-                char == '.' -> handleAltDot()
-                else -> {
-                    resetModifiers()
-                    return false
-                }
-            }
-            return true
-        }
-        return false
-    }
-
     private fun updateGhostText(text: String, cursor: Int) {
         if (isWaitingConfirmation) {
             ghostText = ""
             return
         }
+        val currentEntries = synchronized(cachedDirectoryEntries) { cachedDirectoryEntries.toList() }
         ghostText = AutosuggestionEngine.calculateGhostText(
             input = text,
             cursorPosition = cursor,
             registeredCommands = registry.commands.keys.toList(),
-            directoryEntries = cachedDirectoryEntries,
-            history = history
+            directoryEntries = currentEntries,
+            history = historyNavigator.memoryHistory
         )
     }
 
@@ -410,28 +369,17 @@ class TerminalViewModel(
      * 关闭并重置自动补全候选栏
      */
     fun dismissCompletionBar() {
-        isCompletionBarVisible = false
-        completionCandidates.clear()
-        activeCandidateIndex = -1
-        baseInputText = ""
-        baseParsedContext = null
+        completionCoordinator.dismiss()
     }
 
     /**
      * 选中并应用自动补全候选项
      */
     fun selectCandidate(candidate: CompletionCandidate) {
-        val targetParsed = baseParsedContext ?: CompletionEngine.parseContext(
-            inputState.text,
-            inputState.selection.end
-        )
-        val targetOriginalText = baseInputText.ifEmpty { inputState.text }
-
-        val (newText, newCursor) = CompletionEngine.applyCandidate(
-            originalText = targetOriginalText,
-            parsedContext = targetParsed,
-            candidateToInsert = candidate.name,
-            isDirectory = candidate.isDirectory
+        val (newText, newCursor) = completionCoordinator.applySelected(
+            candidate = candidate,
+            currentText = inputState.text,
+            cursor = inputState.selection.end
         )
         inputState = TextFieldValue(newText, selection = TextRange(newCursor))
         ghostText = ""
@@ -440,14 +388,10 @@ class TerminalViewModel(
         if (candidate.isDirectory) {
             // 目录补全：级联加载下一级子目录候选项
             viewModelScope.launch(uiDispatcher) {
-                baseInputText = newText
-                baseParsedContext = CompletionEngine.parseContext(newText, newCursor)
+                completionCoordinator.setCascadeAnchor(newText, newCursor)
                 val nextResult = computeCompletions()
                 if (nextResult.candidates.isNotEmpty()) {
-                    completionCandidates.clear()
-                    completionCandidates.addAll(nextResult.candidates)
-                    activeCandidateIndex = -1
-                    isCompletionBarVisible = true
+                    completionCoordinator.updateCandidates(nextResult.candidates)
                 } else {
                     dismissCompletionBar()
                 }
@@ -461,24 +405,12 @@ class TerminalViewModel(
      * 在已打开的候选项列表中按顺序轮转切换焦点
      */
     private fun cycleCandidates() {
-        if (completionCandidates.isEmpty()) return
-        activeCandidateIndex = (activeCandidateIndex + 1) % completionCandidates.size
-        val candidate = completionCandidates[activeCandidateIndex]
-
-        val targetParsed = baseParsedContext ?: CompletionEngine.parseContext(
-            inputState.text,
-            inputState.selection.end
-        )
-        val targetOriginalText = baseInputText.ifEmpty { inputState.text }
-
-        val (newText, newCursor) = CompletionEngine.applyCandidate(
-            originalText = targetOriginalText,
-            parsedContext = targetParsed,
-            candidateToInsert = candidate.name,
-            isDirectory = candidate.isDirectory
-        )
-        inputState = TextFieldValue(newText, selection = TextRange(newCursor))
-        ghostText = ""
+        val cycled = completionCoordinator.cycle(inputState.text, inputState.selection.end)
+        if (cycled != null) {
+            val (newText, newCursor) = cycled
+            inputState = TextFieldValue(newText, selection = TextRange(newCursor))
+            ghostText = ""
+        }
     }
 
     /**
@@ -547,13 +479,7 @@ class TerminalViewModel(
                 }
 
                 // B. 单击 Tab 直接展开候选栏（Chips Bar）供点选或继续 Tab 轮询
-                baseInputText = inputState.text
-                baseParsedContext =
-                    CompletionEngine.parseContext(inputState.text, inputState.selection.end)
-                completionCandidates.clear()
-                completionCandidates.addAll(result.candidates)
-                activeCandidateIndex = -1
-                isCompletionBarVisible = true
+                completionCoordinator.show(result.candidates, inputState.text, inputState.selection.end)
             }
         }
     }
@@ -615,12 +541,7 @@ class TerminalViewModel(
         dismissCompletionBar()
 
         if (isWaitingConfirmation) {
-            appendTerminalLine(TerminalLine(raw, TerminalLineType.System.COMMAND))
-            val isConfirmed =
-                raw.equals("yes", ignoreCase = true) || raw.equals("y", ignoreCase = true)
-            isWaitingConfirmation = false
-            confirmDeferred?.complete(isConfirmed)
-            confirmDeferred = null
+            commandExecutor.resolveConfirmation(raw)
             return
         }
 
@@ -630,6 +551,7 @@ class TerminalViewModel(
         }
 
         if (raw.isEmpty()) {
+            historyNavigator.resetPointer()
             appendTerminalLine(TerminalLine(promptText(), TerminalLineType.System.COMMAND))
             return
         }
@@ -640,84 +562,29 @@ class TerminalViewModel(
         }
 
         if (isCommandValid) {
-            if (history.lastOrNull() != raw) {
-                history.add(raw)
-            }
-            historyPointer = -1
+            historyNavigator.add(raw)
             viewModelScope.launch(Dispatchers.IO) {
                 historyManager.appendCommand(raw)
             }
+        } else {
+            historyNavigator.resetPointer()
         }
 
         // 统一双行格式入屏：第 1 行完整路径上下文，第 2 行提示符与用户命令
         appendTerminalLine(TerminalLine("${contextPromptText()}\n$ $raw", TerminalLineType.System.COMMAND))
 
-        isExecuting = true
-        currentExecutionJob = viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val flow = engine.execute(raw, context)
-                // 采用微批次聚合输出机制（缓冲区满 50 行或间隔 32ms 即刷屏），保障大量输出时的高帧率渲染
-                val buffer = mutableListOf<TerminalLine>()
-                var lastFlushTime = System.currentTimeMillis()
-
-                // 【关键机制 - 请勿移除 withContext(Dispatchers.Main)】：
-                // 必须在主线程调度更新 Compose 的 SnapshotStateList（lines）。
-                // 若在 Dispatchers.IO 后台线程直接修改 lines，会与 Compose 主线程测量/布局发生并发状态竞争，
-                // 导致 LazyColumn 内部 itemProvider 数量出现帧不同步并抛出 IndexOutOfBoundsException 崩溃。
-                suspend fun flushBuffer() {
-                    if (buffer.isNotEmpty()) {
-                        val toAdd = buffer.toList()
-                        buffer.clear()
-                        withContext(uiDispatcher) {
-                            appendTerminalLines(toAdd)
-                        }
-                    }
-                }
-
-                flow.collect { output ->
-                    if (output.text == TerminalControlTokens.CLEAR_SCREEN) {
-                        flushBuffer()
-                        withContext(uiDispatcher) {
-                            lines.clear()
-                        }
-                    } else if (output.text == TerminalControlTokens.EXIT) {
-                        flushBuffer()
-                        withContext(uiDispatcher) {
-                            resetSession()
-                            onExitAction?.invoke()
-                        }
-                    } else {
-                        // 兼容处理可能包含换行符的输出，拆分为独立行并继承源头赋予的语义类型
-                        if (output.text.contains('\n')) {
-                            for (subLine in output.text.split('\n')) {
-                                buffer.add(TerminalLine(subLine, output.type))
-                            }
-                        } else {
-                            buffer.add(TerminalLine(output.text, output.type))
-                        }
-
-                        val now = System.currentTimeMillis()
-                        if (buffer.size >= 50 || now - lastFlushTime >= 32) {
-                            flushBuffer()
-                            lastFlushTime = now
-                        }
-                    }
-                }
-                flushBuffer()
-            } catch (e: CancellationException) {
-                // 协程被 Ctrl+C 中断正常退出，不作为异常打印
-            } catch (e: Exception) {
-                withContext(uiDispatcher) {
-                    appendTerminalLine(TerminalLine("execution error: ${e.message}", TerminalLineType.System.ERROR))
-                }
-            } finally {
-                withContext(uiDispatcher) {
-                    isExecuting = false
-                    currentExecutionJob = null
-                }
+        commandExecutor.execute(
+            scope = viewModelScope,
+            command = raw,
+            context = context,
+            onExit = {
+                resetSession()
+                onExitAction?.invoke()
+            },
+            onComplete = {
                 refreshCachedEntries(currentCid)
             }
-        }
+        )
     }
 
     // --- Readline / Linux 风格快捷键处理 ---
@@ -730,11 +597,9 @@ class TerminalViewModel(
     fun handleCtrlC() {
         resetModifiers()
         dismissCompletionBar()
+        historyNavigator.resetPointer()
         lastSubmittedText = ""
-        if (isExecuting) {
-            currentExecutionJob?.cancel()
-            currentExecutionJob = null
-            isExecuting = false
+        if (commandExecutor.cancelExecution()) {
             appendTerminalLine(TerminalLine("^C", TerminalLineType.Output.TEXT))
         } else {
             val raw = inputState.text
@@ -881,7 +746,7 @@ class TerminalViewModel(
      */
     fun handleAltDot() {
         resetModifiers()
-        val lastCmd = history.lastOrNull()
+        val lastCmd = historyNavigator.lastCommand
         val lastArg = TerminalLineEditor.extractLastArgument(lastCmd)
         if (!lastArg.isNullOrEmpty()) {
             inputState = TerminalLineEditor.insertTextAtCursor(inputState, lastArg)
@@ -891,30 +756,19 @@ class TerminalViewModel(
 
     // 历史命令漫游 (↑ / ↓)
     fun navigateHistoryUp() {
-        if (history.isEmpty()) return
-        if (historyPointer == -1) {
-            savedDraftInput = inputState.text
-            historyPointer = history.size - 1
-        } else if (historyPointer > 0) {
-            historyPointer--
+        val target = historyNavigator.navigateUp(inputState.text)
+        if (target != null) {
+            inputState = TextFieldValue(target, selection = TextRange(target.length))
+            ghostText = ""
         }
-        val target = history[historyPointer]
-        inputState = TextFieldValue(target, selection = TextRange(target.length))
-        ghostText = ""
     }
 
     fun navigateHistoryDown() {
-        if (historyPointer == -1) return
-        if (historyPointer < history.size - 1) {
-            historyPointer++
-            val target = history[historyPointer]
+        val target = historyNavigator.navigateDown()
+        if (target != null) {
             inputState = TextFieldValue(target, selection = TextRange(target.length))
-        } else {
-            historyPointer = -1
-            inputState =
-                TextFieldValue(savedDraftInput, selection = TextRange(savedDraftInput.length))
+            ghostText = ""
         }
-        ghostText = ""
     }
 
     // 悬浮工具栏按键动作
@@ -963,10 +817,10 @@ class TerminalViewModel(
 
     fun clearScreen() {
         dismissCompletionBar()
-        lines.clear()
+        screenBuffer.clear()
     }
 
     fun getAllTerminalText(): String {
-        return lines.joinToString("\n") { it.text }
+        return screenBuffer.getAllText()
     }
 }
