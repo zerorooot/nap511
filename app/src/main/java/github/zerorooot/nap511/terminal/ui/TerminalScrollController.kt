@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 终端列表滚动与边界安全纯算法辅助类
@@ -63,9 +64,11 @@ object TerminalScrollSafetyHelper {
  *
  * 集中管理终端界面的所有滚动、软键盘呼起及吸底跟随行为，彻底收拢 TerminalScreen 中的状态机逻辑：
  * 1. 【关键机制 3 - safeScrollToBottom 防越界】：结合 totalItemsCount 边界收敛并捕获并发帧异步异常；
- * 2. 【关键机制 4 - 双保险键盘弹出吸底】：软键盘高度变化时由 imeBottom 状态响应式驱动吸底；
- * 3. 【关键机制 4B - autoScrollToBottom 跟随输出模式】：用户上滑翻看历史暂停吸底，滑回底部或提交输入自动恢复；
- * 4. 【关键机制 4C - 每次进入终端页面始终吸底并弹出键盘】：基于响应式焦点令牌 (focusTrigger)，零 delay 延时。
+ * 2. 【关键机制 3B - 布局后单点吸底防滞后】：由 snapshotFlow 布局完成帧统一驱动，消除并发协程抢占与上一帧滞后；
+ * 3. 【关键机制 3C - 命令执行结束终态稳态收敛】：命令退出时延时 16ms 稳妥对齐末行与输入框；
+ * 4. 【关键机制 4 - 双保险键盘弹出吸底】：软键盘高度变化时由 imeBottom 状态响应式驱动吸底；
+ * 5. 【关键机制 4B - autoScrollToBottom 跟随输出模式】：用户上滑翻看历史暂停吸底，滑回底部或提交输入自动恢复；
+ * 6. 【关键机制 4C - 每次进入终端页面始终吸底并弹出键盘】：基于响应式焦点令牌 (focusTrigger)，零 delay 延时。
  */
 @Stable
 class TerminalScrollController(
@@ -182,7 +185,6 @@ class TerminalScrollController(
 @Composable
 fun rememberTerminalScrollController(
     listState: LazyListState = rememberLazyListState(),
-    linesCount: Int,
     isExecuting: Boolean,
     imeBottom: Dp = 0.dp,
     isInputFocused: Boolean,
@@ -244,21 +246,40 @@ fun rememberTerminalScrollController(
         }
     }
 
-    // 4. 【智能防打扰滚动】：新条目增加或执行状态变化时，若处于跟随模式则吸底
-    LaunchedEffect(linesCount, isExecuting) {
-        if (controller.autoScrollToBottom) {
-            controller.safeScrollToBottom()
-        }
-    }
-
-    // 5. 当列表测量布局完成、条目总数增加时，如果处于吸底跟随模式，确保滚动到最新添加的末尾项
+    // 4. 【关键机制 3B - 布局后单点吸底，严格防御 IndexOutOfBoundsException 并彻底解决海量输出吸底滞后】：
+    // 【改动背景与原因】：
+    // 此前在此处同时开启了 LaunchedEffect(linesCount, isExecuting) 与 snapshotFlow 两路并发协程调用 safeScrollToBottom()。
+    // 在 find 等密集高速流式输出场景下，产生了两大严重弊端：
+    //   1) 帧异步滞后：LaunchedEffect(linesCount) 在数据源更新瞬间立即触发，但此时 Compose 主线程尚未
+    //      完成该批次新条目的测量布局（Layout Pass），layoutInfo.totalItemsCount 仍是上一帧的旧数量，
+    //      导致 safeScrollToBottom() 每次都滚向了上一个批次的旧末尾，页面在视觉上永远落后 50~100 行；
+    //   2) 协程互斥抢占：双路协程高频争抢 LazyListState 内部的 scrollMutex，后一个滚动请求强行 Cancel 前一个，
+    //      导致滚动频繁被打断并停滞在半路；
+    //   3) 为什么不能直接将未测量的 linesCount 强传给 scrollToItem：若在未测量完成前直接强传数据源的 linesCount 尝试滚动，
+    //      由于 LazyColumn 内部 itemProvider 此时尚未扩展，LazyListState 会在底层抛出 IndexOutOfBoundsException
+    //      致命崩溃！因此【关键机制 3】的边界收敛防御绝对不可破坏！
+    // 【经过与经过验证的解决方案】：
+    // 废弃未测量时 LaunchedEffect(linesCount) 的盲目早滚，统一由 snapshotFlow { listState.layoutInfo.totalItemsCount }
+    // 在 Compose 真正完成包含新条目的测量布局（Layout Pass）的瞬间单点驱动吸底！
+    // 此时目标索引已在 itemProvider 中 100% 合法且已就绪，既绝对不会抛出 IndexOutOfBoundsException，
+    // 又彻底保证每次滚动都能精准直达当前真实的最新最底行！
     LaunchedEffect(listState) {
         snapshotFlow { listState.layoutInfo.totalItemsCount }
-            .collect {
-                if (controller.autoScrollToBottom) {
+            .collect { total ->
+                if (controller.autoScrollToBottom && total > 0) {
                     controller.safeScrollToBottom()
                 }
             }
+    }
+
+    // 5. 【关键机制 3C - 命令执行结束终态稳态收敛 (Settling Barrier)】：
+    // 当 find 等耗时命令执行完成（isExecuting 从 true 变为 false）时，最后一批输出可能刚好伴随命令结束被 flush，
+    // 此时挂起等待下一帧（16ms）测量完全收敛，进行终态稳态吸底，确保输入框与末行稳定对齐在屏幕最底部。
+    LaunchedEffect(isExecuting) {
+        if (!isExecuting && controller.autoScrollToBottom) {
+            kotlinx.coroutines.delay(16.milliseconds)
+            controller.safeScrollToBottom()
+        }
     }
 
     // 6. 【关键机制 4C - 每次进入终端页面始终吸底并弹出键盘】：

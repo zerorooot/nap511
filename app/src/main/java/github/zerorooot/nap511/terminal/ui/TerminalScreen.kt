@@ -143,7 +143,6 @@ fun TerminalScreen(
     // 统一吸底与滚动控制器【托管关键机制 3, 4, 4B, 4C】
     val scrollController = rememberTerminalScrollController(
         listState = listState,
-        linesCount = viewModel.lines.size,
         isExecuting = viewModel.isExecuting,
         imeBottom = imeBottom,
         isInputFocused = isInputFocused,

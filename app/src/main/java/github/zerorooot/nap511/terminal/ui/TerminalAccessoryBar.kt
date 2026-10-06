@@ -103,7 +103,7 @@ object TerminalAccessoryDefaults {
     ): List<List<AccessoryKeyItem>> {
         val row1 = listOf(
             AccessoryKeyItem(label = "↹", onClick = actions.onTab),
-            AccessoryKeyItem(label = "CTRL", onClick = actions.onCtrlToggle, isAccent = true, isActive = isCtrlActive),
+            AccessoryKeyItem(label = "|", onClick = actions.onPipe),
             AccessoryKeyItem(label = "/", onClick = actions.onSlash),
             AccessoryKeyItem(label = "-", onClick = actions.onDash),
             AccessoryKeyItem(label = "HOME", onClick = actions.onHome),
@@ -114,8 +114,8 @@ object TerminalAccessoryDefaults {
 
         val row2 = listOf(
             AccessoryKeyItem(label = "≡", onClick = actions.onMenu, isAccent = true),
+            AccessoryKeyItem(label = "CTRL", onClick = actions.onCtrlToggle, isAccent = true, isActive = isCtrlActive),
             AccessoryKeyItem(label = "ALT", onClick = actions.onAltToggle, isAccent = true, isActive = isAltActive),
-            AccessoryKeyItem(label = "|", onClick = actions.onPipe),
             AccessoryKeyItem(label = "*", onClick = actions.onStar),
             // 左右方向键开启 autoRepeat，支持按住连按持续移动光标
             AccessoryKeyItem(label = "←", onClick = actions.onArrowLeft, autoRepeat = true),

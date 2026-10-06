@@ -215,7 +215,7 @@ class TerminalViewModel(
         appendTerminalLine(TerminalLine("=== 115 Cloud Terminal (nap511) ===", TerminalLineType.System.INFO))
         appendTerminalLine(
             TerminalLine(
-                "欢迎使用网盘极客终端！输入 '?' 或 'help' 可查看命令列表与快捷键指南。",
+                "欢迎使用网盘终端！输入 '?' 'help' 或 'man' 可查看命令列表与快捷键指南。终端尚不稳定，目前还在测试中",
                 TerminalLineType.System.INFO
             )
         )
