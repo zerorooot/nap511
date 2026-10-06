@@ -68,6 +68,53 @@ class CommandUtilsUnitTest {
     }
 
     /**
+     * 测试 CommandArgs 对 "--"（选项结束符）的标准 POSIX 支持
+     */
+    @Test
+    fun testCommandArgsEndOptionsDelimiter() {
+        // 1. 基本 "--" 分隔：之前是选项，之后即使以 "-" 开头也是位置参数
+        val args1 = CommandArgs(listOf("-l", "-a", "--", "-f", "-n", "20", "file.txt"))
+        assertTrue(args1.hasDelimiter)
+        assertEquals(2, args1.delimiterIndex)
+        assertTrue(args1.hasFlag("-l"))
+        assertTrue(args1.hasFlag("-a"))
+        // "--" 之后的 -f 不应被识别为 Flag，-n 不应被识别为 Option
+        assertFalse(args1.hasFlag("-f"))
+        assertFalse(args1.hasAny("-f", "-rf"))
+        assertNull(args1.getOption("-n"))
+        // 选项结束符之后的所有参数均作为位置参数保留，"--" 本身被剔除
+        assertEquals(listOf("-f", "-n", "20", "file.txt"), args1.positionalArgs)
+        assertEquals("-f", args1.firstPositional)
+        assertEquals("-f -n 20 file.txt", args1.joinPositional())
+
+        // 2. "--" 之前包含位置参数，"--" 之后也包含位置参数
+        val args2 = CommandArgs(listOf("src", "--", "-dest"))
+        assertTrue(args2.hasDelimiter)
+        assertEquals(listOf("src", "-dest"), args2.positionalArgs)
+        assertEquals("src", args2.firstPositional)
+
+        // 3. 仅有 "--" 选项结束符
+        val args3 = CommandArgs(listOf("--"))
+        assertTrue(args3.hasDelimiter)
+        assertEquals(0, args3.delimiterIndex)
+        assertTrue(args3.positionalArgs.isEmpty())
+        assertNull(args3.firstPositional)
+
+        // 4. 重复 "--"：第一个作为选项结束符，后续 "--" 作为位置参数
+        val args4 = CommandArgs(listOf("-l", "--", "--", "-a"))
+        assertTrue(args4.hasFlag("-l"))
+        assertFalse(args4.hasFlag("-a"))
+        assertEquals(listOf("--", "-a"), args4.positionalArgs)
+
+        // 5. 不包含 "--" 时的兼容性
+        val args5 = CommandArgs(listOf("-l", "file.txt"))
+        assertFalse(args5.hasDelimiter)
+        assertEquals(-1, args5.delimiterIndex)
+        assertTrue(args5.hasFlag("-l"))
+        assertEquals(listOf("file.txt"), args5.positionalArgs)
+    }
+
+    /**
      * 测试 SizeParser 大小解析器及尺寸匹配
      */
     @Test

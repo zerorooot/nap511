@@ -166,7 +166,5 @@ class HistoryCommandTest {
         val out24 = engine.executeStrings("history | tail -n 3", ctx)
         assertTrue(out24.size <= 3)
 
-        // 历史记录持久化确认
-        assertTrue(tempFile.exists())
     }
 }

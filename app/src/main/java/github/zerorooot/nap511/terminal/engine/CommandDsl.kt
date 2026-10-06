@@ -31,9 +31,11 @@ class CommandDefinition(
     private val executor: suspend (ctx: TerminalContext, args: List<String>, stdin: Flow<String>) -> Flow<TerminalOutput>
 ) {
     suspend fun execute(ctx: TerminalContext, args: List<String>, stdin: Flow<String>): Flow<TerminalOutput> {
-        // 当使用 --help 或 (当命令本身未定义 -h 选项且参数包含 -h) 时自动拦截输出参数说明与用法
+        // 当使用 --help 或 (当命令本身未定义 -h 选项且参数包含 -h) 时自动拦截输出参数说明与用法（需遵守 "--" 选项结束符规范）
+        val delimiterIndex = args.indexOf("--")
+        val optionTokens = if (delimiterIndex >= 0) args.subList(0, delimiterIndex) else args
         val hasHOption = flags.any { it.optionName == "-h" }
-        if (args.contains("--help") || (!hasHOption && args.contains("-h"))) {
+        if (optionTokens.contains("--help") || (!hasHOption && optionTokens.contains("-h"))) {
             return flow {
                 // 源头直接发射带有 TerminalLineType.System.HELP 语义类型的帮助文档行
                 for (subLine in buildHelpMessage().split('\n')) {

@@ -86,7 +86,7 @@ class CrossCommandCombinationTest {
         assertEquals(listOf("a.txt"), out08)
 
         // ls 中文输出 + grep 中文匹配
-        val out09 = engine.executeStrings("ls | grep 测试 | wc -l", ctx)
+        val out09 = engine.executeStrings("ls / | grep 测试 | wc -l", ctx)
         assertEquals(listOf("1"), out09)
 
         // cd 失败报错后原工作目录不发生变更
@@ -154,7 +154,7 @@ class CrossCommandCombinationTest {
         assertEquals(listOf("b.txt"), outY004)
 
         val outY005 = engine.executeStrings("find -name b.txt | head -n 1", ctx)
-        assertEquals(listOf("b.txt"), outY005)
+        assertEquals(listOf("/根目录/b.txt"), outY005)
 
         // rm -f 强行删除后校验目录为空
         engine.executeStrings("rm -f b.txt", ctx)

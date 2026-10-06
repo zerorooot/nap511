@@ -48,6 +48,12 @@ class XargsCommand(
         while (i < args.size) {
             val arg = args[i]
             when {
+                arg == "--" -> {
+                    for (k in (i + 1) until args.size) {
+                        commandTokens.add(args[k])
+                    }
+                    break
+                }
                 arg == "-I" -> {
                     if (i + 1 < args.size) {
                         replaceStr = args[++i]

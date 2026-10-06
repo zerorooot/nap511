@@ -83,10 +83,8 @@ class PipelineEngine(
             currentStdin = flow {
                 stageStdout.collect { output ->
                     if (output.type.isPipeableData) {
-                        for (subLine in output.text.split('\n')) {
-                            if (subLine.isNotEmpty()) {
-                                emit(subLine)
-                            }
+                        for (subLine in output.text.lines()) {
+                            emit(subLine)
                         }
                     }
                 }

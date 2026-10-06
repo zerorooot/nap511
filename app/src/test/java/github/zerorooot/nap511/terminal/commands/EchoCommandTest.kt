@@ -138,11 +138,39 @@ class EchoCommandTest {
 
         // -n 选项不换行输出
         val out28 = engine.executeStrings("echo -n hello", ctx)
-        assertTrue(out28.isNotEmpty())
+        assertEquals(listOf("hello"), out28)
 
-        // -e 选项开启转义序列解析
+        // -n 选项无参数时静默不输出任何内容
+        val out28Empty = engine.executeStrings("echo -n", ctx)
+        assertTrue(out28Empty.isEmpty())
+
+        // -n 选项空字符串时静默
+        val out28EmptyStr = engine.executeStrings("echo -n ''", ctx)
+        assertTrue(out28EmptyStr.isEmpty())
+
+        // -e 选项开启转义序列解析（\n 换行）
         val out29 = engine.executeStrings("echo -e 'a\\nb'", ctx)
-        assertTrue(out29.isNotEmpty())
+        assertEquals(listOf("a\nb"), out29)
+
+        // -e 选项解析 \t 水平制表符
+        val out29Tab = engine.executeStrings("echo -e 'a\\tb'", ctx)
+        assertEquals(listOf("a\tb"), out29Tab)
+
+        // -e 选项解析 \\ 双反斜杠为单个反斜杠
+        val out29Slash = engine.executeStrings("echo -e 'a\\\\b'", ctx)
+        assertEquals(listOf("a\\b"), out29Slash)
+
+        // -e 选项通过 \c 截断后续输出
+        val out29Stop = engine.executeStrings("echo -e 'hello\\cworld'", ctx)
+        assertEquals(listOf("hello"), out29Stop)
+
+        // -n 与 -e 组合选项（-ne / -en）
+        val outCombo = engine.executeStrings("echo -ne 'a\\nb'", ctx)
+        assertEquals(listOf("a\nb"), outCombo)
+
+        // -n 与 -e 分开书写组合
+        val outComboSplit = engine.executeStrings("echo -n -e 'hello'", ctx)
+        assertEquals(listOf("hello"), outComboSplit)
 
         // -- 选项分隔符后输出
         val out30 = engine.executeStrings("echo -- -h", ctx)
@@ -236,5 +264,17 @@ class EchoCommandTest {
         // echo 接 xargs 拼接参数输出
         val out50 = engine.executeStrings("echo 'a b c' | xargs echo", ctx)
         assertEquals(listOf("a b c"), out50)
+
+        // echo -e 多行输出接 wc -l
+        val out51 = engine.executeStrings("echo -e 'line1\\nline2\\nline3' | wc -l", ctx)
+        assertEquals(listOf("3"), out51)
+
+        // echo -e 多行输出接 sort
+        val out52 = engine.executeStrings("echo -e 'c\\na\\nb' | sort", ctx)
+        assertEquals(listOf("a", "b", "c"), out52)
+
+        // echo -n 空输入接 wc -l
+        val out53 = engine.executeStrings("echo -n '' | wc -l", ctx)
+        assertEquals(listOf("0"), out53)
     }
 }

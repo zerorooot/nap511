@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.terminal.commands.system
 
+import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
@@ -37,8 +38,9 @@ class HistoryCommand(
         args: List<String>,
         stdin: Flow<String>
     ): Flow<TerminalOutput> = flow {
+        val cmdArgs = CommandArgs(args)
         // 1. 若携带 -c 参数，执行历史记录清空
-        if (args.contains("-c")) {
+        if (cmdArgs.hasFlag("-c")) {
             historyManager.clearHistory()
             onClearMemoryHistory()
             emitText("terminal: history cleared")
@@ -46,7 +48,7 @@ class HistoryCommand(
         }
 
         // 2. 检查是否指定了数量截取 <N>，例如: history 20
-        val limitArg = args.firstOrNull { it.toIntOrNull() != null }?.toIntOrNull()
+        val limitArg = cmdArgs.positionalArgs.firstOrNull { it.toIntOrNull() != null }?.toIntOrNull()
         val limit = if (limitArg != null && limitArg > 0) limitArg else Int.MAX_VALUE
 
         // 3. 流式发射历史命令记录

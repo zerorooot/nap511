@@ -78,6 +78,15 @@ class FindCommand : TerminalCommand {
         while (i < args.size) {
             val arg = args[i]
             when {
+                arg == "--" -> {
+                    for (k in (i + 1) until args.size) {
+                        if (pathArg == null) {
+                            pathArg = args[k]
+                            break
+                        }
+                    }
+                    break
+                }
                 arg == "-name" && i + 1 < args.size -> namePattern = args[++i]
                 arg == "-type" && i + 1 < args.size -> typeFilter = args[++i]
                 arg == "-suffix" && i + 1 < args.size -> suffixFilter =

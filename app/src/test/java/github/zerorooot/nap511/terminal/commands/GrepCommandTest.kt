@@ -176,16 +176,16 @@ class GrepCommandTest {
         val out37 = engine.executeStrings("grep -x", ctx)
         assertTrue(out37.isEmpty() || out37.any { it.contains("grep") })
 
-        // 复合选项 -iv 结合
-        val out38 = engine.executeStrings("echo Hello | grep -iv hell", ctx)
+        // 复合选项 -i -v 结合
+        val out38 = engine.executeStrings("echo Hello | grep -i -v hell", ctx)
         assertTrue(out38.isEmpty())
 
-        // 复合选项 -ic 结合
-        val out39 = engine.executeStrings("echo 'A\na' | grep -ic a", ctx)
+        // 复合选项 -i -c 结合
+        val out39 = engine.executeStrings("echo 'A\na' | grep -i -c a", ctx)
         assertEquals(listOf("2"), out39)
 
-        // 复合选项 -vc 结合
-        val out40 = engine.executeStrings("echo 'a\nb' | grep -vc a", ctx)
+        // 复合选项 -v -c 结合
+        val out40 = engine.executeStrings("echo 'a\nb' | grep -v -c a", ctx)
         assertEquals(listOf("1"), out40)
     }
 

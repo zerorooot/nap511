@@ -59,6 +59,12 @@ class UnzipCommand : TerminalCommand {
         var idx = 0
         while (idx < args.size) {
             when (val arg = args[idx]) {
+                "--" -> {
+                    for (k in (idx + 1) until args.size) {
+                        fileArgs.add(args[k])
+                    }
+                    break
+                }
                 "-l" -> isList = true
                 "-p" -> {
                     if (idx + 1 < args.size) {

@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.terminal.commands.file
 
 import github.zerorooot.nap511.bean.RenameBean
+import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.context.TerminalPath
@@ -31,7 +32,7 @@ class MvCommand : TerminalCommand {
         args: List<String>,
         stdin: Flow<String>
     ): Flow<TerminalOutput> = flow {
-        val targets = args.filter { !it.startsWith("-") }.toMutableList()
+        val targets = CommandArgs(args).positionalArgs.toMutableList()
 
         // 管道支持：若命令行参数仅提供了 1 个目标目录（例如 find ... | mv ../），且上游管道存在输入，智能从 stdin 获取源列表
         if (targets.size < 2) {
