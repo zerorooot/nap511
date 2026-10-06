@@ -111,7 +111,6 @@ class MvCommand : TerminalCommand {
 
         if (targetDestCid != null) {
             // 移动操作：将所有 sources 移入 targetDestCid 目录
-            val affectedCids = mutableSetOf(ctx.currentCid, targetDestCid)
             for (src in sources) {
                 val resolvedSrc = resolveSourceItem(src)
                 if (resolvedSrc == null) {
@@ -124,8 +123,9 @@ class MvCommand : TerminalCommand {
                     moveMap["fid[0]"] = resolvedSrc.fid
                     val res = ctx.fileRepository.move(moveMap)
                     if (res.state) {
-                        // 同时记录源文件所在的父目录，后续一并失效缓存
-                        resolvedSrc.parentCid?.let { affectedCids.add(it) }
+                        // 就地完成缓存移动：从源父目录移出，并添加到目标目录缓存中
+                        val srcParentCid = resolvedSrc.parentCid ?: ctx.currentCid
+                        ctx.moveCachedFile(srcParentCid = srcParentCid, targetCid = targetDestCid, fid = resolvedSrc.fid)
                         emitText("mv: '$src' -> '$destDisplayName/'")
                     } else {
                         val err =
@@ -135,9 +135,6 @@ class MvCommand : TerminalCommand {
                 } catch (e: Exception) {
                     emitError("mv: 移动 '$src' 失败: ${e.message}")
                 }
-            }
-            for (cid in affectedCids) {
-                ctx.invalidateCache(cid)
             }
         } else if (sources.size == 1) {
             // 单源且目标不是现有目录：执行重命名
@@ -157,8 +154,9 @@ class MvCommand : TerminalCommand {
                 val renameBean = RenameBean(resolvedSrc.fid, newName)
                 val res = ctx.fileRepository.rename(renameBean.toRequestBody())
                 if (res.state) {
-                    ctx.invalidateCache(ctx.currentCid)
-                    resolvedSrc.parentCid?.let { ctx.invalidateCache(it) }
+                    val parentCid = resolvedSrc.parentCid ?: ctx.currentCid
+                    // 就地在父目录缓存中重命名该文件/文件夹（对齐 FileViewModel 的 rename 逻辑）
+                    ctx.renameCachedFile(parentCid = parentCid, fid = resolvedSrc.fid, newName = newName)
                     emitText("mv: '$src' renamed to '$newName'")
                 } else {
                     val err = res.error.ifEmpty { res.errorMsg.ifEmpty { res.message } }

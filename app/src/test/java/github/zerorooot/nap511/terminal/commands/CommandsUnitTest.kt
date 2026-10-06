@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.terminal.commands
 
 import github.zerorooot.nap511.bean.BaseReturnMessage
+import github.zerorooot.nap511.bean.CreateFolderMessage
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.RecycleBean
@@ -11,6 +12,7 @@ import github.zerorooot.nap511.terminal.engine.PipelineEngine
 import github.zerorooot.nap511.terminal.viewmodel.TerminalLineType
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
+import okhttp3.RequestBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -922,8 +924,8 @@ class CommandsUnitTest {
                 return RecycleInfo(
                     state = true,
                     recycleBeanList = arrayListOf(
-                        RecycleBean(id = "8801", fileName = "project_backup.zip", isFolder = false),
-                        RecycleBean(id = "8802", fileName = "notes.txt", isFolder = false)
+                        RecycleBean(id = "8801", fileName = "project_backup.zip", isFolder = false, cid = "0"),
+                        RecycleBean(id = "8802", fileName = "notes.txt", isFolder = false, cid = "0")
                     )
                 )
             }
@@ -938,10 +940,18 @@ class CommandsUnitTest {
         val engine = PipelineEngine(registry)
         val ctx = TerminalContext(fileRepository = mockRepo)
 
+        // 初始化根目录缓存（空）
+        ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(), cid = "0", count = 0, order = "", path = emptyList()))
+
         // 1. 通过文件名还原
         val outName = engine.executeStrings("trash -r project_backup.zip", ctx)
         assertEquals(listOf("trash: 已还原 'project_backup.zip' (rid: 8801)"), outName)
         assertEquals(listOf("8801"), revertedRids)
+        // 验证 addCachedFile 原位补入缓存
+        assertTrue(ctx.fileCacheManager.containsKey("0"))
+        assertEquals(1, ctx.fileCacheManager["0"]!!.fileBeanList.size)
+        assertEquals("project_backup.zip", ctx.fileCacheManager["0"]!!.fileBeanList[0].name)
+        assertEquals(1, ctx.fileCacheManager["0"]!!.count)
 
         // 2. 通过 RID 直接还原
         val outRid = engine.executeStrings("trash -r 8802", ctx)
@@ -963,5 +973,149 @@ class CommandsUnitTest {
         // 当管道连接到 wc -l 时，System.INFO 行不会进入下游，下游计数应为 0
         val outEmptyFindPipe = engine.executeStrings("find -suffix nonexistent | wc -l", ctx)
         assertEquals(listOf("0"), outEmptyFindPipe)
+    }
+
+    @Test
+    fun testRmMutatesCacheInPlace() = runBlocking {
+        val f1 = FileBean(name = "file1.txt", fileId = "101", isFolder = false)
+        val dir1 = FileBean(name = "folder1", categoryId = "201", isFolder = true)
+        val childFile = FileBean(name = "child.txt", fileId = "301", isFolder = false)
+
+        val mockRepo = object : FileRepository() {
+            override suspend fun delete(pid: String, fid: String): BaseReturnMessage {
+                return BaseReturnMessage(state = true)
+            }
+        }
+
+        val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
+        val engine = PipelineEngine(registry)
+        val ctx = TerminalContext(fileRepository = mockRepo)
+
+        // 初始化缓存
+        ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(f1, dir1), cid = "0", count = 2, order = "", path = emptyList()))
+        ctx.fileCacheManager.put("201", FilesBean(fileBeanList = arrayListOf(childFile), cid = "201", count = 1, order = "", path = emptyList()))
+
+        // 1. 删除普通文件
+        engine.executeStrings("rm -f file1.txt", ctx)
+        // 验证当前目录缓存未被移除，而是就地删除了该项且 count 减 1
+        assertTrue("根目录缓存不应整体失效", ctx.fileCacheManager.containsKey("0"))
+        assertEquals(1, ctx.fileCacheManager["0"]!!.fileBeanList.size)
+        assertEquals("folder1", ctx.fileCacheManager["0"]!!.fileBeanList[0].name)
+        assertEquals(1, ctx.fileCacheManager["0"]!!.count)
+
+        // 2. 递归删除子目录
+        engine.executeStrings("rm -r -f folder1", ctx)
+        // 验证根目录中移除了 folder1
+        assertTrue("根目录缓存仍保留", ctx.fileCacheManager.containsKey("0"))
+        assertTrue("根目录列表已清空", ctx.fileCacheManager["0"]!!.fileBeanList.isEmpty())
+        assertEquals(0, ctx.fileCacheManager["0"]!!.count)
+        // 验证子目录缓存被递归清理
+        assertFalse("被删除的子目录缓存应被递归清理", ctx.fileCacheManager.containsKey("201"))
+    }
+
+    @Test
+    fun testMvRenameMutatesCacheInPlace() = runBlocking {
+        val f1 = FileBean(name = "old_name.txt", fileId = "101", isFolder = false)
+        val mockRepo = object : FileRepository() {
+            override suspend fun rename(renameBean: RequestBody): BaseReturnMessage {
+                return BaseReturnMessage(state = true)
+            }
+        }
+
+        val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
+        val engine = PipelineEngine(registry)
+        val ctx = TerminalContext(fileRepository = mockRepo)
+
+        ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(f1), cid = "0", count = 1, order = "", path = emptyList()))
+
+        engine.executeStrings("mv old_name.txt new_name.txt", ctx)
+
+        assertTrue("重命名后缓存不应失效", ctx.fileCacheManager.containsKey("0"))
+        assertEquals(1, ctx.fileCacheManager["0"]!!.fileBeanList.size)
+        assertEquals("new_name.txt", ctx.fileCacheManager["0"]!!.fileBeanList[0].name)
+        assertEquals("101", ctx.fileCacheManager["0"]!!.fileBeanList[0].fileId)
+    }
+
+    @Test
+    fun testMvMoveMutatesCacheInPlace() = runBlocking {
+        val f1 = FileBean(name = "doc.txt", fileId = "101", isFolder = false)
+        val targetDir = FileBean(name = "targetDir", categoryId = "500", isFolder = true)
+
+        val mockRepo = object : FileRepository() {
+            override suspend fun move(body: Map<String, String>): BaseReturnMessage {
+                return BaseReturnMessage(state = true)
+            }
+        }
+
+        val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
+        val engine = PipelineEngine(registry)
+        val ctx = TerminalContext(fileRepository = mockRepo)
+
+        ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(f1, targetDir), cid = "0", count = 2, order = "", path = emptyList()))
+        ctx.fileCacheManager.put("500", FilesBean(fileBeanList = arrayListOf(), cid = "500", count = 0, order = "", path = emptyList()))
+
+        engine.executeStrings("mv doc.txt targetDir/", ctx)
+
+        // 源目录就地移除
+        assertTrue("源目录缓存不应整体失效", ctx.fileCacheManager.containsKey("0"))
+        assertEquals(1, ctx.fileCacheManager["0"]!!.fileBeanList.size)
+        assertEquals("targetDir", ctx.fileCacheManager["0"]!!.fileBeanList[0].name)
+        assertEquals(1, ctx.fileCacheManager["0"]!!.count)
+
+        // 目标目录就地追加
+        assertTrue("目标目录缓存不应整体失效", ctx.fileCacheManager.containsKey("500"))
+        assertEquals(1, ctx.fileCacheManager["500"]!!.fileBeanList.size)
+        assertEquals("doc.txt", ctx.fileCacheManager["500"]!!.fileBeanList[0].name)
+        assertEquals(1, ctx.fileCacheManager["500"]!!.count)
+    }
+
+    @Test
+    fun testMkdirMutatesCacheInPlace() = runBlocking {
+        val mockRepo = object : FileRepository() {
+            override suspend fun createFolder(pid: String, folderName: String): CreateFolderMessage {
+                return CreateFolderMessage(state = true, cid = "888", fileId = "888", fileName = folderName)
+            }
+        }
+
+        val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
+        val engine = PipelineEngine(registry)
+        val ctx = TerminalContext(fileRepository = mockRepo)
+
+        ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(), cid = "0", count = 0, order = "", path = emptyList()))
+
+        engine.executeStrings("mkdir created_folder", ctx)
+
+        assertTrue("新建文件夹后父目录缓存不应整体失效", ctx.fileCacheManager.containsKey("0"))
+        assertEquals(1, ctx.fileCacheManager["0"]!!.fileBeanList.size)
+        val addedFolder = ctx.fileCacheManager["0"]!!.fileBeanList[0]
+        assertEquals("created_folder", addedFolder.name)
+        assertEquals("888", addedFolder.categoryId)
+        assertTrue(addedFolder.isFolder)
+        assertEquals(1, ctx.fileCacheManager["0"]!!.count)
+    }
+
+    @Test
+    fun testFindDeleteMutatesCacheInPlace() = runBlocking {
+        val f1 = FileBean(name = "test.log", fileId = "101", isFolder = false)
+        val f2 = FileBean(name = "test.txt", fileId = "102", isFolder = false)
+
+        val mockRepo = object : FileRepository() {
+            override suspend fun delete(pid: String, fid: String): BaseReturnMessage {
+                return BaseReturnMessage(state = true)
+            }
+        }
+
+        val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
+        val engine = PipelineEngine(registry)
+        val ctx = TerminalContext(fileRepository = mockRepo, onConfirmRequest = { false })
+
+        ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(f1, f2), cid = "0", count = 2, order = "", path = emptyList()))
+
+        engine.executeStrings("find -suffix .log -delete -f", ctx)
+
+        assertTrue("find -delete 后缓存不应失效", ctx.fileCacheManager.containsKey("0"))
+        assertEquals(1, ctx.fileCacheManager["0"]!!.fileBeanList.size)
+        assertEquals("test.txt", ctx.fileCacheManager["0"]!!.fileBeanList[0].name)
+        assertEquals(1, ctx.fileCacheManager["0"]!!.count)
     }
 }

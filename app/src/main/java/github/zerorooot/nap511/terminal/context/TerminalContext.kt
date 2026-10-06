@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.terminal.context
 
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.FileCacheManager
@@ -301,10 +302,133 @@ class TerminalContext(
     }
 
     /**
-     * 当执行了文件增删改（mkdir/rm/mv）时，使对应目录的缓存失效
+     * 当执行了文件增删改（mkdir/rm/mv）时，使对应目录的缓存失效（备用降级）
      */
     suspend fun invalidateCache(cid: String = currentCid) {
         fileCacheManager.remove(cid)
+    }
+
+    /**
+     * 就地从父目录缓存中移除指定文件或目录，并递减计数；若删除项为目录，则级联清理其子孙目录缓存
+     */
+    suspend fun removeCachedFile(parentCid: String, fid: String, isFolder: Boolean? = null) {
+        val cache = fileCacheManager[parentCid]
+        var targetItem: FileBean? = null
+        if (cache != null) {
+            targetItem = cache.fileBeanList.firstOrNull { it.fileId == fid || it.categoryId == fid }
+            if (targetItem != null) {
+                cache.fileBeanList.remove(targetItem)
+                cache.count = (cache.count - 1).coerceAtLeast(0)
+            }
+        }
+        val actualIsFolder = isFolder ?: (targetItem?.isFolder ?: false)
+        if (actualIsFolder) {
+            val targetFolderCid = targetItem?.categoryId?.ifEmpty { fid } ?: fid
+            removeFolderCacheRecursively(targetFolderCid)
+        }
+    }
+
+    /**
+     * 递归清理目录及其所有子孙目录在 FileCacheManager 中的缓存（对齐 FileViewModel.removeFolderCacheRecursively 策略）
+     */
+    suspend fun removeFolderCacheRecursively(folderCid: String) {
+        suspend fun walk(cid: String) {
+            val list = fileCacheManager[cid]?.fileBeanList ?: emptyList()
+            for (item in list) {
+                if (item.isFolder) {
+                    val subFolderCid = item.categoryId.ifEmpty { item.fileId }
+                    if (subFolderCid.isNotEmpty()) {
+                        walk(subFolderCid)
+                    }
+                }
+            }
+            fileCacheManager.remove(cid)
+        }
+        walk(folderCid)
+    }
+
+    /**
+     * 就地重命名父目录缓存中的文件或子目录，若为目录则同步更新子目录自身缓存中的面包屑末级名称
+     */
+    suspend fun renameCachedFile(parentCid: String, fid: String, newName: String) {
+        val cache = fileCacheManager[parentCid] ?: return
+        val index = cache.fileBeanList.indexOfFirst { it.fileId == fid || it.categoryId == fid }
+        if (index >= 0) {
+            val oldBean = cache.fileBeanList[index]
+            cache.fileBeanList[index] = oldBean.copy(name = newName)
+            if (oldBean.isFolder) {
+                val folderCid = oldBean.categoryId.ifEmpty { fid }
+                fileCacheManager[folderCid]?.let { subCache ->
+                    subCache.path.lastOrNull()?.let { it.name = newName }
+                }
+            }
+        }
+    }
+
+    /**
+     * 就地向父目录缓存中追加新创建的目录，并预埋新目录自身的空缓存
+     */
+    suspend fun addCachedFolder(parentCid: String, folderName: String, newCid: String) {
+        val parentCache = fileCacheManager[parentCid]
+        if (parentCache != null) {
+            if (parentCache.fileBeanList.none { it.isFolder && it.name == folderName }) {
+                val newFolderBean = FileBean(
+                    name = folderName,
+                    categoryId = newCid,
+                    fileId = newCid,
+                    isFolder = true
+                )
+                parentCache.fileBeanList.add(newFolderBean)
+                parentCache.count = (parentCache.count + 1)
+            }
+        }
+        // 预埋新目录自身的空缓存（若未创建）
+        if (!fileCacheManager.containsKey(newCid)) {
+            val parentPathList = parentCache?.path ?: emptyList()
+            val newPathList = parentPathList + PathBean(cid = newCid, name = folderName, pid = parentCid)
+            val newFilesBean = FilesBean(
+                fileBeanList = arrayListOf(),
+                cid = newCid,
+                count = 0,
+                order = "",
+                path = newPathList
+            )
+            fileCacheManager.put(newCid, newFilesBean)
+        }
+    }
+
+    /**
+     * 就地向父目录缓存追加普通文件条目
+     */
+    suspend fun addCachedFile(parentCid: String, fileBean: FileBean) {
+        val cache = fileCacheManager[parentCid] ?: return
+        if (cache.fileBeanList.none { !it.isFolder && it.name == fileBean.name }) {
+            cache.fileBeanList.add(fileBean)
+            cache.count = (cache.count + 1)
+        }
+    }
+
+    /**
+     * 就地处理跨目录移动：从源父目录移出，并添加到目标目录缓存中
+     */
+    suspend fun moveCachedFile(srcParentCid: String, targetCid: String, fid: String) {
+        val srcCache = fileCacheManager[srcParentCid]
+        val targetBean = srcCache?.fileBeanList?.find { it.fileId == fid || it.categoryId == fid }
+        if (srcCache != null && targetBean != null) {
+            srcCache.fileBeanList.remove(targetBean)
+            srcCache.count = (srcCache.count - 1).coerceAtLeast(0)
+        }
+        if (targetBean != null) {
+            if (targetBean.isFolder) {
+                val folderCid = targetBean.categoryId.ifEmpty { fid }
+                addCachedFolder(targetCid, targetBean.name, folderCid)
+                // 若移动的是文件夹，由于其完整层级路径发生变更，清理被移动文件夹本身的缓存以保证下次进入时重新生成正确面包屑
+                fileCacheManager.remove(folderCid)
+            } else {
+                val movedBean = targetBean.copy(categoryId = targetCid)
+                addCachedFile(targetCid, movedBean)
+            }
+        }
     }
 
     /**

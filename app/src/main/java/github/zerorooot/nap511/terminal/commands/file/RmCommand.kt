@@ -45,9 +45,6 @@ class RmCommand : TerminalCommand {
             return@flow
         }
 
-        // 收集所有被影响的目录 CID（用于统一批量刷新本地缓存）
-        val affectedCids = mutableSetOf<String>()
-        var deletedCount = 0
 
         for (target in targetNames) {
             val resolved = ctx.resolveTarget(target)
@@ -106,11 +103,8 @@ class RmCommand : TerminalCommand {
                 // 传入目标真实的 parentCid 与 fid，确保跨目录删除成功
                 val res = ctx.fileRepository.delete(pid = parentCid, fid = actualFid)
                 if (res.state) {
-                    deletedCount++
-                    affectedCids.add(parentCid)
-                    if (isFolder) {
-                        affectedCids.add(actualFid)
-                    }
+                    // 就地从父目录缓存中剔除并级联清理文件夹缓存，无需网络重新拉取
+                    ctx.removeCachedFile(parentCid = parentCid, fid = actualFid, isFolder = isFolder)
                     emitText("rm: 已移入回收站 '$displayName'")
                 } else {
                     val err = res.error.ifEmpty { res.message }
@@ -119,11 +113,6 @@ class RmCommand : TerminalCommand {
             } catch (e: Exception) {
                 emitError("rm: 删除失败 '$displayName': ${e.message}")
             }
-        }
-
-        // 批量失效所有受影响目录的本地缓存，确保后续 ls 呈现最新数据
-        for (cid in affectedCids) {
-            ctx.invalidateCache(cid)
         }
     }
 }

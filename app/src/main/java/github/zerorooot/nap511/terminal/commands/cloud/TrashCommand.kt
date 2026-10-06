@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.terminal.commands.cloud
 
+import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.terminal.commands.util.CommandArgs
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
@@ -63,6 +64,22 @@ class TrashCommand : TerminalCommand {
 
                 val res = ctx.fileRepository.revert(actualRid)
                 if (res.state) {
+                    if (matchedItem != null && matchedItem.cid.isNotEmpty()) {
+                        val isFolder = matchedItem.isFolder || matchedItem.type.equals("folder", ignoreCase = true)
+                        if (isFolder) {
+                            ctx.addCachedFolder(matchedItem.cid, matchedItem.fileName, matchedItem.id)
+                        } else {
+                            val restoredBean = FileBean(
+                                fileId = matchedItem.id,
+                                categoryId = matchedItem.cid,
+                                name = matchedItem.fileName,
+                                size = matchedItem.fileSize,
+                                isFolder = false,
+                                icoString = matchedItem.ico
+                            )
+                            ctx.addCachedFile(matchedItem.cid, restoredBean)
+                        }
+                    }
                     emitSystem(successMessage)
                 } else {
                     emitError("trash: 还原失败: ${res.error.ifEmpty { res.message }}")

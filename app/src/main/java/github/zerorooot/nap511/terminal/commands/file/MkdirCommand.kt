@@ -87,12 +87,13 @@ class MkdirCommand : TerminalCommand {
                             // 调用 115 网盘接口创建文件夹
                             val res = ctx.fileRepository.createFolder(pid = curCid, folderName = seg)
                             if (res.state) {
-                                ctx.invalidateCache(curCid)
                                 val nextCid = res.cid.ifEmpty {
                                     val refreshed = ctx.listDirectory(curCid, forceRefresh = true)
                                     refreshed.firstOrNull { it.isFolder && it.name == seg }?.categoryId ?: ""
                                 }
                                 if (nextCid.isNotEmpty()) {
+                                    // 就地追加到父目录缓存并预埋新目录缓存，零额外网络请求
+                                    ctx.addCachedFolder(parentCid = curCid, folderName = seg, newCid = nextCid)
                                     curCid = nextCid
                                 } else {
                                     break
@@ -146,7 +147,13 @@ class MkdirCommand : TerminalCommand {
                         folderName = folderName
                     )
                     if (res.state) {
-                        ctx.invalidateCache(parentCid)
+                        val newCid = res.cid
+                        if (newCid.isNotEmpty()) {
+                            // 就地向父目录追加新建目录并预埋空缓存，无需失效父目录缓存
+                            ctx.addCachedFolder(parentCid = parentCid, folderName = folderName, newCid = newCid)
+                        } else {
+                            ctx.invalidateCache(parentCid)
+                        }
                         emitText("mkdir: created directory '$rawName'")
                     } else {
                         val err = res.error.ifEmpty { "创建失败" }

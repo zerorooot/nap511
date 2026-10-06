@@ -120,7 +120,7 @@ class FindCommand : TerminalCommand {
                             ctx.fileRepository.delete(pid = resolved.parentCid, fid = resolved.file.fileId)
                         }.getOrNull()
                         if (res?.state == true) {
-                            ctx.fileCacheManager.remove(resolved.parentCid)
+                            ctx.removeCachedFile(parentCid = resolved.parentCid, fid = resolved.file.fileId, isFolder = false)
                             emitSystem("find: 已成功删除 '${resolved.file.name}' 至回收站")
                         } else {
                             emitError("find: 删除失败: ${res?.error ?: "未知错误"}")
@@ -362,7 +362,6 @@ class FindCommand : TerminalCommand {
         }
 
         var successCount = 0
-        val affectedParentCids = mutableSetOf<String>()
         for (target in targets) {
             try {
                 val res = ctx.fileRepository.delete(
@@ -371,17 +370,11 @@ class FindCommand : TerminalCommand {
                 )
                 if (res.state) {
                     successCount++
-                    if (target.parentCid.isNotEmpty()) {
-                        affectedParentCids.add(target.parentCid)
-                    }
+                    // 就地从父目录缓存中剔除并级联清理文件夹缓存，无需整体失效
+                    ctx.removeCachedFile(parentCid = target.parentCid, fid = target.fid, isFolder = target.isFolder)
                 }
             } catch (_: Exception) {
             }
-        }
-
-        // 统一失效被影响目录的本地缓存，确保后续操作看到最新状态
-        affectedParentCids.forEach { cid ->
-            ctx.fileCacheManager.remove(cid)
         }
 
         emitSystem("find: 已成功删除 $successCount / ${targets.size} 个项目至回收站")

@@ -226,7 +226,7 @@ open class FileRepository {
         return fileService.getFileInfo(cid)
     }
 
-    suspend fun createFolder(
+    open suspend fun createFolder(
         pid: String, folderName: String
     ): CreateFolderMessage {
         return fileService.createFolder(pid, folderName)
@@ -266,7 +266,7 @@ open class FileRepository {
         return fileService.setDownloadPath(cid)
     }
 
-    suspend fun move(body: Map<String, String>): BaseReturnMessage {
+    open suspend fun move(body: Map<String, String>): BaseReturnMessage {
         return executeWithRetry { fileService.move(body) }
     }
 
@@ -304,7 +304,7 @@ open class FileRepository {
         return executeWithRetry { fileService.delete(pid, fid) }
     }
 
-    suspend fun rename(renameBean: RequestBody): BaseReturnMessage {
+    open suspend fun rename(renameBean: RequestBody): BaseReturnMessage {
         return executeWithRetry { fileService.rename(renameBean) }
     }
 
