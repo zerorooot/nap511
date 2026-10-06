@@ -15,6 +15,7 @@ import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.terminal.commands.CommandRegistryFactory
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.context.TerminalPath
+import github.zerorooot.nap511.terminal.context.currentCid
 import github.zerorooot.nap511.terminal.context.toDisplayPath
 import github.zerorooot.nap511.terminal.engine.AutosuggestionEngine
 import github.zerorooot.nap511.terminal.engine.CompletionCandidate
@@ -44,11 +45,8 @@ import kotlinx.coroutines.withContext
  * 本 ViewModel 负责统筹以上子组件，对外保持 100% 的公开 API 与 Compose 状态观察兼容。
  */
 class TerminalViewModel(
-    initialCid: String = "0",
-    initialPath: String = "/",
     initialPathList: List<PathBean> = emptyList(),
     avatarBean: AvatarBean = AvatarBean(),
-//    var onNavigateAction: ((Route) -> Unit)? = null,
     fileOpener: FileOpener? = null,
     fileRepository: FileRepository = FileRepository.getInstance(),
     private val mainDispatcher: CoroutineDispatcher? = null
@@ -82,15 +80,18 @@ class TerminalViewModel(
     var isSessionInitialized = false
         private set
 
-    fun initDirectoryIfNeeded(cid: String, path: String, pathList: List<PathBean>) {
+    /**
+     * 根据全局面包屑路径链表初始化工作目录
+     */
+    fun initDirectoryIfNeeded(pathList: List<PathBean>) {
         if (!isSessionInitialized) {
             isSessionInitialized = true
-            currentCid = cid
-            currentPath = if (path.startsWith("/")) path else "/$path"
-            context.updateDirectory(cid, path, pathList)
+            currentCid = pathList.currentCid()
+            currentPath = pathList.toDisplayPath()
+            context.updateDirectory(pathList)
             screenBuffer.clear()
             printWelcomeBanner()
-            refreshCachedEntries(cid)
+            refreshCachedEntries(currentCid)
         }
     }
 
@@ -125,10 +126,10 @@ class TerminalViewModel(
 
     val isExecuting: Boolean get() = commandExecutor.isExecuting
 
-    var currentPath by mutableStateOf(if (initialPath.startsWith("/")) initialPath else "/$initialPath")
+    var currentPath: String by mutableStateOf(initialPathList.toDisplayPath())
         private set
 
-    var currentCid by mutableStateOf(initialCid)
+    var currentCid: String by mutableStateOf(initialPathList.currentCid())
         private set
 
     val isWaitingConfirmation: Boolean get() = commandExecutor.isWaitingConfirmation
@@ -142,8 +143,6 @@ class TerminalViewModel(
     private val cachedDirectoryEntries = mutableListOf<String>()
 
     val context = TerminalContext(
-        initialCid = initialCid,
-        initialPath = initialPath,
         initialPathList = initialPathList,
         fileRepository = fileRepository,
         onConfirmRequest = { prompt ->
@@ -175,7 +174,7 @@ class TerminalViewModel(
     init {
         // 打印终端欢迎信息与快捷指引
         printWelcomeBanner()
-        refreshCachedEntries(initialCid)
+        refreshCachedEntries(currentCid)
         loadPersistentHistory()
     }
 

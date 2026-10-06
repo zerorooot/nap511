@@ -3,6 +3,7 @@ package github.zerorooot.nap511.terminal.viewmodel
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import github.zerorooot.nap511.bean.AvatarBean
+import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.repository.FileRepository
@@ -37,8 +38,6 @@ class TerminalViewModelTest {
             userId = "1001"
         )
         viewModel = TerminalViewModel(
-            initialCid = "0",
-            initialPath = "/",
             avatarBean = avatar,
             mainDispatcher = testDispatcher
         )
@@ -250,7 +249,7 @@ class TerminalViewModelTest {
     @Test
     fun testInitDirectoryIfNeededPreservesSessionAndResetsOnExit() {
         // 1. 第一次初始化进入 /MyFolder
-        viewModel.initDirectoryIfNeeded("100", "/MyFolder", emptyList())
+        viewModel.initDirectoryIfNeeded(listOf(PathBean("100", "MyFolder", "0")))
         assertTrue(viewModel.isSessionInitialized)
         assertEquals("100", viewModel.currentCid)
         assertEquals("/MyFolder", viewModel.currentPath)
@@ -260,7 +259,7 @@ class TerminalViewModelTest {
         val countBefore = viewModel.lines.size
 
         // 2. 当前会话保持状态（如从 open 文件预览返回），不应被覆盖
-        viewModel.initDirectoryIfNeeded("200", "/OtherFolder", emptyList())
+        viewModel.initDirectoryIfNeeded(listOf(PathBean("200", "OtherFolder", "0")))
         assertEquals("100", viewModel.currentCid)
         assertEquals("/MyFolder", viewModel.currentPath)
         assertEquals(countBefore, viewModel.lines.size)
@@ -271,7 +270,7 @@ class TerminalViewModelTest {
         assertEquals(0, viewModel.lines.size)
 
         // 4. exit 退出后重新进入，视同第一次进入，工作目录与新的 FileScreen 目录一致
-        viewModel.initDirectoryIfNeeded("200", "/OtherFolder", emptyList())
+        viewModel.initDirectoryIfNeeded(listOf(PathBean("200", "OtherFolder", "0")))
         assertTrue(viewModel.isSessionInitialized)
         assertEquals("200", viewModel.currentCid)
         assertEquals("/OtherFolder", viewModel.currentPath)
@@ -283,7 +282,7 @@ class TerminalViewModelTest {
         assertEquals("tester@1001:/\n$ ", viewModel.promptText())
 
         // 验证切换目录后上下文同步更新
-        viewModel.initDirectoryIfNeeded("123", "/电影/科幻", emptyList())
+        viewModel.initDirectoryIfNeeded(listOf(PathBean("1", "电影", "0"), PathBean("123", "科幻", "1")))
         assertEquals("tester@1001:/电影/科幻", viewModel.contextPromptText())
         assertEquals("tester@1001:/电影/科幻\n$ ", viewModel.promptText())
     }
@@ -401,8 +400,6 @@ class TerminalViewModelTest {
             }
         }
         val vm = TerminalViewModel(
-            initialCid = "0",
-            initialPath = "/",
             fileRepository = testRepo,
             mainDispatcher = testDispatcher
         )

@@ -151,13 +151,14 @@ data class TerminalPath(
 }
 
 /**
- * 将 List<PathBean> 面包屑链表转为规范化的显示路径字符串（如 "/根目录/Movies/Action"）
+ * 将 List<PathBean> 面包屑链表转为规范化的显示路径字符串
+ * 若链表为空则返回 Unix 根路径 "/"；若包含面包屑节点则拼接为 "/根目录/Movies/Action" 或 "/MyFolder"
  */
 fun List<PathBean>.toDisplayPath(): String {
-    if (isEmpty()) return TerminalPathConstants.ROOT_DISPLAY_PATH
-    val names = map { it.name }
-    val path = "/" + names.joinToString("/")
-    return if (path == "/") TerminalPathConstants.ROOT_DISPLAY_PATH else path
+    if (isEmpty()) return "/"
+    val names = map { it.name }.filter { it.isNotEmpty() }
+    if (names.isEmpty()) return "/"
+    return "/" + names.joinToString("/")
 }
 
 /**
@@ -175,7 +176,7 @@ fun List<PathBean>.ensureRoot(): List<PathBean> {
  * 返回当前所处目录的 CID
  */
 fun List<PathBean>.currentCid(): String =
-    lastOrNull()?.cid ?: TerminalPathConstants.ROOT_CID
+    lastOrNull()?.cid?.ifEmpty { TerminalPathConstants.ROOT_CID } ?: TerminalPathConstants.ROOT_CID
 
 /**
  * 返回当前所处目录的名称
@@ -201,24 +202,4 @@ fun List<PathBean>.cdUp(): List<PathBean> =
 fun List<PathBean>.cdDown(cid: String, name: String): List<PathBean> {
     val pid = currentCid()
     return this + PathBean(cid = cid, name = name, pid = pid)
-}
-
-/**
- * 从原始路径字符串和当前 CID 启发式合成 List<PathBean> 兜底结构
- * 当缓存未命中且未显式提供 pathList 时，避免面包屑链为空
- */
-fun synthesizePathList(cid: String, path: String): List<PathBean> {
-    val parsed = TerminalPath.parse(path)
-    if (parsed.isRoot || parsed.segments.isEmpty()) {
-        return listOf(TerminalPathConstants.ROOT_PATH_BEAN)
-    }
-    val list = mutableListOf(TerminalPathConstants.ROOT_PATH_BEAN)
-    for (i in parsed.segments.indices) {
-        val seg = parsed.segments[i]
-        val isLast = (i == parsed.segments.size - 1)
-        val segCid = if (isLast) cid else ""
-        val pid = list.last().cid
-        list.add(PathBean(cid = segCid, name = seg, pid = pid))
-    }
-    return list
 }

@@ -30,7 +30,7 @@ sealed class ResolvedTarget {
         val parentCid: String? = null,
         val name: String = "",
         val folderBean: FileBean? = null,
-        val pathList: List<PathBean> = emptyList()
+        val pathList: List<PathBean>
     ) : ResolvedTarget()
 
     /**
@@ -45,7 +45,7 @@ sealed class ResolvedTarget {
         val file: FileBean,
         val parentCid: String,
         val fullPath: String,
-        val parentPathList: List<PathBean> = emptyList()
+        val parentPathList: List<PathBean>
     ) : ResolvedTarget()
 }
 
@@ -54,8 +54,6 @@ sealed class ResolvedTarget {
  * 维护当前终端的工作目录、115网盘仓库层接口、缓存管理器、路径解析及交互回调
  */
 class TerminalContext(
-    initialCid: String = TerminalPathConstants.ROOT_CID,
-    initialPath: String = "/",
     initialPathList: List<PathBean> = emptyList(),
     val fileRepository: FileRepository = FileRepository.getInstance(),
     val fileCacheManager: FileCacheManager = FileCacheManager,
@@ -63,26 +61,15 @@ class TerminalContext(
     val onDirectoryChanged: ((cid: String, path: String) -> Unit)? = null,
     var fileOpener: FileOpener? = null
 ) {
-    @Volatile
-    var currentCid: String = initialCid
-        private set
-
-    @Volatile
-    var currentPath: String = initialPath
-        private set
-
     val pathList: MutableList<PathBean> = initialPathList.toMutableList()
 
-    init {
-        // 若初始面包屑为空，根据初始 CID 与初始路径启发式初始化
-        if (pathList.isEmpty()) {
-            if (initialCid == TerminalPathConstants.ROOT_CID) {
-                pathList.add(TerminalPathConstants.ROOT_PATH_BEAN)
-            } else {
-                pathList.addAll(synthesizePathList(initialCid, initialPath))
-            }
-        }
-    }
+    @Volatile
+    var currentCid: String = initialPathList.currentCid()
+        private set
+
+    @Volatile
+    var currentPath: String = initialPathList.toDisplayPath()
+        private set
 
     /**
      * 当前工作目录的面包屑路径链表（保证非空且包含根节点）
@@ -95,31 +82,13 @@ class TerminalContext(
         }
 
     /**
-     * 更新当前工作目录
+     * 更新当前工作目录（由 List<PathBean> 提供路径与层级结构）
      */
-    fun updateDirectory(cid: String, path: String, newPathList: List<PathBean>? = null) {
-        currentCid = cid
-        currentPath = if (path.startsWith("/")) path else "/$path"
-        if (newPathList != null && newPathList.isNotEmpty()) {
-            pathList.clear()
-            pathList.addAll(newPathList)
-        } else {
-            val index = pathList.indexOfFirst { it.cid == cid }
-            if (index != -1) {
-                val trimmedList = pathList.take(index + 1)
-                pathList.clear()
-                pathList.addAll(trimmedList)
-            } else {
-                val cachedPath = fileCacheManager.getDate(cid)?.path
-                if (!cachedPath.isNullOrEmpty()) {
-                    pathList.clear()
-                    pathList.addAll(cachedPath)
-                } else {
-                    pathList.clear()
-                    pathList.addAll(synthesizePathList(cid, currentPath))
-                }
-            }
-        }
+    fun updateDirectory(newPathList: List<PathBean>) {
+        pathList.clear()
+        pathList.addAll(newPathList)
+        currentCid = pathList.currentCid()
+        currentPath = pathList.toDisplayPath()
         onDirectoryChanged?.invoke(currentCid, currentPath)
     }
 
@@ -127,7 +96,7 @@ class TerminalContext(
      * 根据解析所得目录目标直接更新工作目录（保持 PathBean 面包屑链完整，无缝同步）
      */
     fun updateDirectory(target: ResolvedTarget.Directory) {
-        updateDirectory(target.cid, target.path, target.pathList)
+        updateDirectory(target.pathList)
     }
 
     /**

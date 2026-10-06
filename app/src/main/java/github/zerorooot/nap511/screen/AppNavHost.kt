@@ -254,10 +254,7 @@ fun AppNavHost(
 
             entry<Route.Terminal> {
                 onSetGesturesEnabled(false)
-                val currentCid = fileViewModel.currentCid
-                val currentPathList = fileViewModel.pathList
-                val currentPath = "/" + currentPathList.joinToString("/") { it.name }
-                terminalViewModel.initDirectoryIfNeeded(currentCid, currentPath, currentPathList)
+                terminalViewModel.initDirectoryIfNeeded(fileViewModel.pathList)
                 terminalViewModel.updateFileOpener(fileOpener)
                 terminalViewModel.avatarBean = avatarBean
                 TerminalScreen(

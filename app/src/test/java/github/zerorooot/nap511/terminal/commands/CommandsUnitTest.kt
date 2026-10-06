@@ -4,6 +4,7 @@ import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.CreateFolderMessage
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FilesBean
+import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.repository.FileRepository
@@ -300,7 +301,7 @@ class CommandsUnitTest {
         ctx.fileCacheManager.put("300", FilesBean(fileBeanList = arrayListOf(subDirFolder, docFile), cid = "300", count = 2, order = "", path = emptyList()))
 
         // 切换工作目录到 /test
-        ctx.updateDirectory("100", "/test")
+        ctx.updateDirectory(listOf(PathBean("100", "test", "0")))
 
         // 在 /test 目录下执行 "find 2023/22 -type d"
         val out = engine.executeStrings("find 2023/22 -type d", ctx)
@@ -409,7 +410,7 @@ class CommandsUnitTest {
         assertEquals("Sample Dir B(1)", dir2.name)
 
         // 3. 在 t1 目录下直接解析当前目录下的子文件夹（带或不带斜杠）
-        ctx.updateDirectory("100", "/根目录/t1")
+        ctx.updateDirectory(listOf(PathBean("0", "根目录", "0"), PathBean("100", "t1", "0")))
         val res3 = ctx.resolveTarget("Sample Dir A")
         assertTrue(res3 is github.zerorooot.nap511.terminal.context.ResolvedTarget.Directory)
         val dir3 = res3 as github.zerorooot.nap511.terminal.context.ResolvedTarget.Directory
@@ -551,7 +552,7 @@ class CommandsUnitTest {
         val out = engine.executeStrings("pwd", ctx)
         assertEquals(listOf("/"), out)
 
-        ctx.updateDirectory("99", "/根目录/work")
+        ctx.updateDirectory(listOf(PathBean("0", "根目录", "0"), PathBean("99", "work", "0")))
         val outWork = engine.executeStrings("pwd", ctx)
         assertEquals(listOf("/根目录/work"), outWork)
     }
@@ -574,7 +575,7 @@ class CommandsUnitTest {
         assertTrue(outCurrent[0].contains("Cannot remove root directory") || outCurrent[0].contains("Cannot remove current working directory"))
 
         // 3. 在子目录下尝试删除当前工作目录
-        cancelCtx.updateDirectory("10", "/根目录/important_dir")
+        cancelCtx.updateDirectory(listOf(PathBean("0", "根目录", "0"), PathBean("10", "important_dir", "0")))
         val outCurrentSub = engine.executeStrings("rm .", cancelCtx)
         assertTrue(outCurrentSub[0].contains("Cannot remove current working directory"))
     }
