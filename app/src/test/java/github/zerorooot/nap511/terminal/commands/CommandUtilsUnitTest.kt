@@ -94,23 +94,23 @@ class CommandUtilsUnitTest {
         val ctx = TerminalContext()
         val result = echoCmd.execute(ctx, listOf("hello", "terminal", "refactor"), emptyFlow()).toList()
         assertEquals(listOf("hello terminal refactor"), result.map { it.text })
-        assertEquals(TerminalLineType.OUTPUT_TEXT, result[0].type)
+        assertEquals(TerminalLineType.Output.TEXT, result[0].type)
     }
 
     @Test
     fun testTerminalOutputDataCarrierAndDslEmitters() = runBlocking {
         // 1. 验证 TerminalOutput 属性与 CharSequence 委托
-        val output = TerminalOutput("hello world", TerminalLineType.OUTPUT_FILE_ENTRY)
+        val output = TerminalOutput("hello world", TerminalLineType.Output.FILE_ENTRY)
         assertEquals("hello world", output.text)
-        assertEquals(TerminalLineType.OUTPUT_FILE_ENTRY, output.type)
+        assertEquals(TerminalLineType.Output.FILE_ENTRY, output.type)
         assertEquals(11, output.length)
         assertEquals('h', output[0])
         assertEquals("hello", output.subSequence(0, 5))
         assertEquals("hello world", output.toString())
 
         // 2. 验证 equals 与 hashCode
-        val same = TerminalOutput("hello world", TerminalLineType.OUTPUT_FILE_ENTRY)
-        val diffType = TerminalOutput("hello world", TerminalLineType.OUTPUT_TEXT)
+        val same = TerminalOutput("hello world", TerminalLineType.Output.FILE_ENTRY)
+        val diffType = TerminalOutput("hello world", TerminalLineType.Output.TEXT)
         assertEquals(output, same)
         assertFalse(output == diffType)
         assertEquals(output.hashCode(), same.hashCode())
@@ -129,20 +129,20 @@ class CommandUtilsUnitTest {
         }.toList()
 
         assertEquals(9, emittedList.size)
-        assertEquals(TerminalLineType.OUTPUT_TEXT, emittedList[0].type)
+        assertEquals(TerminalLineType.Output.TEXT, emittedList[0].type)
         assertEquals("text", emittedList[0].text)
 
-        assertEquals(TerminalLineType.OUTPUT_FILE_ENTRY, emittedList[1].type)
+        assertEquals(TerminalLineType.Output.FILE_ENTRY, emittedList[1].type)
         assertEquals("file.txt", emittedList[1].text)
 
-        assertEquals(TerminalLineType.OUTPUT_PATH_ENTRY, emittedList[2].type)
+        assertEquals(TerminalLineType.Output.PATH_ENTRY, emittedList[2].type)
         assertEquals("/dir/file.txt", emittedList[2].text)
 
-        assertEquals(TerminalLineType.OUTPUT_LONG_LISTING, emittedList[3].type)
-        assertEquals(TerminalLineType.OUTPUT_FIND_CATEGORY, emittedList[4].type)
-        assertEquals(TerminalLineType.OUTPUT_ANSI, emittedList[5].type)
-        assertEquals(TerminalLineType.HELP, emittedList[6].type)
-        assertEquals(TerminalLineType.ERROR, emittedList[7].type)
-        assertEquals(TerminalLineType.SYSTEM, emittedList[8].type)
+        assertEquals(TerminalLineType.Output.LONG_LISTING, emittedList[3].type)
+        assertEquals(TerminalLineType.Output.FIND_CATEGORY, emittedList[4].type)
+        assertEquals(TerminalLineType.Output.ANSI, emittedList[5].type)
+        assertEquals(TerminalLineType.System.HELP, emittedList[6].type)
+        assertEquals(TerminalLineType.System.ERROR, emittedList[7].type)
+        assertEquals(TerminalLineType.System.INFO, emittedList[8].type)
     }
 }

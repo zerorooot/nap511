@@ -54,8 +54,8 @@ class PipelineEngine(
 
         for (stage in stages) {
             val commandDef = registry.get(stage.command) ?: return flow {
-                emit(TerminalOutput("terminal: command not found: ${stage.command}", TerminalLineType.ERROR))
-                emit(TerminalOutput("输入 '?' 或 'help' 可查看所有支持的命令", TerminalLineType.HELP))
+                emit(TerminalOutput("terminal: command not found: ${stage.command}", TerminalLineType.System.ERROR))
+                emit(TerminalOutput("输入 '?' 或 'help' 可查看所有支持的命令", TerminalLineType.System.HELP))
             }
 
             // 对参数列表中的 Glob 通配符（*.mp4 等）进行自动展开
@@ -75,10 +75,16 @@ class PipelineEngine(
             lastStdout = stageStdout
 
             // 将当前阶段的输出转换为纯文本行流供给下一阶段作为 stdin
+            // 【核心通道隔离机制】：仅 Output 数据类型流入下一级管道 stdin；
+            // System 提示、诊断头、错误信息自动隔离在当前屏幕展示，绝不污染下游数据流。
             currentStdin = flow {
                 stageStdout.collect { output ->
-                    for (subLine in output.text.split('\n')) {
-                        emit(subLine)
+                    if (output.type is TerminalLineType.Output) {
+                        for (subLine in output.text.split('\n')) {
+                            if (subLine.isNotEmpty()) {
+                                emit(subLine)
+                            }
+                        }
                     }
                 }
             }
@@ -110,7 +116,7 @@ class PipelineEngine(
                 send(output)
             }
         } catch (e: Exception) {
-            send(TerminalOutput("${commandDef.name}: error: ${e.message ?: e.javaClass.simpleName}", TerminalLineType.ERROR))
+            send(TerminalOutput("${commandDef.name}: error: ${e.message ?: e.javaClass.simpleName}", TerminalLineType.System.ERROR))
         }
     }.flowOn(Dispatchers.IO)
 }

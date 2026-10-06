@@ -8,28 +8,38 @@ import github.zerorooot.nap511.terminal.engine.GlobMatcher
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
-import github.zerorooot.nap511.terminal.viewmodel.emitFindCategory
 import github.zerorooot.nap511.terminal.viewmodel.emitPath
-import github.zerorooot.nap511.terminal.viewmodel.emitText
+import github.zerorooot.nap511.terminal.viewmodel.emitSystem
 import github.zerorooot.nap511.viewmodel.formatFileBeanList
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import java.util.Locale
 
 /**
+ * 待删除目标实体数据载体
+ */
+private data class DeletableTarget(
+    val parentCid: String,
+    val fid: String,
+    val name: String,
+    val isFolder: Boolean
+)
+
+/**
  * 网盘文件搜索与筛选命令（find）
  *
  * 支持按名称通配符（-name）、类型（-type f/d）、扩展名（-suffix）、大小（-size）、空文件/目录（-empty）、
  * 115官方分类（-filter）以及全盘全局搜索（-global）。
+ * 原生支持批量删除操作（-delete），配合 -f 实现强制删除免确认。
  */
 class FindCommand : TerminalCommand {
 
     override val name: String = "find"
 
     override val description: String =
-        "网盘文件检索（支持按名称、类型、后缀、深度、115分类筛选及全盘全局搜索）"
+        "网盘文件检索（支持按名称、类型、后缀、深度、115分类筛选、全盘全局搜索及 -delete 批量安全删除）"
 
-    override val usage: String = "find [path] [options]"
+    override val usage: String = "find [path] [options] [-delete] [-f]"
 
     override val flags: List<CommandFlag> = listOf(
         CommandFlag("-name <pattern>", "按文件名或通配符过滤匹配（如 -name '*.mp4'）"),
@@ -42,7 +52,9 @@ class FindCommand : TerminalCommand {
         CommandFlag("-maxdepth <N>", "限制递归搜索的最大层级深度，默认为5"),
         CommandFlag("-empty", "只匹配空文件（大小为 0）或空目录（内容为空）"),
         CommandFlag("-size <[+|-]N[k|M|G]>", "按文件大小筛选（如 +100M 大于 100MB，-10k 小于 10KB）"),
-        CommandFlag("-global", "在整个 115 网盘根目录进行全局云端搜索")
+        CommandFlag("-global", "在整个 115 网盘根目录进行全局云端搜索"),
+        CommandFlag("-delete", "将查找到的匹配项批量删除至回收站（默认执行前进行交互式二次确认）"),
+        CommandFlag("-f", "配合 -delete 使用，强制直接删除免二次确认（同 rm -f）")
     )
 
     override suspend fun execute(
@@ -59,6 +71,8 @@ class FindCommand : TerminalCommand {
         var sizeFilterSpec: String? = null
         var pathArg: String? = null
         var isGlobal = false
+        var isDelete = false
+        var isForce = false
 
         var i = 0
         while (i < args.size) {
@@ -78,6 +92,8 @@ class FindCommand : TerminalCommand {
                 arg == "-size" && i + 1 < args.size -> sizeFilterSpec = args[++i]
                 arg == "-empty" -> isEmptyFilter = true
                 arg == "-global" -> isGlobal = true
+                arg == "-delete" -> isDelete = true
+                arg == "-f" -> isForce = true
                 !arg.startsWith("-") && pathArg == null -> pathArg = arg
             }
             i++
@@ -92,7 +108,26 @@ class FindCommand : TerminalCommand {
             when (val resolved = ctx.resolveTarget(pathArg)) {
                 is ResolvedTarget.Directory -> Pair(resolved.cid, resolved.path)
                 is ResolvedTarget.File -> {
-                    emitPath(resolved.fullPath)
+                    if (isDelete) {
+                        if (!isForce) {
+                            val confirmed = ctx.confirm("find: 是否确认删除 '${resolved.file.name}' 至回收站? (yes/no): ")
+                            if (!confirmed) {
+                                emitSystem("find: 已取消删除操作")
+                                return@flow
+                            }
+                        }
+                        val res = runCatching {
+                            ctx.fileRepository.delete(pid = resolved.parentCid, fid = resolved.file.fileId)
+                        }.getOrNull()
+                        if (res?.state == true) {
+                            ctx.fileCacheManager.remove(resolved.parentCid)
+                            emitSystem("find: 已成功删除 '${resolved.file.name}' 至回收站")
+                        } else {
+                            emitError("find: 删除失败: ${res?.error ?: "未知错误"}")
+                        }
+                    } else {
+                        emitPath(resolved.fullPath)
+                    }
                     return@flow
                 }
 
@@ -104,6 +139,8 @@ class FindCommand : TerminalCommand {
         } else {
             Pair(ctx.currentCid, ctx.currentPath)
         }
+
+        val deletableTargets = mutableListOf<DeletableTarget>()
 
         // 1. 若指定了 -filter，参考 FileViewModel.filterFile 直接调用 fileRepository.filterFile
         if (filterType != null) {
@@ -145,14 +182,29 @@ class FindCommand : TerminalCommand {
                 }
 
                 if (list.isEmpty()) {
-                    emitText("find: 未找到匹配的分类文件 (filterType: $filterType)")
+                    emitSystem("find: 未找到匹配的分类文件 (filterType: $filterType)")
+                    return@flow
+                }
+
+                if (isDelete) {
+                    list.forEach { file ->
+                        val fid = if (file.isFolder) file.categoryId else file.fileId
+                        deletableTargets.add(
+                            DeletableTarget(
+                                parentCid = targetCid,
+                                fid = fid,
+                                name = file.name,
+                                isFolder = file.isFolder
+                            )
+                        )
+                    }
+                    performBatchDelete(ctx, deletableTargets, isForce)
                 } else {
-                    emitText("分类筛选结果（共 ${list.size} 项，分类: $filterType）：")
+                    emitSystem("分类筛选结果（共 ${list.size} 项，分类: $filterType）：")
                     for (file in list) {
+                        val fullPath = if (searchRootPath == "/") "/${file.name}" else "$searchRootPath/${file.name}"
                         val isFolder = file.fileId.isEmpty()
-                        val prefix = if (isFolder) "[目录] " else "[文件] "
-                        val sizeStr = if (isFolder) "-" else file.sizeString.trim()
-                        emitFindCategory("$prefix${file.name}  ($sizeStr)")
+                        emitPath(fullPath + if (isFolder) "/" else "")
                     }
                 }
             } catch (e: Exception) {
@@ -175,12 +227,30 @@ class FindCommand : TerminalCommand {
                 )
                 val list = searchResult.fileBeanList
                 if (list.isEmpty()) {
-                    emitText("find: 未在网盘中找到匹配项")
-                } else {
+                    emitSystem("find: 未在网盘中找到匹配项")
+                    return@flow
+                }
+
+                if (isDelete) {
                     list.forEach { file ->
                         val isFolder = file.fileId.isEmpty()
-                        val prefix = if (isFolder) "[目录] " else "[文件] "
-                        emitFindCategory("$prefix${file.name} (cid: ${if (isFolder) file.categoryId else file.parentId})")
+                        val fid = if (isFolder) file.categoryId else file.fileId
+                        val parentCid = if (isFolder) "" else file.parentId
+                        deletableTargets.add(
+                            DeletableTarget(
+                                parentCid = parentCid,
+                                fid = fid,
+                                name = file.name,
+                                isFolder = isFolder
+                            )
+                        )
+                    }
+                    performBatchDelete(ctx, deletableTargets, isForce)
+                } else {
+                    emitSystem("全局搜索结果（共 ${list.size} 项）：")
+                    list.forEach { file ->
+                        val isFolder = file.fileId.isEmpty()
+                        emitPath(file.name + if (isFolder) "/" else "")
                     }
                 }
             } catch (e: Exception) {
@@ -241,7 +311,19 @@ class FindCommand : TerminalCommand {
                 }
 
                 if (matches) {
-                    emitPath(fullPath + if (file.isFolder) "/" else "")
+                    if (isDelete) {
+                        val fid = if (file.isFolder) file.categoryId else file.fileId
+                        deletableTargets.add(
+                            DeletableTarget(
+                                parentCid = currentCid,
+                                fid = fid,
+                                name = file.name,
+                                isFolder = file.isFolder
+                            )
+                        )
+                    } else {
+                        emitPath(fullPath + if (file.isFolder) "/" else "")
+                    }
                 }
 
                 if (file.isFolder && currentDepth < maxDepth) {
@@ -251,6 +333,58 @@ class FindCommand : TerminalCommand {
         }
 
         searchRecursive(targetCid, searchRootPath, 1)
+
+        if (isDelete) {
+            performBatchDelete(ctx, deletableTargets, isForce)
+        }
+    }
+
+    /**
+     * 执行批量移入回收站安全操作（支持 -f 强制免确认）
+     */
+    private suspend fun kotlinx.coroutines.flow.FlowCollector<TerminalOutput>.performBatchDelete(
+        ctx: TerminalContext,
+        targets: List<DeletableTarget>,
+        isForce: Boolean
+    ) {
+        if (targets.isEmpty()) {
+            emitSystem("find: 未找到匹配的删除目标")
+            return
+        }
+
+        // 默认安全交互确认（类似 rm，若未指定 -f 则提示用户进行二次确认）
+        if (!isForce) {
+            val confirmed = ctx.confirm("find: 是否确认将匹配到的 ${targets.size} 个项目移入回收站? (yes/no): ")
+            if (!confirmed) {
+                emitSystem("find: 已取消删除操作")
+                return
+            }
+        }
+
+        var successCount = 0
+        val affectedParentCids = mutableSetOf<String>()
+        for (target in targets) {
+            try {
+                val res = ctx.fileRepository.delete(
+                    pid = target.parentCid,
+                    fid = target.fid
+                )
+                if (res.state) {
+                    successCount++
+                    if (target.parentCid.isNotEmpty()) {
+                        affectedParentCids.add(target.parentCid)
+                    }
+                }
+            } catch (_: Exception) {
+            }
+        }
+
+        // 统一失效被影响目录的本地缓存，确保后续操作看到最新状态
+        affectedParentCids.forEach { cid ->
+            ctx.fileCacheManager.remove(cid)
+        }
+
+        emitSystem("find: 已成功删除 $successCount / ${targets.size} 个项目至回收站")
     }
 
     private fun parseFilterType(raw: String): Int? {

@@ -10,8 +10,10 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import github.zerorooot.nap511.bean.AvatarBean
+import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.Route
+import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.terminal.commands.CommandRegistryFactory
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.AutosuggestionEngine
@@ -27,6 +29,7 @@ import github.zerorooot.nap511.terminal.engine.TerminalLineEditor
 import github.zerorooot.nap511.util.FileOpener
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -38,8 +41,13 @@ class TerminalViewModel(
     initialPathList: List<PathBean> = emptyList(),
     avatarBean: AvatarBean = AvatarBean(),
 //    var onNavigateAction: ((Route) -> Unit)? = null,
-    fileOpener: FileOpener? = null
+    fileOpener: FileOpener? = null,
+    fileRepository: FileRepository = FileRepository.getInstance(),
+    private val mainDispatcher: CoroutineDispatcher? = null
 ) : ViewModel() {
+    private val uiDispatcher: CoroutineDispatcher
+        get() = mainDispatcher ?: runCatching { Dispatchers.Main }.getOrDefault(Dispatchers.Default)
+
     var avatarBean by mutableStateOf(avatarBean)
     var fileOpener: FileOpener? by mutableStateOf(fileOpener)
         private set
@@ -145,9 +153,10 @@ class TerminalViewModel(
         initialCid = initialCid,
         initialPath = initialPath,
         initialPathList = initialPathList,
+        fileRepository = fileRepository,
         onConfirmRequest = { prompt ->
             isWaitingConfirmation = true
-            appendTerminalLine(TerminalLine(prompt, TerminalLineType.PROMPT))
+            appendTerminalLine(TerminalLine(prompt, TerminalLineType.System.PROMPT))
             val deferred = CompletableDeferred<Boolean>()
             confirmDeferred = deferred
             deferred.await()
@@ -180,7 +189,7 @@ class TerminalViewModel(
     private fun loadPersistentHistory() {
         viewModelScope.launch(Dispatchers.IO) {
             val loaded = historyManager.loadRecentHistory(1000)
-            withContext(Dispatchers.Main) {
+            withContext(uiDispatcher) {
                 history.clear()
                 history.addAll(loaded)
                 historyPointer = -1
@@ -227,23 +236,23 @@ class TerminalViewModel(
     }
 
     private fun printWelcomeBanner() {
-        appendTerminalLine(TerminalLine("=== 115 Cloud Terminal (nap511) ===", TerminalLineType.SYSTEM))
+        appendTerminalLine(TerminalLine("=== 115 Cloud Terminal (nap511) ===", TerminalLineType.System.INFO))
         appendTerminalLine(
             TerminalLine(
                 "欢迎使用网盘极客终端！输入 '?' 或 'help' 可查看命令列表与快捷键指南。",
-                TerminalLineType.SYSTEM
+                TerminalLineType.System.INFO
             )
         )
         appendTerminalLine(
             TerminalLine(
                 "提示：支持管道 '|' 与通配符；悬浮栏已内置 CTRL / ALT 粘滞键与常用 Readline 快捷键。",
-                TerminalLineType.SYSTEM
+                TerminalLineType.System.INFO
             )
         )
         appendTerminalLine(
             TerminalLine(
                 "当前工作目录: $currentPath (cid: $currentCid)\n",
-                TerminalLineType.SYSTEM
+                TerminalLineType.System.INFO
             )
         )
     }
@@ -430,7 +439,7 @@ class TerminalViewModel(
 
         if (candidate.isDirectory) {
             // 目录补全：级联加载下一级子目录候选项
-            viewModelScope.launch {
+            viewModelScope.launch(uiDispatcher) {
                 baseInputText = newText
                 baseParsedContext = CompletionEngine.parseContext(newText, newCursor)
                 val nextResult = computeCompletions()
@@ -490,7 +499,7 @@ class TerminalViewModel(
         }
 
         // 1. 异步计算匹配候选
-        viewModelScope.launch {
+        viewModelScope.launch(uiDispatcher) {
             val result = computeCompletions()
             if (result.candidates.isEmpty()) {
                 if (ghostText.isNotEmpty()) {
@@ -549,7 +558,7 @@ class TerminalViewModel(
         }
     }
 
-    private suspend fun computeCompletions(): CompletionResult {
+    internal suspend fun computeCompletions(): CompletionResult {
         val cursor = inputState.selection.end
         val text = inputState.text
         val parsed = CompletionEngine.parseContext(text, cursor)
@@ -560,7 +569,19 @@ class TerminalViewModel(
         }
 
         val directoryFiles = if (parsed.contextType == CompletionContextType.PATH) {
-            if (parsed.parentPath.isEmpty()) {
+            if (parsed.commandName == "trash") {
+                // 回收站管理专属智能预测：拉取回收站中的真实待清理文件列表供补全与还原
+                runCatching {
+                    context.fileRepository.recycleList().recycleBeanList.map { item ->
+                        FileBean(
+                            name = item.fileName,
+                            fileId = item.id,
+                            size = item.fileSize,
+                            isFolder = item.isFolder
+                        )
+                    }
+                }.getOrDefault(emptyList())
+            } else if (parsed.parentPath.isEmpty()) {
                 context.listDirectory(currentCid)
             } else {
                 val resolved = context.resolvePath(parsed.parentPath)
@@ -594,7 +615,7 @@ class TerminalViewModel(
         dismissCompletionBar()
 
         if (isWaitingConfirmation) {
-            appendTerminalLine(TerminalLine(raw, TerminalLineType.COMMAND))
+            appendTerminalLine(TerminalLine(raw, TerminalLineType.System.COMMAND))
             val isConfirmed =
                 raw.equals("yes", ignoreCase = true) || raw.equals("y", ignoreCase = true)
             isWaitingConfirmation = false
@@ -609,7 +630,7 @@ class TerminalViewModel(
         }
 
         if (raw.isEmpty()) {
-            appendTerminalLine(TerminalLine(promptText(), TerminalLineType.COMMAND))
+            appendTerminalLine(TerminalLine(promptText(), TerminalLineType.System.COMMAND))
             return
         }
 
@@ -629,7 +650,7 @@ class TerminalViewModel(
         }
 
         // 统一双行格式入屏：第 1 行完整路径上下文，第 2 行提示符与用户命令
-        appendTerminalLine(TerminalLine("${contextPromptText()}\n$ $raw", TerminalLineType.COMMAND))
+        appendTerminalLine(TerminalLine("${contextPromptText()}\n$ $raw", TerminalLineType.System.COMMAND))
 
         isExecuting = true
         currentExecutionJob = viewModelScope.launch(Dispatchers.IO) {
@@ -647,7 +668,7 @@ class TerminalViewModel(
                     if (buffer.isNotEmpty()) {
                         val toAdd = buffer.toList()
                         buffer.clear()
-                        withContext(Dispatchers.Main) {
+                        withContext(uiDispatcher) {
                             appendTerminalLines(toAdd)
                         }
                     }
@@ -656,12 +677,12 @@ class TerminalViewModel(
                 flow.collect { output ->
                     if (output.text == TerminalControlTokens.CLEAR_SCREEN) {
                         flushBuffer()
-                        withContext(Dispatchers.Main) {
+                        withContext(uiDispatcher) {
                             lines.clear()
                         }
                     } else if (output.text == TerminalControlTokens.EXIT) {
                         flushBuffer()
-                        withContext(Dispatchers.Main) {
+                        withContext(uiDispatcher) {
                             resetSession()
                             onExitAction?.invoke()
                         }
@@ -686,11 +707,11 @@ class TerminalViewModel(
             } catch (e: CancellationException) {
                 // 协程被 Ctrl+C 中断正常退出，不作为异常打印
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    appendTerminalLine(TerminalLine("execution error: ${e.message}", TerminalLineType.ERROR))
+                withContext(uiDispatcher) {
+                    appendTerminalLine(TerminalLine("execution error: ${e.message}", TerminalLineType.System.ERROR))
                 }
             } finally {
-                withContext(Dispatchers.Main) {
+                withContext(uiDispatcher) {
                     isExecuting = false
                     currentExecutionJob = null
                 }
@@ -714,10 +735,10 @@ class TerminalViewModel(
             currentExecutionJob?.cancel()
             currentExecutionJob = null
             isExecuting = false
-            appendTerminalLine(TerminalLine("^C", TerminalLineType.OUTPUT_TEXT))
+            appendTerminalLine(TerminalLine("^C", TerminalLineType.Output.TEXT))
         } else {
             val raw = inputState.text
-            appendTerminalLine(TerminalLine("${contextPromptText()}\n$ $raw^C", TerminalLineType.COMMAND))
+            appendTerminalLine(TerminalLine("${contextPromptText()}\n$ $raw^C", TerminalLineType.System.COMMAND))
             inputState = TextFieldValue("")
             ghostText = ""
         }

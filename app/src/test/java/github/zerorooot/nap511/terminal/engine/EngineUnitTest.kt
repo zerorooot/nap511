@@ -70,7 +70,7 @@ class EngineUnitTest {
         // 测试自动 -h
         val ctx = TerminalContext()
         val helpOutput = def!!.execute(ctx, listOf("-h"), kotlinx.coroutines.flow.emptyFlow()).toList()
-        assertEquals(TerminalLineType.HELP, helpOutput.first().type)
+        assertEquals(TerminalLineType.System.HELP, helpOutput.first().type)
         val fullHelpText = helpOutput.joinToString("\n") { it.text }
         assertTrue(fullHelpText.contains("测试命令"))
         assertTrue(fullHelpText.contains("-a"))
@@ -295,7 +295,7 @@ class EngineUnitTest {
         val result = engine.execute("echo 'apple\nbanana\napricot' | grep ap | wc", ctx).toList()
         assertEquals(1, result.size)
         assertEquals("2", result[0].text)
-        assertEquals(TerminalLineType.OUTPUT_TEXT, result[0].type)
+        assertEquals(TerminalLineType.Output.TEXT, result[0].type)
     }
 
     @Test
@@ -306,9 +306,9 @@ class EngineUnitTest {
 
         val output = engine.execute("unknown_cmd -a", ctx).toList()
         assertEquals(2, output.size)
-        assertEquals(TerminalLineType.ERROR, output[0].type)
+        assertEquals(TerminalLineType.System.ERROR, output[0].type)
         assertTrue(output[0].text.contains("terminal: command not found: unknown_cmd"))
-        assertEquals(TerminalLineType.HELP, output[1].type)
+        assertEquals(TerminalLineType.System.HELP, output[1].type)
         assertTrue(output[1].text.contains("输入 '?' 或 'help'"))
     }
 

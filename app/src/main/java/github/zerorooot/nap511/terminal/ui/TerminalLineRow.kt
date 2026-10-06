@@ -29,7 +29,7 @@ fun TerminalLineRow(
     when (line.type) {
         // 普通文本输出（echo, wc, stat, 普通管道等，占绝大多数终端行）
         // 核心直通渲染通道：直接单色渲染，实现极致滚动性能
-        TerminalLineType.OUTPUT_TEXT -> {
+        is TerminalLineType.Output.TEXT -> {
             Text(
                 text = line.text,
                 color = TerminalColors.TextPrimary,
@@ -42,7 +42,7 @@ fun TerminalLineRow(
             )
         }
 
-        TerminalLineType.HELP -> {
+        is TerminalLineType.System.HELP -> {
             Text(
                 text = line.text,
                 color = TerminalColors.TextMuted,
@@ -56,7 +56,7 @@ fun TerminalLineRow(
         }
 
         // 双行历史命令美化格式（第 1 行上下文路径，第 2 行提示符与命令）
-        TerminalLineType.COMMAND if line.text.contains("\n$ ") -> {
+        is TerminalLineType.System.COMMAND if line.text.contains("\n$ ") -> {
             val annotatedString = remember(line.text, theme) {
                 TerminalStyleParser.parseCommandLine(line.text, theme)
             }
@@ -72,11 +72,11 @@ fun TerminalLineRow(
         }
 
         // 富文本输出类型：按显式 TerminalLineType 委托给 TerminalStyleParser 组装样式
-        TerminalLineType.OUTPUT_FILE_ENTRY,
-        TerminalLineType.OUTPUT_PATH_ENTRY,
-        TerminalLineType.OUTPUT_LONG_LISTING,
-        TerminalLineType.OUTPUT_FIND_CATEGORY,
-        TerminalLineType.OUTPUT_ANSI -> {
+        is TerminalLineType.Output.FILE_ENTRY,
+        is TerminalLineType.Output.PATH_ENTRY,
+        is TerminalLineType.Output.LONG_LISTING,
+        is TerminalLineType.Output.FIND_CATEGORY,
+        is TerminalLineType.Output.ANSI -> {
             val annotatedString = remember(line.text, line.type, theme) {
                 TerminalStyleParser.parseLine(line.text, line.type, theme)
             }
@@ -91,23 +91,8 @@ fun TerminalLineRow(
             )
         }
 
-        @Suppress("DEPRECATION")
-        TerminalLineType.OUTPUT -> {
-            val annotatedString = remember(line.text, theme) {
-                TerminalStyleParser.parseLine(line.text, TerminalLineType.OUTPUT, theme)
-            }
-            Text(
-                text = annotatedString,
-                fontSize = 13.sp,
-                fontFamily = FontFamily.Monospace,
-                lineHeight = 18.sp,
-                modifier = modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 1.dp)
-            )
-        }
 
-        TerminalLineType.SYSTEM -> {
+        is TerminalLineType.System.INFO -> {
             Text(
                 text = line.text,
                 color = TerminalColors.System,
@@ -120,7 +105,7 @@ fun TerminalLineRow(
             )
         }
 
-        TerminalLineType.COMMAND -> {
+        is TerminalLineType.System.COMMAND -> {
             Text(
                 text = line.text,
                 color = TerminalColors.Command,
@@ -133,7 +118,7 @@ fun TerminalLineRow(
             )
         }
 
-        TerminalLineType.ERROR -> {
+        is TerminalLineType.System.ERROR -> {
             Text(
                 text = line.text,
                 color = TerminalColors.Error,
@@ -146,7 +131,7 @@ fun TerminalLineRow(
             )
         }
 
-        TerminalLineType.PROMPT -> {
+        is TerminalLineType.System.PROMPT -> {
             Text(
                 text = line.text,
                 color = TerminalColors.PromptConfirm,

@@ -32,9 +32,9 @@ class HelpCommand(
         args: List<String>,
         stdin: Flow<String>
     ): Flow<TerminalOutput> = flow {
-        // 调用注册表的 buildAllHelpMessage 汇总全部已注册命令及按键帮助，源头直接赋予 TerminalLineType.HELP
+        // 调用注册表的 buildAllHelpMessage 汇总全部已注册命令及按键帮助，源头直接赋予 TerminalLineType.System.HELP
         for (line in registrySupplier().buildAllHelpMessage().split('\n')) {
-            emit(TerminalOutput(line, TerminalLineType.HELP))
+            emit(TerminalOutput(line, TerminalLineType.System.HELP))
         }
     }
 }

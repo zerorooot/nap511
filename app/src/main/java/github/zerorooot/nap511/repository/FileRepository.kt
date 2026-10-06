@@ -53,7 +53,7 @@ import kotlin.math.log10
 import kotlin.math.pow
 import kotlin.time.Duration.Companion.milliseconds
 
-class FileRepository {
+open class FileRepository {
     companion object {
         @Volatile
         private var INSTANCE: FileRepository? = null
@@ -172,7 +172,7 @@ class FileRepository {
 
     //-----------------离线下载结束--------------------------------
 
-    suspend fun getFiles(
+    open suspend fun getFiles(
         cid: String,
         showDir: Int = 1,
         aid: Int = 1,
@@ -197,13 +197,13 @@ class FileRepository {
         return fileService.deleteMultiple(data)
     }
 
-    suspend fun search(
+    open suspend fun search(
         cid: String, searchValue: String, aid: Int = 1, asc: Int = 0, limit: Int = 999
     ): FilesBean {
         return fileService.search(cid, searchValue, aid, asc, limit)
     }
 
-    suspend fun filterFile(cid: String, type: Int, limit: Int = 999): FilesBean {
+    open suspend fun filterFile(cid: String, type: Int, limit: Int = 999): FilesBean {
         return fileService.filterFile(cid = cid, type = type, limit = limit)
     }
 
@@ -270,7 +270,7 @@ class FileRepository {
         return executeWithRetry { fileService.move(body) }
     }
 
-    suspend fun recycleList(
+    open suspend fun recycleList(
         aid: String = "7",
         cid: String = "0",
         offset: String = "0",
@@ -279,11 +279,11 @@ class FileRepository {
         return fileService.recycleList(aid, cid, offset, limit)
     }
 
-    suspend fun revert(rid: String): BaseReturnMessage {
+    open suspend fun revert(rid: String): BaseReturnMessage {
         return fileService.revert(rid)
     }
 
-    suspend fun recycleCleanAll(password: String = ""): BaseReturnMessage {
+    open suspend fun recycleCleanAll(password: String = ""): BaseReturnMessage {
         return fileService.recycleCleanAll(password)
     }
 
@@ -300,7 +300,7 @@ class FileRepository {
         return returnCid
     }
 
-    suspend fun delete(pid: String, fid: String): BaseReturnMessage {
+    open suspend fun delete(pid: String, fid: String): BaseReturnMessage {
         return executeWithRetry { fileService.delete(pid, fid) }
     }
 

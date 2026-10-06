@@ -28,6 +28,6 @@ class ExitCommand : TerminalCommand {
         stdin: Flow<String>
     ): Flow<TerminalOutput> = flow {
         // 输出统一控制标记通知终端会话退出
-        emit(TerminalOutput(TerminalControlTokens.EXIT, TerminalLineType.SYSTEM))
+        emit(TerminalOutput(TerminalControlTokens.EXIT, TerminalLineType.System.INFO))
     }
 }

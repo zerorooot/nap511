@@ -3,20 +3,20 @@ package github.zerorooot.nap511.terminal.commands.file
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
-import github.zerorooot.nap511.terminal.viewmodel.emitText
+import github.zerorooot.nap511.terminal.viewmodel.emitPath
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
 /**
  * 打印当前工作目录路径命令（pwd）
  *
- * 输出当前工作目录的规范路径及其在 115 网盘系统中的真实分类目录 ID（CID）。
+ * 输出当前工作目录的纯净绝对路径，遵循 Unix 标准，保证管道与参数传递的无缝互操作性。
  */
 class PwdCommand : TerminalCommand {
 
     override val name: String = "pwd"
 
-    override val description: String = "打印当前工作目录路径及 CID"
+    override val description: String = "打印当前工作目录绝对路径"
 
     override val usage: String = "pwd"
 
@@ -25,6 +25,6 @@ class PwdCommand : TerminalCommand {
         args: List<String>,
         stdin: Flow<String>
     ): Flow<TerminalOutput> = flow {
-        emitText("${ctx.currentPath} (cid: ${ctx.currentCid})")
+        emitPath(ctx.currentPath)
     }
 }

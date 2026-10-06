@@ -1,7 +1,11 @@
 package github.zerorooot.nap511.terminal.commands
 
+import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FilesBean
+import github.zerorooot.nap511.bean.RecycleBean
+import github.zerorooot.nap511.bean.RecycleInfo
+import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.PipelineEngine
 import github.zerorooot.nap511.terminal.viewmodel.TerminalLineType
@@ -71,7 +75,7 @@ class CommandsUnitTest {
 
         val out = engine.execute("ls -h", ctx).toList()
         assertTrue(out.isNotEmpty())
-        assertEquals("帮助拦截必须在源头携带 TerminalLineType.HELP 语义类型", TerminalLineType.HELP, out.first().type)
+        assertEquals("帮助拦截必须在源头携带 TerminalLineType.System.HELP 语义类型", TerminalLineType.System.HELP, out.first().type)
         val text = out.joinToString("\n") { it.text }
         assertTrue(text.contains("ls"))
         assertTrue(text.contains("-l"))
@@ -80,7 +84,7 @@ class CommandsUnitTest {
 
         val findHelpList = engine.execute("find -h", ctx).toList()
         assertTrue(findHelpList.isNotEmpty())
-        assertEquals("find -h 必须在源头携带 TerminalLineType.HELP 语义类型", TerminalLineType.HELP, findHelpList.first().type)
+        assertEquals("find -h 必须在源头携带 TerminalLineType.System.HELP 语义类型", TerminalLineType.System.HELP, findHelpList.first().type)
         val findHelp = findHelpList.joinToString("\n") { it.text }
         assertTrue(findHelp.contains("find"))
         assertTrue(findHelp.contains("-filter"))
@@ -97,7 +101,7 @@ class CommandsUnitTest {
         val outChineseList = engine.execute("man", ctx).toList()
         val outHelpList = engine.execute("help", ctx).toList()
 
-        assertEquals("help 汇总输出必须在源头携带 TerminalLineType.HELP 语义类型", TerminalLineType.HELP, outChineseList.first().type)
+        assertEquals("help 汇总输出必须在源头携带 TerminalLineType.System.HELP 语义类型", TerminalLineType.System.HELP, outChineseList.first().type)
         val outAscii = outAsciiList.joinToString("\n") { it.text }
         val outChinese = outChineseList.joinToString("\n") { it.text }
         val outHelp = outHelpList.joinToString("\n") { it.text }
@@ -543,11 +547,11 @@ class CommandsUnitTest {
         val ctx = TerminalContext()
 
         val out = engine.executeStrings("pwd", ctx)
-        assertEquals(listOf("/ (cid: 0)"), out)
+        assertEquals(listOf("/"), out)
 
         ctx.updateDirectory("99", "/根目录/work")
         val outWork = engine.executeStrings("pwd", ctx)
-        assertEquals(listOf("/根目录/work (cid: 99)"), outWork)
+        assertEquals(listOf("/根目录/work"), outWork)
     }
 
     @Test
@@ -770,28 +774,194 @@ class CommandsUnitTest {
         val engine = PipelineEngine(registry)
         val ctx = TerminalContext()
 
-        // 1. 普通文本输出 echo -> OUTPUT_TEXT
+        // 1. 普通文本输出 echo -> Output.TEXT
         val echoOut = engine.execute("echo hello", ctx).toList()
-        assertEquals(TerminalLineType.OUTPUT_TEXT, echoOut[0].type)
+        assertEquals(TerminalLineType.Output.TEXT, echoOut[0].type)
 
-        // 2. 文件列表 ls -> OUTPUT_FILE_ENTRY
+        // 2. 文件列表 ls -> Output.FILE_ENTRY
         val file = FileBean(name = "test.txt", fileId = "1", isFolder = false)
         ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(file), cid = "0", count = 1, order = "", path = emptyList()))
         val lsOut = engine.execute("ls", ctx).toList()
-        assertEquals(TerminalLineType.OUTPUT_FILE_ENTRY, lsOut[0].type)
+        assertEquals(TerminalLineType.Output.FILE_ENTRY, lsOut[0].type)
 
-        // 3. 详细列表 ls -l -> 第一行 "total N" (OUTPUT_TEXT)，后续文件行 (OUTPUT_LONG_LISTING)
+        // 3. 详细列表 ls -l -> 第一行 "total N" (Output.TEXT)，后续文件行 (Output.LONG_LISTING)
         val lsLongOut = engine.execute("ls -l", ctx).toList()
         assertEquals(2, lsLongOut.size)
-        assertEquals(TerminalLineType.OUTPUT_TEXT, lsLongOut[0].type)
-        assertEquals(TerminalLineType.OUTPUT_LONG_LISTING, lsLongOut[1].type)
+        assertEquals(TerminalLineType.Output.TEXT, lsLongOut[0].type)
+        assertEquals(TerminalLineType.Output.LONG_LISTING, lsLongOut[1].type)
 
-        // 4. 路径输出 find -> OUTPUT_PATH_ENTRY
+        // 4. 路径输出 find -> Output.PATH_ENTRY
         val findOut = engine.execute("find test.txt", ctx).toList()
-        assertEquals(TerminalLineType.OUTPUT_PATH_ENTRY, findOut[0].type)
+        assertEquals(TerminalLineType.Output.PATH_ENTRY, findOut[0].type)
 
-        // 5. 错误输出 -> ERROR
+        // 5. 错误输出 -> System.ERROR
         val errOut = engine.execute("rm", ctx).toList()
-        assertEquals(TerminalLineType.ERROR, errOut[0].type)
+        assertEquals(TerminalLineType.System.ERROR, errOut[0].type)
+    }
+
+    @Test
+    fun testFindFilterPipeXargsRm() = runBlocking {
+        val folderT1 = FileBean(name = "t1", categoryId = "10", isFolder = true)
+        val f1 = FileBean(name = "backup archive 2026 part1.zip", fileId = "101", isFolder = false, size = "303649000")
+        val f2 = FileBean(name = "backup archive 2026 part2.zip", fileId = "102", isFolder = false, size = "25171000")
+        val f3 = FileBean(name = "backup archive 2026 part3.zip", fileId = "103", isFolder = false, size = "148537000")
+
+        val deletedFiles = mutableListOf<Pair<String, String>>()
+        val mockRepo = object : FileRepository() {
+            override suspend fun getFiles(
+                cid: String,
+                showDir: Int,
+                aid: Int,
+                asc: Int,
+                naturalSort: Int,
+                order: String,
+                limit: Int,
+                format: String
+            ): FilesBean {
+                return if (cid == "0") {
+                    FilesBean(fileBeanList = arrayListOf(folderT1), cid = "0", count = 1, order = "", path = emptyList())
+                } else {
+                    FilesBean(fileBeanList = arrayListOf(f1, f2, f3), cid = "10", count = 3, order = "", path = emptyList())
+                }
+            }
+
+            override suspend fun filterFile(cid: String, type: Int, limit: Int): FilesBean {
+                return FilesBean(fileBeanList = arrayListOf(f1, f2, f3), cid = cid, count = 3, order = "", path = emptyList())
+            }
+
+            override suspend fun delete(pid: String, fid: String): BaseReturnMessage {
+                deletedFiles.add(pid to fid)
+                return BaseReturnMessage(state = true)
+            }
+        }
+
+        val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
+        val engine = PipelineEngine(registry)
+        val ctx = TerminalContext(fileRepository = mockRepo, onConfirmRequest = { true })
+
+        ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(folderT1), cid = "0", count = 1, order = "", path = emptyList()))
+        ctx.fileCacheManager.put("10", FilesBean(fileBeanList = arrayListOf(f1, f2, f3), cid = "10", count = 3, order = "", path = emptyList()))
+
+        val outputs = engine.executeStrings("find t1/ -filter 5 | xargs -t -I _ rm _", ctx)
+
+        // 验证系统行被隔离：xargs 不会执行 rm 分类筛选结果
+        assertFalse(outputs.any { it.contains("cannot remove '分类筛选结果") })
+        // 验证 3 个文件成功删除
+        assertEquals(3, deletedFiles.size)
+        assertEquals(listOf("10" to "101", "10" to "102", "10" to "103"), deletedFiles)
+    }
+
+    @Test
+    fun testFindWithDeleteInteractiveConfirmAndCancel() = runBlocking {
+        val deletedFiles = mutableListOf<Pair<String, String>>()
+        val mockRepo = object : FileRepository() {
+            override suspend fun filterFile(cid: String, type: Int, limit: Int): FilesBean {
+                val f1 = FileBean(name = "a.zip", fileId = "101", isFolder = false)
+                val f2 = FileBean(name = "b.zip", fileId = "102", isFolder = false)
+                return FilesBean(fileBeanList = arrayListOf(f1, f2), cid = cid, count = 2, order = "", path = emptyList())
+            }
+
+            override suspend fun delete(pid: String, fid: String): BaseReturnMessage {
+                deletedFiles.add(pid to fid)
+                return BaseReturnMessage(state = true)
+            }
+        }
+
+        val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
+        val engine = PipelineEngine(registry)
+
+        // 1. 用户取消确认
+        val cancelCtx = TerminalContext(fileRepository = mockRepo, onConfirmRequest = { false })
+        val cancelOut = engine.executeStrings("find -filter 5 -delete", cancelCtx)
+        assertTrue(cancelOut.any { it.contains("find: 已取消删除操作") })
+        assertEquals(0, deletedFiles.size)
+
+        // 2. 用户确认删除
+        val confirmCtx = TerminalContext(fileRepository = mockRepo, onConfirmRequest = { true })
+        val confirmOut = engine.executeStrings("find -filter 5 -delete", confirmCtx)
+        assertTrue(confirmOut.any { it.contains("已成功删除 2 / 2 个项目") })
+        assertEquals(2, deletedFiles.size)
+    }
+
+    @Test
+    fun testFindWithDeleteForceFlag() = runBlocking {
+        val deletedFiles = mutableListOf<Pair<String, String>>()
+        val mockRepo = object : FileRepository() {
+            override suspend fun filterFile(cid: String, type: Int, limit: Int): FilesBean {
+                val f1 = FileBean(name = "doc.pdf", fileId = "201", isFolder = false)
+                return FilesBean(fileBeanList = arrayListOf(f1), cid = cid, count = 1, order = "", path = emptyList())
+            }
+
+            override suspend fun delete(pid: String, fid: String): BaseReturnMessage {
+                deletedFiles.add(pid to fid)
+                return BaseReturnMessage(state = true)
+            }
+        }
+
+        val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
+        val engine = PipelineEngine(registry)
+
+        // 即使 onConfirmRequest 为 false，-f 标志也会跳过交互确认直接删除
+        val ctx = TerminalContext(fileRepository = mockRepo, onConfirmRequest = { false })
+        val out = engine.executeStrings("find -filter 5 -delete -f", ctx)
+        assertTrue(out.any { it.contains("已成功删除 1 / 1 个项目") })
+        assertEquals(1, deletedFiles.size)
+        assertEquals("0" to "201", deletedFiles[0])
+    }
+
+    @Test
+    fun testTrashRevertByFileNameAndRid() = runBlocking {
+        val revertedRids = mutableListOf<String>()
+        val mockRepo = object : FileRepository() {
+            override suspend fun recycleList(
+                aid: String,
+                cid: String,
+                offset: String,
+                limit: String
+            ): RecycleInfo {
+                return RecycleInfo(
+                    state = true,
+                    recycleBeanList = arrayListOf(
+                        RecycleBean(id = "8801", fileName = "project_backup.zip", isFolder = false),
+                        RecycleBean(id = "8802", fileName = "notes.txt", isFolder = false)
+                    )
+                )
+            }
+
+            override suspend fun revert(rid: String): BaseReturnMessage {
+                revertedRids.add(rid)
+                return BaseReturnMessage(state = true)
+            }
+        }
+
+        val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
+        val engine = PipelineEngine(registry)
+        val ctx = TerminalContext(fileRepository = mockRepo)
+
+        // 1. 通过文件名还原
+        val outName = engine.executeStrings("trash -r project_backup.zip", ctx)
+        assertEquals(listOf("trash: 已还原 'project_backup.zip' (rid: 8801)"), outName)
+        assertEquals(listOf("8801"), revertedRids)
+
+        // 2. 通过 RID 直接还原
+        val outRid = engine.executeStrings("trash -r 8802", ctx)
+        assertEquals(listOf("trash: 已还原 '8802'"), outRid)
+        assertEquals(listOf("8801", "8802"), revertedRids)
+
+        // 3. 还原不存在的文件报错
+        val outNotFound = engine.executeStrings("trash -r non_existing.doc", ctx)
+        assertEquals(listOf("trash: 未在回收站中找到 'non_existing.doc'"), outNotFound)
+    }
+
+    @Test
+    fun testPipelineDiagnosticChannelIsolation() = runBlocking {
+        val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
+        val engine = PipelineEngine(registry)
+        val ctx = TerminalContext()
+
+        // find 针对空目录或无匹配项会 emitSystem("未找到匹配的项目")
+        // 当管道连接到 wc -l 时，System.INFO 行不会进入下游，下游计数应为 0
+        val outEmptyFindPipe = engine.executeStrings("find -suffix nonexistent | wc -l", ctx)
+        assertEquals(listOf("0"), outEmptyFindPipe)
     }
 }

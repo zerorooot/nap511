@@ -1,7 +1,6 @@
 package github.zerorooot.nap511.viewmodel
 
 import android.annotation.SuppressLint
-import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.viewModelScope
 import coil.annotation.ExperimentalCoilApi
 import coil.imageLoader
@@ -288,7 +287,7 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
             sizeString = (fileBean.size.toLongOrNull() ?: 0L).formatFileSize() + " "
             modifiedTimeString = fileBean.modifiedTime
 
-            if (fileBean.modifiedTime.isDigitsOnly()) {
+            if (fileBean.modifiedTime.isNotEmpty() && fileBean.modifiedTime.all { it.isDigit() }) {
                 val parsedTime = runCatching {
                     dateFormat.parse(fileBean.modifiedTime)?.time?.div(1000)
                 }.getOrNull()

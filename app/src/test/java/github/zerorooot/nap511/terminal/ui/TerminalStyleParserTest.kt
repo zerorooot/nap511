@@ -102,7 +102,7 @@ class TerminalStyleParserTest {
         assertEquals(theme.apkStyle, apkParsed.spanStyles[0].item)
 
         // 验证通过 parseLine 统一入口以 OUTPUT_FILE_ENTRY 类型分发的结果一致
-        val viaParseLine = TerminalStyleParser.parseLine("nap511.apk", TerminalLineType.OUTPUT_FILE_ENTRY, theme)
+        val viaParseLine = TerminalStyleParser.parseLine("nap511.apk", TerminalLineType.Output.FILE_ENTRY, theme)
         assertEquals(apkParsed.spanStyles, viaParseLine.spanStyles)
     }
 
@@ -118,8 +118,8 @@ class TerminalStyleParserTest {
               Alt + B / F     光标按单词向左 / 向右跳跃
         """.trimIndent()
 
-        // 帮助文档行通过 TerminalLineType.HELP 显式类型分发，零跨行正则开销，不产生杂乱 SpanStyle
-        val parsed = TerminalStyleParser.parseLine(helpText, TerminalLineType.HELP, theme)
+        // 帮助文档行通过 TerminalLineType.System.HELP 显式类型分发，零跨行正则开销，不产生杂乱 SpanStyle
+        val parsed = TerminalStyleParser.parseLine(helpText, TerminalLineType.System.HELP, theme)
         assertEquals(helpText, parsed.text)
         assertTrue("HELP 类型纯文本由屏幕层统一着色，无需内部附加多余 spanStyles", parsed.spanStyles.isEmpty())
     }
@@ -136,13 +136,13 @@ class TerminalStyleParserTest {
 
         testLines.forEach { line ->
             // 在类型化架构中，帮助行与普通文本行显式分发，绝不会走路径高亮器，杜绝 metadataStyle 误染
-            val parsedHelp = TerminalStyleParser.parseLine(line, TerminalLineType.HELP, theme)
+            val parsedHelp = TerminalStyleParser.parseLine(line, TerminalLineType.System.HELP, theme)
             assertFalse(
                 "HELP 类型的行 [$line] 不应包含 metadataStyle 路径样式",
                 parsedHelp.spanStyles.any { it.item == theme.metadataStyle }
             )
 
-            val parsedText = TerminalStyleParser.parseLine(line, TerminalLineType.OUTPUT_TEXT, theme)
+            val parsedText = TerminalStyleParser.parseLine(line, TerminalLineType.Output.TEXT, theme)
             assertFalse(
                 "OUTPUT_TEXT 类型的行 [$line] 不应包含 metadataStyle 路径样式",
                 parsedText.spanStyles.any { it.item == theme.metadataStyle }
@@ -163,22 +163,22 @@ class TerminalStyleParserTest {
         assertEquals(theme.videoStyle, parsed.spanStyles[1].item)
         assertEquals("007.mp4", pathLine.substring(parsed.spanStyles[1].start, parsed.spanStyles[1].end))
 
-        // 同时验证通过 parseLine 统一入口以 TerminalLineType.OUTPUT_PATH_ENTRY 分发
-        val viaParseLine = TerminalStyleParser.parseLine(pathLine, TerminalLineType.OUTPUT_PATH_ENTRY, theme)
+        // 同时验证通过 parseLine 统一入口以 TerminalLineType.Output.PATH_ENTRY 分发
+        val viaParseLine = TerminalStyleParser.parseLine(pathLine, TerminalLineType.Output.PATH_ENTRY, theme)
         assertEquals(parsed.spanStyles, viaParseLine.spanStyles)
     }
 
     @Test
     fun testParseFindCategoryLine() {
         val dirCategoryLine = "[目录] Movies  (-)"
-        val parsedDir = TerminalStyleParser.parseLine(dirCategoryLine, TerminalLineType.OUTPUT_FIND_CATEGORY, theme)
+        val parsedDir = TerminalStyleParser.parseLine(dirCategoryLine, TerminalLineType.Output.FIND_CATEGORY, theme)
         assertEquals(dirCategoryLine, parsedDir.text)
         assertTrue(parsedDir.spanStyles.isNotEmpty())
         assertEquals(theme.metadataStyle, parsedDir.spanStyles[0].item)
         assertEquals(theme.folderStyle, parsedDir.spanStyles[1].item)
 
         val fileCategoryLine = "[文件] song.mp3  (3.5 MB)"
-        val parsedFile = TerminalStyleParser.parseLine(fileCategoryLine, TerminalLineType.OUTPUT_FIND_CATEGORY, theme)
+        val parsedFile = TerminalStyleParser.parseLine(fileCategoryLine, TerminalLineType.Output.FIND_CATEGORY, theme)
         assertEquals(fileCategoryLine, parsedFile.text)
         assertEquals(theme.metadataStyle, parsedFile.spanStyles[0].item)
         assertEquals(theme.audioStyle, parsedFile.spanStyles[1].item)
@@ -188,11 +188,11 @@ class TerminalStyleParserTest {
     fun testParseLineDirectOutputTextZeroOverhead() {
         val plainText = "total 42 items calculated"
         val types = listOf(
-            TerminalLineType.OUTPUT_TEXT,
-            TerminalLineType.SYSTEM,
-            TerminalLineType.COMMAND,
-            TerminalLineType.ERROR,
-            TerminalLineType.PROMPT
+            TerminalLineType.Output.TEXT,
+            TerminalLineType.System.INFO,
+            TerminalLineType.System.COMMAND,
+            TerminalLineType.System.ERROR,
+            TerminalLineType.System.PROMPT
         )
 
         for (type in types) {
@@ -205,7 +205,7 @@ class TerminalStyleParserTest {
     @Test
     fun testParseLineAnsiDispatch() {
         val ansiText = "\u001B[32mSuccess\u001B[0m"
-        val parsed = TerminalStyleParser.parseLine(ansiText, TerminalLineType.OUTPUT_ANSI, theme)
+        val parsed = TerminalStyleParser.parseLine(ansiText, TerminalLineType.Output.ANSI, theme)
         assertEquals("Success", parsed.text)
         assertEquals(1, parsed.spanStyles.size)
         assertEquals(TerminalColors.Ansi.Green, parsed.spanStyles[0].item.color)
@@ -214,7 +214,7 @@ class TerminalStyleParserTest {
     @Test
     fun testParseLineMultilinePreservesLineBreaksAndStyles() {
         val multiline = "video.mp4\nsong.flac\npicture.png"
-        val parsed = TerminalStyleParser.parseLine(multiline, TerminalLineType.OUTPUT_FILE_ENTRY, theme)
+        val parsed = TerminalStyleParser.parseLine(multiline, TerminalLineType.Output.FILE_ENTRY, theme)
         assertEquals(multiline, parsed.text)
         // 3 行各自拥有对应的高亮样式
         assertEquals(3, parsed.spanStyles.size)
@@ -265,7 +265,7 @@ class TerminalStyleParserTest {
     @Test
     fun testParseCommandLineMultilineContextAndPrompt() {
         val commandLine = "/Movies/Sci-Fi\n$ ls -la"
-        val parsed = TerminalStyleParser.parseLine(commandLine, TerminalLineType.COMMAND, theme)
+        val parsed = TerminalStyleParser.parseLine(commandLine, TerminalLineType.System.COMMAND, theme)
         assertEquals(commandLine, parsed.text)
 
         // 验证三段 SpanStyle：
@@ -295,7 +295,7 @@ class TerminalStyleParserTest {
     @Test
     fun testParseCommandLineSingleLineWithoutPrompt() {
         val singleCmd = "echo hello world"
-        val parsed = TerminalStyleParser.parseLine(singleCmd, TerminalLineType.COMMAND, theme)
+        val parsed = TerminalStyleParser.parseLine(singleCmd, TerminalLineType.System.COMMAND, theme)
         assertEquals(singleCmd, parsed.text)
         // 单行无 "\n$ " 的命令作为直通纯文本返回，零多余 SpanStyle
         assertTrue(parsed.spanStyles.isEmpty())

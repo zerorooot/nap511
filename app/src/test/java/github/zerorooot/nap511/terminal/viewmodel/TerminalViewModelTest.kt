@@ -3,18 +3,32 @@ package github.zerorooot.nap511.terminal.viewmodel
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import github.zerorooot.nap511.bean.AvatarBean
+import github.zerorooot.nap511.bean.RecycleBean
+import github.zerorooot.nap511.bean.RecycleInfo
+import github.zerorooot.nap511.repository.FileRepository
+import github.zerorooot.nap511.terminal.engine.CompletionResult
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class TerminalViewModelTest {
 
+    private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var viewModel: TerminalViewModel
 
     @Before
     fun setup() {
+        Dispatchers.setMain(testDispatcher)
         val avatar = AvatarBean(
             face = "",
             userName = "tester",
@@ -23,8 +37,14 @@ class TerminalViewModelTest {
         viewModel = TerminalViewModel(
             initialCid = "0",
             initialPath = "/",
-            avatarBean = avatar
+            avatarBean = avatar,
+            mainDispatcher = testDispatcher
         )
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
     }
 
     @Test
@@ -234,7 +254,7 @@ class TerminalViewModelTest {
         assertEquals("/MyFolder", viewModel.currentPath)
 
         // 模拟用户在终端执行操作，添加了行内容
-        viewModel.lines.add(TerminalLine("custom test output", TerminalLineType.OUTPUT_TEXT))
+        viewModel.lines.add(TerminalLine("custom test output", TerminalLineType.Output.TEXT))
         val countBefore = viewModel.lines.size
 
         // 2. 当前会话保持状态（如从 open 文件预览返回），不应被覆盖
@@ -272,7 +292,7 @@ class TerminalViewModelTest {
         viewModel.handleCtrlC()
 
         // 验证历史屏幕记录为双行：第一行路径，第二行 $ 命令 + ^C
-        val commandLine = viewModel.lines.lastOrNull { it.type == TerminalLineType.COMMAND }
+        val commandLine = viewModel.lines.lastOrNull { it.type == TerminalLineType.System.COMMAND }
         assertTrue(commandLine != null)
         assertEquals("tester@1001:/\n$ pwd^C", commandLine!!.text)
     }
@@ -283,7 +303,7 @@ class TerminalViewModelTest {
         assertEquals(0, viewModel.lines.size)
 
         // 追加 2050 行输出，验证自动截断修剪至 MAX_SCROLLBACK_LINES (2000)
-        val dummyLines = (1..2050).map { TerminalLine("line $it", TerminalLineType.OUTPUT_TEXT) }
+        val dummyLines = (1..2050).map { TerminalLine("line $it", TerminalLineType.Output.TEXT) }
         viewModel.appendTerminalLines(dummyLines)
 
         assertEquals(TerminalViewModel.MAX_SCROLLBACK_LINES, viewModel.lines.size)
@@ -292,7 +312,7 @@ class TerminalViewModelTest {
         assertEquals("line 2050", viewModel.lines.last().text)
 
         // 单行追加再触发一次修剪
-        viewModel.appendTerminalLine(TerminalLine("line 2051", TerminalLineType.OUTPUT_TEXT))
+        viewModel.appendTerminalLine(TerminalLine("line 2051", TerminalLineType.Output.TEXT))
         assertEquals(TerminalViewModel.MAX_SCROLLBACK_LINES, viewModel.lines.size)
         assertEquals("line 52", viewModel.lines.first().text)
         assertEquals("line 2051", viewModel.lines.last().text)
@@ -324,12 +344,12 @@ class TerminalViewModelTest {
         viewModel.clearScreen()
         assertEquals(0, viewModel.lines.size)
 
-        // 验证 TerminalLineType.HELP 能够安全追加至终端行缓冲并在列表中正常保持
-        val helpLine = TerminalLine("命令名称: find", TerminalLineType.HELP)
+        // 验证 TerminalLineType.System.HELP 能够安全追加至终端行缓冲并在列表中正常保持
+        val helpLine = TerminalLine("命令名称: find", TerminalLineType.System.HELP)
         viewModel.appendTerminalLine(helpLine)
 
         assertEquals(1, viewModel.lines.size)
-        assertEquals(TerminalLineType.HELP, viewModel.lines.first().type)
+        assertEquals(TerminalLineType.System.HELP, viewModel.lines.first().type)
         assertEquals("命令名称: find", viewModel.lines.first().text)
     }
 
@@ -338,17 +358,17 @@ class TerminalViewModelTest {
         viewModel.clearScreen()
 
         val allTypedLines = listOf(
-            TerminalLine("plain text", TerminalLineType.OUTPUT_TEXT),
-            TerminalLine("movie.mp4", TerminalLineType.OUTPUT_FILE_ENTRY),
-            TerminalLine("/Movies/movie.mp4", TerminalLineType.OUTPUT_PATH_ENTRY),
-            TerminalLine("-rwxr-xr-x 100 2026-10-05 file.txt", TerminalLineType.OUTPUT_LONG_LISTING),
-            TerminalLine("[目录] docs (-)", TerminalLineType.OUTPUT_FIND_CATEGORY),
-            TerminalLine("\u001B[31mError\u001B[0m", TerminalLineType.OUTPUT_ANSI),
-            TerminalLine("help doc", TerminalLineType.HELP),
-            TerminalLine("system banner", TerminalLineType.SYSTEM),
-            TerminalLine("error msg", TerminalLineType.ERROR),
-            TerminalLine("prompt confirm", TerminalLineType.PROMPT),
-            TerminalLine("user command", TerminalLineType.COMMAND)
+            TerminalLine("plain text", TerminalLineType.Output.TEXT),
+            TerminalLine("movie.mp4", TerminalLineType.Output.FILE_ENTRY),
+            TerminalLine("/Movies/movie.mp4", TerminalLineType.Output.PATH_ENTRY),
+            TerminalLine("-rwxr-xr-x 100 2026-10-05 file.txt", TerminalLineType.Output.LONG_LISTING),
+            TerminalLine("[目录] docs (-)", TerminalLineType.Output.FIND_CATEGORY),
+            TerminalLine("\u001B[31mError\u001B[0m", TerminalLineType.Output.ANSI),
+            TerminalLine("help doc", TerminalLineType.System.HELP),
+            TerminalLine("system banner", TerminalLineType.System.INFO),
+            TerminalLine("error msg", TerminalLineType.System.ERROR),
+            TerminalLine("prompt confirm", TerminalLineType.System.PROMPT),
+            TerminalLine("user command", TerminalLineType.System.COMMAND)
         )
 
         viewModel.appendTerminalLines(allTypedLines)
@@ -358,5 +378,38 @@ class TerminalViewModelTest {
             assertEquals(allTypedLines[i].type, viewModel.lines[i].type)
             assertEquals(allTypedLines[i].text, viewModel.lines[i].text)
         }
+    }
+
+    @Test
+    fun testTrashCompletionPredictsRecycleBin() = runBlocking {
+        val testRepo = object : FileRepository() {
+            override suspend fun recycleList(
+                aid: String,
+                cid: String,
+                offset: String,
+                limit: String
+            ): RecycleInfo {
+                return RecycleInfo(
+                    state = true,
+                    recycleBeanList = arrayListOf(
+                        RecycleBean(id = "101", fileName = "document_in_trash.pdf", isFolder = false),
+                        RecycleBean(id = "102", fileName = "video_in_trash.mp4", isFolder = false)
+                    )
+                )
+            }
+        }
+        val vm = TerminalViewModel(
+            initialCid = "0",
+            initialPath = "/",
+            fileRepository = testRepo,
+            mainDispatcher = testDispatcher
+        )
+
+        // 输入 "trash -r doc" 并触发补全计算，光标位于末尾
+        vm.onInputChange(TextFieldValue("trash -r doc", TextRange(12)))
+        val completions = vm.computeCompletions()
+        assertTrue(completions.isUniqueMatch)
+        assertEquals(1, completions.candidates.size)
+        assertEquals("document_in_trash.pdf", completions.candidates.first().name)
     }
 }

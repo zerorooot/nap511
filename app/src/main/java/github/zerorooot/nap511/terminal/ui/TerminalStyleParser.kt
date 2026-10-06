@@ -34,7 +34,7 @@ object TerminalStyleParser {
         theme: TerminalColorTheme = TerminalColorTheme.Default
     ): AnnotatedString {
         // 双行历史命令格式美化解析：优先直接交给 parseCommandLine 处理，避免被换行误切
-        if (type == TerminalLineType.COMMAND && text.contains("\n$ ")) {
+        if (type is TerminalLineType.System.COMMAND && text.contains("\n$ ")) {
             return parseCommandLine(text, theme)
         }
 
@@ -51,50 +51,41 @@ object TerminalStyleParser {
         }
 
         return when (type) {
-            TerminalLineType.OUTPUT_TEXT,
-            TerminalLineType.SYSTEM,
-            TerminalLineType.COMMAND,
-            TerminalLineType.HELP,
-            TerminalLineType.ERROR,
-            TerminalLineType.PROMPT -> {
+            is TerminalLineType.Output.TEXT,
+            is TerminalLineType.System.INFO,
+            is TerminalLineType.System.COMMAND,
+            is TerminalLineType.System.HELP,
+            is TerminalLineType.System.ERROR,
+            is TerminalLineType.System.PROMPT -> {
                 // 普通纯文本与单色行：直接返回无附加 SpanStyle 的纯文本，零计算开销
                 AnnotatedString(text)
             }
 
-            TerminalLineType.OUTPUT_FILE_ENTRY -> {
+            is TerminalLineType.Output.FILE_ENTRY -> {
                 // 单个文件或目录条目（ls 紧凑列表）
                 parseFileEntryLine(text, theme)
             }
 
-            TerminalLineType.OUTPUT_PATH_ENTRY -> {
+            is TerminalLineType.Output.PATH_ENTRY -> {
                 // 完整多级路径条目（find 检索结果）
                 parsePathEntryLine(text, theme)
             }
 
-            TerminalLineType.OUTPUT_LONG_LISTING -> {
+            is TerminalLineType.Output.LONG_LISTING -> {
                 // ls -l 详细列表行
                 parseLongListingLine(text, theme)
             }
 
-            TerminalLineType.OUTPUT_FIND_CATEGORY -> {
+            is TerminalLineType.Output.FIND_CATEGORY -> {
                 // find 分类检索行
                 parseFindCategoryLine(text, theme)
             }
 
-            TerminalLineType.OUTPUT_ANSI -> {
+            is TerminalLineType.Output.ANSI -> {
                 // 包含 ANSI 转义序列的文本
                 parseAnsiText(text, theme)
             }
 
-            @Suppress("DEPRECATION")
-            TerminalLineType.OUTPUT -> {
-                // 兼容旧枚举：若含 ANSI 则解析 ANSI，否则作为普通文本
-                if (text.contains("\u001B[")) {
-                    parseAnsiText(text, theme)
-                } else {
-                    AnnotatedString(text)
-                }
-            }
         }
     }
 

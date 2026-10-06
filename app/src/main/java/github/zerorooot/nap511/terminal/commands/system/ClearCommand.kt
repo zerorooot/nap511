@@ -28,6 +28,6 @@ class ClearCommand : TerminalCommand {
         stdin: Flow<String>
     ): Flow<TerminalOutput> = flow {
         // 输出统一控制标记通知终端视图清屏
-        emit(TerminalOutput(TerminalControlTokens.CLEAR_SCREEN, TerminalLineType.SYSTEM))
+        emit(TerminalOutput(TerminalControlTokens.CLEAR_SCREEN, TerminalLineType.System.INFO))
     }
 }

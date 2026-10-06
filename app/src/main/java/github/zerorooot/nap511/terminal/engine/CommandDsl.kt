@@ -35,9 +35,9 @@ class CommandDefinition(
         val hasHOption = flags.any { it.optionName == "-h" }
         if (args.contains("--help") || (!hasHOption && args.contains("-h"))) {
             return flow {
-                // 源头直接发射带有 TerminalLineType.HELP 语义类型的帮助文档行
+                // 源头直接发射带有 TerminalLineType.System.HELP 语义类型的帮助文档行
                 for (subLine in buildHelpMessage().split('\n')) {
-                    emit(TerminalOutput(subLine, TerminalLineType.HELP))
+                    emit(TerminalOutput(subLine, TerminalLineType.System.HELP))
                 }
             }
         }
@@ -85,7 +85,7 @@ class CommandBuilder(val name: String) {
     }
 
     fun build(): CommandDefinition {
-        val exec = executor ?: { _, _, _ -> flow { emit(TerminalOutput("命令 $name 未定义实现", TerminalLineType.ERROR)) } }
+        val exec = executor ?: { _, _, _ -> flow { emit(TerminalOutput("命令 $name 未定义实现", TerminalLineType.System.ERROR)) } }
         return CommandDefinition(
             name = name,
             description = description,
