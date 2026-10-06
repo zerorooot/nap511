@@ -94,6 +94,7 @@ class FindCommandTest {
         val registry = CommandRegistryFactory.createDefaultRegistry { emptyList() }
         val engine = PipelineEngine(registry)
         val ctx = TerminalContext()
+        ctx.updateDirectory(listOf(PathBean("0", "根目录", "0")))
 
         val docFile = FileBean(name = "report.pdf", fileId = "10", size = "500", isFolder = false)
         val videoFile = FileBean(name = "movie.mp4", fileId = "20", size = "1000", isFolder = false)
@@ -101,7 +102,7 @@ class FindCommandTest {
 
         // 1. 针对单个普通文件执行 find
         val outSingle = engine.executeStrings("find report.pdf", ctx)
-        assertEquals(listOf("/report.pdf"), outSingle)
+        assertEquals(listOf("/根目录/report.pdf"), outSingle)
 
         // 2. 搜索不存在的路径
         val outNotFound = engine.executeStrings("find not_exist.txt", ctx)
@@ -109,11 +110,11 @@ class FindCommandTest {
 
         // 3. -suffix 过滤
         val outSuffix = engine.executeStrings("find -suffix mp4", ctx)
-        assertEquals(listOf("/movie.mp4"), outSuffix)
+        assertEquals(listOf("/根目录/movie.mp4"), outSuffix)
 
         // 4. -name 匹配
         val outName = engine.executeStrings("find -name '*.pdf'", ctx)
-        assertEquals(listOf("/report.pdf"), outName)
+        assertEquals(listOf("/根目录/report.pdf"), outName)
     }
 
     @Test
