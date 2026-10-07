@@ -55,6 +55,7 @@ import github.zerorooot.nap511.screen.components.MenuItemAction
 import github.zerorooot.nap511.screen.components.MiddleEllipsisText
 import github.zerorooot.nap511.screen.components.TopBarAction
 import github.zerorooot.nap511.screenitem.RepeatFileCardItem
+import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.viewmodel.RepeatFileViewModel
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.LazyVerticalGridScrollbar
@@ -75,9 +76,6 @@ fun RepeatFileScreen(
     onClick: () -> Unit,
     jumpClick: (String) -> Unit
 ) {
-    LaunchedEffect(Unit) {
-        viewModel.loadData()
-    }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showDeleteDialog by remember { mutableStateOf(false) }
     val count = uiState.statusData?.fileCount ?: "0"
@@ -124,7 +122,11 @@ fun RepeatFileScreen(
     val appBarOnClick = { action: AppBarAction ->
         when (action) {
             MenuItemAction.ONE_KEY_DEDUP -> {
-                showDeleteDialog = true
+                if (uiState.hasStartedDedup) {
+                    showDeleteDialog = true
+                }else{
+                    App.instance.toast("请先点击右上角查重，完成后即可去重")
+                }
             }
 
             MenuItemAction.START_DEDUP -> {
@@ -144,14 +146,17 @@ fun RepeatFileScreen(
     }
 
 
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val emptyText = when {
+        !uiState.hasStartedDedup -> "点击右上角开始查重"
+        uiState.totalCount == 0 -> "暂无重复文件"
+        else -> null
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .nestedScroll(scrollBehavior.nestedScrollConnection)
     ) {
-        AppTopBarRepeatFile("文件去重", appBarOnClick, scrollBehavior = scrollBehavior)
+        AppTopBarRepeatFile("文件去重", appBarOnClick)
         MiddleEllipsisText(
             text = "共${count}个重复文件，占用空间${formattedSize}",
             modifier = Modifier.padding(8.dp, 4.dp)
@@ -160,14 +165,14 @@ fun RepeatFileScreen(
         PullToRefreshBox(
             isRefreshing = uiState.isRefreshing,
             onRefresh = { viewModel.refreshList() }) {
-            if (uiState.totalCount == 0) {
+            if (emptyText != null) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState()),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "暂无重复文件，点击右上角进行查重")
+                    Text(text = emptyText)
                 }
             } else if (isGridScreen) {
                 LazyVerticalGridScrollbar(

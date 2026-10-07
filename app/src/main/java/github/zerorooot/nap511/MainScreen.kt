@@ -125,6 +125,10 @@ fun MainScreen(
                 backStack.removeLastOrNull()
             }
         } else {
+            // 从高级设置导航到终端时，移除高级设置路由，使返回时不返回高级设置，而是返回其上级页面
+            if (route == Route.Terminal && backStack.lastOrNull() == Route.AdvancedSettings) {
+                backStack.removeLastOrNull()
+            }
             backStack.add(route)
         }
     }
