@@ -322,7 +322,7 @@ class TerminalViewModelTest {
     }
 
     @Test
-    fun testStaleImeReplayInterceptionAfterSubmit() {
+    fun testStaleImeReplayInterceptionAfterSubmit() = runBlocking {
         val command = "find -name '*.mp4'"
         viewModel.onInputChange(TextFieldValue(command))
         assertEquals(command, viewModel.inputState.text)
@@ -336,7 +336,13 @@ class TerminalViewModelTest {
         // 应拦截旧文本，输入框依然保持为空
         assertEquals("", viewModel.inputState.text)
 
-        // 用户输入新字符，应正常更新
+        // 等待异步命令完成恢复 Idle 就绪态
+        val start = System.currentTimeMillis()
+        while (viewModel.isExecuting && System.currentTimeMillis() - start < 2000) {
+            kotlinx.coroutines.delay(20)
+        }
+
+        // 恢复就绪态后，用户输入新字符，应正常更新
         viewModel.onInputChange(TextFieldValue("ls"))
         assertEquals("ls", viewModel.inputState.text)
     }
@@ -642,4 +648,45 @@ class TerminalViewModelTest {
         assertTrue("indexOfCancel2 should be found", indexOfCancel2 >= 0)
         assertTrue("cancel2 必须排在 prompt2 之后", indexOfPrompt2 < indexOfCancel2)
     }
+
+    @Test
+    fun testUnixSessionStateAndInputSuppressionDuringExecution() = runBlocking {
+        // 初始状态为 Idle 就绪态
+        assertTrue("初始状态应为 Idle", viewModel.sessionState is TerminalSessionState.Idle)
+
+        // 提交一个耗时任务（如大型 find 操作）
+        viewModel.onInputChange(TextFieldValue("find -name '*.log'"))
+        viewModel.submitInput()
+
+        // 验证进入 Executing 执行态
+        if (viewModel.isExecuting) {
+            assertTrue("执行中状态应为 Executing", viewModel.sessionState is TerminalSessionState.Executing)
+            val executingState = viewModel.sessionState as TerminalSessionState.Executing
+            assertEquals("find -name '*.log'", executingState.command)
+
+            // 核心 Unix 规范验证：前台执行期间，普通按键输入被严格抑制，不产生假就绪与伪输入缓冲
+            viewModel.onInputChange(TextFieldValue("ls -la"))
+            assertEquals("执行中普通字符输入应被抑制并清空", "", viewModel.inputState.text)
+            assertEquals("执行中幽灵文本应为空", "", viewModel.ghostText)
+
+            // 执行中再次按回车，不会触发任何命令提交
+            val linesCountBefore = viewModel.lines.size
+            viewModel.submitInput()
+            assertEquals("执行中回车不应产生新行", linesCountBefore, viewModel.lines.size)
+
+            // 用户按下 Ctrl+C（通过软键盘修饰或快捷键入口触发）
+            viewModel.handleCtrlC()
+            assertFalse("Ctrl+C 应中断任务执行", viewModel.isExecuting)
+            assertTrue("中断后状态应恢复为 Idle", viewModel.sessionState is TerminalSessionState.Idle)
+
+            // 验证末尾追加了 ^C 输出
+            val lastLine = viewModel.lines.lastOrNull()?.text
+            assertEquals("^C", lastLine)
+
+            // 中断恢复 Idle 之后，用户输入新命令应恢复正常
+            viewModel.onInputChange(TextFieldValue("pwd"))
+            assertEquals("pwd", viewModel.inputState.text)
+        }
+    }
 }
+

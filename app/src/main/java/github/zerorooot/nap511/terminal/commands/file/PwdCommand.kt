@@ -7,6 +7,8 @@ import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitPath
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import github.zerorooot.nap511.terminal.engine.completion.CommandCompleter
+import github.zerorooot.nap511.terminal.engine.completion.StandardCompleter
 
 /**
  * 打印当前工作目录路径命令（pwd）
@@ -21,8 +23,7 @@ class PwdCommand : TerminalCommand {
 
     override val usage: String = "pwd"
 
-    override val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter =
-        github.zerorooot.nap511.terminal.engine.completion.StandardCompleters.NONE
+    override val completer: CommandCompleter = StandardCompleter.NONE
 
     override suspend fun execute(
         ctx: TerminalContext,

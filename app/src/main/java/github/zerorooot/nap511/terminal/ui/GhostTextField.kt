@@ -180,6 +180,7 @@ fun GhostTextField(
     contextPrompt: String = "",
     promptSign: String = if (contextPrompt.isNotEmpty()) "$ " else prompt,
     isWaitingConfirmation: Boolean = false,
+    isExecuting: Boolean = false,
     onSubmit: () -> Unit,
     onTab: () -> Unit = {},
     onAcceptGhostText: () -> Unit = {},
@@ -260,10 +261,10 @@ fun GhostTextField(
             ) {
                 requestFocusAndMoveCursorToEnd()
             }
-            .padding(vertical = 4.dp)
+            .padding(vertical = if (isExecuting && !isWaitingConfirmation) 0.dp else 4.dp)
     ) {
-        // 第一行：上下文完整路径信息（仅在非确认模式且上下文非空时展示）
-        if (!isWaitingConfirmation && contextPrompt.isNotEmpty()) {
+        // 第一行：上下文完整路径信息（仅在非确认模式、非执行中且上下文非空时展示）
+        if (!isWaitingConfirmation && !isExecuting && contextPrompt.isNotEmpty()) {
             Text(
                 text = contextPrompt,
                 color = TerminalColors.System,
@@ -277,20 +278,25 @@ fun GhostTextField(
             )
         }
 
+        // 实际生效的提示符：执行中（非二次确认状态）彻底隐藏，对齐 Unix 终端前台进程独占语义
+        val effectivePromptSign = if (isExecuting && !isWaitingConfirmation) "" else promptSign
+
         // 第二行（专属输入行）：提示符号 + 独占满宽输入框与幽灵预测补全
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top
         ) {
             // 引导提示符号（如 "$ " 或确认模式 "confirm (yes/no): "）
-            Text(
-                text = promptSign,
-                color = promptColor,
-                fontSize = 14.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                lineHeight = 20.sp
-            )
+            if (effectivePromptSign.isNotEmpty()) {
+                Text(
+                    text = effectivePromptSign,
+                    color = promptColor,
+                    fontSize = 14.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = 20.sp
+                )
+            }
 
             Box(modifier = Modifier.weight(1f)) {
                 // 输入框：支持多行自然折行排版 (maxLines = 5)，避免超长命令截断无法查看
@@ -304,7 +310,11 @@ fun GhostTextField(
                         onValueChange(newValue)
                     },
                     textStyle = textStyle,
-                    cursorBrush = SolidColor(TerminalColors.Prompt),
+                    cursorBrush = if (isExecuting && !isWaitingConfirmation) {
+                        SolidColor(Color.Transparent)
+                    } else {
+                        SolidColor(TerminalColors.Prompt)
+                    },
                     singleLine = false,
                     maxLines = 5,
                     interactionSource = textFieldInteractionSource,
@@ -313,9 +323,9 @@ fun GhostTextField(
                         autoCorrectEnabled = false
                     ),
                     keyboardActions = KeyboardActions(
-                        onSend = { submitAndKeepKeyboard() },
-                        onGo = { submitAndKeepKeyboard() },
-                        onDone = { submitAndKeepKeyboard() }
+                        onSend = { if (!isExecuting || isWaitingConfirmation) submitAndKeepKeyboard() },
+                        onGo = { if (!isExecuting || isWaitingConfirmation) submitAndKeepKeyboard() },
+                        onDone = { if (!isExecuting || isWaitingConfirmation) submitAndKeepKeyboard() }
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -331,13 +341,21 @@ fun GhostTextField(
                             onFocusChange?.invoke(focusState.isFocused)
                         }
                         .onKeyEvent { event ->
-                            // 1. 优先分发外接物理键盘的 Ctrl / Alt 组合键
+                            // 1. 优先分发外接物理键盘的 Ctrl / Alt 组合键（特别是 Ctrl+C 中断）
                             if (TerminalHardwareKeyHandler.handleKeyEvent(event, hardwareKeyActions)) {
                                 return@onKeyEvent true
                             }
 
                             // 2. 仅在 KeyDown 时响应，防止物理键盘单次敲击触发两次
                             if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+
+                            // 3. 执行态控制：前台任务运行中且非二次确认时，拦截回车与普通输入按键，放行滚动按键
+                            if (isExecuting && !isWaitingConfirmation) {
+                                return@onKeyEvent when (event.key) {
+                                    Key.PageUp, Key.PageDown, Key.DirectionUp, Key.DirectionDown -> false
+                                    else -> true
+                                }
+                            }
 
                             // 外接键盘回车处理：Shift+Enter 允许换行，单独 Enter 执行提交
                             when (event.key) {
@@ -380,8 +398,8 @@ fun GhostTextField(
                 )
 
                 // 行内幽灵文本层 (Inline Ghost Text)
-                // 仅当光标位于末尾且存在建议时渲染在末尾，保持字体度量与折行完全一致
-                if (ghostText.isNotEmpty() && value.selection.end == value.text.length) {
+                // 仅当非执行中、光标位于末尾且存在建议时渲染在末尾，保持字体度量与折行完全一致
+                if (!isExecuting && ghostText.isNotEmpty() && value.selection.end == value.text.length) {
                     Text(
                         text = buildAnnotatedString {
                             // 前缀使用透明色占位，保证排版与折行位置与用户已输入文本完全一致

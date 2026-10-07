@@ -6,7 +6,8 @@ import github.zerorooot.nap511.terminal.engine.archetype.StreamPlan
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.emitText
 import java.util.Locale
-
+import github.zerorooot.nap511.terminal.engine.completion.CommandCompleter
+import github.zerorooot.nap511.terminal.engine.completion.StandardCompleter
 /**
  * 文本字数统计命令（wc）
  *
@@ -30,8 +31,7 @@ class WcCommand : StreamPipelineCommand() {
         CommandFlag("-c", "仅统计字符/字节数")
     )
 
-    override val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter =
-        github.zerorooot.nap511.terminal.engine.completion.StandardCompleters.TEXT_FILES
+    override val completer: CommandCompleter = StandardCompleter.TEXT_FILES
 
     override fun compilePlan(ast: CommandInvocationAst): Result<StreamPlan> {
         val linesOnly = ast.hasFlag("-l")

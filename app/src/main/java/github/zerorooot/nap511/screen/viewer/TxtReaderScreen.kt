@@ -1,8 +1,5 @@
 package github.zerorooot.nap511.screen.viewer
 
-import github.zerorooot.nap511.screen.components.TopAppBarTxtReaderNormal
-import github.zerorooot.nap511.screen.components.TopAppBarTxtReaderSearch
-
 import android.app.Activity
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
@@ -61,12 +58,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -75,11 +68,12 @@ import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import github.zerorooot.nap511.util.SearchMatch
+import github.zerorooot.nap511.screen.components.TopAppBarTxtReaderNormal
+import github.zerorooot.nap511.screen.components.TopAppBarTxtReaderSearch
 import github.zerorooot.nap511.util.buildSearchHighlightedText
 import github.zerorooot.nap511.util.findSearchMatches
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 import java.nio.charset.Charset
@@ -162,7 +156,7 @@ fun TxtReaderScreen(
     LaunchedEffect(currentMatchIndex, searchMatches) {
         if (searchMatches.isNotEmpty() && currentMatchIndex in searchMatches.indices) {
             val targetMatch = searchMatches[currentMatchIndex]
-            listState.animateScrollToItem(targetMatch.paragraphIndex)
+            listState.animateScrollToItem(targetMatch.itemIndex)
         }
     }
     // 监听 showControls 状态，同步隐藏/显示状态栏和导航栏

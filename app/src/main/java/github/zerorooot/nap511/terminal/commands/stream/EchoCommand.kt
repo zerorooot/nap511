@@ -9,7 +9,8 @@ import github.zerorooot.nap511.terminal.viewmodel.emitAnsi
 import github.zerorooot.nap511.terminal.viewmodel.emitText
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-
+import github.zerorooot.nap511.terminal.engine.completion.CommandCompleter
+import github.zerorooot.nap511.terminal.engine.completion.StandardCompleter
 /**
  * 文本回显命令（echo）
  *
@@ -28,8 +29,7 @@ class EchoCommand : TerminalCommand {
 
     override val usage: String = "echo [-n] [-e] [text...]"
 
-    override val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter =
-        github.zerorooot.nap511.terminal.engine.completion.StandardCompleters.NONE
+    override val completer: CommandCompleter = StandardCompleter.NONE
 
     override val flags: List<CommandFlag> = listOf(
         CommandFlag("-n", "不输出尾随换行符"),

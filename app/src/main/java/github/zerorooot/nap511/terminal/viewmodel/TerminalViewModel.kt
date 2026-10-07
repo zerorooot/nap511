@@ -14,7 +14,6 @@ import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.terminal.commands.CommandRegistryFactory
 import github.zerorooot.nap511.terminal.context.TerminalContext
-import github.zerorooot.nap511.terminal.context.TerminalPath
 import github.zerorooot.nap511.terminal.context.currentCid
 import github.zerorooot.nap511.terminal.context.toDisplayPath
 import github.zerorooot.nap511.terminal.engine.AutosuggestionEngine
@@ -26,7 +25,7 @@ import github.zerorooot.nap511.terminal.engine.PipelineEngine
 import github.zerorooot.nap511.terminal.engine.TerminalHistoryManager
 import github.zerorooot.nap511.terminal.engine.TerminalLineEditor
 import github.zerorooot.nap511.terminal.engine.completion.FileFilters
-import github.zerorooot.nap511.terminal.engine.completion.StandardCompleters
+import github.zerorooot.nap511.terminal.engine.completion.StandardCompleter
 import github.zerorooot.nap511.util.FileOpener
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -128,6 +127,19 @@ class TerminalViewModel(
 
     val isExecuting: Boolean get() = commandExecutor.isExecuting
 
+    /**
+     * 响应式终端当前会话状态机，遵循 Unix 控制终端语义派发 Idle / Executing / Confirming 三种模式
+     */
+    val sessionState: TerminalSessionState
+        get() = when {
+            commandExecutor.isWaitingConfirmation ->
+                TerminalSessionState.Confirming(commandExecutor.currentConfirmationPrompt)
+            commandExecutor.isExecuting ->
+                TerminalSessionState.Executing(commandExecutor.currentRunningCommand)
+            else ->
+                TerminalSessionState.Idle
+        }
+
     var currentPath: String by mutableStateOf(initialPathList.toDisplayPath())
         private set
 
@@ -217,7 +229,7 @@ class TerminalViewModel(
         appendTerminalLine(TerminalLine("=== 115 Cloud Terminal (nap511) ===", TerminalLineType.System.INFO))
         appendTerminalLine(
             TerminalLine(
-                "欢迎使用网盘终端！输入 '?' 'help' 或 'man' 可查看命令列表与快捷键指南。终端尚不稳定，目前还在测试中",
+                "欢迎使用网盘终端！输入 '?' 'help' 或 'man' 可查看命令列表与快捷键指南。终端尚不稳定，目前还在测试中。",
                 TerminalLineType.System.INFO
             )
         )
@@ -320,6 +332,14 @@ class TerminalViewModel(
 
             // 如果未能匹配对应快捷键，重置修饰键并按常规输入处理
             resetModifiers()
+        }
+
+        // 核心 Unix 控制：当处于任务执行中且非二次确认时，拦截并抑制普通字符输入与幽灵补全
+        if (sessionState is TerminalSessionState.Executing) {
+            // 保持 inputState 为空，不形成残留输入
+            inputState = TextFieldValue("")
+            ghostText = ""
+            return
         }
 
         if (isCompletionBarVisible) {
@@ -513,7 +533,7 @@ class TerminalViewModel(
             entry.value.flags
         }
         val activeCommand = registry.get(parsed.commandName)
-        val completer = activeCommand?.completer ?: StandardCompleters.ALL
+        val completer = activeCommand?.completer ?: StandardCompleter.ALL
 
         val directoryFiles = if (parsed.contextType == CompletionContextType.PATH) {
             val rawFiles = if (parsed.parentPath.isEmpty()) {

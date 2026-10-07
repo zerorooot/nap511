@@ -3,6 +3,8 @@ package github.zerorooot.nap511.terminal.commands.file
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
+import github.zerorooot.nap511.terminal.engine.completion.CommandCompleter
+import github.zerorooot.nap511.terminal.engine.completion.StandardCompleter
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
 import kotlinx.coroutines.flow.Flow
@@ -21,8 +23,7 @@ class CdCommand : TerminalCommand {
 
     override val usage: String = "cd [path]"
 
-    override val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter =
-        github.zerorooot.nap511.terminal.engine.completion.StandardCompleters.DIRECTORY_ONLY
+    override val completer: CommandCompleter = StandardCompleter.DIRECTORY_ONLY
 
     override suspend fun execute(
         ctx: TerminalContext,

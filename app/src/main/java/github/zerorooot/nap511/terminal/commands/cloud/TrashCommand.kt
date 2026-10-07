@@ -3,6 +3,7 @@ package github.zerorooot.nap511.terminal.commands.cloud
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
+import github.zerorooot.nap511.terminal.engine.ParsedContext
 import github.zerorooot.nap511.terminal.engine.archetype.ActionDispatchCommand
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
@@ -11,6 +12,7 @@ import github.zerorooot.nap511.terminal.viewmodel.emitSystem
 import github.zerorooot.nap511.terminal.viewmodel.emitText
 import kotlinx.coroutines.flow.FlowCollector
 import java.util.Locale
+import github.zerorooot.nap511.terminal.engine.completion.CommandCompleter
 
 /**
  * 回收站操作密封类定义
@@ -46,11 +48,11 @@ class TrashCommand : ActionDispatchCommand<TrashAction>() {
 
     override val valueOptions: Set<String> = setOf("-r")
 
-    override val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter =
-        object : github.zerorooot.nap511.terminal.engine.completion.CommandCompleter {
+    override val completer: CommandCompleter =
+        object : CommandCompleter {
             override suspend fun resolveCandidates(
                 ctx: TerminalContext,
-                parsedContext: github.zerorooot.nap511.terminal.engine.ParsedContext,
+                parsedContext: ParsedContext,
                 defaultFiles: List<FileBean>
             ): List<FileBean> {
                 return runCatching {

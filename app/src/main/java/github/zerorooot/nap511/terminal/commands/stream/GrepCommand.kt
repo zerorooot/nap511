@@ -5,6 +5,9 @@ import github.zerorooot.nap511.terminal.engine.archetype.StreamPipelineCommand
 import github.zerorooot.nap511.terminal.engine.archetype.StreamPlan
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.emitText
+import github.zerorooot.nap511.terminal.engine.completion.CommandCompleter
+import github.zerorooot.nap511.terminal.engine.completion.FileFilters
+import github.zerorooot.nap511.terminal.engine.completion.PathFilter
 
 /**
  * 文本过滤匹配命令（grep）
@@ -26,13 +29,13 @@ class GrepCommand : StreamPipelineCommand() {
         CommandFlag("-c", "仅输出匹配行的总数")
     )
 
-    override val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter =
-        object : github.zerorooot.nap511.terminal.engine.completion.CommandCompleter {
-            override fun getPathFilter(argIndex: Int): github.zerorooot.nap511.terminal.engine.completion.PathFilter {
+    override val completer: CommandCompleter =
+        object : CommandCompleter {
+            override fun getPathFilter(argIndex: Int): PathFilter {
                 return if (argIndex == 0) {
-                    github.zerorooot.nap511.terminal.engine.completion.PathFilter { _, _ -> false }
+                    PathFilter { _, _ -> false }
                 } else {
-                    github.zerorooot.nap511.terminal.engine.completion.FileFilters.TEXT_FILES
+                    FileFilters.TEXT_FILES
                 }
             }
         }

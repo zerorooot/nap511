@@ -494,6 +494,7 @@ fun TerminalContent(
                                     contextPrompt = contextPrompt,
                                     promptSign = if (isWaitingConfirmation) "confirm (yes/no): " else "$ ",
                                     isWaitingConfirmation = isWaitingConfirmation,
+                                    isExecuting = isExecuting,
                                     onSubmit = onSubmit,
                                     onTab = onTab,
                                     onAcceptGhostText = onAcceptGhostText,

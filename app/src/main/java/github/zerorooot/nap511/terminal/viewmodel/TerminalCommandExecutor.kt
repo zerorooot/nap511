@@ -46,9 +46,21 @@ class TerminalCommandExecutor(
         private set
 
     /**
+     * 当前正在执行的命令文本
+     */
+    var currentRunningCommand: String by mutableStateOf("")
+        private set
+
+    /**
      * 是否正在挂起等待用户交互式确认输入 (yes/no)
      */
     var isWaitingConfirmation: Boolean by mutableStateOf(false)
+        private set
+
+    /**
+     * 当前交互式确认的提示词文本
+     */
+    var currentConfirmationPrompt: String by mutableStateOf("")
         private set
 
     private var confirmDeferred: CompletableDeferred<Boolean>? = null
@@ -90,6 +102,7 @@ class TerminalCommandExecutor(
         // 2. 在 UI 调度器中原子地将提示信息追加到屏幕末尾并标记挂起状态
         withContext(uiDispatcher) {
             screenBuffer.appendLine(TerminalLine(prompt, TerminalLineType.System.PROMPT))
+            currentConfirmationPrompt = prompt
             isWaitingConfirmation = true
         }
 
@@ -110,6 +123,7 @@ class TerminalCommandExecutor(
         screenBuffer.appendLine(TerminalLine(raw, TerminalLineType.System.COMMAND))
         val isConfirmed = raw.equals("yes", ignoreCase = true) || raw.equals("y", ignoreCase = true)
         isWaitingConfirmation = false
+        currentConfirmationPrompt = ""
         confirmDeferred?.complete(isConfirmed)
         confirmDeferred = null
         return true
@@ -125,8 +139,10 @@ class TerminalCommandExecutor(
             currentExecutionJob?.cancel()
             currentExecutionJob = null
             isExecuting = false
+            currentRunningCommand = ""
             if (isWaitingConfirmation) {
                 isWaitingConfirmation = false
+                currentConfirmationPrompt = ""
                 confirmDeferred?.cancel()
                 confirmDeferred = null
             }
@@ -157,6 +173,7 @@ class TerminalCommandExecutor(
         if (isExecuting) return
 
         isExecuting = true
+        currentRunningCommand = command
         synchronized(bufferLock) {
             pendingBuffer.clear()
             lastFlushTime = System.currentTimeMillis()
@@ -214,7 +231,9 @@ class TerminalCommandExecutor(
                 flushPendingBuffer()
                 withContext(uiDispatcher) {
                     isExecuting = false
+                    currentRunningCommand = ""
                     isWaitingConfirmation = false
+                    currentConfirmationPrompt = ""
                     confirmDeferred = null
                     currentExecutionJob = null
                 }

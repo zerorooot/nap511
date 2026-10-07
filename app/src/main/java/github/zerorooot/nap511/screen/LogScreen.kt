@@ -614,11 +614,11 @@ fun LogItemRow(
     onLongClick: (LogEntry) -> Unit
 ) {
     val matchesForThisLog = remember(searchMatches, logIndex) {
-        if (searchQuery.isBlank()) emptyList() else searchMatches.filter { it.logIndex == logIndex }
+        if (searchQuery.isBlank()) emptyList() else searchMatches.filter { it.itemIndex == logIndex }
     }
 
     val isActiveLogEntry = remember(searchMatches, currentMatchIndex, logIndex) {
-        if (searchQuery.isBlank()) false else searchMatches.getOrNull(currentMatchIndex)?.logIndex == logIndex
+        if (searchQuery.isBlank()) false else searchMatches.getOrNull(currentMatchIndex)?.itemIndex == logIndex
     }
 
     // 精炼时间戳计算：搜索匹配了日期时展示完整日期，日常查看时默认展示紧凑时间 (HH:mm:ss.SSS)
@@ -1099,7 +1099,7 @@ fun LogScreen(isDualPane: Boolean = false, onClick: () -> Unit) {
     LaunchedEffect(currentMatchIndex, searchMatches) {
         if (searchMatches.isNotEmpty() && currentMatchIndex in searchMatches.indices) {
             val targetMatch = searchMatches[currentMatchIndex]
-            lazyListState.animateScrollToItem(targetMatch.logIndex)
+            lazyListState.animateScrollToItem(targetMatch.itemIndex)
         }
     }
 

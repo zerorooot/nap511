@@ -25,19 +25,9 @@ data class TextSearchMatch(
     val itemIndex: Int,
     val startChar: Int,
     val length: Int
-) {
-    /** 兼容 TxtReaderScreen 段落索引命名 */
-    val paragraphIndex: Int get() = itemIndex
-
-    /** 兼容 LogScreen 日志行索引命名 */
-    val logIndex: Int get() = itemIndex
-
-    /** 兼容原始绝对下标命名 */
-    val startCharInRaw: Int get() = startChar
-}
+)
 
 /** 统一类型别名，确保向后兼容 */
-typealias SearchMatch = TextSearchMatch
 typealias LogSearchMatch = TextSearchMatch
 
 /**

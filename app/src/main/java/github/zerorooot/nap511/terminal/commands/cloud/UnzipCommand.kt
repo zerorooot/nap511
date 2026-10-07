@@ -17,6 +17,8 @@ import github.zerorooot.nap511.terminal.engine.CommandFlag
 import github.zerorooot.nap511.terminal.engine.GlobMatcher
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
+import github.zerorooot.nap511.terminal.engine.completion.CommandCompleter
+import github.zerorooot.nap511.terminal.engine.completion.StandardCompleter
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
 import github.zerorooot.nap511.terminal.viewmodel.emitText
@@ -50,8 +52,7 @@ class UnzipCommand : TerminalCommand {
 
     override val valueOptions: Set<String> = setOf("-p")
 
-    override val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter =
-        github.zerorooot.nap511.terminal.engine.completion.StandardCompleters.ARCHIVE_FILES
+    override val completer: CommandCompleter = StandardCompleter.ARCHIVE_FILES
 
     override suspend fun execute(
         ctx: TerminalContext,
@@ -141,8 +142,7 @@ class UnzipCommand : TerminalCommand {
                 }
                 try {
                     val zipBeanList = ctx.fileRepository.getZipListFile(
-                        pickCode = pickCode,
-                        fileName = file.name
+                        pickCode = pickCode
                     )
                     emitText("Archive: ${file.name}")
                     if (zipBeanList.list.isNotEmpty()) {

@@ -4,12 +4,12 @@ import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.engine.TerminalControlTokens
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
-import github.zerorooot.nap511.terminal.viewmodel.TerminalLineType
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitSystem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-
+import github.zerorooot.nap511.terminal.engine.completion.CommandCompleter
+import github.zerorooot.nap511.terminal.engine.completion.StandardCompleter
 /**
  * 屏幕清空命令（clear）
  *
@@ -24,8 +24,7 @@ class ClearCommand : TerminalCommand {
 
     override val usage: String = "clear"
 
-    override val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter =
-        github.zerorooot.nap511.terminal.engine.completion.StandardCompleters.NONE
+    override val completer: CommandCompleter = StandardCompleter.NONE
 
     override suspend fun execute(
         ctx: TerminalContext,

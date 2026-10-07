@@ -1,6 +1,9 @@
 package github.zerorooot.nap511.terminal.engine
 
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.terminal.context.TerminalPath
+import github.zerorooot.nap511.terminal.engine.completion.CommandCompleter
+import github.zerorooot.nap511.terminal.engine.completion.DefaultCompleterRegistry
 
 /**
  * 补全候选项类型
@@ -237,7 +240,7 @@ object CompletionEngine {
 
         // 路径上下文：切分 parentPath 与前缀 prefix
         val unescapedToken = unescapePath(rawToken)
-        val (parentPath, prefix) = github.zerorooot.nap511.terminal.context.TerminalPath.splitParentAndPrefix(unescapedToken)
+        val (parentPath, prefix) = TerminalPath.splitParentAndPrefix(unescapedToken)
 
         return ParsedContext(
             contextType = CompletionContextType.PATH,
@@ -265,7 +268,7 @@ object CompletionEngine {
         registeredCommands: List<String>,
         commandFlagsMap: Map<String, List<CommandFlag>>,
         directoryFiles: List<FileBean>,
-        completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter? = null
+        completer: CommandCompleter? = null
     ): CompletionResult {
         val candidates = mutableListOf<CompletionCandidate>()
 
@@ -311,7 +314,7 @@ object CompletionEngine {
             CompletionContextType.PATH -> {
                 val prefix = parsedContext.prefix
                 val filter = completer?.getPathFilter(parsedContext.argIndex)
-                    ?: github.zerorooot.nap511.terminal.engine.completion.DefaultCompleterRegistry.findFilter(
+                    ?: DefaultCompleterRegistry.findFilter(
                         parsedContext.commandName,
                         parsedContext.argIndex
                     )

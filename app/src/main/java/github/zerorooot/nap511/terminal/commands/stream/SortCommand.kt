@@ -6,7 +6,8 @@ import github.zerorooot.nap511.terminal.engine.archetype.StreamPlan
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.emitText
 import kotlinx.coroutines.flow.toList
-
+import github.zerorooot.nap511.terminal.engine.completion.CommandCompleter
+import github.zerorooot.nap511.terminal.engine.completion.StandardCompleter
 /**
  * 文本行排序命令（sort）
  *
@@ -27,8 +28,7 @@ class SortCommand : StreamPipelineCommand() {
         CommandFlag("-u", "去重（唯一输出）")
     )
 
-    override val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter =
-        github.zerorooot.nap511.terminal.engine.completion.StandardCompleters.TEXT_FILES
+    override val completer: CommandCompleter = StandardCompleter.TEXT_FILES
 
     override fun compilePlan(ast: CommandInvocationAst): Result<StreamPlan> {
         val reverse = ast.hasFlag("-r")

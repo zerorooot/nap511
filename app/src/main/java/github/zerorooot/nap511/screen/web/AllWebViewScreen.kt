@@ -71,7 +71,6 @@ fun WebView.applyDefaultSettings() {
         builtInZoomControls = true
         displayZoomControls = false
         domStorageEnabled = true
-        databaseEnabled = true
         textZoom = 100
         cacheMode = WebSettings.LOAD_NO_CACHE
         mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
