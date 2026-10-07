@@ -108,8 +108,6 @@ class MkdirCommand : MutationCommand<MkdirPlan>() {
                                     refreshed.firstOrNull { it.isFolder && it.name == seg }?.categoryId ?: ""
                                 }
                                 if (nextCid.isNotEmpty()) {
-                                    // 就地追加到父目录缓存并预埋新目录缓存，零额外网络请求
-                                    ctx.addCachedFolder(parentCid = curCid, folderName = seg, newCid = nextCid)
                                     workingPathList.add(PathBean(cid = nextCid, name = seg, pid = curCid))
                                 } else {
                                     break
@@ -160,13 +158,8 @@ class MkdirCommand : MutationCommand<MkdirPlan>() {
                         folderName = folderName
                     )
                     if (res.state) {
-                        val newCid = res.cid
-                        if (newCid.isNotEmpty()) {
-                            // 就地向父目录追加新建目录并预埋空缓存，无需失效父目录缓存
-                            ctx.addCachedFolder(parentCid = parentCid, folderName = folderName, newCid = newCid)
-                        } else {
-                            ctx.invalidateCache(parentCid)
-                        }
+                        // 更新缓存
+                        ctx.listDirectory(parentCid, forceRefresh = true)
                         collector.emitText("mkdir: created directory '$rawName'")
                     } else {
                         val err = res.error.ifEmpty { "创建失败" }

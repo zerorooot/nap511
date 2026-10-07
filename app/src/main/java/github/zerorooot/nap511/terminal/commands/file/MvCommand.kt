@@ -81,15 +81,20 @@ class MvCommand : MutationCommand<MvPlan>() {
         val currentFiles = ctx.listDirectory(ctx.currentCid)
         val destParsed = TerminalPath.parse(destination)
 
-        // 解析源文件/目录信息封装体（包含其原本所在目录的 parentCid）
-        data class ResolvedSource(val fid: String, val name: String, val parentCid: String?)
+        // 解析源文件/目录信息封装体（包含其原本所在目录的 parentCid 与是否为文件夹）
+        data class ResolvedSource(
+            val fid: String,
+            val name: String,
+            val parentCid: String?,
+            val isFolder: Boolean
+        )
 
         suspend fun resolveSourceItem(rawSrc: String): ResolvedSource? {
             val srcParsed = TerminalPath.parse(rawSrc)
             val localFile = currentFiles.firstOrNull { it.name == srcParsed.targetName || it.name == rawSrc.trim() }
             if (localFile != null && !srcParsed.isMultiSegment && !srcParsed.isAbsolute) {
                 val fid = if (localFile.isFolder) localFile.categoryId else localFile.fileId
-                return ResolvedSource(fid, localFile.name, ctx.currentCid)
+                return ResolvedSource(fid, localFile.name, ctx.currentCid, localFile.isFolder)
             }
 
             // 尝试路径解析（支持绝对路径与相对路径）
@@ -97,13 +102,15 @@ class MvCommand : MutationCommand<MvPlan>() {
                 is ResolvedTarget.Directory -> ResolvedSource(
                     resolved.cid,
                     resolved.name.ifEmpty { srcParsed.targetName.ifEmpty { "/" } },
-                    resolved.parentCid
+                    resolved.parentCid,
+                    isFolder = true
                 )
 
                 is ResolvedTarget.File -> ResolvedSource(
                     resolved.file.fileId,
                     resolved.file.name,
-                    resolved.parentCid
+                    resolved.parentCid,
+                    isFolder = false
                 )
 
                 null -> null
@@ -128,6 +135,7 @@ class MvCommand : MutationCommand<MvPlan>() {
 
         if (targetDestCid != null) {
             // 移动操作：将所有 sources 移入 targetDestCid 目录
+            var anyMoved = false
             for (src in sources) {
                 val resolvedSrc = resolveSourceItem(src)
                 if (resolvedSrc == null) {
@@ -140,9 +148,14 @@ class MvCommand : MutationCommand<MvPlan>() {
                     moveMap["fid[0]"] = resolvedSrc.fid
                     val res = ctx.fileRepository.move(moveMap)
                     if (res.state) {
-                        // 就地完成缓存移动：从源父目录移出，并添加到目标目录缓存中
+                        // 1. 在源父目录中删除该条目缓存；若为文件夹则同步递归删除该文件夹自身的缓存
                         val srcParentCid = resolvedSrc.parentCid ?: ctx.currentCid
-                        ctx.moveCachedFile(srcParentCid = srcParentCid, targetCid = targetDestCid, fid = resolvedSrc.fid)
+                        ctx.fileCacheManager.removeItem(
+                            parentCid = srcParentCid,
+                            fid = resolvedSrc.fid,
+                            isFolder = resolvedSrc.isFolder
+                        )
+                        anyMoved = true
                         collector.emitText("mv: '$src' -> '$destDisplayName/'")
                     } else {
                         val err =
@@ -152,6 +165,10 @@ class MvCommand : MutationCommand<MvPlan>() {
                 } catch (e: Exception) {
                     collector.emitError("mv: 移动 '$src' 失败: ${e.message}")
                 }
+            }
+            if (anyMoved) {
+                // 2. 移动完成后强制刷新目标目录 b 的缓存，拉取服务端最新数据并落盘和通知 UI
+                ctx.listDirectory(cid = targetDestCid, forceRefresh = true)
             }
         } else if (sources.size == 1) {
             // 单源且目标不是现有目录：执行重命名
@@ -173,7 +190,7 @@ class MvCommand : MutationCommand<MvPlan>() {
                 if (res.state) {
                     val parentCid = resolvedSrc.parentCid ?: ctx.currentCid
                     // 就地在父目录缓存中重命名该文件/文件夹（对齐 FileViewModel 的 rename 逻辑）
-                    ctx.renameCachedFile(parentCid = parentCid, fid = resolvedSrc.fid, newName = newName)
+                    ctx.fileCacheManager.renameItem(parentCid = parentCid, fid = resolvedSrc.fid, newName = newName)
                     collector.emitText("mv: '$src' renamed to '$newName'")
                 } else {
                     val err = res.error.ifEmpty { res.errorMsg.ifEmpty { res.message } }

@@ -94,11 +94,14 @@ fun FileViewModel.onVideoActivityResult(
     videoHistoryMap: Map<String, VideoBean>
 ) {
     if (videoHistoryMap.isNotEmpty()) {
-        updateVideoFileBeans(cid, videoHistoryMap)
+        viewModelScope.launch {
+            // 委托 FileCacheManager 进行播放进度更新与落盘，通过全局事件流自动驱动 UI 刷新
+            FileCacheManager.updateVideoProgress(cid, videoHistoryMap)
+        }
     }
     if (pickCode.isNotEmpty()) {
         viewModelScope.launch {
-            val fileList = FileCacheManager[cid]?.fileBeanList
+            val fileList = FileCacheManager.getDate(cid)?.fileBeanList
             val index = fileList?.indexOfFirst { it.pickCode == pickCode } ?: -1
             if (index >= 0) {
                 clickMap[cid] = index
@@ -109,79 +112,6 @@ fun FileViewModel.onVideoActivityResult(
                 }
             }
         }
-
-    }
-}
-
-/**
- * 批量更新视频播放进度与历史记录
- * @param cid 当前 ID
- * @param videoHistoryMap 包含 pickCode 与对应 VideoBean 的映射表
- */
-internal fun FileViewModel.updateVideoFileBeans(
-    cid: String, videoHistoryMap: Map<String, VideoBean>
-) {
-    if (videoHistoryMap.isEmpty()) return
-    viewModelScope.launch {
-        //可能在终端使用，而终端不一定是当前的文件list,所以从缓存里取file list
-        val fileList = FileCacheManager[cid]?.fileBeanList ?: return@launch
-        // 批量更新本地内存中的列表数据
-        videoHistoryMap.forEach { (pickCode, bean) ->
-            val index = fileList.indexOfFirst { it.pickCode == pickCode }
-            // 防御越界保护
-            if (index == -1) return@forEach
-
-            val fileBean = fileList[index]
-            if (fileBean.isVideo != 1) return@forEach
-
-            val duration = bean.currentDuration
-            val playTime = if (fileBean.playLong == 0.0) {
-                100
-            } else {
-                ((duration.toFloat() / fileBean.playLong) * 100).roundToInt()
-            }
-
-            val playTimeRatio = "▶️ $playTime%"
-            val updatedBean = fileBean.copy(playLongRatio = playTimeRatio)
-
-            fileList[index] = updatedBean
-        }
-
-        //本地列表全部修改完成后，仅同步一次缓存，避免频繁拷贝与多次刷新
-        if (!isSearchState) {
-            FileCacheManager[cid]?.fileBeanList = ArrayList(fileList.toList())
-        }
-        //在FileScreen中刷新
-        if (cid == currentCid) {
-            fileBeanList.clear()
-            fileBeanList.addAll(fileList)
-        }
-
-//        // 并发发起所有网络请求（async + awaitAll）
-//        val uploadJobs = videoHistoryMap.map { (pickCode, bean) ->
-//            async {
-//                val map = mapOf(
-//                    "op" to "update",
-//                    "pick_code" to pickCode,
-//                    "time" to bean.currentDuration.toString(),
-//                    "category" to "1",
-//                    "format" to "json"
-//                )
-//                runCatching {
-//                    val videoHistory = fileRepository.videoHistory(map)
-//                    if (!videoHistory.state) {
-//                        XLog.e("更新视频时间失败！ name: ${bean.name}, pickCode: $pickCode, result: $videoHistory")
-//                    } else {
-//                        XLog.d("更新视频时间成功 name: ${bean.name}, pickCode: $pickCode, result: $videoHistory")
-//                    }
-//                }.onFailure { e ->
-//                    XLog.e("更新视频时间异常 name: ${bean.name}, pickCode: $pickCode", e)
-//                }
-//            }
-//        }
-//
-//        // 等待所有请求完成
-//        uploadJobs.awaitAll()
     }
 }
 

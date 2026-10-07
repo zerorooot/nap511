@@ -119,20 +119,8 @@ class TrashCommand : ActionDispatchCommand<TrashAction>() {
             val res = ctx.fileRepository.revert(actualRid)
             if (res.state) {
                 if (matchedItem != null && matchedItem.cid.isNotEmpty()) {
-                    val isFolder = matchedItem.isFolder || matchedItem.type.equals("folder", ignoreCase = true)
-                    if (isFolder) {
-                        ctx.addCachedFolder(matchedItem.cid, matchedItem.fileName, matchedItem.id)
-                    } else {
-                        val restoredBean = FileBean(
-                            fileId = matchedItem.id,
-                            categoryId = matchedItem.cid,
-                            name = matchedItem.fileName,
-                            size = matchedItem.fileSize,
-                            isFolder = false,
-                            icoString = matchedItem.ico
-                        )
-                        ctx.addCachedFile(matchedItem.cid, restoredBean)
-                    }
+                    // 更新缓存
+                    ctx.listDirectory(matchedItem.cid, forceRefresh = true)
                 }
                 collector.emitSystem(successMessage)
             } else {

@@ -43,6 +43,7 @@ import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.CacheEvent
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DialogEvent
 import github.zerorooot.nap511.util.DialogEventBus
@@ -138,6 +139,12 @@ class FileViewModel(
                 when (event) {
                     is DialogEvent.RefreshFileList -> refresh(event.cid)
                 }
+            }
+        }
+        // 监听 FileCacheManager 全局缓存变动事件（如终端操作、视频进度更新等），实现 UI 实时同步
+        viewModelScope.launch {
+            FileCacheManager.cacheEvents.collect { event ->
+                handleCacheEvent(event)
             }
         }
     }
@@ -440,29 +447,64 @@ class FileViewModel(
         }
     }
 
-    @OptIn(ExperimentalCoilApi::class)
-    suspend fun removeFolderCacheRecursively(categoryId: String) {
-        suspend fun walk(cid: String) {
-//            XLog.d("DebugWalk delete 真实 cid 值: $cid")
-            val fileBeanList = FileCacheManager[cid]?.fileBeanList ?: emptyList()
+    /**
+     * 响应 FileCacheManager 的全局缓存变更事件，实现 UI 实时同步
+     */
+    private fun handleCacheEvent(event: CacheEvent) {
+        when (event) {
+            is CacheEvent.ContentUpdated -> {
+                // 仅当变动的目录是当前正在展示的目录时同步
+                if (event.cid == currentCid) {
+                    val updatedCache = FileCacheManager.getDate(currentCid) ?: return
+                    // 状态重置：退出多选模式，确保列表状态绝对纯净无残留
+                    recoverFromLongPress()
+                    unSelect()
 
-            fileBeanList.forEach {
-                if (it.isFolder) {
-                    //向下递归，清理所有子文件夹
-                    walk(it.categoryId)
-                } else {
-                    //清空coli图片缓存
-                    if (it.photoThumb != "") {
-                        context.imageLoader.deleteCoilCache(it.pickCode)
-                    }
+                    // 更新 Compose 响应式列表与面包屑（包括视频进度更新）
+                    fileBeanList.clear()
+                    fileBeanList.addAll(updatedCache.fileBeanList)
+                    pathList = updatedCache.path
                 }
             }
 
-            // 所有子级处理完后，再清理当前节点的缓存
-            FileCacheManager.remove(cid)
+            is CacheEvent.FolderDeleted -> {
+                // 判断当前所在目录或其祖先目录是否被删除
+                val isCurrentDeleted = (currentCid == event.folderCid)
+                val isAncestorDeleted = pathList.any { it.cid == event.folderCid }
+
+                if (isCurrentDeleted || isAncestorDeleted) {
+                    App.instance.toast("当前所在目录已被删除")
+                    // 回退至最近仍存在的祖先目录，兜底为根目录 "0"
+                    val survivingAncestorCid = pathList
+                        .takeWhile { it.cid != event.folderCid }
+                        .lastOrNull()?.cid ?: "0"
+                    getFiles(survivingAncestorCid)
+                }
+            }
+
+            is CacheEvent.AllCleared -> {
+                if (currentCid != "0") {
+                    getFiles("0")
+                }
+            }
         }
-        // 执行递归清理（内部已包含对根文件夹 fileBean.categoryId 的 remove）
-        walk(categoryId)
+    }
+
+    @OptIn(ExperimentalCoilApi::class)
+    suspend fun removeFolderCacheRecursively(categoryId: String) {
+        fun cleanCoilCache(cid: String) {
+            val fileBeanList = FileCacheManager.getDate(cid)?.fileBeanList ?: emptyList()
+            fileBeanList.forEach {
+                if (it.isFolder) {
+                    cleanCoilCache(it.categoryId)
+                } else if (it.photoThumb.isNotEmpty()) {
+                    context.imageLoader.deleteCoilCache(it.pickCode)
+                }
+            }
+        }
+        cleanCoilCache(categoryId)
+        // 委托 FileCacheManager 进行底层缓存的递归深度清理及广播事件
+        FileCacheManager.removeFolderRecursively(categoryId)
     }
 
     /**

@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.terminal.commands
 
 import github.zerorooot.nap511.bean.FilesBean
+import github.zerorooot.nap511.bean.PathBean
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -82,5 +83,78 @@ class MvCommandTest {
         ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(file4, dirA), cid = "0", count = 2, order = "", path = emptyList()))
         val outAbs = engine.executeStrings("mv /根目录/abs.txt /根目录/dirA/", ctx)
         assertEquals(listOf("mv: '/根目录/abs.txt' -> '/根目录/dirA/'"), outAbs)
+    }
+
+    /**
+     * 测试移动文件夹（如 mv a/ b/）：
+     * 1. 在源父目录缓存中删除 a 文件夹条目
+     * 2. 级联递归删除 a 文件夹自身及所有子孙文件夹的缓存
+     * 3. 强制网络刷新目标目录 b 的缓存
+     */
+    @Test
+    fun testMvFolderRemovesSourceCacheRecursivelyAndRefreshesDestination() = runBlocking {
+        val folderA = createMockFolder("a", "100")
+        val folderB = createMockFolder("b", "200")
+        val subFolder = createMockFolder("sub_a", "101")
+        val subFile = createMockFile("file_in_a.txt", "102")
+
+        val mockRepo = object : TestMockFileRepository() {
+            override suspend fun getFiles(
+                cid: String,
+                showDir: Int,
+                aid: Int,
+                asc: Int,
+                naturalSort: Int,
+                order: String,
+                limit: Int,
+                format: String
+            ): FilesBean {
+                if (cid == "200") {
+                    return FilesBean(
+                        fileBeanList = arrayListOf(folderA),
+                        cid = "200",
+                        count = 1,
+                        order = "",
+                        path = listOf(
+                            PathBean(cid = "0", name = "根目录", pid = "0"),
+                            PathBean(cid = "200", name = "b", pid = "0")
+                        )
+                    )
+                }
+                return super.getFiles(cid, showDir, aid, asc, naturalSort, order, limit, format)
+            }
+        }
+
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        // 初始化缓存：根目录有 a 和 b，a 目录下有子目录 101 和文件 102
+        ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(folderA, folderB), cid = "0", count = 2, order = "", path = emptyList()))
+        ctx.fileCacheManager.put("100", FilesBean(fileBeanList = arrayListOf(subFolder, subFile), cid = "100", count = 2, order = "", path = emptyList()))
+        ctx.fileCacheManager.put("101", FilesBean(fileBeanList = arrayListOf(), cid = "101", count = 0, order = "", path = emptyList()))
+        ctx.fileCacheManager.put("200", FilesBean(fileBeanList = arrayListOf(), cid = "200", count = 0, order = "", path = emptyList()))
+
+        org.junit.Assert.assertTrue(ctx.fileCacheManager.containsKey("100"))
+        org.junit.Assert.assertTrue(ctx.fileCacheManager.containsKey("101"))
+        assertEquals(2, ctx.fileCacheManager.getDate("0")?.fileBeanList?.size)
+        assertEquals(0, ctx.fileCacheManager.getDate("200")?.fileBeanList?.size)
+
+        // 执行 mv a/ b/
+        val out = engine.executeStrings("mv a/ b/", ctx)
+        assertEquals(listOf("mv: 'a/' -> 'b/'"), out)
+
+        // 1. 验证 a 的源父目录（0）已删除 a 文件夹条目
+        val rootFiles = ctx.fileCacheManager.getDate("0")?.fileBeanList
+        assertEquals(1, rootFiles?.size)
+        assertEquals("b", rootFiles?.first()?.name)
+
+        // 2. 验证 a 文件夹自身（100）及子文件夹（101）缓存已被递归清理
+        org.junit.Assert.assertFalse(ctx.fileCacheManager.containsKey("100"))
+        org.junit.Assert.assertFalse(ctx.fileCacheManager.containsKey("101"))
+
+        // 3. 验证 b 目录（200）已从服务端强制刷新，包含最新数据
+        val bFiles = ctx.fileCacheManager.getDate("200")?.fileBeanList
+        assertEquals(1, bFiles?.size)
+        assertEquals("a", bFiles?.first()?.name)
     }
 }

@@ -122,7 +122,7 @@ class RmCommand : MutationCommand<RmPlan>() {
                 val res = ctx.fileRepository.delete(pid = parentCid, fid = actualFid)
                 if (res.state) {
                     // 就地从父目录缓存中剔除并级联清理文件夹缓存，无需网络重新拉取
-                    ctx.removeCachedFile(parentCid = parentCid, fid = actualFid, isFolder = isFolder)
+                    ctx.fileCacheManager.removeItem(parentCid = parentCid, fid = actualFid, isFolder = isFolder)
                     collector.emitText("rm: 已移入回收站 '$displayName'")
                 } else {
                     val err = res.error.ifEmpty { res.message }

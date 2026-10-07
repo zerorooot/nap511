@@ -316,7 +316,7 @@ class FindCommand : TerminalCommand {
         }.getOrNull()
 
         if (res?.state == true) {
-            ctx.removeCachedFile(parentCid = resolved.parentCid, fid = resolved.file.fileId, isFolder = false)
+            ctx.fileCacheManager.removeItem(parentCid = resolved.parentCid, fid = resolved.file.fileId, isFolder = false)
             emitSystem("find: 已成功删除 '${resolved.file.name}' 至回收站")
         } else {
             emitError("find: 删除失败: ${res?.error ?: "未知错误"}")
@@ -446,7 +446,7 @@ class FindCommand : TerminalCommand {
                 if (res.state) {
                     successCount++
                     // 就地从父目录缓存中剔除并级联清理文件夹缓存，保持会话状态一致
-                    ctx.removeCachedFile(parentCid = target.parentCid, fid = target.fid, isFolder = target.isFolder)
+                    ctx.fileCacheManager.removeItem(parentCid = target.parentCid, fid = target.fid, isFolder = target.isFolder)
                 }
             } catch (_: Exception) {
             }
