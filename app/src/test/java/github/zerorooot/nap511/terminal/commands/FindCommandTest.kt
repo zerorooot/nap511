@@ -513,4 +513,38 @@ class FindCommandTest {
         val outInvalidTime = engine.executeStrings("find -time abc", ctx)
         assertTrue(outInvalidTime.any { it.contains("无效的时间格式 'abc'") })
     }
+
+    /**
+     * 测试 -print0 选项功能及其与 xargs -0 的管道协同
+     */
+    @Test
+    fun testFindPrint0Options() = runBlocking {
+        val engine = createTestEngine()
+        val ctx = createTestContext()
+
+        val f1 = createMockFile("file with space 1.txt", "101")
+        val f2 = createMockFile("file with space 2.txt", "102")
+        val subDir = createMockFolder("sub dir", "201")
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(fileBeanList = arrayListOf(f1, f2, subDir), cid = "0", count = 3, order = "", path = emptyList())
+        )
+
+        // 1. 基本 -print0 输出格式测试：各匹配项末尾包含 \0 字符
+        val outPrint0 = engine.executeStrings("find -name '*.txt' -print0", ctx)
+        assertEquals(2, outPrint0.size)
+        assertTrue("输出项必须以 \\0 字符结尾", outPrint0.all { it.endsWith("\u0000") })
+
+        // 2. 目录匹配项在 -print0 模式下同样以 / 结尾再接 \0
+        val outDirPrint0 = engine.executeStrings("find -type d -print0", ctx)
+        assertTrue(outDirPrint0.any { it.contains("/sub dir/\u0000") })
+
+        // 3. 端到端管道集成测试：find -print0 | xargs -0 -n 1 echo 完美处理含空格文件名
+        val outPiped = engine.executeStrings("find -name '*.txt' -print0 | xargs -0 -n 1 echo", ctx)
+        assertEquals(
+            listOf("/根目录/file with space 1.txt", "/根目录/file with space 2.txt"),
+            outPiped
+        )
+    }
 }
+

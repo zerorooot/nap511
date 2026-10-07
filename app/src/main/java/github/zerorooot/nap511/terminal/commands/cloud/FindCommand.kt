@@ -83,12 +83,14 @@ private sealed interface TargetResolution {
  * @property strategy 数据源检索策略（递归树 / 业务分类 / 云端全局）
  * @property expression AST 条件表达式语法树（内置短路求值与优先级计算）
  * @property deletePolicy 删除操作策略（只读 / 交互确认 / 强制删除）
+ * @property isPrint0 是否启用 -print0，以 NUL 字符定界输出路径
  */
 private data class FindPlan(
     val targetPath: String?,
     val strategy: FindSearchStrategy,
     val expression: FindExpression,
-    val deletePolicy: FindDeletePolicy
+    val deletePolicy: FindDeletePolicy,
+    val isPrint0: Boolean = false
 )
 
 /**
@@ -98,7 +100,8 @@ private data class FindPlan(
  * 1. 条件谓词：按名称通配符（-name）、类型（-type f/d）、扩展名（-suffix）、大小（-size）、空文件/空目录（-empty）；
  * 2. 逻辑运算符：逻辑非（-not / !）、逻辑或（-or / -o）、隐式与显式逻辑与（-and / -a）、括号分组（( / )）；
  * 3. 网盘专项能力：115官方分类（-filter）、全盘全局搜索（-global）；
- * 4. 批量操作：原生支持批量移入回收站（-delete），配合 -f 实现免二次确认。
+ * 4. 批量操作：原生支持批量移入回收站（-delete），配合 -f 实现免二次确认；
+ * 5. 纯净管道集成：原生支持 -print0，以 NUL (\0) 分界安全透传包含空格的文件名至 xargs -0。
  *
  * 架构重构亮点：
  * - 采用“两阶段设计”：编译期提取不可变 [FindPlan]，运行期按策略多态分发执行；
@@ -111,7 +114,7 @@ class FindCommand : TerminalCommand {
     override val description: String =
         "网盘文件检索（支持按名称、大小、时长、类型、后缀、空项筛选，支持 -not/-or 复合逻辑，及 -delete 批量安全删除）"
 
-    override val usage: String = "find [path] [expression] [-delete] [-f]"
+    override val usage: String = "find [path] [expression] [-print0] [-delete] [-f]"
 
     override val flags: List<CommandFlag> = listOf(
         CommandFlag("-name <pattern>", "按文件名或通配符过滤匹配（区分大小写，如 -name '*.mp4'）"),
@@ -140,6 +143,7 @@ class FindCommand : TerminalCommand {
         CommandFlag("-not / !", "对后续条件取反（非运算）"),
         CommandFlag("-or / -o", "逻辑或运算，匹配两边任一条件"),
         CommandFlag("-global", "在整个 115 网盘根目录进行全局云端搜索"),
+        CommandFlag("-print0", "以 NUL (\\0) 字符作为各匹配项的结尾，配合 xargs -0 安全处理含空格文件名"),
         CommandFlag("-delete", "将查找到的匹配项批量删除至回收站（默认执行前进行交互式二次确认）"),
         CommandFlag("-f", "配合 -delete 使用，强制直接删除免二次确认（同 rm -f）")
     )
@@ -222,7 +226,8 @@ class FindCommand : TerminalCommand {
                 targetPath = parsed.pathArg,
                 strategy = strategy,
                 expression = parsed.expression,
-                deletePolicy = deletePolicy
+                deletePolicy = deletePolicy,
+                isPrint0 = parsed.isPrint0
             )
         )
     }
@@ -276,7 +281,12 @@ class FindCommand : TerminalCommand {
 
         when (plan.deletePolicy) {
             is FindDeletePolicy.None -> {
-                emitPath(resolved.fullPath)
+                val pathStr = resolved.fullPath
+                if (plan.isPrint0) {
+                    emitPath("$pathStr\u0000")
+                } else {
+                    emitPath(pathStr)
+                }
             }
 
             is FindDeletePolicy.Interactive -> {
@@ -342,10 +352,18 @@ class FindCommand : TerminalCommand {
                     )
                 }
             } else {
-                emitSystem("全局搜索结果（共 ${matchedList.size} 项）：")
+                // -print0 模式下抑制非路径的统计提示头，保障管道数据流纯净
+                if (!plan.isPrint0) {
+                    emitSystem("全局搜索结果（共 ${matchedList.size} 项）：")
+                }
                 matchedList.forEach { file ->
                     val isFolder = file.fileId.isEmpty()
-                    emitPath(file.name + if (isFolder) "/" else "")
+                    val pathStr = file.name + if (isFolder) "/" else ""
+                    if (plan.isPrint0) {
+                        emitPath("$pathStr\u0000")
+                    } else {
+                        emitPath(pathStr)
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -380,7 +398,12 @@ class FindCommand : TerminalCommand {
                             DeletableTarget(parentCid = currentCid, fid = fid, name = file.name, isFolder = file.isFolder)
                         )
                     } else {
-                        emitPath(fullPath + if (file.isFolder) "/" else "")
+                        val pathStr = fullPath + if (file.isFolder) "/" else ""
+                        if (plan.isPrint0) {
+                            emitPath("$pathStr\u0000")
+                        } else {
+                            emitPath(pathStr)
+                        }
                     }
                 }
 

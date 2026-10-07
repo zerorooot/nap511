@@ -381,6 +381,7 @@ internal data class ParsedFindCommand(
     val isGlobal: Boolean,
     val isDelete: Boolean,
     val isForce: Boolean,
+    val isPrint0: Boolean = false,
     val expression: FindExpression,
     val firstKeyword: String?
 )
@@ -402,6 +403,7 @@ internal object FindCommandArgsParser {
         var isGlobal = false
         var isDelete = false
         var isForce = false
+        var isPrint0 = false
         var firstKeyword: String? = null
         val expressionTokens = mutableListOf<FindToken>()
 
@@ -442,6 +444,10 @@ internal object FindCommandArgsParser {
 
                 arg == "-f" -> {
                     isForce = true
+                }
+
+                arg == "-print0" -> {
+                    isPrint0 = true
                 }
 
                 arg == "-filter" -> {
@@ -565,6 +571,7 @@ internal object FindCommandArgsParser {
                     isGlobal = isGlobal,
                     isDelete = isDelete,
                     isForce = isForce,
+                    isPrint0 = isPrint0,
                     expression = ast,
                     firstKeyword = firstKeyword
                 )
