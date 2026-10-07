@@ -317,9 +317,9 @@ class VideoActivity : AppCompatActivity() {
                             is VideoUiEvent.FinishWithResult -> {
                                 val returnIntent = Intent().apply {
                                     putExtra("videoHistory", event.videoHistoryJson)
-                                    putExtra("nav", event.nav)
                                     putExtra("toast", event.toast)
                                     putExtra("pickCode", event.pickCode)
+                                    putExtra("cid", event.cid)
                                 }
                                 setResult(event.resultCode, returnIntent)
                                 videoPlayer.setVideoAllCallBack(null)
@@ -442,8 +442,8 @@ class VideoActivity : AppCompatActivity() {
     /**
      * 执行退出/返回操作，将当前播放进度保存至历史记录，并关闭当前 Activity
      */
-    private fun performBack(nav: String = "", toast: String = "", resultCode: Int = RESULT_OK) {
-        viewModel.back(videoPlayer.currentPositionWhenPlaying, nav, toast, resultCode)
+    private fun performBack(toast: String = "", resultCode: Int = RESULT_OK) {
+        viewModel.back(videoPlayer.currentPositionWhenPlaying, toast, resultCode)
     }
 
     /**

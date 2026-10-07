@@ -1,5 +1,8 @@
 package github.zerorooot.nap511.screen
 
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -8,21 +11,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.bean.SubtitleItem
-import github.zerorooot.nap511.util.AudioPlayerController
-import github.zerorooot.nap511.util.FileDialogController
-import github.zerorooot.nap511.util.FileOpener
-import github.zerorooot.nap511.util.MediaViewerStateHolder
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import androidx.window.core.layout.WindowSizeClass
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.bean.AvatarBean
+import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
+import github.zerorooot.nap511.bean.SubtitleItem
+import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.dialog.ExitApp
 import github.zerorooot.nap511.screen.auth.LoginScreen
 import github.zerorooot.nap511.screen.file.FileScreen
@@ -41,6 +43,11 @@ import github.zerorooot.nap511.screen.web.HtmlWebViewScreen
 import github.zerorooot.nap511.screen.web.WebViewScreen
 import github.zerorooot.nap511.terminal.ui.TerminalScreen
 import github.zerorooot.nap511.terminal.viewmodel.TerminalViewModel
+import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.AudioPlayerController
+import github.zerorooot.nap511.util.FileDialogController
+import github.zerorooot.nap511.util.FileOpener
+import github.zerorooot.nap511.util.MediaViewerStateHolder
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.LoginViewModel
@@ -51,6 +58,8 @@ import github.zerorooot.nap511.viewmodel.SettingViewModel
 import github.zerorooot.nap511.viewmodel.getImage
 import github.zerorooot.nap511.viewmodel.getTorrentTask
 import github.zerorooot.nap511.viewmodel.getZipListFile
+import github.zerorooot.nap511.viewmodel.onVideoActivityResult
+import java.lang.reflect.Type
 
 /**
  * 应用全局根导航容器 (AppNavHost)
@@ -93,6 +102,7 @@ fun AppNavHost(
             override fun playAudio(fileBean: FileBean, localSubtitles: List<SubtitleItem>) {
                 audioViewModel.playAudio(fileBean, localSubtitles)
             }
+
             override fun pauseAudio() {
                 audioViewModel.pause()
             }
@@ -103,8 +113,10 @@ fun AppNavHost(
             override fun openTorrent(fileBean: FileBean) {
                 fileViewModel.getTorrentTask(fileBean.sha1)
             }
+
             override fun openZip(fileBean: FileBean) {
-                val index = fileViewModel.fileBeanList.indexOfFirst { it.pickCode == fileBean.pickCode }
+                val index =
+                    fileViewModel.fileBeanList.indexOfFirst { it.pickCode == fileBean.pickCode }
                 if (index >= 0) {
                     fileViewModel.selectIndex = index
                 }
@@ -112,7 +124,38 @@ fun AppNavHost(
             }
         }
     }
-    val fileOpener = remember(mediaViewerStateHolder, audioPlayerController, fileDialogController, uiState, fileViewModel, onNavigate) {
+
+    val videoActivityLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val data = result.data
+        if (result.resultCode == Activity.RESULT_OK) {
+            val videoHistoryJson = data?.getStringExtra("videoHistory") ?: "{}"
+            val type: Type = object : TypeToken<MutableMap<String, VideoBean>>() {}.type
+            val videoHistoryMap: MutableMap<String, VideoBean> =
+                Gson().fromJson(videoHistoryJson, type) ?: mutableMapOf()
+            val pickCode = data?.getStringExtra("pickCode") ?: ""
+            val cid = data?.getStringExtra("cid") ?: fileViewModel.currentCid
+            // 统一交给 fileViewModel 处理（更新进度 + 触发滚动事件）
+            fileViewModel.onVideoActivityResult(pickCode, cid, videoHistoryMap)
+        }
+
+        if (result.resultCode == Activity.RESULT_CANCELED) {
+            val message = data?.getStringExtra("toast") ?: ""
+            if (message.isNotEmpty()) {
+                App.instance.toast(message)
+            }
+        }
+    }
+
+    val fileOpener = remember(
+        mediaViewerStateHolder,
+        audioPlayerController,
+        fileDialogController,
+        uiState,
+        fileViewModel,
+        onNavigate
+    ) {
         FileOpener(
             context = context,
             mediaViewerStateHolder = mediaViewerStateHolder,
@@ -122,7 +165,10 @@ fun AppNavHost(
             onOpenFolder = { cid ->
                 fileViewModel.getFiles(cid)
             },
-            onNavigate = onNavigate
+            onNavigate = onNavigate,
+            onLaunchVideoIntent = { intent ->
+                videoActivityLauncher.launch(intent)
+            }
         )
     }
 
@@ -304,7 +350,8 @@ fun AppNavHost(
             }
 
             entry<Route.Photo> {
-                val photoList = mediaViewerStateHolder.photoFileBeanList.ifEmpty { fileViewModel.photoFileBeanList }
+                val photoList =
+                    mediaViewerStateHolder.photoFileBeanList.ifEmpty { fileViewModel.photoFileBeanList }
                 val photoIndex = mediaViewerStateHolder.photoIndexOf
                 val photoCid = mediaViewerStateHolder.photoCid.ifEmpty { fileViewModel.currentCid }
                 MyPhotoScreen(
@@ -330,7 +377,8 @@ fun AppNavHost(
             }
 
             entry<Route.TxtReader> { route ->
-                val byteArray = mediaViewerStateHolder.textBodyByteArray ?: fileViewModel.textBodyByteArray
+                val byteArray =
+                    mediaViewerStateHolder.textBodyByteArray ?: fileViewModel.textBodyByteArray
 
                 LaunchedEffect(byteArray) {
                     if (byteArray == null) {
@@ -354,7 +402,8 @@ fun AppNavHost(
             }
 
             entry<Route.HtmlWebViewScreen> { route ->
-                val byteArray = mediaViewerStateHolder.webBodyByteArray ?: fileViewModel.webBodyByteArray
+                val byteArray =
+                    mediaViewerStateHolder.webBodyByteArray ?: fileViewModel.webBodyByteArray
 
                 LaunchedEffect(byteArray) {
                     if (byteArray == null) {

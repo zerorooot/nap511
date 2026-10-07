@@ -3,9 +3,6 @@ package github.zerorooot.nap511.viewmodel
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Intent
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -33,7 +30,6 @@ import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.FileInfo
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.ImageBean
-import github.zerorooot.nap511.bean.LaunchVideoParams
 import github.zerorooot.nap511.bean.LocationBean
 import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.OrderBean
@@ -51,6 +47,7 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.DialogEvent
 import github.zerorooot.nap511.util.DialogEventBus
 import github.zerorooot.nap511.util.FileCacheManager
+import github.zerorooot.nap511.util.LazyScrollState
 import github.zerorooot.nap511.util.copy
 import github.zerorooot.nap511.util.deleteCoilCache
 import github.zerorooot.nap511.util.isIgnoringBatteryOptimizations
@@ -172,15 +169,14 @@ class FileViewModel(
 
     var fileInfo by mutableStateOf(FileInfo())
 
-    //小文件缓存
-    internal var textFileCache = hashMapOf<FileBean, ByteArray?>()
     var orderBean = OrderBean(OrderEnum.name, 1)
     internal val fileRepository: FileRepository by lazy {
         FileRepository.getInstance()
     }
 
-    internal val _launchVideoEvent = MutableSharedFlow<LaunchVideoParams>()
-    val launchVideoEvent = _launchVideoEvent.asSharedFlow()
+    internal val _videoResultEvent = MutableSharedFlow<Int>(extraBufferCapacity = 1)
+    val videoResultEvent = _videoResultEvent.asSharedFlow()
+
 
     private val _navigationEvent = Channel<NavEvent>()
     val navigationEvent = _navigationEvent.receiveAsFlow()
@@ -294,17 +290,14 @@ class FileViewModel(
         }
     }
 
-    fun setListLocation(path: String, state: Any) {
-        val (index, offset) = when (state) {
-            is LazyListState -> state.firstVisibleItemIndex to state.firstVisibleItemScrollOffset
-            is LazyGridState -> state.firstVisibleItemIndex to state.firstVisibleItemScrollOffset
-            is LazyStaggeredGridState -> state.firstVisibleItemIndex to state.firstVisibleItemScrollOffset
-            else -> return
-        }
-        currentLocation[path] = LocationBean(index, offset)
+    fun setListLocation(cid: String, scrollState: LazyScrollState) {
+        currentLocation[cid] = LocationBean(
+            scrollState.firstVisibleItemIndex,
+            scrollState.firstVisibleItemScrollOffset
+        )
     }
 
-    fun setListLocationAndClickCache(index: Int, state: Any) {
+    fun setListLocationAndClickCache(index: Int, state: LazyScrollState) {
         setListLocation(currentCid, state)
         clickMap[currentCid] = index
     }

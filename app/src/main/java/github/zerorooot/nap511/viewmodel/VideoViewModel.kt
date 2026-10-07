@@ -21,6 +21,8 @@ import github.zerorooot.nap511.util.keyWord
 import github.zerorooot.nap511.util.network.parseOssErrorWithDom
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.util.subtitle.SubtitleDelegate
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -29,6 +31,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType
 import java.io.File
 
@@ -49,8 +52,9 @@ sealed class VideoUiEvent {
     data class FinishWithResult(
         val resultCode: Int,
         val videoHistoryJson: String,
-        val nav: String = "",
         val toast: String = "",
+        //当前文件所在目录的cid，用于更新ui显示时间
+        val cid: String = "",
         /**
          * 最后一个视频的pickCode，方便selectIndex定位到视频
          */
@@ -166,6 +170,16 @@ class VideoViewModel : ViewModel() {
      * @param currentPositionMs 当前视频已播放进度（毫秒），用于保存历史记录
      */
     fun playVideoAtIndex(targetIndex: Int, isPortrait: Boolean, currentPositionMs: Long) {
+        val currentInfo = _uiState.value.videoInfo ?: VideoInfoBean()
+        val pickCode = currentInfo.pickCode
+        val currentDuration = (currentPositionMs / 1000).toInt()
+        val bean = VideoBean(currentDuration, pickCode, name = currentInfo.fileName)
+        videoHistoryMap[pickCode] = bean
+        // 异步启动：不阻塞当前协程。内部已加 NonCancellable，销毁后依然会执行。
+        viewModelScope.launch {
+            updateVideoHistory(bean)
+        }
+
         if (targetIndex == _uiState.value.fileBeanIndex) return
         val fileBean = launchVideoParams.videoList.getOrNull(targetIndex)
         if (fileBean == null) {
@@ -186,8 +200,6 @@ class VideoViewModel : ViewModel() {
 
         viewModelScope.launch {
             runCatching {
-                updateVideoHistory(currentPositionMs)
-
                 val pickCode = fileBean.pickCode
                 val name = fileBean.name
                 val video = if (videoLinkMode) {
@@ -233,7 +245,11 @@ class VideoViewModel : ViewModel() {
                 val currentInfo = _uiState.value.videoInfo ?: return@launch
                 val video = fileRepository.video(currentInfo.pickCode)
                 XLog.i("playNewVideo $video")
-                _uiEvent.emit(VideoUiEvent.PlayNext(video.downloadUrl, video.fileName.ifBlank { "获取视频链接失败，视频可能被删除，请刷新重试" }))
+                _uiEvent.emit(
+                    VideoUiEvent.PlayNext(
+                        video.downloadUrl,
+                        video.fileName.ifBlank { "获取视频链接失败，视频可能被删除，请刷新重试" })
+                )
             } catch (_: Exception) {
             } finally {
                 isReloadingVideo = false
@@ -244,32 +260,30 @@ class VideoViewModel : ViewModel() {
     /**
      * 更新并提交当前视频的播放进度和历史记录
      *
-     * @param currentPositionMs 当前播放进度（毫秒）
      */
-    suspend fun updateVideoHistory(currentPositionMs: Long) {
-        val currentInfo = _uiState.value.videoInfo ?: return
-        val currentDuration = (currentPositionMs / 1000).toInt()
-        val pickCode = currentInfo.pickCode
-        val name = currentInfo.fileName
-        val bean = VideoBean(currentDuration, pickCode)
-        videoHistoryMap[pickCode] = bean
-
-        val map = mapOf(
-            "op" to "update",
-            "pick_code" to pickCode,
-            "time" to currentDuration.toString(),
-            "category" to "1",
-            "format" to "json"
-        )
-        runCatching {
-            val videoHistory = fileRepository.videoHistory(map)
-            if (!videoHistory.state) {
-                XLog.e("更新视频时间失败！ name: $name, pickCode: $pickCode, result: $videoHistory")
-            } else {
-                XLog.d("更新视频时间成功 name: $name, pickCode: $pickCode, result: $videoHistory")
+    suspend fun updateVideoHistory(videoBean: VideoBean) {
+        // 切换到 IO 线程，并包裹在 NonCancellable 中,即使 ViewModel 销毁触发了取消信号，它也会坚持把该代码块执行完
+        withContext(Dispatchers.IO + NonCancellable) {
+            val pickCode = videoBean.pickCode
+            val currentDuration = videoBean.currentDuration
+            val name = videoBean.name
+            val map = mapOf(
+                "op" to "update",
+                "pick_code" to pickCode,
+                "time" to currentDuration.toString(),
+                "category" to "1",
+                "format" to "json"
+            )
+            runCatching {
+                val videoHistory = fileRepository.videoHistory(map)
+                if (!videoHistory.state) {
+                    XLog.e("更新视频时间失败！ name: $name, pickCode: $pickCode, result: $videoHistory")
+                } else {
+                    XLog.d("更新视频时间成功 name: $name, pickCode: $pickCode, result: $videoHistory")
+                }
+            }.onFailure { e ->
+                XLog.e("更新视频时间异常 name: $name, pickCode: $pickCode", e)
             }
-        }.onFailure { e ->
-            XLog.e("更新视频时间异常 name: $name, pickCode: $pickCode", e)
         }
     }
 
@@ -283,20 +297,27 @@ class VideoViewModel : ViewModel() {
      */
     fun back(
         currentPositionMs: Long,
-        nav: String = "",
         toast: String = "",
         resultCode: Int = Activity.RESULT_OK
     ) {
+        val currentInfo = _uiState.value.videoInfo ?: VideoInfoBean()
+        val pickCode = currentInfo.pickCode
+        val currentDuration = (currentPositionMs / 1000).toInt()
+        val bean = VideoBean(currentDuration, pickCode, name = currentInfo.fileName)
+        videoHistoryMap[pickCode] = bean
+        val videoHistoryMapJson = Gson().toJson(videoHistoryMap)
+        // 异步启动：不阻塞当前协程。内部已加 NonCancellable，销毁后依然会执行。
         viewModelScope.launch {
-            val currentInfo = _uiState.value.videoInfo ?: VideoInfoBean()
-            updateVideoHistory(currentPositionMs)
-            val videoHistoryMapJson = Gson().toJson(videoHistoryMap)
+            updateVideoHistory(bean)
+        }
+
+        viewModelScope.launch {
             _uiEvent.emit(
                 VideoUiEvent.FinishWithResult(
                     resultCode = resultCode,
                     videoHistoryJson = videoHistoryMapJson,
-                    nav = nav,
                     toast = toast,
+                    cid = launchVideoParams.categoryId,
                     pickCode = currentInfo.pickCode
                 )
             )

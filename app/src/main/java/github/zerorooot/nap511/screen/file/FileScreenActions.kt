@@ -8,6 +8,7 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.util.FileOpener
+import github.zerorooot.nap511.util.asScrollState
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -67,12 +68,10 @@ class FileClickHandler(
 
     fun handleTorrentClick(fileBean: FileBean) {
         fileOpener.openTorrent(fileBean)
-        fileViewModel.setRefreshingStatus(false)
     }
 
     fun handleZipClick(fileBean: FileBean) {
         fileOpener.openZip(fileBean)
-        fileViewModel.setRefreshingStatus(false)
     }
 
 
@@ -101,12 +100,12 @@ class FileClickHandler(
             lastClickTime[0] = currentTime
 
             fileViewModel.setRefreshingStatus(true)
-
-            when {
-                isPreviewActive -> fileViewModel.setListLocationAndClickCache(i, staggeredGrid)
-                isExpandedScreen -> fileViewModel.setListLocationAndClickCache(i, gridState)
-                else -> fileViewModel.setListLocationAndClickCache(i, listState)
+            val state = when {
+                isPreviewActive -> staggeredGrid.asScrollState
+                isExpandedScreen -> gridState.asScrollState
+                else -> listState.asScrollState
             }
+            fileViewModel.setListLocationAndClickCache(i, state)
             val fileBean = fileViewModel.fileBeanList[i]
 
             when {

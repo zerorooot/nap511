@@ -39,10 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.annotation.ExperimentalCoilApi
 import coil.imageLoader
 import coil.memory.MemoryCache
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.activity.VideoActivity
 import github.zerorooot.nap511.bean.FileBannerActions
 import github.zerorooot.nap511.bean.FileBannerState
 import github.zerorooot.nap511.bean.FileContentActions
@@ -54,21 +51,17 @@ import github.zerorooot.nap511.bean.FilePathActions
 import github.zerorooot.nap511.bean.FileScaffoldActions
 import github.zerorooot.nap511.bean.FileScaffoldState
 import github.zerorooot.nap511.bean.ForceOpenType
-import github.zerorooot.nap511.bean.LaunchVideoParams
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
-import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.dialog.ForceOpenDialog
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.screen.components.AppBarAction
 import github.zerorooot.nap511.screen.components.MenuItemAction
-import github.zerorooot.nap511.bean.SubtitleItem
+import github.zerorooot.nap511.screen.components.TopBarAction
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.AudioPlayerController
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.FileDialogController
 import github.zerorooot.nap511.util.FileOpener
-import github.zerorooot.nap511.util.MediaViewerStateHolder
+import github.zerorooot.nap511.util.asScrollState
 import github.zerorooot.nap511.util.copy
 import github.zerorooot.nap511.util.isNotificationEnabled
 import github.zerorooot.nap511.viewmodel.AudioViewModel
@@ -79,10 +72,6 @@ import github.zerorooot.nap511.viewmodel.delete
 import github.zerorooot.nap511.viewmodel.deleteMultiple
 import github.zerorooot.nap511.viewmodel.getFileInfo
 import github.zerorooot.nap511.viewmodel.getImage
-import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.screen.components.TopBarAction
-import github.zerorooot.nap511.viewmodel.getTorrentTask
-import github.zerorooot.nap511.viewmodel.getZipListFile
 import github.zerorooot.nap511.viewmodel.openAria2Dialog
 import github.zerorooot.nap511.viewmodel.openCreateFolderDialog
 import github.zerorooot.nap511.viewmodel.openFileOrderDialog
@@ -92,9 +81,7 @@ import github.zerorooot.nap511.viewmodel.openUnzipAllFileDialog
 import github.zerorooot.nap511.viewmodel.removeFile
 import github.zerorooot.nap511.viewmodel.startSendAria2Service
 import github.zerorooot.nap511.viewmodel.unzipFile
-import github.zerorooot.nap511.viewmodel.updateVideoFileBeans
 import kotlinx.coroutines.launch
-import java.lang.reflect.Type
 
 @OptIn(
     ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalCoilApi::class
@@ -109,7 +96,7 @@ fun FileScreen(
     onNav: (Route) -> Unit,
     openDrawer: () -> Unit,
     drawerState: () -> Boolean,
-    fileOpener: FileOpener? = null
+    fileOpener: FileOpener
 ) {
 
     val fabPosition = when (settingUiState.fabPosition) {
@@ -222,99 +209,27 @@ fun FileScreen(
         onTopBarShowChange = { isTopBarShow = it },
         onBottomBarShowChange = { isBottomBarShow = it })
 
-    val videoActivityLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val data = result.data
-        if (result.resultCode == Activity.RESULT_OK) {
-            val videoHistoryJson = data?.getStringExtra("videoHistory") ?: "{}"
-            val type: Type = object : TypeToken<MutableMap<String, VideoBean>>() {}.type
-            val videoHistoryMap: MutableMap<String, VideoBean> =
-                Gson().fromJson(videoHistoryJson, type) ?: mutableMapOf()
-            val pickCode = data?.getStringExtra("pickCode") ?: ""
 
-            //跳转到最后一个视频
-            var index = fileBeanList.indexOfFirst { it.pickCode == pickCode }
-            if (index >= 0) {
-                fileViewModel.clickMap[fileViewModel.currentCid] = index
-                // 根据当前页面视图模式滚动，将当前行提前 x 行显示，使位置接近中央
-                index = (index - 4).coerceAtLeast(0)
-                when {
-                    isPreviewActive -> staggeredGrid.requestScrollToItem(index, 0)
-                    isGridScreen -> gridState.requestScrollToItem(index, 0)
-                    else -> listState.requestScrollToItem(index, 0)
-                }
+    LaunchedEffect(fileViewModel) {
+        fileViewModel.videoResultEvent.collect { index ->
+            val state = when {
+                isPreviewActive -> staggeredGrid.asScrollState
+                isGridScreen -> gridState.asScrollState
+                else -> listState.asScrollState
             }
-
-            if (videoHistoryMap.isNotEmpty()) {
-                fileViewModel.updateVideoFileBeans(
-                    fileViewModel.currentCid, videoHistoryMap
-                )
-            }
-        }
-
-        if (result.resultCode == Activity.RESULT_CANCELED) {
-            val nav = data?.getStringExtra("nav") ?: ""
-            if (nav == "VerifyVideoAccount") {
-                onNav.invoke(Route.VerifyVideoAccount)
-            }
-            val message = data?.getStringExtra("toast") ?: ""
-            if (message.isNotEmpty()) {
-                App.instance.toast(message)
-            }
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        fileViewModel.launchVideoEvent.collect { launchVideoParams ->
-            val launchVideoParamsJson =
-                Gson().toJson(launchVideoParams, LaunchVideoParams::class.java)
-            val intent = Intent(context, VideoActivity::class.java).apply {
-                putExtra("bean", launchVideoParamsJson)
-            }
-            videoActivityLauncher.launch(intent)
+            // 根据当前页面视图模式滚动，将当前行提前 x 行显示，使位置接近中央
+            val scrollIndex = (index - 4).coerceAtLeast(0)
+            state.animateScrollToItem(scrollIndex, 0)
         }
     }
 
     // 记录上次点击时间，使用 longArrayOf 避免无意义的重组
     val lastClickTime = remember { longArrayOf(0L) }
-    val actualFileOpener = fileOpener ?: remember(fileViewModel, audioViewModel, settingUiState, onNav) {
-        val audioController = object : AudioPlayerController {
-            override fun playAudio(fileBean: FileBean, localSubtitles: List<SubtitleItem>) {
-                audioViewModel.playAudio(fileBean, localSubtitles)
-            }
-            override fun pauseAudio() {
-                audioViewModel.pause()
-            }
-        }
-        val dialogController = object : FileDialogController {
-            override fun openTorrent(fileBean: FileBean) {
-                fileViewModel.getTorrentTask(fileBean.sha1)
-            }
-            override fun openZip(fileBean: FileBean) {
-                val index = fileViewModel.fileBeanList.indexOfFirst { it.pickCode == fileBean.pickCode }
-                if (index >= 0) {
-                    fileViewModel.selectIndex = index
-                }
-                fileViewModel.getZipListFile()
-            }
-        }
-        FileOpener(
-            context = context,
-            mediaViewerStateHolder = MediaViewerStateHolder(),
-            audioPlayerController = audioController,
-            fileDialogController = dialogController,
-            settingUiState = { settingUiState },
-            onOpenFolder = { cid ->
-                fileViewModel.getFiles(cid)
-            },
-            onNavigate = onNav
-        )
-    }
+
 
     val clickHandler = remember(
         fileViewModel,
-        actualFileOpener,
+        fileOpener,
         settingUiState,
         scope,
         isPreviewActive,
@@ -326,7 +241,7 @@ fun FileScreen(
     ) {
         FileClickHandler(
             fileViewModel = fileViewModel,
-            fileOpener = actualFileOpener,
+            fileOpener = fileOpener,
             settingUiState = settingUiState,
             coroutineScope = scope,
             isPreviewActive = isPreviewActive,
@@ -357,7 +272,7 @@ fun FileScreen(
                     ForceOpenType.AUDIO -> clickHandler.handleAudioClick(bean)
                     ForceOpenType.IMAGE -> clickHandler.handlePhotoClick(bean)
                     ForceOpenType.TEXT -> clickHandler.handleTextClick(bean)
-                    ForceOpenType.WEB -> clickHandler.handleWebClick( bean)
+                    ForceOpenType.WEB -> clickHandler.handleWebClick(bean)
                     ForceOpenType.ARCHIVE -> clickHandler.handleZipClick(bean)
                     ForceOpenType.TORRENT -> clickHandler.handleTorrentClick(bean)
                 }
@@ -392,11 +307,12 @@ fun FileScreen(
         }
         if (fileViewModel.currentCid != "0" && !fileViewModel.isLongClickState) {
             val currentCid = fileViewModel.currentCid
-            when {
-                isPreviewActive -> fileViewModel.setListLocation(currentCid, staggeredGrid)
-                isGridScreen -> fileViewModel.setListLocation(currentCid, gridState)
-                else -> fileViewModel.setListLocation(currentCid, listState)
+            val state = when {
+                isPreviewActive -> staggeredGrid.asScrollState
+                isGridScreen -> gridState.asScrollState
+                else -> listState.asScrollState
             }
+            fileViewModel.setListLocation(currentCid, state)
         }
         isBottomBarShow = true
         isTopBarShow = true

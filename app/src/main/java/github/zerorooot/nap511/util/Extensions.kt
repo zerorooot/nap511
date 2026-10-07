@@ -6,6 +6,9 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
 import android.os.PowerManager
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.layout.PaneScaffoldDirective
@@ -279,3 +282,35 @@ fun Long.formatFileSize(): String {
         units[digitGroups]
     )
 }
+
+
+interface LazyScrollState {
+    val firstVisibleItemIndex: Int
+    val firstVisibleItemScrollOffset: Int
+    suspend fun animateScrollToItem(index: Int, scrollOffset: Int = 0)
+}
+
+// 三个扩展属性/函数桥接
+val LazyListState.asScrollState: LazyScrollState
+    get() = object : LazyScrollState {
+        override val firstVisibleItemIndex get() = this@asScrollState.firstVisibleItemIndex
+        override val firstVisibleItemScrollOffset get() = this@asScrollState.firstVisibleItemScrollOffset
+        override suspend fun animateScrollToItem(index: Int, scrollOffset: Int) =
+            this@asScrollState.animateScrollToItem(index, scrollOffset)
+    }
+
+val LazyGridState.asScrollState: LazyScrollState
+    get() = object : LazyScrollState {
+        override val firstVisibleItemIndex get() = this@asScrollState.firstVisibleItemIndex
+        override val firstVisibleItemScrollOffset get() = this@asScrollState.firstVisibleItemScrollOffset
+        override suspend fun animateScrollToItem(index: Int, scrollOffset: Int) =
+            this@asScrollState.animateScrollToItem(index, scrollOffset)
+    }
+
+val LazyStaggeredGridState.asScrollState: LazyScrollState
+    get() = object : LazyScrollState {
+        override val firstVisibleItemIndex get() = this@asScrollState.firstVisibleItemIndex
+        override val firstVisibleItemScrollOffset get() = this@asScrollState.firstVisibleItemScrollOffset
+        override suspend fun animateScrollToItem(index: Int, scrollOffset: Int) =
+            this@asScrollState.animateScrollToItem(index, scrollOffset)
+    }

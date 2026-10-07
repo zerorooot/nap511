@@ -17,6 +17,8 @@ import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.onFailureToastAndLog
+import github.zerorooot.nap511.util.resolveCallerTag
+import github.zerorooot.nap511.util.toUserFriendlyMessage
 import github.zerorooot.nap511.worker.UnzipAllFileWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -72,7 +74,13 @@ internal fun FileViewModel.getZipListFile(
         }.onSuccess { zipList ->
             unzipBeanList.value = zipList
             openUnzipDialog()
-        }.onFailureToastAndLog()
+        }.onFailure { e ->
+            setRefreshingStatus(false) // 失败时也确保关闭
+            val logTag = resolveCallerTag()
+            val userMsg = e.toUserFriendlyMessage()
+            XLog.e("[$logTag] $userMsg", e)
+            App.instance.toast(userMsg)
+        }
     }
 }
 

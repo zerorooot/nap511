@@ -73,7 +73,8 @@ class FileOpener(
     private val fileDialogController: FileDialogController? = null,
     private val settingUiState: () -> SettingUiState,
     private val onOpenFolder: ((String) -> Unit)? = null,
-    private val onNavigate: (Route) -> Unit
+    private val onNavigate: (Route) -> Unit,
+    private val onLaunchVideoIntent: ((Intent) -> Unit)
 ) {
 
     /**
@@ -94,34 +95,41 @@ class FileOpener(
                 if (ok) FileOpenResult.Success("video", "已启动视频播放器: ${fileBean.name}")
                 else FileOpenResult.Failure("获取视频播放信息失败")
             }
+
             fileBean.photoThumb.isNotEmpty() || fileBean.fileIco == R.drawable.png -> {
                 openPhoto(fileBean, siblingFiles)
                 FileOpenResult.Success("photo", "已打开图片预览: ${fileBean.name}")
             }
+
             fileBean.fileIco == R.drawable.mp3 -> {
                 openAudio(fileBean, siblingFiles, navigateToDetail = fromTerminal)
                 FileOpenResult.Success("audio", "已开始播放音频: ${fileBean.name}")
             }
+
             fileBean.fileIco == R.drawable.txt -> {
                 val ok = openText(fileBean)
                 if (ok) FileOpenResult.Success("text", "已打开文本阅读器: ${fileBean.name}")
                 else FileOpenResult.Failure("文本打开失败或超出大小限制")
             }
+
             fileBean.fileIco == R.drawable.web -> {
                 val ok = openWeb(fileBean)
                 if (ok) FileOpenResult.Success("web", "已打开网页预览: ${fileBean.name}")
                 else FileOpenResult.Failure("网页打开失败或超出大小限制")
             }
+
             fileBean.fileIco == R.drawable.torrent -> {
                 val ok = openTorrent(fileBean)
                 if (ok) FileOpenResult.Success("torrent", "已提交种子解析任务: ${fileBean.name}")
                 else FileOpenResult.Failure("当前环境不支持打开种子解析弹窗")
             }
+
             fileBean.fileIco == R.drawable.zip -> {
                 val ok = openZip(fileBean)
                 if (ok) FileOpenResult.Success("zip", "已打开压缩包预览: ${fileBean.name}")
                 else FileOpenResult.Failure("当前环境不支持打开压缩包弹窗，请使用 'unzip -l' 预览")
             }
+
             else -> {
                 FileOpenResult.Unsupported(fileBean.name)
             }
@@ -135,6 +143,7 @@ class FileOpener(
         onOpenFolder?.invoke(targetCid)
         onNavigate(Route.MyFile)
     }
+
     /**
      * 打开视频文件并启动 [VideoActivity]
      */
@@ -157,7 +166,8 @@ class FileOpener(
                 )
             )
         }
-        val fileBeanIndex = videoList.indexOfFirst { it.pickCode == fileBean.pickCode }.coerceAtLeast(0)
+        val fileBeanIndex =
+            videoList.indexOfFirst { it.pickCode == fileBean.pickCode }.coerceAtLeast(0)
         val localSubtitleList = extractSubtitles(siblingFiles)
 
         val settings = settingUiState()
@@ -208,9 +218,8 @@ class FileOpener(
         val launchVideoParamsJson = Gson().toJson(launchVideoParams, LaunchVideoParams::class.java)
         val intent = Intent(context, VideoActivity::class.java).apply {
             putExtra("bean", launchVideoParamsJson)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        context.startActivity(intent)
+        onLaunchVideoIntent.invoke(intent)
         return true
     }
 
@@ -219,14 +228,20 @@ class FileOpener(
      */
     fun openPhoto(fileBean: FileBean, photoList: List<FileBean> = emptyList()): Boolean {
         audioPlayerController.pauseAudio()
-        val validPhotoList = photoList.filter { it.photoThumb.isNotEmpty() || it.fileIco == R.drawable.png }
-            .ifEmpty { listOf(fileBean) }
+        val validPhotoList =
+            photoList.filter { it.photoThumb.isNotEmpty() || it.fileIco == R.drawable.png }
+                .ifEmpty { listOf(fileBean) }
 
-        val targetIndex = validPhotoList.indexOfFirst { it.pickCode == fileBean.pickCode || it.fileId == fileBean.fileId }
+        val targetIndex =
+            validPhotoList.indexOfFirst { it.pickCode == fileBean.pickCode || it.fileId == fileBean.fileId }
         val finalIndex = if (targetIndex >= 0) targetIndex else 0
         val targetCid = fileBean.categoryId.ifEmpty { fileBean.parentId }
 
-        mediaViewerStateHolder.setPhotoList(list = validPhotoList, index = finalIndex, cid = targetCid)
+        mediaViewerStateHolder.setPhotoList(
+            list = validPhotoList,
+            index = finalIndex,
+            cid = targetCid
+        )
         onNavigate(Route.Photo)
         return true
     }
@@ -262,7 +277,8 @@ class FileOpener(
             var cached = mediaViewerStateHolder.getCachedBytes(fileBean)
             if (cached == null) {
                 runCatching {
-                    val inputStream = fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
+                    val inputStream =
+                        fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
                     if (inputStream != null) {
                         cached = inputStream.readBytes()
                         mediaViewerStateHolder.putCachedBytes(fileBean, cached)
@@ -299,7 +315,8 @@ class FileOpener(
             var cached = mediaViewerStateHolder.getCachedBytes(fileBean)
             if (cached == null) {
                 runCatching {
-                    val inputStream = fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
+                    val inputStream =
+                        fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
                     if (inputStream != null) {
                         cached = inputStream.readBytes()
                         mediaViewerStateHolder.putCachedBytes(fileBean, cached)

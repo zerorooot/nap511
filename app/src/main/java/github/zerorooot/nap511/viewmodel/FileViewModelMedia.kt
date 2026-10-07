@@ -1,31 +1,20 @@
 package github.zerorooot.nap511.viewmodel
 
 import android.content.Intent
-import android.content.res.Configuration
 import androidx.lifecycle.viewModelScope
 import coil.imageLoader
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ImageBean
-import github.zerorooot.nap511.bean.LaunchVideoParams
-import github.zerorooot.nap511.bean.Route
-import github.zerorooot.nap511.bean.SubtitleItem
-import github.zerorooot.nap511.bean.SubtitleSourceType
-import github.zerorooot.nap511.bean.VideoAttributeBean
 import github.zerorooot.nap511.bean.VideoBean
-import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.service.Sha1Service
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.getCoilCacheUrl
 import github.zerorooot.nap511.util.onFailureToastAndLog
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
@@ -97,27 +86,52 @@ internal fun FileViewModel.getImage(fileBean: FileBean) {
 }
 
 /**
+ * 处理 VideoActivity 返回的播放历史与定位结果
+ */
+fun FileViewModel.onVideoActivityResult(
+    pickCode: String,
+    cid: String,
+    videoHistoryMap: Map<String, VideoBean>
+) {
+    if (videoHistoryMap.isNotEmpty()) {
+        updateVideoFileBeans(cid, videoHistoryMap)
+    }
+    if (pickCode.isNotEmpty()) {
+        viewModelScope.launch {
+            val fileList = FileCacheManager[cid]?.fileBeanList
+            val index = fileList?.indexOfFirst { it.pickCode == pickCode } ?: -1
+            if (index >= 0) {
+                clickMap[cid] = index
+                //可能被终端页面影响。所以只有在当前目录才滚动。
+                // 无法更新非当前页的位置，未被布局，不知道非当前页面的 firstVisibleItemIndex 和 firstVisibleItemScrollOffset
+                if (cid == currentCid) {
+                    _videoResultEvent.tryEmit(index)
+                }
+            }
+        }
+
+    }
+}
+
+/**
  * 批量更新视频播放进度与历史记录
- * @param cid 当前目录 ID
+ * @param cid 当前 ID
  * @param videoHistoryMap 包含 pickCode 与对应 VideoBean 的映射表
  */
 internal fun FileViewModel.updateVideoFileBeans(
     cid: String, videoHistoryMap: Map<String, VideoBean>
 ) {
     if (videoHistoryMap.isEmpty()) return
-
     viewModelScope.launch {
-        // 构建时间格式化工具，避免在循环体内重复实例化
-        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-        var isAnyUpdated = false
-
+        //可能在终端使用，而终端不一定是当前的文件list,所以从缓存里取file list
+        val fileList = FileCacheManager[cid]?.fileBeanList ?: return@launch
         // 批量更新本地内存中的列表数据
         videoHistoryMap.forEach { (pickCode, bean) ->
-            val index = fileBeanList.indexOfFirst { it.pickCode == pickCode }
+            val index = fileList.indexOfFirst { it.pickCode == pickCode }
             // 防御越界保护
             if (index == -1) return@forEach
 
-            val fileBean = fileBeanList[index]
+            val fileBean = fileList[index]
             if (fileBean.isVideo != 1) return@forEach
 
             val duration = bean.currentDuration
@@ -130,13 +144,17 @@ internal fun FileViewModel.updateVideoFileBeans(
             val playTimeRatio = "▶️ $playTime%"
             val updatedBean = fileBean.copy(playLongRatio = playTimeRatio)
 
-            fileBeanList[index] = updatedBean
-            isAnyUpdated = true
+            fileList[index] = updatedBean
         }
 
         //本地列表全部修改完成后，仅同步一次缓存，避免频繁拷贝与多次刷新
-        if (isAnyUpdated && !isSearchState) {
-            FileCacheManager[cid]?.fileBeanList = ArrayList(fileBeanList.toList())
+        if (!isSearchState) {
+            FileCacheManager[cid]?.fileBeanList = ArrayList(fileList.toList())
+        }
+        //在FileScreen中刷新
+        if (cid == currentCid) {
+            fileBeanList.clear()
+            fileBeanList.addAll(fileList)
         }
 
 //        // 并发发起所有网络请求（async + awaitAll）
@@ -167,112 +185,6 @@ internal fun FileViewModel.updateVideoFileBeans(
     }
 }
 
-internal fun FileViewModel.getLocalSubtitleList(): List<SubtitleItem> {
-    return github.zerorooot.nap511.util.extractSubtitles(fileBeanList)
-}
-
-internal fun FileViewModel.getVideoInfo(fileBean: FileBean) {
-    val pickCode = fileBean.pickCode
-    val fileName = fileBean.name
-    val videoList = fileBeanList.filter { it.isVideo == 1 && it.playLong != 0.0 }
-        .map {
-            VideoBean(
-                name = it.name,
-                pickCode = it.pickCode,
-                fileId = it.fileId,
-                time = it.playLongString
-            )
-        }
-    val fileBeanIndex = videoList.indexOfFirst { it.pickCode == pickCode }
-
-    val localSubtitleList = getLocalSubtitleList()
-
-
-
-    viewModelScope.launch {
-        runCatching {
-            val videoAttributeBean = VideoAttributeBean(
-                isAutoRotate = settingUiState.autoRotateEnabled,
-                videoLinkMode = settingUiState.videoLinkMode,
-                autoJumpRetry = settingUiState.autoJumpRetry,
-                hideLoading = settingUiState.hideLoadingView,
-                positionAfterAt = settingUiState.positionAfterAt
-            )
-            val video = if (settingUiState.videoLinkMode) {
-                fileRepository.video(pickCode).copy(
-                    index = fileBeanIndex,
-                )
-            } else {
-                val (width, height) = if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
-                    1080 to 1920
-                } else {
-                    1920 to 1080
-                }
-                VideoInfoBean(
-                    width = width,
-                    height = height,
-                    index = fileBeanIndex,
-                    fileName = fileName,
-                    pickCode = pickCode,
-                    videoUrl = "http://115.com/api/video/m3u8/${pickCode}.m3u8"
-                )
-            }
-            XLog.d("FileViewModel getVideoInfo $video")
-            val launchVideoParams = LaunchVideoParams(
-                videoInfo = video,
-                videoAttribute = videoAttributeBean,
-                localSubtitleItem = localSubtitleList,
-                videoList = videoList,
-                categoryId = fileBean.categoryId
-            )
-            _launchVideoEvent.emit(launchVideoParams)
-        }.onFailureToastAndLog()
-        setRefreshingStatus(false)
-    }
-}
-
-internal fun FileViewModel.downloadSmallFile(
-    fileBean: FileBean, onSuccess: (ByteArray) -> Unit
-) {
-    viewModelScope.launch(Dispatchers.IO) {
-        var bytes = textFileCache[fileBean]
-        if (bytes == null) {
-            runCatching {
-                val downloadInputStream =
-                    fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
-                if (downloadInputStream == null) {
-                    setRefreshingStatus(false)
-                    App.instance.toast("文件加载失败！")
-                    return@launch
-                }
-                bytes = downloadInputStream.readBytes()
-                textFileCache[fileBean] = bytes
-            }.onFailureToastAndLog()
-        }
-        if (bytes != null) {
-            setRefreshingStatus(false)
-            withContext(Dispatchers.Main) {
-                onSuccess(bytes)
-            }
-        } else {
-            setRefreshingStatus(false)
-        }
-    }
-}
-
-internal fun FileViewModel.downloadText(fileBean: FileBean, onNav: (Route) -> Unit) {
-    downloadSmallFile(fileBean) { bytes ->
-        textBodyByteArray = bytes
-        onNav.invoke(Route.TxtReader(title = fileBean.name))
-    }
-}
-
-internal fun FileViewModel.downloadWeb(fileBean: FileBean, onNav: (Route) -> Unit) {
-    downloadSmallFile(fileBean) { bytes ->
-        webBodyByteArray = bytes
-        onNav.invoke(Route.HtmlWebViewScreen(title = fileBean.name))
-    }
-}
 
 internal fun FileViewModel.startSendAria2Service(index: Int) {
     val fileBean = fileBeanList[index]
