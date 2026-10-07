@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.terminal.commands.cloud
 
+import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.terminal.commands.util.SizeFilter
 import github.zerorooot.nap511.terminal.commands.util.SizeParser
@@ -104,6 +105,60 @@ internal object EmptyPredicate : FindExpression {
 }
 
 /**
+ * 文件业务/种类分类枚举
+ *
+ * 映射自 formatFileBeanList 的图标分类与 115 业务标准，支持丰富的文件类型筛选
+ */
+internal enum class FindFileCategory(val targetIco: Int, val label: String) {
+    DOC(R.drawable.txt, "文档"),
+    IMG(R.drawable.png, "图片"),
+    AUDIO(R.drawable.mp3, "音频"),
+    VIDEO(R.drawable.mp4, "视频"),
+    ZIP(R.drawable.zip, "压缩包"),
+    APP(R.drawable.apk, "软件应用"),
+    WEB(R.drawable.web, "网页"),
+    ISO(R.drawable.iso, "镜像"),
+    TORRENT(R.drawable.torrent, "种子"),
+    FOLDER(R.drawable.folder, "目录"),
+    OTHER(R.drawable.other, "其它");
+
+    companion object {
+        fun from(raw: String): FindFileCategory? {
+            return when (raw.lowercase(Locale.ROOT)) {
+                "doc", "document", "txt", "text", "文档", "文本" -> DOC
+                "img", "image", "pic", "photo", "图片" -> IMG
+                "audio", "music", "mp3", "音频", "音乐" -> AUDIO
+                "video", "movie", "mp4", "视频" -> VIDEO
+                "zip", "archive", "rar", "7z", "tar", "压缩", "压缩包" -> ZIP
+                "app", "apk", "software", "软件", "应用" -> APP
+                "web", "html", "htm", "网页" -> WEB
+                "iso", "镜像" -> ISO
+                "torrent", "bt", "种子" -> TORRENT
+                "dir", "directory", "folder", "目录", "文件夹" -> FOLDER
+                "other", "其它", "其他" -> OTHER
+                else -> null
+            }
+        }
+    }
+}
+
+/**
+ * 文件种类匹配谓词（-filter）
+ *
+ * 依托 [formatFileBeanList] 所标记的 [FileBean.fileIco]，对文件种类进行内存短路匹配。
+ * 完全融入 AST 语法树，天然支持 -not, -or, -and 及括号分组。
+ */
+internal class CategoryPredicate(val category: FindFileCategory) : FindExpression {
+    override suspend fun evaluate(file: FileBean, ctx: TerminalContext): Boolean {
+        if (category == FindFileCategory.FOLDER) {
+            return file.isFolder
+        }
+        if (file.isFolder) return false
+        return file.fileIco == category.targetIco
+    }
+}
+
+/**
  * 逻辑非表达式（-not / !）
  *
  * 一元前缀操作符，对内部子表达式的求值结果执行布尔取反。
@@ -148,14 +203,19 @@ internal class OrExpression(
 internal sealed interface FindToken {
     /** 具体的原子谓词操作（包装为 AST 节点） */
     data class Predicate(val expr: FindExpression) : FindToken
+
     /** 逻辑非操作符（-not / !） */
     data object Not : FindToken
+
     /** 逻辑或操作符（-or / -o） */
     data object Or : FindToken
+
     /** 逻辑与操作符（-and / -a） */
     data object And : FindToken
+
     /** 左括号（"("） */
     data object OpenParen : FindToken
+
     /** 右括号（")"） */
     data object CloseParen : FindToken
 }
@@ -300,7 +360,6 @@ internal data class ParsedFindCommand(
     val pathArg: String?,
     val maxDepth: Int,
     val isGlobal: Boolean,
-    val filterType: Int?,
     val isDelete: Boolean,
     val isForce: Boolean,
     val expression: FindExpression,
@@ -322,7 +381,6 @@ internal object FindCommandArgsParser {
         var pathArg: String? = null
         var maxDepth = 5
         var isGlobal = false
-        var filterType: Int? = null
         var isDelete = false
         var isForce = false
         var firstKeyword: String? = null
@@ -372,9 +430,9 @@ internal object FindCommandArgsParser {
                         return Result.failure(FindParseException("find: '-filter' 缺少参数"))
                     }
                     val rawFilter = args[++i]
-                    val parsedType = parseFilterType(rawFilter)
+                    val category = FindFileCategory.from(rawFilter)
                         ?: return Result.failure(FindParseException("find: 未知的分类 '$rawFilter'"))
-                    filterType = parsedType
+                    expressionTokens.add(FindToken.Predicate(CategoryPredicate(category)))
                 }
 
                 arg == "-name" -> {
@@ -463,7 +521,6 @@ internal object FindCommandArgsParser {
                     pathArg = pathArg,
                     maxDepth = maxDepth,
                     isGlobal = isGlobal,
-                    filterType = filterType,
                     isDelete = isDelete,
                     isForce = isForce,
                     expression = ast,
@@ -472,21 +529,6 @@ internal object FindCommandArgsParser {
             )
         } catch (e: FindParseException) {
             Result.failure(e)
-        }
-    }
-
-    /**
-     * 解析 115 分类业务类型
-     */
-    fun parseFilterType(raw: String): Int? {
-        return when (raw.lowercase(Locale.ROOT)) {
-            "1", "doc", "document", "txt", "文档" -> 1
-            "2", "img", "image", "pic", "photo", "图片" -> 2
-            "3", "audio", "music", "mp3", "音频" -> 3
-            "4", "video", "movie", "mp4", "视频" -> 4
-            "5", "zip", "archive", "rar", "7z", "压缩" -> 5
-            "6", "app", "apk", "software", "软件" -> 6
-            else -> raw.toIntOrNull()?.takeIf { it in 1..6 }
         }
     }
 }

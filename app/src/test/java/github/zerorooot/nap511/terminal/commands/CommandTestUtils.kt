@@ -87,7 +87,7 @@ internal suspend fun TerminalContext.putMockFiles(
     fileCacheManager.put(
         cid,
         FilesBean(
-            fileBeanList = ArrayList(files),
+            fileBeanList = github.zerorooot.nap511.viewmodel.formatFileBeanList(files),
             cid = cid,
             count = files.size,
             order = "",
@@ -120,7 +120,8 @@ internal fun createMockFile(
     categoryId: String = "0",
     modifiedTime: String = "1000",
     pickCode: String = "",
-    sha1: String = ""
+    sha1: String = "",
+    icoString: String = name.substringAfterLast('.', "")
 ): FileBean = FileBean(
     name = name,
     fileId = fileId,
@@ -129,7 +130,8 @@ internal fun createMockFile(
     isFolder = false,
     modifiedTime = modifiedTime,
     pickCode = pickCode,
-    sha1 = sha1
+    sha1 = sha1,
+    icoString = icoString
 )
 
 /**

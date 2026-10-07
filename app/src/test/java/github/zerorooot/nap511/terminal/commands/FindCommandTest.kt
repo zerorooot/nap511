@@ -348,5 +348,67 @@ class FindCommandTest {
         // 9. -size 非法格式
         val outInvalidSize = engine.executeStrings("find -size abc", ctx)
         assertTrue(outInvalidSize.any { it.contains("无效的文件大小格式 'abc'") })
+
+        // 10. -filter 缺少参数
+        val outMissingFilterArg = engine.executeStrings("find -filter", ctx)
+        assertTrue(outMissingFilterArg.any { it.contains("'-filter' 缺少参数") })
+
+        // 11. -filter 非法分类
+        val outInvalidFilter = engine.executeStrings("find -filter unknown", ctx)
+        assertTrue(outInvalidFilter.any { it.contains("未知的分类 'unknown'") })
+    }
+
+    /**
+     * 测试 -filter 文件种类谓词及与 -not / -size / -type / -or 的无缝联动
+     */
+    @Test
+    fun testFindFilterCategoryPredicateAndLogic() = runBlocking {
+        val engine = createTestEngine()
+        val ctx = createTestContext()
+
+        val imgFile = createMockFile("photo.jpg", "1", size = "2048") // 2KB, img
+        val videoFile = createMockFile("movie.mp4", "2", size = "209715200") // 200MB, video
+        val docFile = createMockFile("doc.txt", "3", size = "4096") // 4KB, doc
+        val audioFile = createMockFile("song.mp3", "4", size = "5242880") // 5MB, audio
+        val webFile = createMockFile("index.html", "5", size = "1024") // 1KB, web
+        val torrentFile = createMockFile("download.torrent", "6", size = "512") // 512B, torrent
+
+        ctx.putMockFiles("0", listOf(imgFile, videoFile, docFile, audioFile, webFile, torrentFile))
+
+        // 1. 基础分类检索与别名：find -filter img 与 find -filter photo（已删除数字魔数）
+        val outImgText = engine.executeStrings("find -filter img", ctx)
+        assertEquals(listOf("/根目录/photo.jpg"), outImgText)
+
+        val outPhotoAlias = engine.executeStrings("find -filter photo", ctx)
+        assertEquals(listOf("/根目录/photo.jpg"), outPhotoAlias)
+
+        // 验证已彻底废弃数字魔数（如 1..6）
+        val outNumericRejected = engine.executeStrings("find -filter 2", ctx)
+        assertTrue(outNumericRejected.any { it.contains("未知的分类 '2'") })
+
+        // 2. 复合逻辑联动：find -type f -size -10m -not -filter img
+        // 小于 10M 的普通文件有：photo.jpg(2K), doc.txt(4K), song.mp3(5M), index.html(1K), download.torrent(512B)
+        // 排除图片 (-not -filter img) 后，应包含 doc.txt, song.mp3, index.html, download.torrent
+        val outNotFilter = engine.executeStrings("find -type f -size -10m -not -filter img", ctx)
+        assertEquals(4, outNotFilter.size)
+        assertFalse(outNotFilter.any { it.contains("photo.jpg") })
+        assertFalse(outNotFilter.any { it.contains("movie.mp4") }) // 超过 10M
+        assertTrue(outNotFilter.any { it.contains("doc.txt") })
+        assertTrue(outNotFilter.any { it.contains("song.mp3") })
+        assertTrue(outNotFilter.any { it.contains("index.html") })
+        assertTrue(outNotFilter.any { it.contains("download.torrent") })
+
+        // 3. 逻辑或联动：find -filter video -or -filter audio
+        val outMedia = engine.executeStrings("find -filter video -or -filter audio", ctx)
+        assertEquals(2, outMedia.size)
+        assertTrue(outMedia.any { it.contains("movie.mp4") })
+        assertTrue(outMedia.any { it.contains("song.mp3") })
+
+        // 4. 新增扩展种类：web 与 torrent
+        val outWeb = engine.executeStrings("find -filter web", ctx)
+        assertEquals(listOf("/根目录/index.html"), outWeb)
+
+        val outTorrent = engine.executeStrings("find -filter torrent", ctx)
+        assertEquals(listOf("/根目录/download.torrent"), outTorrent)
     }
 }

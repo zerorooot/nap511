@@ -305,25 +305,26 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
 
         // 图标与时长处理
         var playLongString = fileBean.playLongString
+        val ext = fileBean.icoString.ifEmpty { fileBean.name.substringAfterLast('.', "").lowercase() }
         val icoRes = when {
             isFolder -> R.drawable.folder
-            fileBean.isVideo == 1 -> {
+            fileBean.isVideo == 1 || ext in VIDEO_EXTS -> {
                 playLongString = generateTime(fileBean.playLong.toLong()) + " "
                 R.drawable.mp4
             }
 
-            fileBean.icoString in HTML_EXTS -> R.drawable.web
-            fileBean.icoString in ZIP_EXTS -> R.drawable.zip
-            fileBean.icoString in IMG_EXTS -> R.drawable.png
-            fileBean.icoString in TXT_EXTS -> R.drawable.txt
-            fileBean.icoString in AUDIO_EXTS -> {
+            ext in HTML_EXTS -> R.drawable.web
+            ext in ZIP_EXTS -> R.drawable.zip
+            ext in IMG_EXTS -> R.drawable.png
+            ext in TXT_EXTS -> R.drawable.txt
+            ext in AUDIO_EXTS -> {
                 playLongString = generateTime(fileBean.playLong.toLong()) + " "
                 R.drawable.mp3
             }
 
-            fileBean.icoString == "apk" -> R.drawable.apk
-            fileBean.icoString == "iso" -> R.drawable.iso
-            fileBean.icoString == "torrent" -> R.drawable.torrent
+            ext == "apk" -> R.drawable.apk
+            ext == "iso" -> R.drawable.iso
+            ext == "torrent" -> R.drawable.torrent
             else -> fileBean.fileIco
         }
 

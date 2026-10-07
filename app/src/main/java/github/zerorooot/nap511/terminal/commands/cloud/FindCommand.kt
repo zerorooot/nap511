@@ -38,10 +38,7 @@ private sealed interface FindSearchStrategy {
     /** 1. 常规目录树递归检索（通过 DFS 逐层下潜扫描网盘目录，限制深度为 [maxDepth]） */
     data class Tree(val maxDepth: Int) : FindSearchStrategy
 
-    /** 2. 115 业务分类筛选（调用官方 filterFile API，按文档/图片/视频/音乐/压缩包/软件分类） */
-    data class Category(val filterType: Int) : FindSearchStrategy
-
-    /** 3. 全盘云端全局搜索（调用官方 search API 在网盘根目录下全文检索指定关键词） */
+    /** 2. 全盘云端全局搜索（调用官方 search API 在网盘根目录下全文检索指定关键词） */
     data class Global(val keyword: String) : FindSearchStrategy
 }
 
@@ -122,7 +119,18 @@ class FindCommand : TerminalCommand {
         CommandFlag("-suffix <ext>", "按文件扩展名筛选（如 -suffix apk）"),
         CommandFlag(
             "-filter <type>",
-            "按 115 业务分类筛选：1|doc(文档), 2|img(图片), 3|audio(音频), 4|video(视频), 5|zip(压缩), 6|app(软件)"
+            "按文件种类筛选（基于图标与扩展名）。支持分类与别名：\n" +
+                "               doc/document/txt/text/文档/文本 -> 文档\n" +
+                "               img/image/pic/photo/图片 -> 图片\n" +
+                "               audio/music/mp3/音频/音乐 -> 音频\n" +
+                "               video/movie/mp4/视频 -> 视频\n" +
+                "               zip/archive/rar/7z/tar/压缩/压缩包 -> 压缩包\n" +
+                "               app/apk/software/软件/应用 -> 软件应用\n" +
+                "               web/html/htm/网页 -> 网页\n" +
+                "               iso/镜像 -> 镜像\n" +
+                "               torrent/bt/种子 -> 种子\n" +
+                "               dir/directory/folder/目录/文件夹 -> 目录\n" +
+                "               other/其它/其他 -> 其它"
         ),
         CommandFlag("-maxdepth <N>", "限制递归搜索的最大层级深度，默认为5"),
         CommandFlag("-empty", "只匹配空文件（大小为 0）或空目录（内容为空）"),
@@ -163,9 +171,6 @@ class FindCommand : TerminalCommand {
 
         // 4. 根据执行计划中的搜索策略分发具体检索逻辑
         when (val strategy = plan.strategy) {
-            is FindSearchStrategy.Category -> {
-                executeCategorySearch(ctx, dirResolution.targetCid, dirResolution.searchRootPath, strategy.filterType, plan, deletableTargets)
-            }
             is FindSearchStrategy.Global -> {
                 executeGlobalSearch(ctx, strategy.keyword, plan, deletableTargets)
             }
@@ -191,9 +196,8 @@ class FindCommand : TerminalCommand {
 
         val parsed = parseResult.getOrThrow()
 
-        // 决议搜索策略（优先级：Category > Global > Tree）
+        // 决议搜索策略（优先级：Global > Tree）
         val strategy = when {
-            parsed.filterType != null -> FindSearchStrategy.Category(parsed.filterType)
             parsed.isGlobal -> {
                 val keyword = parsed.firstKeyword.orEmpty()
                 if (keyword.isEmpty()) {
@@ -308,48 +312,7 @@ class FindCommand : TerminalCommand {
     }
 
     /**
-     * 分支 A：115 业务分类检索（调用 filterFile API）
-     */
-    private suspend fun FlowCollector<TerminalOutput>.executeCategorySearch(
-        ctx: TerminalContext,
-        targetCid: String,
-        searchRootPath: String,
-        filterType: Int,
-        plan: FindPlan,
-        deletableTargets: MutableList<DeletableTarget>
-    ) {
-        try {
-            val res = ctx.fileRepository.filterFile(cid = targetCid, type = filterType)
-            val rawList = formatFileBeanList(res.fileBeanList).toList()
-            val matchedList = rawList.filter { file -> plan.expression.evaluate(file, ctx) }
-
-            if (matchedList.isEmpty()) {
-                emitSystem("find: 未找到匹配的分类文件 (filterType: $filterType)")
-                return
-            }
-
-            if (plan.deletePolicy != FindDeletePolicy.None) {
-                matchedList.forEach { file ->
-                    val fid = if (file.isFolder) file.categoryId else file.fileId
-                    deletableTargets.add(
-                        DeletableTarget(parentCid = targetCid, fid = fid, name = file.name, isFolder = file.isFolder)
-                    )
-                }
-            } else {
-                emitSystem("分类筛选结果（共 ${matchedList.size} 项，分类: $filterType）：")
-                for (file in matchedList) {
-                    val fullPath = if (searchRootPath == "/") "/${file.name}" else "$searchRootPath/${file.name}"
-                    val isFolder = file.fileId.isEmpty()
-                    emitPath(fullPath + if (isFolder) "/" else "")
-                }
-            }
-        } catch (e: Exception) {
-            emitError("find: 分类筛选失败: ${e.message}")
-        }
-    }
-
-    /**
-     * 分支 B：115 全局云端搜索（调用 search API）
+     * 分支 A：115 全局云端搜索（调用 search API）
      */
     private suspend fun FlowCollector<TerminalOutput>.executeGlobalSearch(
         ctx: TerminalContext,
@@ -359,7 +322,8 @@ class FindCommand : TerminalCommand {
     ) {
         try {
             val searchResult = ctx.fileRepository.search(cid = "0", searchValue = keyword)
-            val matchedList = searchResult.fileBeanList.filter { file -> plan.expression.evaluate(file, ctx) }
+            val formattedList = formatFileBeanList(searchResult.fileBeanList)
+            val matchedList = formattedList.filter { file -> plan.expression.evaluate(file, ctx) }
 
             if (matchedList.isEmpty()) {
                 emitSystem("find: 未在网盘中找到匹配项")
@@ -388,7 +352,7 @@ class FindCommand : TerminalCommand {
     }
 
     /**
-     * 分支 C：常规递归目录树检索（DFS 深度优先扫描，内置短路求值）
+     * 分支 B：常规递归目录树检索（DFS 深度优先扫描，内置短路求值）
      */
     private suspend fun FlowCollector<TerminalOutput>.executeTreeSearch(
         ctx: TerminalContext,
