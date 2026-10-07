@@ -13,6 +13,7 @@ import github.zerorooot.nap511.terminal.engine.PipelineEngine
 import github.zerorooot.nap511.terminal.engine.TerminalHistoryManager
 import kotlinx.coroutines.flow.toList
 import okhttp3.RequestBody
+import java.io.InputStream
 
 /**
  * 终端命令单元测试辅助函数与测试基础设施
@@ -163,6 +164,12 @@ internal open class TestMockFileRepository(
     val deletedItems = mutableListOf<Pair<String, String>>()
     val movedItems = mutableListOf<Map<String, String>>()
     val revertedRids = mutableListOf<String>()
+    val mockDownloadStreams = mutableMapOf<String, String>()
+
+    override fun getDownloadInputStream(pickCode: String, fileId: String): InputStream? {
+        val content = mockDownloadStreams[fileId] ?: mockDownloadStreams[pickCode]
+        return content?.byteInputStream(Charsets.UTF_8)
+    }
 
     override suspend fun createFolder(pid: String, folderName: String): CreateFolderMessage {
         val newId = (counter++).toString()

@@ -6,6 +6,7 @@ import github.zerorooot.nap511.terminal.commands.cloud.OpenCommand
 import github.zerorooot.nap511.terminal.commands.cloud.StatCommand
 import github.zerorooot.nap511.terminal.commands.cloud.TrashCommand
 import github.zerorooot.nap511.terminal.commands.cloud.UnzipCommand
+import github.zerorooot.nap511.terminal.commands.file.CatCommand
 import github.zerorooot.nap511.terminal.commands.file.CdCommand
 import github.zerorooot.nap511.terminal.commands.file.LsCommand
 import github.zerorooot.nap511.terminal.commands.file.MkdirCommand
@@ -59,6 +60,7 @@ object CommandRegistryFactory {
             ExitCommand(),
             XargsCommand { registry },
             // 2. 注册网盘基础文件管理命令
+            CatCommand(),
             LsCommand(),
             CdCommand(),
             PwdCommand(),

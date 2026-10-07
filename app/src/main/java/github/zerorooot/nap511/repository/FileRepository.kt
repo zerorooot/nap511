@@ -521,7 +521,7 @@ open class FileRepository {
         return downloadUrl;
     }
 
-    fun getDownloadInputStream(
+    open fun getDownloadInputStream(
         pickCode: String, fileId: String
     ): InputStream? {
         val downloadUrl = getDownloadUrl(pickCode, fileId) ?: return null

@@ -267,26 +267,23 @@ class FileOpener(
      */
     suspend fun openText(fileBean: FileBean): Boolean {
         val settings = settingUiState()
-        val txtSize = settings.txtSize.toIntOrNull() ?: 200
-        if (fileBean.size.toLong() >= txtSize * 1024) {
-            App.instance.toast("仅支持打开${txtSize}kb以下的文件")
-            return false
+        val txtSize = settings.txtSize.toIntOrNull() ?: TextFileHelper.DEFAULT_TXT_SIZE_KB
+        when (val validation = TextFileHelper.validate(fileBean, txtSize)) {
+            is TextValidationResult.ExceedsSizeLimit -> {
+                App.instance.toast("仅支持打开${validation.limitKb}kb以下的文件")
+                return false
+            }
+            is TextValidationResult.NotTextFile -> {
+                App.instance.toast("非文本类型文件")
+                return false
+            }
+            is TextValidationResult.Valid -> {
+                // 校验通过，继续执行
+            }
         }
 
-        val bytes = withContext(Dispatchers.IO) {
-            var cached = mediaViewerStateHolder.getCachedBytes(fileBean)
-            if (cached == null) {
-                runCatching {
-                    val inputStream =
-                        fileRepository.getDownloadInputStream(fileBean.pickCode, fileBean.fileId)
-                    if (inputStream != null) {
-                        cached = inputStream.readBytes()
-                        mediaViewerStateHolder.putCachedBytes(fileBean, cached)
-                    }
-                }
-            }
-            cached
-        }
+        val fetchResult = TextFileHelper.fetchBytes(fileRepository, fileBean, mediaViewerStateHolder)
+        val bytes = fetchResult.getOrNull()
 
         if (bytes != null) {
             withContext(Dispatchers.Main) {

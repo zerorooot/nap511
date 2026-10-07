@@ -29,4 +29,5 @@ app/release/
 .artifacts
 .proxyai
 lib/
+docs/
 /skills
