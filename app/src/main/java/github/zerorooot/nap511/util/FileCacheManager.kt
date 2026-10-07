@@ -100,7 +100,7 @@ object FileCacheManager {
 
         // 2. 在后台异步加载其余文件及清理过期缓存，不阻塞启动流程/SplashScreen
         scope.launch {
-            //cleanExpiredDiskCache()
+//            cleanExpiredDiskCache()
 
             cacheDir.listFiles()?.forEach { file ->
                 val key = file.name.substringBeforeLast(".")
@@ -383,102 +383,6 @@ object FileCacheManager {
         deleteDiskFile(folderCid)
     }
 
-    /**
-     * 就地向父目录缓存中追加新创建的目录，并预埋新目录自身的空缓存（若未创建）。
-     */
-    suspend fun addFolder(parentCid: String, folderName: String, newCid: String) =
-        withContext(Dispatchers.IO) {
-            mutex.withLock {
-                val parentCache = memoryCache[parentCid]?.data
-                if (parentCache != null) {
-                    if (parentCache.fileBeanList.none { it.isFolder && it.name == folderName }) {
-                        val newFolderBean = FileBean(
-                            name = folderName,
-                            categoryId = newCid,
-                            fileId = newCid,
-                            isFolder = true
-                        )
-                        parentCache.fileBeanList.add(newFolderBean)
-                        parentCache.count = (parentCache.count + 1)
-                        flushToDiskInternal(parentCid)
-                    }
-                }
-
-                // 预埋新目录自身的空缓存（若未创建）
-                if (!memoryCache.containsKey(newCid)) {
-                    val parentPathList = parentCache?.path ?: emptyList()
-                    val newPathList = parentPathList + PathBean(cid = newCid, name = folderName, pid = parentCid)
-                    val newFilesBean = FilesBean(
-                        fileBeanList = arrayListOf(),
-                        cid = newCid,
-                        count = 0,
-                        order = "",
-                        path = newPathList
-                    )
-                    val entry = CacheWrapper(data = newFilesBean)
-                    memoryCache[newCid] = entry
-                    flushToDiskInternal(newCid)
-                }
-
-                _cacheEvents.tryEmit(CacheEvent.ContentUpdated(parentCid))
-            }
-        }
-
-    /**
-     * 就地向父目录缓存追加普通文件条目并落盘。
-     */
-    suspend fun addFile(parentCid: String, fileBean: FileBean) =
-        withContext(Dispatchers.IO) {
-            mutex.withLock {
-                val cache = memoryCache[parentCid]?.data ?: return@withContext
-                if (cache.fileBeanList.none { !it.isFolder && it.name == fileBean.name }) {
-                    cache.fileBeanList.add(fileBean)
-                    cache.count = (cache.count + 1)
-                    flushToDiskInternal(parentCid)
-                    _cacheEvents.tryEmit(CacheEvent.ContentUpdated(parentCid))
-                }
-            }
-        }
-
-    /**
-     * 就地处理跨目录移动：从源父目录移出，并添加到目标目录缓存中。
-     */
-    suspend fun moveItem(srcParentCid: String, targetCid: String, fid: String) =
-        withContext(Dispatchers.IO) {
-            mutex.withLock {
-                val srcCache = memoryCache[srcParentCid]?.data
-                val targetBean = srcCache?.fileBeanList?.find { it.fileId == fid || it.categoryId == fid }
-                if (srcCache != null && targetBean != null) {
-                    srcCache.fileBeanList.remove(targetBean)
-                    srcCache.count = (srcCache.count - 1).coerceAtLeast(0)
-                    flushToDiskInternal(srcParentCid)
-                    _cacheEvents.tryEmit(CacheEvent.ContentUpdated(srcParentCid))
-                }
-
-                if (targetBean != null) {
-                    val targetCache = memoryCache[targetCid]?.data
-                    if (targetBean.isFolder) {
-                        val folderCid = targetBean.categoryId.ifEmpty { fid }
-                        if (targetCache != null && targetCache.fileBeanList.none { it.isFolder && it.name == targetBean.name }) {
-                            targetCache.fileBeanList.add(targetBean)
-                            targetCache.count = (targetCache.count + 1)
-                            flushToDiskInternal(targetCid)
-                        }
-                        // 若移动的是文件夹，由于其完整层级路径发生变更，清理被移动文件夹本身的缓存以保证下次进入时重新生成正确面包屑
-                        memoryCache.remove(folderCid)
-                        deleteDiskFile(folderCid)
-                    } else {
-                        val movedBean = targetBean.copy(categoryId = targetCid)
-                        if (targetCache != null && targetCache.fileBeanList.none { !it.isFolder && it.name == movedBean.name }) {
-                            targetCache.fileBeanList.add(movedBean)
-                            targetCache.count = (targetCache.count + 1)
-                            flushToDiskInternal(targetCid)
-                        }
-                    }
-                    _cacheEvents.tryEmit(CacheEvent.ContentUpdated(targetCid))
-                }
-            }
-        }
 
     /**
      * 批量更新指定目录下视频文件的播放进度比例（playLongRatio），加锁更新、同步刷盘并广播变动事件。

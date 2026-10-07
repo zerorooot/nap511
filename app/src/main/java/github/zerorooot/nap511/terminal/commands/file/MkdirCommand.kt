@@ -103,8 +103,8 @@ class MkdirCommand : MutationCommand<MkdirPlan>() {
                             // 调用 115 网盘接口创建文件夹
                             val res = ctx.fileRepository.createFolder(pid = curCid, folderName = seg)
                             if (res.state) {
+                                val refreshed = ctx.listDirectory(curCid, forceRefresh = true)
                                 val nextCid = res.cid.ifEmpty {
-                                    val refreshed = ctx.listDirectory(curCid, forceRefresh = true)
                                     refreshed.firstOrNull { it.isFolder && it.name == seg }?.categoryId ?: ""
                                 }
                                 if (nextCid.isNotEmpty()) {

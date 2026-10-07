@@ -11,6 +11,7 @@ import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.PipelineEngine
 import github.zerorooot.nap511.terminal.engine.TerminalHistoryManager
+import github.zerorooot.nap511.util.FileCacheManager
 import kotlinx.coroutines.flow.toList
 import okhttp3.RequestBody
 import java.io.InputStream
@@ -169,25 +170,75 @@ internal open class TestMockFileRepository(
     val movedItems = mutableListOf<Map<String, String>>()
     val revertedRids = mutableListOf<String>()
     val mockDownloadStreams = mutableMapOf<String, String>()
+    val directoryFilesMap = mutableMapOf<String, MutableList<FileBean>>()
+    val folderPaths = mutableMapOf<String, List<PathBean>>()
 
     override fun getDownloadInputStream(pickCode: String, fileId: String): InputStream? {
         val content = mockDownloadStreams[fileId] ?: mockDownloadStreams[pickCode]
         return content?.byteInputStream(Charsets.UTF_8)
     }
 
+    override suspend fun getFiles(
+        cid: String,
+        showDir: Int,
+        aid: Int,
+        asc: Int,
+        naturalSort: Int,
+        order: String,
+        limit: Int,
+        format: String
+    ): FilesBean {
+        val existing = FileCacheManager.getDate(cid)?.fileBeanList ?: emptyList()
+        val created = directoryFilesMap[cid] ?: emptyList()
+        val combined = (existing + created).distinctBy { if (it.isFolder) it.categoryId else it.fileId }
+        val path = FileCacheManager.getDate(cid)?.path?.takeIf { it.isNotEmpty() }
+            ?: folderPaths[cid]
+            ?: if (cid == "0") listOf(PathBean("0", "根目录", "0")) else emptyList()
+        return FilesBean(
+            fileBeanList = ArrayList(combined),
+            cid = cid,
+            count = combined.size,
+            order = order,
+            path = path
+        )
+    }
+
     override suspend fun createFolder(pid: String, folderName: String): CreateFolderMessage {
         val newId = (counter++).toString()
+        val newFolder = FileBean(
+            name = folderName,
+            categoryId = newId,
+            fileId = "",
+            isFolder = true
+        )
+        directoryFilesMap.getOrPut(pid) { mutableListOf() }.add(newFolder)
+        val parentPath = folderPaths[pid] ?: FileCacheManager.getDate(pid)?.path?.takeIf { it.isNotEmpty() } ?: listOf(PathBean("0", "根目录", "0"))
+        folderPaths[newId] = parentPath + PathBean(newId, folderName, pid)
         return CreateFolderMessage(state = true, cid = newId, fileId = newId, fileName = folderName)
     }
 
     override suspend fun delete(pid: String, fid: String): BaseReturnMessage {
         deletedItems.add(pid to fid)
+        directoryFilesMap[pid]?.removeAll { it.fileId == fid || it.categoryId == fid }
         onDelete?.invoke(pid, fid)
         return BaseReturnMessage(state = true)
     }
 
     override suspend fun move(body: Map<String, String>): BaseReturnMessage {
         movedItems.add(body)
+        val targetPid = body["pid"]
+        if (targetPid != null) {
+            val fids = body.filterKeys { it.startsWith("fid[") }.values
+            for (fid in fids) {
+                for ((pid, list) in directoryFilesMap) {
+                    val found = list.find { it.fileId == fid || it.categoryId == fid }
+                    if (found != null) {
+                        list.remove(found)
+                        directoryFilesMap.getOrPut(targetPid) { mutableListOf() }.add(found.copy(categoryId = targetPid))
+                    }
+                }
+            }
+        }
         onMove?.invoke(body)
         return BaseReturnMessage(state = true)
     }
@@ -207,6 +258,16 @@ internal open class TestMockFileRepository(
 
     override suspend fun revert(rid: String): BaseReturnMessage {
         revertedRids.add(rid)
+        val matched = recycleBeans.firstOrNull { it.id == rid }
+        if (matched != null) {
+            val restored = FileBean(
+                name = matched.fileName,
+                fileId = matched.id,
+                categoryId = matched.cid,
+                isFolder = matched.isFolder
+            )
+            directoryFilesMap.getOrPut(matched.cid) { mutableListOf() }.add(restored)
+        }
         onRevert?.invoke(rid)
         return BaseReturnMessage(state = true)
     }

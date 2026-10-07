@@ -19,7 +19,7 @@ import java.nio.file.Files
 /**
  * FileCacheManager 单元测试集合
  * 验证：
- * 1. renameItem、removeItem、removeItems、addFolder、addFile、moveItem 的原子操作与状态维护
+ * 1. renameItem、removeItem、removeItems 的原子操作与状态维护
  * 2. 文件夹重命名时子目录面包屑末级同步
  * 3. 递归删除子孙目录 (removeFolderRecursively)
  * 4. 视频播放进度批量计算与更新 (updateVideoProgress)
@@ -193,48 +193,6 @@ class FileCacheManagerTest {
         assertFalse(FileCacheManager.containsKey("200"))
     }
 
-    @Test
-    fun testAddFolderAndAddFile() = runBlocking {
-        FileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(), cid = "0", count = 0, order = "", path = listOf(PathBean(cid = "0", name = "根", pid = "0"))))
-
-        // 添加文件夹
-        FileCacheManager.addFolder("0", "新建目录", "new_cid")
-        val cache = FileCacheManager.getDate("0")
-        assertEquals(1, cache?.count)
-        val folder = cache?.fileBeanList?.firstOrNull()
-        assertNotNull(folder)
-        assertTrue(folder!!.isFolder)
-        assertEquals("新建目录", folder.name)
-
-        // 验证新建文件夹自身的空缓存已预埋
-        val newFolderCache = FileCacheManager.getDate("new_cid")
-        assertNotNull(newFolderCache)
-        assertEquals(0, newFolderCache!!.count)
-        assertEquals("新建目录", newFolderCache.path.lastOrNull()?.name)
-
-        // 添加普通文件
-        val fileBean = FileBean(fileId = "file_1", name = "hello.txt", isFolder = false)
-        FileCacheManager.addFile("0", fileBean)
-        assertEquals(2, FileCacheManager.getDate("0")?.count)
-        assertEquals("hello.txt", FileCacheManager.getDate("0")?.fileBeanList?.last()?.name)
-    }
-
-    @Test
-    fun testMoveItem() = runBlocking {
-        val f1 = FileBean(fileId = "f1", name = "file1.txt", isFolder = false, categoryId = "0")
-        FileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(f1), cid = "0", count = 1, order = "", path = emptyList()))
-        FileCacheManager.put("10", FilesBean(fileBeanList = arrayListOf(), cid = "10", count = 0, order = "", path = emptyList()))
-
-        FileCacheManager.moveItem(srcParentCid = "0", targetCid = "10", fid = "f1")
-
-        assertEquals(0, FileCacheManager.getDate("0")?.count)
-        assertEquals(0, FileCacheManager.getDate("0")?.fileBeanList?.size)
-
-        val targetCache = FileCacheManager.getDate("10")
-        assertEquals(1, targetCache?.count)
-        assertEquals("file1.txt", targetCache?.fileBeanList?.first()?.name)
-        assertEquals("10", targetCache?.fileBeanList?.first()?.categoryId)
-    }
 
     @Test
     fun testUpdateVideoProgress() = runBlocking {

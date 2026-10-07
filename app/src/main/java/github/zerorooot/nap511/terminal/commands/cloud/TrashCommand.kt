@@ -118,9 +118,10 @@ class TrashCommand : ActionDispatchCommand<TrashAction>() {
 
             val res = ctx.fileRepository.revert(actualRid)
             if (res.state) {
-                if (matchedItem != null && matchedItem.cid.isNotEmpty()) {
+                val targetCid = matchedItem?.cid ?: recycleList.firstOrNull { it.id == actualRid }?.cid
+                if (!targetCid.isNullOrEmpty()) {
                     // 更新缓存
-                    ctx.listDirectory(matchedItem.cid, forceRefresh = true)
+                    ctx.listDirectory(targetCid, forceRefresh = true)
                 }
                 collector.emitSystem(successMessage)
             } else {

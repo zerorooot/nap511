@@ -174,11 +174,7 @@ class MkdirCommandTest {
      */
     @Test
     fun testMkdirMutatesCacheInPlace() = runBlocking {
-        val mockRepo = object : FileRepository() {
-            override suspend fun createFolder(pid: String, folderName: String): CreateFolderMessage {
-                return CreateFolderMessage(state = true, cid = "888", fileId = "888", fileName = folderName)
-            }
-        }
+        val mockRepo = createTestMockRepository(initialFolderId = 888)
 
         val engine = createTestEngine()
         val ctx = createTestContext(fileRepository = mockRepo)

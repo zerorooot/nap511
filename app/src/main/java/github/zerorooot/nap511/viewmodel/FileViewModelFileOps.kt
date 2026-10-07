@@ -258,7 +258,7 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
 
 
         // 判断是否为文件夹
-        val isFolder = fileBean.fileId.isEmpty()
+        val isFolder = fileBean.isFolder || fileBean.fileId.isEmpty()
         val finalFileId = if (isFolder) fileBean.categoryId else fileBean.fileId
 
         var sizeString = fileBean.sizeString
