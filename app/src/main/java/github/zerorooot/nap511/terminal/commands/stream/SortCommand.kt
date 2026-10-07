@@ -27,6 +27,9 @@ class SortCommand : StreamPipelineCommand() {
         CommandFlag("-u", "去重（唯一输出）")
     )
 
+    override val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter =
+        github.zerorooot.nap511.terminal.engine.completion.StandardCompleters.TEXT_FILES
+
     override fun compilePlan(ast: CommandInvocationAst): Result<StreamPlan> {
         val reverse = ast.hasFlag("-r")
         val numeric = ast.hasFlag("-n")

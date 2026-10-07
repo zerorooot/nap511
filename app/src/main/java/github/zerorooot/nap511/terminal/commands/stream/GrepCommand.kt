@@ -26,6 +26,17 @@ class GrepCommand : StreamPipelineCommand() {
         CommandFlag("-c", "仅输出匹配行的总数")
     )
 
+    override val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter =
+        object : github.zerorooot.nap511.terminal.engine.completion.CommandCompleter {
+            override fun getPathFilter(argIndex: Int): github.zerorooot.nap511.terminal.engine.completion.PathFilter {
+                return if (argIndex == 0) {
+                    github.zerorooot.nap511.terminal.engine.completion.PathFilter { _, _ -> false }
+                } else {
+                    github.zerorooot.nap511.terminal.engine.completion.FileFilters.TEXT_FILES
+                }
+            }
+        }
+
     override fun compilePlan(ast: CommandInvocationAst): Result<StreamPlan> {
         val ignoreCase = ast.hasFlag("-i")
         val invertMatch = ast.hasFlag("-v")

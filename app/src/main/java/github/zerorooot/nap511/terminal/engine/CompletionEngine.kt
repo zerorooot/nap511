@@ -48,6 +48,7 @@ enum class CompletionContextType {
  * @param prefix 当前正在匹配的前缀过滤词（如 "Do" 或 ""）
  * @param tokenStartIndex 当前 Token 在整个 input 中的起始索引
  * @param tokenEndIndex 当前 Token 在整个 input 中的结束索引（即解析时的光标位）
+ * @param argIndex 当前正在输入的目标位置参数索引（0-indexed，自动跳过 flag 及其选项值）
  */
 data class ParsedContext(
     val contextType: CompletionContextType,
@@ -56,7 +57,8 @@ data class ParsedContext(
     val parentPath: String,
     val prefix: String,
     val tokenStartIndex: Int,
-    val tokenEndIndex: Int
+    val tokenEndIndex: Int,
+    val argIndex: Int = 0
 )
 
 /**
@@ -141,7 +143,11 @@ object CompletionEngine {
      * @param input 终端整行输入文本
      * @param cursorPosition 当前输入光标所在索引位置 (0..input.length)
      */
-    fun parseContext(input: String, cursorPosition: Int): ParsedContext {
+    fun parseContext(
+        input: String,
+        cursorPosition: Int,
+        valueOptions: Set<String> = emptySet()
+    ): ParsedContext {
         val safeCursor = cursorPosition.coerceIn(0, input.length)
         val textBeforeCursor = input.substring(0, safeCursor)
 
@@ -187,8 +193,32 @@ object CompletionEngine {
                 parentPath = "",
                 prefix = rawToken,
                 tokenStartIndex = tokenGlobalStart,
-                tokenEndIndex = safeCursor
+                tokenEndIndex = safeCursor,
+                argIndex = 0
             )
+        }
+
+        // 计算当前 Token 前已存在的位置参数数量 (argIndex)
+        val segmentPrefix = segment.substring(0, tokenStartInSegment)
+        val prevTokens = Lexer.tokenizeWithQuoteInfo(segmentPrefix)
+        var positionalArgIndex = 0
+        if (prevTokens.size > 1) {
+            var skipNext = false
+            for (token in prevTokens.drop(1)) {
+                if (skipNext) {
+                    skipNext = false
+                    continue
+                }
+                val text = token.text
+                if (!token.isQuoted && text.startsWith("-") && !text.contains("/")) {
+                    val optName = text.substringBefore('=')
+                    if (valueOptions.contains(optName) && !text.contains('=')) {
+                        skipNext = true
+                    }
+                    continue
+                }
+                positionalArgIndex++
+            }
         }
 
         // 非第一个单词，当前处于参数上下文
@@ -200,7 +230,8 @@ object CompletionEngine {
                 parentPath = "",
                 prefix = rawToken,
                 tokenStartIndex = tokenGlobalStart,
-                tokenEndIndex = safeCursor
+                tokenEndIndex = safeCursor,
+                argIndex = positionalArgIndex
             )
         }
 
@@ -215,7 +246,8 @@ object CompletionEngine {
             parentPath = parentPath,
             prefix = prefix,
             tokenStartIndex = tokenGlobalStart,
-            tokenEndIndex = safeCursor
+            tokenEndIndex = safeCursor,
+            argIndex = positionalArgIndex
         )
     }
 
@@ -226,12 +258,14 @@ object CompletionEngine {
      * @param registeredCommands 系统已注册的所有命令名称列表
      * @param commandFlagsMap 每个命令对应的所有参数列表（如 "ls" -> ["-l", "-a", "-t", "-S", "-u", "-X", "-r"]）
      * @param directoryFiles 当前作用目录下的 FileBean 文件列表
+     * @param completer 命令自定义的补全器（可选，未传入时自动从 DefaultCompleterRegistry 查找对应命令的默认规则）
      */
     fun calculateCompletion(
         parsedContext: ParsedContext,
         registeredCommands: List<String>,
         commandFlagsMap: Map<String, List<CommandFlag>>,
-        directoryFiles: List<FileBean>
+        directoryFiles: List<FileBean>,
+        completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter? = null
     ): CompletionResult {
         val candidates = mutableListOf<CompletionCandidate>()
 
@@ -276,12 +310,16 @@ object CompletionEngine {
 
             CompletionContextType.PATH -> {
                 val prefix = parsedContext.prefix
-                val isCd = parsedContext.commandName == "cd"
+                val filter = completer?.getPathFilter(parsedContext.argIndex)
+                    ?: github.zerorooot.nap511.terminal.engine.completion.DefaultCompleterRegistry.findFilter(
+                        parsedContext.commandName,
+                        parsedContext.argIndex
+                    )
 
                 directoryFiles
                     .filter { file ->
-                        // 1. 如果是 cd，自动过滤所有非文件夹
-                        if (isCd && !file.isFolder) {
+                        // 1. 业务过滤器规则校验（如目录筛选、文本筛选、压缩包筛选）
+                        if (!filter.accept(file, parsedContext.argIndex)) {
                             return@filter false
                         }
                         // 2. 前缀过滤（忽略大小写）

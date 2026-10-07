@@ -21,6 +21,9 @@ class CdCommand : TerminalCommand {
 
     override val usage: String = "cd [path]"
 
+    override val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter =
+        github.zerorooot.nap511.terminal.engine.completion.StandardCompleters.DIRECTORY_ONLY
+
     override suspend fun execute(
         ctx: TerminalContext,
         ast: CommandInvocationAst,

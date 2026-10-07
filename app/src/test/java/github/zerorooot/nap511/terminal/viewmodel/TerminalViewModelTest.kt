@@ -415,6 +415,103 @@ class TerminalViewModelTest {
     }
 
     @Test
+    fun testCatAndUnzipCompletionFilteringInViewModel() = runBlocking {
+        val testRepo = object : FileRepository() {
+            override suspend fun getFiles(
+                cid: String,
+                showDir: Int,
+                aid: Int,
+                asc: Int,
+                naturalSort: Int,
+                order: String,
+                limit: Int,
+                format: String
+            ): FilesBean {
+                return FilesBean(
+                    fileBeanList = arrayListOf(
+                        FileBean(fileId = "", categoryId = "1", name = "folder", isFolder = true),
+                        FileBean(fileId = "2", name = "movie.mp4", isFolder = false),
+                        FileBean(fileId = "3", name = "readme.txt", isFolder = false),
+                        FileBean(fileId = "4", name = "bundle.zip", isFolder = false)
+                    ),
+                    cid = cid,
+                    count = 4,
+                    order = order,
+                    path = emptyList()
+                )
+            }
+        }
+        val catPathList = listOf(PathBean("test_cat_cid_unique", "TestCat", "0"))
+        val vm = TerminalViewModel(
+            initialPathList = catPathList,
+            fileRepository = testRepo,
+            mainDispatcher = testDispatcher
+        )
+
+        // 1. cat 补全：仅包含 folder 和 readme.txt
+        vm.onInputChange(TextFieldValue("cat ", TextRange(4)))
+        val catComp = vm.computeCompletions()
+        val catNames = catComp.candidates.map { it.name }.toSet()
+        assertEquals(setOf("folder", "readme.txt"), catNames)
+
+        // 2. unzip 补全：仅包含 folder 和 bundle.zip
+        vm.onInputChange(TextFieldValue("unzip ", TextRange(6)))
+        val unzipComp = vm.computeCompletions()
+        val unzipNames = unzipComp.candidates.map { it.name }.toSet()
+        assertEquals(setOf("folder", "bundle.zip"), unzipNames)
+
+        // 3. cd 补全：仅包含 folder
+        vm.onInputChange(TextFieldValue("cd ", TextRange(3)))
+        val cdComp = vm.computeCompletions()
+        val cdNames = cdComp.candidates.map { it.name }.toSet()
+        assertEquals(setOf("folder"), cdNames)
+    }
+
+    @Test
+    fun testGhostTextFilteringByCommand() = runBlocking {
+        val testRepo = object : FileRepository() {
+            override suspend fun getFiles(
+                cid: String,
+                showDir: Int,
+                aid: Int,
+                asc: Int,
+                naturalSort: Int,
+                order: String,
+                limit: Int,
+                format: String
+            ): FilesBean {
+                return FilesBean(
+                    fileBeanList = arrayListOf(
+                        FileBean(fileId = "1", name = "audio.mp3", isFolder = false),
+                        FileBean(fileId = "2", name = "archive.zip", isFolder = false),
+                        FileBean(fileId = "3", name = "article.txt", isFolder = false)
+                    ),
+                    cid = cid,
+                    count = 3,
+                    order = order,
+                    path = emptyList()
+                )
+            }
+        }
+        val ghostPathList = listOf(PathBean("test_ghost_cid_unique", "TestGhost", "0"))
+        val vm = TerminalViewModel(
+            initialPathList = ghostPathList,
+            fileRepository = testRepo,
+            mainDispatcher = testDispatcher
+        )
+        vm.refreshCachedEntriesAsync(vm.currentCid)
+
+        // 输入 "cat a" 时：当前目录下有 archive.zip, article.txt, audio.mp3
+        // 幽灵文本应该且仅能建议 article.txt (后缀为 rticle.txt)，不能建议 archive.zip 或 audio.mp3
+        vm.onInputChange(TextFieldValue("cat a", TextRange(5)))
+        assertEquals("rticle.txt", vm.ghostText)
+
+        // 输入 "unzip a" 时：幽灵文本应该建议 archive.zip (后缀为 rchive.zip)
+        vm.onInputChange(TextFieldValue("unzip a", TextRange(7)))
+        assertEquals("rchive.zip", vm.ghostText)
+    }
+
+    @Test
     fun testHistoryPointerResetOnCtrlCAndResetSession() {
         viewModel.historyNavigator.clear()
         viewModel.historyNavigator.add("help")

@@ -24,6 +24,9 @@ class ExitCommand : TerminalCommand {
 
     override val usage: String = "exit"
 
+    override val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter =
+        github.zerorooot.nap511.terminal.engine.completion.StandardCompleters.NONE
+
     override suspend fun execute(
         ctx: TerminalContext,
         ast: CommandInvocationAst,

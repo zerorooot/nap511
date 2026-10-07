@@ -46,6 +46,26 @@ class TrashCommand : ActionDispatchCommand<TrashAction>() {
 
     override val valueOptions: Set<String> = setOf("-r")
 
+    override val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter =
+        object : github.zerorooot.nap511.terminal.engine.completion.CommandCompleter {
+            override suspend fun resolveCandidates(
+                ctx: TerminalContext,
+                parsedContext: github.zerorooot.nap511.terminal.engine.ParsedContext,
+                defaultFiles: List<FileBean>
+            ): List<FileBean> {
+                return runCatching {
+                    ctx.fileRepository.recycleList().recycleBeanList.map { item ->
+                        FileBean(
+                            name = item.fileName,
+                            fileId = item.id,
+                            size = item.fileSize,
+                            isFolder = item.isFolder
+                        )
+                    }
+                }.getOrDefault(emptyList())
+            }
+        }
+
     override fun compileAction(ast: CommandInvocationAst): Result<TrashAction> {
         val ridToRevert = ast.getOption("-r")
         if (ridToRevert != null) {

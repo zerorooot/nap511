@@ -25,6 +25,8 @@ import github.zerorooot.nap511.terminal.engine.CompletionResult
 import github.zerorooot.nap511.terminal.engine.PipelineEngine
 import github.zerorooot.nap511.terminal.engine.TerminalHistoryManager
 import github.zerorooot.nap511.terminal.engine.TerminalLineEditor
+import github.zerorooot.nap511.terminal.engine.completion.FileFilters
+import github.zerorooot.nap511.terminal.engine.completion.StandardCompleters
 import github.zerorooot.nap511.util.FileOpener
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -139,8 +141,8 @@ class TerminalViewModel(
     val isCompletionBarVisible: Boolean get() = completionCoordinator.isVisible
     val activeCandidateIndex: Int get() = completionCoordinator.activeIndex
 
-    // 缓存当前目录下的文件名，用于快速预测补全
-    private val cachedDirectoryEntries = mutableListOf<String>()
+    // 缓存当前目录下的完整文件实体列表，用于快速预测补全与智能过滤
+    private val cachedDirectoryFiles = mutableListOf<FileBean>()
 
     val context = TerminalContext(
         initialPathList = initialPathList,
@@ -247,18 +249,22 @@ class TerminalViewModel(
         return "${contextPromptText()}\n$ "
     }
 
+    internal suspend fun refreshCachedEntriesAsync(cid: String) {
+        val files = runCatching {
+            context.listDirectory(cid)
+        }.getOrDefault(emptyList())
+        synchronized(cachedDirectoryFiles) {
+            cachedDirectoryFiles.clear()
+            cachedDirectoryFiles.addAll(files)
+        }
+        withContext(uiDispatcher) {
+            updateGhostText(inputState.text, inputState.selection.end)
+        }
+    }
+
     private fun refreshCachedEntries(cid: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val entries = runCatching {
-                context.listDirectory(cid).map { it.name }
-            }.getOrDefault(emptyList())
-            synchronized(cachedDirectoryEntries) {
-                cachedDirectoryEntries.clear()
-                cachedDirectoryEntries.addAll(entries)
-            }
-            withContext(uiDispatcher) {
-                updateGhostText(inputState.text, inputState.selection.end)
-            }
+        viewModelScope.launch(ioDispatcher) {
+            refreshCachedEntriesAsync(cid)
         }
     }
 
@@ -329,12 +335,20 @@ class TerminalViewModel(
             ghostText = ""
             return
         }
-        val currentEntries = synchronized(cachedDirectoryEntries) { cachedDirectoryEntries.toList() }
+        val currentFiles = synchronized(cachedDirectoryFiles) { cachedDirectoryFiles.toList() }
+        val parsed = CompletionEngine.parseContext(text, cursor)
+        val activeCommand = registry.get(parsed.commandName)
+        val filter = activeCommand?.completer?.getPathFilter(parsed.argIndex) ?: FileFilters.ALL
+
+        val filteredEntries = currentFiles
+            .filter { filter.accept(it, parsed.argIndex) }
+            .map { it.name }
+
         ghostText = AutosuggestionEngine.calculateGhostText(
             input = text,
             cursorPosition = cursor,
             registeredCommands = registry.commands.keys.toList(),
-            directoryEntries = currentEntries,
+            directoryEntries = filteredEntries,
             history = historyNavigator.memoryHistory
         )
     }
@@ -498,21 +512,11 @@ class TerminalViewModel(
         val commandFlagsMap = registry.commands.mapValues { entry ->
             entry.value.flags
         }
+        val activeCommand = registry.get(parsed.commandName)
+        val completer = activeCommand?.completer ?: StandardCompleters.ALL
 
         val directoryFiles = if (parsed.contextType == CompletionContextType.PATH) {
-            if (parsed.commandName == "trash") {
-                // 回收站管理专属智能预测：拉取回收站中的真实待清理文件列表供补全与还原
-                runCatching {
-                    context.fileRepository.recycleList().recycleBeanList.map { item ->
-                        FileBean(
-                            name = item.fileName,
-                            fileId = item.id,
-                            size = item.fileSize,
-                            isFolder = item.isFolder
-                        )
-                    }
-                }.getOrDefault(emptyList())
-            } else if (parsed.parentPath.isEmpty()) {
+            val rawFiles = if (parsed.parentPath.isEmpty()) {
                 context.listDirectory(currentCid)
             } else {
                 val resolved = context.resolvePath(parsed.parentPath)
@@ -522,6 +526,7 @@ class TerminalViewModel(
                     emptyList()
                 }
             }
+            completer.resolveCandidates(context, parsed, rawFiles)
         } else {
             emptyList()
         }
@@ -530,7 +535,8 @@ class TerminalViewModel(
             parsedContext = parsed,
             registeredCommands = registeredCommands,
             commandFlagsMap = commandFlagsMap,
-            directoryFiles = directoryFiles
+            directoryFiles = directoryFiles,
+            completer = completer
         )
     }
 

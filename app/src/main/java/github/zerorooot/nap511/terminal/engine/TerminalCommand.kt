@@ -50,6 +50,13 @@ interface TerminalCommand {
     val valueOptions: Set<String> get() = emptySet()
 
     /**
+     * 该命令专属的参数补全器策略（默认使用全量路径补全）
+     * 遵循微内核扩展规范，允许命令根据自身业务语义自由定制文件筛选或动态数据源。
+     */
+    val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter
+        get() = github.zerorooot.nap511.terminal.engine.completion.StandardCompleters.ALL
+
+    /**
      * 核心 AST 执行函数
      *
      * @param ctx 终端执行会话上下文

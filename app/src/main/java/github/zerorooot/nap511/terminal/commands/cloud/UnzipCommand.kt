@@ -50,6 +50,9 @@ class UnzipCommand : TerminalCommand {
 
     override val valueOptions: Set<String> = setOf("-p")
 
+    override val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter =
+        github.zerorooot.nap511.terminal.engine.completion.StandardCompleters.ARCHIVE_FILES
+
     override suspend fun execute(
         ctx: TerminalContext,
         ast: CommandInvocationAst,

@@ -46,6 +46,9 @@ class CatCommand : TerminalCommand {
 
     override val valueOptions: Set<String> = setOf("--max-size")
 
+    override val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter =
+        github.zerorooot.nap511.terminal.engine.completion.StandardCompleters.TEXT_FILES
+
     override suspend fun execute(
         ctx: TerminalContext,
         ast: CommandInvocationAst,

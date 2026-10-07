@@ -26,6 +26,9 @@ class TailCommand : StreamPipelineCommand() {
 
     override val valueOptions: Set<String> = setOf("-n")
 
+    override val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter =
+        github.zerorooot.nap511.terminal.engine.completion.StandardCompleters.TEXT_FILES
+
     override fun compilePlan(ast: CommandInvocationAst): Result<StreamPlan> {
         val limit = ast.getIntOption("-n", default = 10) ?: 10
 

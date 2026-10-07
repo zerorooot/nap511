@@ -30,6 +30,9 @@ class WcCommand : StreamPipelineCommand() {
         CommandFlag("-c", "仅统计字符/字节数")
     )
 
+    override val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter =
+        github.zerorooot.nap511.terminal.engine.completion.StandardCompleters.TEXT_FILES
+
     override fun compilePlan(ast: CommandInvocationAst): Result<StreamPlan> {
         val linesOnly = ast.hasFlag("-l")
         val wordsOnly = ast.hasFlag("-w")

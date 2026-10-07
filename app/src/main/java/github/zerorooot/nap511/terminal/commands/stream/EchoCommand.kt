@@ -28,6 +28,9 @@ class EchoCommand : TerminalCommand {
 
     override val usage: String = "echo [-n] [-e] [text...]"
 
+    override val completer: github.zerorooot.nap511.terminal.engine.completion.CommandCompleter =
+        github.zerorooot.nap511.terminal.engine.completion.StandardCompleters.NONE
+
     override val flags: List<CommandFlag> = listOf(
         CommandFlag("-n", "不输出尾随换行符"),
         CommandFlag("-e", "启用反斜杠转义字符解释")
