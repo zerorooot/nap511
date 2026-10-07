@@ -7,7 +7,7 @@ import github.zerorooot.nap511.terminal.engine.ParsedContext
 /**
  * 常用标准补全器单例集合
  */
-object StandardCompleters {
+object StandardCompleter {
 
     /** 全量文件与目录（默认补全器，适用于 ls, rm, mv, stat, open, find 等） */
     val ALL: CommandCompleter = object : CommandCompleter {
