@@ -21,7 +21,7 @@ object GlobMatcher {
     /**
      * 将 Glob 模式转换为正则表达式
      */
-    fun globToRegex(glob: String): Regex {
+    fun globToRegex(glob: String, ignoreCase: Boolean = false): Regex {
         val pattern = StringBuilder("^")
         var i = 0
         while (i < glob.length) {
@@ -44,17 +44,21 @@ object GlobMatcher {
             i++
         }
         pattern.append("$")
-        return Regex(pattern.toString())
+        return if (ignoreCase) {
+            Regex(pattern.toString(), RegexOption.IGNORE_CASE)
+        } else {
+            Regex(pattern.toString())
+        }
     }
 
     /**
      * 判断指定名称是否匹配该 Glob 模式
      */
-    fun matches(glob: String, target: String): Boolean {
+    fun matches(glob: String, target: String, ignoreCase: Boolean = false): Boolean {
         if (!hasGlobWildcards(glob)) {
-            return glob == target
+            return glob.equals(target, ignoreCase = ignoreCase)
         }
-        return globToRegex(glob).matches(target)
+        return globToRegex(glob, ignoreCase).matches(target)
     }
 
     /**
@@ -63,11 +67,11 @@ object GlobMatcher {
      * @param candidates 候选名称列表（如当前目录下的所有文件名）
      * @return 匹配的文件名列表（已排序）；若无任何项匹配，则返回包含原模式的单元素列表
      */
-    fun expand(globPattern: String, candidates: List<String>): List<String> {
+    fun expand(globPattern: String, candidates: List<String>, ignoreCase: Boolean = false): List<String> {
         if (!hasGlobWildcards(globPattern)) {
             return listOf(globPattern)
         }
-        val regex = globToRegex(globPattern)
+        val regex = globToRegex(globPattern, ignoreCase)
         val matched = candidates.filter { regex.matches(it) }.sorted()
         return matched.ifEmpty { listOf(globPattern) }
     }

@@ -122,7 +122,9 @@ internal fun createMockFile(
     modifiedTime: String = "1000",
     pickCode: String = "",
     sha1: String = "",
-    icoString: String = name.substringAfterLast('.', "")
+    icoString: String = name.substringAfterLast('.', ""),
+    playLong: Double = 0.0,
+    isVideo: Int = if (name.substringAfterLast('.', "").lowercase() in listOf("mp4", "mkv", "avi", "flv", "mov", "wmv", "rmvb", "webm", "ts")) 1 else 0
 ): FileBean = FileBean(
     name = name,
     fileId = fileId,
@@ -132,7 +134,9 @@ internal fun createMockFile(
     modifiedTime = modifiedTime,
     pickCode = pickCode,
     sha1 = sha1,
-    icoString = icoString
+    icoString = icoString,
+    playLong = playLong,
+    isVideo = isVideo
 )
 
 /**

@@ -109,12 +109,13 @@ class FindCommand : TerminalCommand {
     override val name: String = "find"
 
     override val description: String =
-        "网盘文件检索（支持按名称、类型、后缀、大小、空项筛选，支持 -not/-or 复合逻辑，及 -delete 批量安全删除）"
+        "网盘文件检索（支持按名称、大小、时长、类型、后缀、空项筛选，支持 -not/-or 复合逻辑，及 -delete 批量安全删除）"
 
     override val usage: String = "find [path] [expression] [-delete] [-f]"
 
     override val flags: List<CommandFlag> = listOf(
-        CommandFlag("-name <pattern>", "按文件名或通配符过滤匹配（如 -name '*.mp4'）"),
+        CommandFlag("-name <pattern>", "按文件名或通配符过滤匹配（区分大小写，如 -name '*.mp4'）"),
+        CommandFlag("-iname <pattern>", "按文件名或通配符过滤匹配（忽略大小写，如 -iname '*.mp4'）"),
         CommandFlag("-type <f|d>", "按类型过滤，f 为普通文件，d 为目录"),
         CommandFlag("-suffix <ext>", "按文件扩展名筛选（如 -suffix apk）"),
         CommandFlag(
@@ -135,6 +136,7 @@ class FindCommand : TerminalCommand {
         CommandFlag("-maxdepth <N>", "限制递归搜索的最大层级深度，默认为5"),
         CommandFlag("-empty", "只匹配空文件（大小为 0）或空目录（内容为空）"),
         CommandFlag("-size <[+|-]N[k|M|G]>", "按文件大小筛选（如 +100M 大于 100MB，-10k 小于 10KB）"),
+        CommandFlag("-time <[+|-]N[s|m|h]|HH:mm:ss>", "按视频/音频时长筛选（如 +30m 大于 30 分钟，-10:00 小于 10 分钟）"),
         CommandFlag("-not / !", "对后续条件取反（非运算）"),
         CommandFlag("-or / -o", "逻辑或运算，匹配两边任一条件"),
         CommandFlag("-global", "在整个 115 网盘根目录进行全局云端搜索"),
@@ -201,7 +203,7 @@ class FindCommand : TerminalCommand {
             parsed.isGlobal -> {
                 val keyword = parsed.firstKeyword.orEmpty()
                 if (keyword.isEmpty()) {
-                    return Result.failure(IllegalArgumentException("find: -global 全局搜索需要提供 -name 或 -suffix 关键词"))
+                    return Result.failure(IllegalArgumentException("find: -global 全局搜索需要提供 -name、-iname 或 -suffix 关键词"))
                 }
                 FindSearchStrategy.Global(keyword)
             }

@@ -2,8 +2,9 @@ package github.zerorooot.nap511.terminal.commands.cloud
 
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.terminal.commands.util.SizeFilter
+import github.zerorooot.nap511.terminal.commands.util.ComparisonFilter
 import github.zerorooot.nap511.terminal.commands.util.SizeParser
+import github.zerorooot.nap511.terminal.commands.util.TimeParser
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.GlobMatcher
 import java.util.Locale
@@ -36,14 +37,26 @@ internal object AlwaysTrueExpression : FindExpression {
 /**
  * 文件名匹配谓词（-name）
  *
- * 支持通配符（*、?、[]）匹配以及忽略大小写包含匹配。
+ * 严格区分大小写（遵循 Unix find 标准），支持通配符（*、?）匹配以及全名精确比对。
  * 为避免空模式导致的全局泛配，当 pattern 为空时直接判定为不匹配。
  */
 internal class NamePredicate(val pattern: String) : FindExpression {
     override suspend fun evaluate(file: FileBean, ctx: TerminalContext): Boolean {
         if (pattern.isEmpty()) return false
-        return GlobMatcher.matches(pattern, file.name) ||
-                file.name.contains(pattern, ignoreCase = true)
+        return GlobMatcher.matches(pattern, file.name, ignoreCase = false)
+    }
+}
+
+/**
+ * 文件名匹配谓词（-iname）
+ *
+ * 忽略大小写（遵循 Unix find 标准），支持通配符（*、?）匹配以及全名精确比对。
+ * 当 pattern 为空时直接判定为不匹配。
+ */
+internal class InamePredicate(val pattern: String) : FindExpression {
+    override suspend fun evaluate(file: FileBean, ctx: TerminalContext): Boolean {
+        if (pattern.isEmpty()) return false
+        return GlobMatcher.matches(pattern, file.name, ignoreCase = true)
     }
 }
 
@@ -77,14 +90,20 @@ internal class SuffixPredicate(val suffix: String) : FindExpression {
 }
 
 /**
- * 文件大小匹配谓词（-size）
+ * 通用数值度量比较 AST 谓词节点
  *
- * 依托 [SizeParser] 进行单位转换与精确/范围匹配（如 +100M、-10k、1M）
+ * 统一承载文件大小（-size）、媒体时长（-time）等所有基于单值数值度量的匹配评估。
+ *
+ * @param filter 统一的数值比较过滤器
+ * @param extractor 从 FileBean 中提取比对数值的函数；若文件不具备该属性或不满足前置条件则返回 null
  */
-internal class SizePredicate(val filter: SizeFilter) : FindExpression {
+internal class MetricPredicate<T : Comparable<T>>(
+    val filter: ComparisonFilter<T>,
+    val extractor: (FileBean) -> T?
+) : FindExpression {
     override suspend fun evaluate(file: FileBean, ctx: TerminalContext): Boolean {
-        val fileSize = file.size.toLongOrNull() ?: 0L
-        return SizeParser.matches(fileSize, filter)
+        val actualValue = extractor(file) ?: return false
+        return filter.matches(actualValue)
     }
 }
 
@@ -444,6 +463,15 @@ internal object FindCommandArgsParser {
                     expressionTokens.add(FindToken.Predicate(NamePredicate(pattern)))
                 }
 
+                arg == "-iname" -> {
+                    if (i + 1 >= args.size) {
+                        return Result.failure(FindParseException("find: '-iname' 缺少参数"))
+                    }
+                    val pattern = args[++i]
+                    if (firstKeyword == null) firstKeyword = pattern
+                    expressionTokens.add(FindToken.Predicate(InamePredicate(pattern)))
+                }
+
                 arg == "-type" -> {
                     if (i + 1 >= args.size) {
                         return Result.failure(FindParseException("find: '-type' 缺少参数"))
@@ -471,7 +499,21 @@ internal object FindCommandArgsParser {
                     val spec = args[++i]
                     val filter = SizeParser.parse(spec)
                         ?: return Result.failure(FindParseException("find: 无效的文件大小格式 '$spec'"))
-                    expressionTokens.add(FindToken.Predicate(SizePredicate(filter)))
+                    expressionTokens.add(FindToken.Predicate(MetricPredicate(filter) { file ->
+                        file.size.toLongOrNull() ?: 0L
+                    }))
+                }
+
+                arg == "-time" -> {
+                    if (i + 1 >= args.size) {
+                        return Result.failure(FindParseException("find: '-time' 缺少参数"))
+                    }
+                    val spec = args[++i]
+                    val filter = TimeParser.parse(spec)
+                        ?: return Result.failure(FindParseException("find: 无效的时间格式 '$spec'"))
+                    expressionTokens.add(FindToken.Predicate(MetricPredicate(filter) { file ->
+                        if (file.isFolder || file.playLong <= 0.0) null else file.playLong
+                    }))
                 }
 
                 arg == "-empty" -> {

@@ -393,7 +393,7 @@ class CommandUtilsUnitTest {
         val plus100M = SizeParser.parse("+100M")
         assertNotNull(plus100M)
         assertEquals('+', plus100M!!.operator)
-        assertEquals(100L * 1024L * 1024L, plus100M.targetBytes)
+        assertEquals(100L * 1024L * 1024L, plus100M.target)
         assertTrue(SizeParser.matches(105L * 1024L * 1024L, plus100M))
         assertFalse(SizeParser.matches(90L * 1024L * 1024L, plus100M))
 
@@ -401,7 +401,7 @@ class CommandUtilsUnitTest {
         val minus10k = SizeParser.parse("-10k")
         assertNotNull(minus10k)
         assertEquals('-', minus10k!!.operator)
-        assertEquals(10L * 1024L, minus10k.targetBytes)
+        assertEquals(10L * 1024L, minus10k.target)
         assertTrue(SizeParser.matches(1024L, minus10k))
         assertFalse(SizeParser.matches(20 * 1024L, minus10k))
 
@@ -409,26 +409,26 @@ class CommandUtilsUnitTest {
         val equal500 = SizeParser.parse("500b")
         assertNotNull(equal500)
         assertEquals('=', equal500!!.operator)
-        assertEquals(500L, equal500.targetBytes)
+        assertEquals(500L, equal500.target)
         assertTrue(SizeParser.matches(500L, equal500))
 
         val equal500c = SizeParser.parse("500c")
         assertNotNull(equal500c)
-        assertEquals(500L, equal500c!!.targetBytes)
+        assertEquals(500L, equal500c!!.target)
 
         val bareNumber = SizeParser.parse("1024")
         assertNotNull(bareNumber)
         assertEquals('=', bareNumber!!.operator)
-        assertEquals(1024L, bareNumber.targetBytes)
+        assertEquals(1024L, bareNumber.target)
 
         // 单位大小写支持与 G 级单位
         val upper1G = SizeParser.parse("+1G")
         assertNotNull(upper1G)
-        assertEquals(1024L * 1024L * 1024L, upper1G!!.targetBytes)
+        assertEquals(1024L * 1024L * 1024L, upper1G!!.target)
 
         val upperK = SizeParser.parse("-50K")
         assertNotNull(upperK)
-        assertEquals(50L * 1024L, upperK!!.targetBytes)
+        assertEquals(50L * 1024L, upperK!!.target)
 
         // 临界边界值比较（严格大于 / 严格小于 / 精确等于）
         val strictlyPlus = SizeParser.parse("+100")!!
@@ -443,7 +443,7 @@ class CommandUtilsUnitTest {
 
         val strictlyEqual = SizeParser.parse("100")!!
         assertEquals('=', strictlyEqual.operator)
-        assertEquals(100L, strictlyEqual.targetBytes)
+        assertEquals(100L, strictlyEqual.target)
         assertTrue(SizeParser.matches(100L, strictlyEqual))
         assertFalse(SizeParser.matches(101L, strictlyEqual))
         assertFalse(SizeParser.matches(99L, strictlyEqual))

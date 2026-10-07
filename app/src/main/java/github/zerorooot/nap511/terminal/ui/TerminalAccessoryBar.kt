@@ -173,10 +173,10 @@ fun TerminalAccessoryBar(
  */
 @Composable
 fun TerminalAccessoryBar(
+    modifier: Modifier = Modifier,
     actions: TerminalAccessoryActions,
     isCtrlActive: Boolean = false,
     isAltActive: Boolean = false,
-    modifier: Modifier = Modifier
 ) {
     val rows = remember(actions, isCtrlActive, isAltActive) {
         TerminalAccessoryDefaults.defaultKeyRows(actions, isCtrlActive, isAltActive)
@@ -184,61 +184,6 @@ fun TerminalAccessoryBar(
     TerminalAccessoryBar(rows = rows, modifier = modifier)
 }
 
-/**
- * 兼容旧签名的重载方法，防止外部未重构代码编译报错
- */
-@Composable
-fun TerminalAccessoryBar(
-    modifier: Modifier = Modifier,
-    onTab: () -> Unit,
-    onCtrlToggle: () -> Unit = {},
-    onSlash: () -> Unit,
-    onDash: () -> Unit,
-    onHome: () -> Unit,
-    onArrowUp: () -> Unit,
-    onEnd: () -> Unit,
-    onPageUp: () -> Unit,
-    onMenu: () -> Unit,
-    onAltToggle: () -> Unit = {},
-    onPipe: () -> Unit,
-    onStar: () -> Unit,
-    onArrowLeft: () -> Unit,
-    onArrowDown: () -> Unit,
-    onArrowRight: () -> Unit,
-    onPageDown: () -> Unit,
-    isCtrlActive: Boolean = false,
-    isAltActive: Boolean = false,
-) {
-    val actions = remember(
-        onTab, onCtrlToggle, onSlash, onDash, onHome, onArrowUp, onEnd, onPageUp,
-        onMenu, onAltToggle, onPipe, onStar, onArrowLeft, onArrowDown, onArrowRight, onPageDown
-    ) {
-        TerminalAccessoryActions(
-            onTab = onTab,
-            onCtrlToggle = onCtrlToggle,
-            onSlash = onSlash,
-            onDash = onDash,
-            onHome = onHome,
-            onArrowUp = onArrowUp,
-            onEnd = onEnd,
-            onPageUp = onPageUp,
-            onMenu = onMenu,
-            onAltToggle = onAltToggle,
-            onPipe = onPipe,
-            onStar = onStar,
-            onArrowLeft = onArrowLeft,
-            onArrowDown = onArrowDown,
-            onArrowRight = onArrowRight,
-            onPageDown = onPageDown
-        )
-    }
-    TerminalAccessoryBar(
-        actions = actions,
-        isCtrlActive = isCtrlActive,
-        isAltActive = isAltActive,
-        modifier = modifier
-    )
-}
 
 /**
  * 单个按键 UI 渲染组件
