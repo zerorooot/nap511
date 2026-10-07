@@ -64,6 +64,9 @@ class RmCommand : MutationCommand<RmPlan>() {
         plan: RmPlan,
         collector: FlowCollector<TerminalOutput>
     ) {
+        val confirmedItems = mutableListOf<DeleteTargetItem>()
+
+        // 阶段一：目标解析、前置安全校验及交互确认（收集确认删除项）
         for (target in plan.targets) {
             val resolved = ctx.resolveTarget(target)
             if (resolved == null) {
@@ -79,7 +82,8 @@ class RmCommand : MutationCommand<RmPlan>() {
             when (resolved) {
                 is ResolvedTarget.File -> {
                     actualFid = resolved.file.fileId
-                    parentCid = resolved.parentCid
+                    // 核心防护：若 resolved.parentCid 为空，回退使用 resolved.file.categoryId 作为有效 parentCid
+                    parentCid = resolved.parentCid.ifEmpty { resolved.file.categoryId }
                     displayName = resolved.file.name
                     isFolder = false
                 }
@@ -95,12 +99,13 @@ class RmCommand : MutationCommand<RmPlan>() {
                         collector.emitError("rm: cannot remove '$target': Cannot remove current working directory")
                         continue
                     }
-                    if (resolved.parentCid == null) {
+                    val effectivePid = resolved.parentCid ?: resolved.folderBean?.parentId.orEmpty()
+                    if (effectivePid.isEmpty()) {
                         collector.emitError("rm: cannot remove '$target': Cannot determine parent directory")
                         continue
                     }
                     actualFid = resolved.cid
-                    parentCid = resolved.parentCid
+                    parentCid = effectivePid
                     displayName = resolved.name.ifEmpty {
                         TerminalPath.parse(target).targetName
                     }
@@ -117,19 +122,46 @@ class RmCommand : MutationCommand<RmPlan>() {
                 }
             }
 
+            confirmedItems.add(
+                DeleteTargetItem(
+                    parentCid = parentCid,
+                    fid = actualFid,
+                    displayName = displayName,
+                    isFolder = isFolder
+                )
+            )
+        }
+
+        if (confirmedItems.isEmpty()) return
+
+        // 阶段二：按有效父目录 parentCid 分组聚合
+        val groupedByParent = confirmedItems.groupBy { it.parentCid }
+
+        // 阶段三：分目录执行批量删除或降级单项删除
+        for ((parentCid, items) in groupedByParent) {
             try {
-                // 传入目标真实的 parentCid 与 fid，确保跨目录删除成功
-                val res = ctx.fileRepository.delete(pid = parentCid, fid = actualFid)
-                if (res.state) {
-                    // 就地从父目录缓存中剔除并级联清理文件夹缓存，无需网络重新拉取
-                    ctx.fileCacheManager.removeItem(parentCid = parentCid, fid = actualFid, isFolder = isFolder)
-                    collector.emitText("rm: 已移入回收站 '$displayName'")
+                if (items.size > 1 && parentCid.isNotEmpty()) {
+                    // 同目录多项：组装 deleteMultiple 批量删除
+                    val res = TerminalFileDeleter.deleteGroup(ctx, parentCid, items)
+                    if (res.state) {
+                        collector.emitText("rm: 已成功批量删除目录下的 ${items.size} 个项目至回收站")
+                    } else {
+                        val err = res.error.ifEmpty { res.message.ifEmpty { "未知错误" } }
+                        collector.emitError("rm: 批量删除失败 (${items.size} 个项目): $err")
+                    }
                 } else {
-                    val err = res.error.ifEmpty { res.message }
-                    collector.emitError("rm: 删除失败 '$displayName': $err")
+                    // 单项处理：保持传统单项提示
+                    val single = items.first()
+                    val res = TerminalFileDeleter.deleteGroup(ctx, parentCid, listOf(single))
+                    if (res.state) {
+                        collector.emitText("rm: 已移入回收站 '${single.displayName}'")
+                    } else {
+                        val err = res.error.ifEmpty { res.message.ifEmpty { "未知错误" } }
+                        collector.emitError("rm: 删除失败 '${single.displayName}': $err")
+                    }
                 }
             } catch (e: Exception) {
-                collector.emitError("rm: 删除失败 '$displayName': ${e.message}")
+                collector.emitError("rm: 删除失败: ${e.message}")
             }
         }
     }

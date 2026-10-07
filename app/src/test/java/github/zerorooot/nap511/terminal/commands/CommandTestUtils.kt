@@ -224,6 +224,21 @@ internal open class TestMockFileRepository(
         return BaseReturnMessage(state = true)
     }
 
+    val deletedMultipleCalls = mutableListOf<Map<String, String>>()
+    var onDeleteMultiple: ((Map<String, String>) -> Unit)? = null
+
+    override suspend fun deleteMultiple(data: Map<String, String>): BaseReturnMessage {
+        deletedMultipleCalls.add(data)
+        val pid = data["pid"].orEmpty()
+        val fids = data.filterKeys { it.startsWith("fid[") }.values.toSet()
+        for (fid in fids) {
+            deletedItems.add(pid to fid)
+        }
+        directoryFilesMap[pid]?.removeAll { it.fileId in fids || it.categoryId in fids }
+        onDeleteMultiple?.invoke(data)
+        return BaseReturnMessage(state = true)
+    }
+
     override suspend fun move(body: Map<String, String>): BaseReturnMessage {
         movedItems.add(body)
         val targetPid = body["pid"]

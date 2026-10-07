@@ -258,8 +258,9 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
 
 
         // 判断是否为文件夹
-        val isFolder = fileBean.isFolder || fileBean.fileId.isEmpty()
+        val isFolder = fileBean.fileId.isEmpty() || fileBean.isFolder
         val finalFileId = if (isFolder) fileBean.categoryId else fileBean.fileId
+        val finalParentId = if (isFolder) fileBean.parentId else fileBean.categoryId
 
         var sizeString = fileBean.sizeString
         var modifiedTimeString: String
@@ -291,7 +292,8 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
 
         // 图标与时长处理
         var playLongString = fileBean.playLongString
-        val ext = fileBean.icoString.ifEmpty { fileBean.name.substringAfterLast('.', "").lowercase() }
+        val ext =
+            fileBean.icoString.ifEmpty { fileBean.name.substringAfterLast('.', "").lowercase() }
         val icoRes = when {
             isFolder -> R.drawable.folder
             fileBean.isVideo == 1 || ext in VIDEO_EXTS -> {
@@ -317,6 +319,7 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
         // 使用 copy() 拷贝并返回更新后的不可变对象
         fileBean.copy(
             fileId = finalFileId,
+            parentId = finalParentId,
             isFolder = isFolder,
             fileIco = icoRes,
             updateTimeString = updateTimeString,

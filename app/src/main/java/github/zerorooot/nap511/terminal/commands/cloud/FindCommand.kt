@@ -9,6 +9,8 @@ import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
 import github.zerorooot.nap511.terminal.viewmodel.emitPath
 import github.zerorooot.nap511.terminal.viewmodel.emitSystem
+import github.zerorooot.nap511.terminal.commands.file.DeleteTargetItem
+import github.zerorooot.nap511.terminal.commands.file.TerminalFileDeleter
 import github.zerorooot.nap511.viewmodel.formatFileBeanList
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
@@ -311,15 +313,19 @@ class FindCommand : TerminalCommand {
         ctx: TerminalContext,
         resolved: ResolvedTarget.File
     ) {
-        val res = runCatching {
-            ctx.fileRepository.delete(pid = resolved.parentCid, fid = resolved.file.fileId)
-        }.getOrNull()
-
-        if (res?.state == true) {
-            ctx.fileCacheManager.removeItem(parentCid = resolved.parentCid, fid = resolved.file.fileId, isFolder = false)
+        val effectivePid = resolved.parentCid.ifEmpty { resolved.file.categoryId }
+        val item = DeleteTargetItem(
+            parentCid = effectivePid,
+            fid = resolved.file.fileId,
+            displayName = resolved.file.name,
+            isFolder = false
+        )
+        val res = TerminalFileDeleter.deleteGroup(ctx, effectivePid, listOf(item))
+        if (res.state) {
             emitSystem("find: 已成功删除 '${resolved.file.name}' 至回收站")
         } else {
-            emitError("find: 删除失败: ${res?.error ?: "未知错误"}")
+            val err = res.error.ifEmpty { res.message.ifEmpty { "未知错误" } }
+            emitError("find: 删除失败: $err")
         }
     }
 
@@ -344,9 +350,10 @@ class FindCommand : TerminalCommand {
 
             if (plan.deletePolicy != FindDeletePolicy.None) {
                 matchedList.forEach { file ->
-                    val isFolder = file.fileId.isEmpty()
+                    val isFolder = file.isFolder || file.fileId.isEmpty()
                     val fid = if (isFolder) file.categoryId else file.fileId
-                    val parentCid = if (isFolder) "" else file.parentId
+                    // 核心事实：普通文件使用 categoryId 作为 parentCid；目录使用 parentId 作为 parentCid
+                    val parentCid = if (isFolder) file.parentId else file.categoryId.ifEmpty { file.parentId }
                     deletableTargets.add(
                         DeletableTarget(parentCid = parentCid, fid = fid, name = file.name, isFolder = isFolder)
                     )
@@ -418,7 +425,7 @@ class FindCommand : TerminalCommand {
     }
 
     /**
-     * 批量安全移入回收站（统一处理交互确认、网络删除及本地目录缓存级联失效）
+     * 批量安全移入回收站（按父目录聚合批量删除，并级联清理父目录及文件夹子孙缓存）
      */
     private suspend fun FlowCollector<TerminalOutput>.performBatchDelete(
         ctx: TerminalContext,
@@ -439,16 +446,29 @@ class FindCommand : TerminalCommand {
             }
         }
 
+        val convertedItems = targets.map {
+            DeleteTargetItem(
+                parentCid = it.parentCid,
+                fid = it.fid,
+                displayName = it.name,
+                isFolder = it.isFolder
+            )
+        }
+
+        val grouped = convertedItems.groupBy { it.parentCid }
         var successCount = 0
-        for (target in targets) {
+
+        for ((parentCid, items) in grouped) {
             try {
-                val res = ctx.fileRepository.delete(pid = target.parentCid, fid = target.fid)
+                val res = TerminalFileDeleter.deleteGroup(ctx, parentCid, items)
                 if (res.state) {
-                    successCount++
-                    // 就地从父目录缓存中剔除并级联清理文件夹缓存，保持会话状态一致
-                    ctx.fileCacheManager.removeItem(parentCid = target.parentCid, fid = target.fid, isFolder = target.isFolder)
+                    successCount += items.size
+                } else {
+                    val err = res.error.ifEmpty { res.message.ifEmpty { "未知错误" } }
+                    emitError("find: 目录 [ID:$parentCid] 下的 ${items.size} 个项目删除失败: $err")
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                emitError("find: 删除异常 [ID:$parentCid]: ${e.message}")
             }
         }
 

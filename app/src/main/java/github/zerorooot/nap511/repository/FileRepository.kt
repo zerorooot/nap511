@@ -193,8 +193,8 @@ open class FileRepository {
         return fileService.order(body)
     }
 
-    suspend fun deleteMultiple(data: Map<String, String>): BaseReturnMessage {
-        return fileService.deleteMultiple(data)
+    open suspend fun deleteMultiple(data: Map<String, String>): BaseReturnMessage {
+        return executeWithRetry { fileService.deleteMultiple(data) }
     }
 
     open suspend fun search(
