@@ -372,4 +372,60 @@ class XargsCommandTest {
         val out80 = engine.executeStrings("echo 'a' | xargs -I '@@' echo '@@'", ctx)
         assertEquals(listOf("a"), out80)
     }
+
+    /**
+     * 5. POSIX 规范化增强测试（子命令选项无损透传、-0、-p、-L、-E、引号空格保护）
+     */
+    @Test
+    fun testXargsPosixStandards() = runBlocking {
+        val engine = createTestEngine()
+        val ctx = createTestContext()
+
+        // 1. 核心 Bug 验收：子命令专属选项无损透传（POSIX Guideline 13），-l 不被 xargs 劫持
+        val outSubFlag = engine.executeStrings("echo 'archive.zip' | xargs -t -I _ unzip -l _", ctx)
+        assertTrue(
+            "xargs -t 输出必须包含完整的子命令选项 -l",
+            outSubFlag.any { it.contains("+ unzip -l archive.zip") }
+        )
+
+        // 2. -0 / --null NUL 字符模式：安全处理带空格与特殊字符的文件名
+        val outNullDelim = engine.executeStrings("echo -e 'a b.txt\\0c d.txt\\0' | xargs -0 -n 1 echo", ctx)
+        assertEquals(listOf("a b.txt", "c d.txt"), outNullDelim)
+
+        // 3. -L 行批处理模式：按行合并参数分批执行
+        val outLines = engine.executeStrings("echo -e '1\\n2\\n3\\n4' | xargs -L 2 echo", ctx)
+        assertEquals(listOf("1 2", "3 4"), outLines)
+
+        // 4. -E 逻辑 EOF 终止符：遇到指定标记行立即终止读取并执行
+        val outEof = engine.executeStrings("echo -e 'first\\nSTOP\\nsecond' | xargs -E STOP echo", ctx)
+        assertEquals(listOf("first"), outEof)
+
+        // 5. 默认模式支持单双引号保留文件名内嵌空格（避免 \s+ 暴力破坏）
+        val outQuotes = engine.executeStrings("echo \"'song a.mp3' 'song b.mp3'\" | xargs -n 1 echo", ctx)
+        assertEquals(listOf("song a.mp3", "song b.mp3"), outQuotes)
+
+        // 6. -p 交互式确认测试：支持用户确认与取消
+        var promptTriggered = false
+        val confirmCtx = createTestContext(
+            onConfirmRequest = { prompt ->
+                promptTriggered = true
+                prompt.contains("+ echo test")
+            }
+        )
+        val outPrompt = engine.executeStrings("echo 'test' | xargs -p echo", confirmCtx)
+        assertTrue("必须触发交互确认询问", promptTriggered)
+        assertEquals(listOf("test"), outPrompt)
+
+        // 7. -p 交互式取消测试：用户拒绝时跳过执行
+        var rejectPromptTriggered = false
+        val rejectCtx = createTestContext(
+            onConfirmRequest = {
+                rejectPromptTriggered = true
+                false // 模拟用户输入 no 取消
+            }
+        )
+        val outReject = engine.executeStrings("echo 'test' | xargs -p echo", rejectCtx)
+        assertTrue(rejectPromptTriggered)
+        assertEquals(emptyList<String>(), outReject)
+    }
 }

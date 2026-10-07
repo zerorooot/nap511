@@ -52,6 +52,15 @@ interface TerminalCommand {
     val valueOptions: Set<String> get() = emptySet()
 
     /**
+     * 标识当前命令是否为高阶包装命令（如 xargs, time, nohup）
+     *
+     * 包装命令的语法规则遵循 POSIX Guideline 13：
+     * 选项解析器在识别完自身前置选项后，遇到的首个非选项操作数即被视为目标子命令名，
+     * 目标命令之后的所有 Token 将直接封包为 [CommandInvocationAst.subcommand]，不再参与外层命令的 Flag/Option 提取。
+     */
+    val isWrapperCommand: Boolean get() = false
+
+    /**
      * 该命令专属的参数补全器策略（默认使用全量路径补全）
      * 遵循微内核扩展规范，允许命令根据自身业务语义自由定制文件筛选或动态数据源。
      */

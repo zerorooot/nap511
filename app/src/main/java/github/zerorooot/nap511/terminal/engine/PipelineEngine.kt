@@ -63,7 +63,12 @@ class PipelineEngine(
             }
 
             // 1. 在引擎层直接完成命令 AST 语法树构建（消灭所有下游命令对 CommandArgs 的依赖）
-            val rawAst = CommandAstParser.parse(stage.command, stage.tokens, command.valueOptions)
+            val rawAst = CommandAstParser.parse(
+                commandName = stage.command,
+                tokens = stage.tokens,
+                allowedValueOptions = command.valueOptions,
+                isWrapperCommand = command.isWrapperCommand
+            )
 
             // 2. 安全 Glob 展开：仅对未加引号的位置参数（路径/文件名）执行通配符展开；
             // 选项名称与选项参数值严格禁止展开，从源头杜绝参数注入。

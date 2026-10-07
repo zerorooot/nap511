@@ -1,5 +1,7 @@
 package github.zerorooot.nap511.terminal.engine.ast
 
+import github.zerorooot.nap511.terminal.engine.Token
+
 /**
  * 选项参数值节点
  *
@@ -29,13 +31,29 @@ data class PositionalArgumentNode(
 )
 
 /**
+ * 包装命令（Wrapper/Meta Command）持有的嵌套子命令语法节点
+ *
+ * 遵循 POSIX Utility Syntax Guideline 13 规范：
+ * 包装命令解析出自身合法选项后，子命令名称及其后续全部 Token（包括子命令专属选项与占位符参数）
+ * 保持完整原貌封包于此节点中，防止被外层命令语法分析器提前剥离或误篡改。
+ *
+ * @property name 子命令标识符（如 "unzip", "echo"）
+ * @property rawTokens 子命令后续携带的原始 Token 序列（包含子命令选项与用户定义的占位符等）
+ */
+data class SubcommandAst(
+    val name: String,
+    val rawTokens: List<Token> = emptyList()
+)
+
+/**
  * 终端命令调用抽象语法树（Command Invocation AST）
  *
  * 遵循 POSIX Utility Syntax Guidelines 规范，在引擎层一次性将输入的 Token 序列切分为结构化的 AST 树：
  * 1. 布尔标志位（flags）：如 -l, -a, --refresh，支持复合简写拆分（-rf 自动展开为 -r 与 -f）；
  * 2. 键值选项（options）：如 -n 10, -I {}，支持紧贴形式与空格分隔形式；
  * 3. 位置参数（positionalArgs）：如文件路径、目标命令等；
- * 4. 选项结束符（hasDelimiter）：严格隔离 "--" 前后的语法语义。
+ * 4. 选项结束符（hasDelimiter）：严格隔离 "--" 前后的语法语义；
+ * 5. 嵌套子命令（subcommand）：支持 xargs 等高阶命令无损透传子命令名与参数。
  *
  * 彻底消除各命令中散落的 CommandArgs 与过程式字符串比对。
  *
@@ -44,6 +62,7 @@ data class PositionalArgumentNode(
  * @property options 带参数值的选项字典
  * @property positionalArgs 位置参数语法节点列表
  * @property hasDelimiter 是否显式提供了 "--" 选项结束符
+ * @property subcommand 针对包装命令嵌套解析出的子命令调用节点（遵循 POSIX Guideline 13）
  */
 data class CommandInvocationAst(
     val commandName: String,
@@ -51,7 +70,8 @@ data class CommandInvocationAst(
     val options: Map<String, OptionValueNode> = emptyMap(),
     val positionalArgs: List<PositionalArgumentNode> = emptyList(),
     val hasDelimiter: Boolean = false,
-    val rawArgs: List<String> = emptyList()
+    val rawArgs: List<String> = emptyList(),
+    val subcommand: SubcommandAst? = null
 ) {
     /**
      * 判断是否包含指定的任一标志位（Flag）
