@@ -1,5 +1,7 @@
 package github.zerorooot.nap511.terminal.commands
 
+import github.zerorooot.nap511.bean.FilesBean
+import github.zerorooot.nap511.bean.PathBean
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -427,5 +429,106 @@ class XargsCommandTest {
         val outReject = engine.executeStrings("echo 'test' | xargs -p echo", rejectCtx)
         assertTrue(rejectPromptTriggered)
         assertEquals(emptyList<String>(), outReject)
+    }
+
+    /**
+     * 6. xargs -0 与 -I 组合及管道协同测试（专项针对 find -print0 管道缺陷与安全注入防范）
+     */
+    @Test
+    fun testXargsNullDelimiterWithReplace() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        // 1. -0 与 -I 基础组合：切分含空格与特殊字符的 NUL 流
+        val out1 = engine.executeStrings(
+            "echo -e 'foo bar\\0hello world\\0' | xargs -0 -I _ echo item=[_]",
+            ctx
+        )
+        assertEquals(listOf("item=[foo bar]", "item=[hello world]"), out1)
+
+        // 2. POSIX/GNU 规范验证：-0 模式下必须严格保留首尾空格，严禁 trim 抹去
+        val out2 = engine.executeStrings(
+            "echo -e '  padded name  \\0 normal \\0' | xargs -0 -I _ echo item=[_]",
+            ctx
+        )
+        assertEquals(listOf("item=[  padded name  ]", "item=[ normal ]"), out2)
+
+        // 3. 短横线前缀文件名防注入验证：以 '-' 开头的文件名必须安全作为字面量参数，不被误判为 Option
+        val out3 = engine.executeStrings(
+            "echo -e '-dash-name.mp4\\0--flag-like\\0' | xargs -0 -I _ echo item=[_]",
+            ctx
+        )
+        assertEquals(listOf("item=[-dash-name.mp4]", "item=[--flag-like]"), out3)
+
+        // 4. 带目录后缀斜杠与 NUL 的组合验证
+        val out4 = engine.executeStrings(
+            "echo -e '/a/b c/\\0/d/e/\\0' | xargs -0 -I _ echo move _ to-dest/",
+            ctx
+        )
+        assertEquals(
+            listOf("move /a/b c/ to-dest/", "move /d/e/ to-dest/"),
+            out4
+        )
+
+        // 5. -0 与 -I 配合 -t 回显验证：确保输出纯净无 \0 干扰
+        val out5 = engine.executeStrings(
+            "echo -e 'dir1/\\0' | xargs -0 -t -I _ echo _",
+            ctx
+        )
+        assertEquals(listOf("+ echo dir1/", "dir1/"), out5)
+
+        // 6. 端到端模拟真实场景：find -print0 目录管道流配合 xargs -0 -t -I _ mv _ /根目录/smll/
+        val taFolder = createMockFolder("ta", "100")
+        val smllFolder = createMockFolder("smll", "200")
+        val targetCatFolder = createMockFolder("蜜汁猫裘 索尼子 双鱼座(1)", "300")
+
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(
+                fileBeanList = arrayListOf(taFolder, smllFolder),
+                cid = "0",
+                count = 2,
+                order = "",
+                path = listOf(PathBean("0", "根目录", "0"))
+            )
+        )
+        ctx.fileCacheManager.put(
+            "100",
+            FilesBean(
+                fileBeanList = arrayListOf(targetCatFolder),
+                cid = "100",
+                count = 1,
+                order = "",
+                path = listOf(PathBean("0", "根目录", "0"), PathBean("100", "ta", "0"))
+            )
+        )
+        ctx.fileCacheManager.put(
+            "200",
+            FilesBean(
+                fileBeanList = arrayListOf(),
+                cid = "200",
+                count = 0,
+                order = "",
+                path = listOf(PathBean("0", "根目录", "0"), PathBean("200", "smll", "0"))
+            )
+        )
+
+        // 切换当前工作目录到 /根目录/ta
+        ctx.updateDirectory(listOf(PathBean("0", "根目录", "0"), PathBean("100", "ta", "0")))
+
+        // 执行管道移动：find 检索匹配目录，通过 print0 流转给 xargs -0 -t -I _ mv _ /根目录/smll/
+        val moveResult = engine.executeStrings(
+            "find -type d -name '*蜜汁猫裘*' -print0 | xargs -0 -t -I _ mv _ /根目录/smll/",
+            ctx
+        )
+
+        // 验证无 cannot stat 报错
+        assertTrue("移动命令不应报错: $moveResult", moveResult.none { it.contains("cannot stat") })
+        assertTrue("应成功打印命令回显且无 NUL 干扰: $moveResult", moveResult.any { it.contains("+ mv") && !it.contains("\u0000") })
+        assertTrue(
+            "应成功执行移动操作: $moveResult",
+            moveResult.any { it.contains("-> '/根目录/smll/'") }
+        )
     }
 }

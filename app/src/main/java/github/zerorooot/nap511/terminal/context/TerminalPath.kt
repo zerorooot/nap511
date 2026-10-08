@@ -59,9 +59,12 @@ data class TerminalPath(
     companion object {
         /**
          * 解析用户输入的任意路径字符串为结构化 [TerminalPath]
+         *
+         * 防御性清洗：剥离可能因管道传输残留的不可见 NUL 控制字符 (\u0000)，
+         * 作为全系统路径解析的统一安全屏障，杜绝控制字符污染路径匹配。
          */
         fun parse(input: String): TerminalPath {
-            val trimmed = input.trim()
+            val trimmed = input.replace("\u0000", "").trim()
             if (trimmed.isEmpty() || trimmed == ".") {
                 return TerminalPath(
                     raw = trimmed,
