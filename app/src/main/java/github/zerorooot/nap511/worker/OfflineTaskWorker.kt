@@ -93,7 +93,7 @@ class OfflineTaskWorker(
             .putString("return", message)
             .build()
         return if (state) {
-            FileCacheManager.notifyContentUpdated(cid)
+            FileCacheManager.notifyRemoteRefresh(cid)
             Result.success(addTaskData)
         } else {
             Result.failure(addTaskData)

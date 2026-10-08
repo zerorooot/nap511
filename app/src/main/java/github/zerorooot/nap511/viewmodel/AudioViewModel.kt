@@ -390,7 +390,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             targetCid = targetCid,
             onSuccess = {
                 viewModelScope.launch {
-                    FileCacheManager.notifyContentUpdated(targetCid)
+                    FileCacheManager.notifyRemoteRefresh(targetCid)
                 }
             }
         )

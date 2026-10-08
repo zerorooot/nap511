@@ -492,7 +492,7 @@ class VideoViewModel : ViewModel() {
             targetCid = parentCid,
             onSuccess = {
                 viewModelScope.launch {
-                    FileCacheManager.notifyContentUpdated(parentCid)
+                    FileCacheManager.notifyRemoteRefresh(parentCid)
                 }
             }
         )

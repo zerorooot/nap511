@@ -29,8 +29,11 @@ data class CacheWrapper(
  * 缓存数据变更通知事件
  */
 sealed interface CacheEvent {
-    /** 目录内部条目发生变动（添加、删除、重命名、移动、播放进度变更等） */
-    data class ContentUpdated(val cid: String) : CacheEvent
+    /** 需请求远端 115 API 全量刷新指定目录（新增文件、解压、离线下载完成、字幕上传、回收站还原等） */
+    data class RemoteRefreshRequired(val cid: String) : CacheEvent
+
+    /** 本地缓存已就地同步完毕，仅需刷新 UI 列表，严禁发起远程 API 请求（删除、重命名、播放进度更新、终端预拉取等） */
+    data class LocalUiUpdated(val cid: String) : CacheEvent
 
     /** 目录本身及其所有子孙目录被级联删除（rm -r / deleteMultiple） */
     data class FolderDeleted(val folderCid: String) : CacheEvent
@@ -79,21 +82,25 @@ object FileCacheManager {
     }
 
     /**
-     * 标注指定 CID 的目录内容发生变动。
-     * @param clearCache 是否清理本地对应 CID 的缓存（默认为 true）。若远端文件数据已更新
-     *                   且本地未有最新的 FilesBean，传入 true 可使缓存失效，促使界面拉取最新网络数据；
-     *                   若仅需要广播更新通知，可传入 false。
+     * 通知远端数据发生变动（新增文件、解压完成、离线下载完成、字幕上传、回收站还原等）。
+     * 清理本地缓存并广播 RemoteRefreshRequired 事件，促使 FileViewModel 在对应目录下发起 115 API 全量刷新。
      */
-    suspend fun notifyContentUpdated(cid: String, clearCache: Boolean = true) =
+    suspend fun notifyRemoteRefresh(cid: String) =
         withContext(Dispatchers.IO) {
             mutex.withLock {
-                if (clearCache) {
-                    memoryCache.remove(cid)
-                    deleteDiskFile(cid)
-                }
-                _cacheEvents.tryEmit(CacheEvent.ContentUpdated(cid))
+                memoryCache.remove(cid)
+                deleteDiskFile(cid)
+                _cacheEvents.tryEmit(CacheEvent.RemoteRefreshRequired(cid))
             }
         }
+
+    /**
+     * 通知本地缓存已完成就地更新（删除、重命名、视频进度更新等）。
+     * 广播 LocalUiUpdated 事件，驱动 UI 在目录匹配时刷新展示列表，绝不触发网络 API 请求。
+     */
+    fun notifyLocalUpdated(cid: String) {
+        _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(cid))
+    }
 
     fun init(cacheDir: File) {
         this.cacheDir = cacheDir
@@ -248,7 +255,7 @@ object FileCacheManager {
 
     suspend fun putAndNotify(key: String, value: FilesBean) {
         put(key, value)
-        _cacheEvents.tryEmit(CacheEvent.ContentUpdated(key))
+        _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(key))
     }
 
     /**
@@ -279,9 +286,9 @@ object FileCacheManager {
                 }
             }
 
-            _cacheEvents.tryEmit(CacheEvent.ContentUpdated(parentCid))
+            _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
             if (isFolder) {
-                _cacheEvents.tryEmit(CacheEvent.ContentUpdated(folderCid))
+                _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(folderCid))
             }
 
             CacheRollback {
@@ -318,7 +325,7 @@ object FileCacheManager {
                 removeFolderRecursivelyInternal(targetFolderCid)
             }
 
-            _cacheEvents.tryEmit(CacheEvent.ContentUpdated(parentCid))
+            _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
             if (actualIsFolder) {
                 _cacheEvents.tryEmit(CacheEvent.FolderDeleted(targetFolderCid))
             }
@@ -330,7 +337,7 @@ object FileCacheManager {
                     curCache.fileBeanList.addAll(originalList)
                     curCache.count = originalCount
                     flushToDiskInternal(parentCid)
-                    _cacheEvents.tryEmit(CacheEvent.ContentUpdated(parentCid))
+                    _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
                 }
             }
         }
@@ -370,7 +377,7 @@ object FileCacheManager {
             cache.count = (cache.count - removedCount).coerceAtLeast(0)
             flushToDiskInternal(parentCid)
 
-            _cacheEvents.tryEmit(CacheEvent.ContentUpdated(parentCid))
+            _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
             deletedFolders.forEach { _cacheEvents.tryEmit(CacheEvent.FolderDeleted(it)) }
 
             CacheRollback {
@@ -380,7 +387,7 @@ object FileCacheManager {
                     curCache.fileBeanList.addAll(originalList)
                     curCache.count = originalCount
                     flushToDiskInternal(parentCid)
-                    _cacheEvents.tryEmit(CacheEvent.ContentUpdated(parentCid))
+                    _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
                 }
             }
         }
@@ -465,8 +472,8 @@ object FileCacheManager {
 
             if (hasChanges) {
                 flushToDiskInternal(cid)
-                XLog.d("updateVideoProgress CacheEvent.ContentUpdated")
-                _cacheEvents.tryEmit(CacheEvent.ContentUpdated(cid))
+                XLog.d("updateVideoProgress CacheEvent.LocalUiUpdated")
+                _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(cid))
             }
         }
     }

@@ -25,7 +25,7 @@ import java.nio.file.Files
  * 3. 递归删除子孙目录 (removeFolderRecursively)
  * 4. 视频播放进度批量计算与更新 (updateVideoProgress)
  * 5. CacheRollback 撤销恢复机制
- * 6. CacheEvent (ContentUpdated / FolderDeleted / AllCleared) 响应式事件发射
+ * 6. CacheEvent (LocalUiUpdated / RemoteRefreshRequired / FolderDeleted / AllCleared) 响应式事件发射
  */
 class FileCacheManagerTest {
 
@@ -68,7 +68,7 @@ class FileCacheManagerTest {
         assertNotNull(rollback)
         val updated = FileCacheManager.getDate("0")?.fileBeanList?.firstOrNull()
         assertEquals("new.txt", updated?.name)
-        assertTrue(lastEvent is CacheEvent.ContentUpdated && (lastEvent as CacheEvent.ContentUpdated).cid == "0")
+        assertTrue(lastEvent is CacheEvent.LocalUiUpdated && (lastEvent as CacheEvent.LocalUiUpdated).cid == "0")
 
         // 2. 执行回滚
         rollback?.rollback()
@@ -319,7 +319,7 @@ class FileCacheManagerTest {
     }
 
     @Test
-    fun testNotifyContentUpdated_ClearsCacheAndEmitsEvent() = runBlocking {
+    fun testNotifyRemoteRefresh_ClearsCacheAndEmitsEvent() = runBlocking {
         val fb = FilesBean(fileBeanList = arrayListOf(), cid = "123", count = 0, order = "", path = emptyList())
         FileCacheManager.put("123", fb)
         assertTrue(FileCacheManager.containsKey("123"))
@@ -331,10 +331,26 @@ class FileCacheManagerTest {
             }
         }
 
-        FileCacheManager.notifyContentUpdated("123", clearCache = true)
+        FileCacheManager.notifyRemoteRefresh("123")
 
         assertFalse(FileCacheManager.containsKey("123"))
-        assertTrue(receivedEvent is CacheEvent.ContentUpdated && (receivedEvent as CacheEvent.ContentUpdated).cid == "123")
+        assertTrue(receivedEvent is CacheEvent.RemoteRefreshRequired && (receivedEvent as CacheEvent.RemoteRefreshRequired).cid == "123")
+
+        job.cancel()
+    }
+
+    @Test
+    fun testNotifyLocalUpdated_EmitsEvent() = runBlocking {
+        var receivedEvent: CacheEvent? = null
+        val job = launch(kotlinx.coroutines.Dispatchers.Unconfined) {
+            FileCacheManager.cacheEvents.collect {
+                receivedEvent = it
+            }
+        }
+
+        FileCacheManager.notifyLocalUpdated("123")
+
+        assertTrue(receivedEvent is CacheEvent.LocalUiUpdated && (receivedEvent as CacheEvent.LocalUiUpdated).cid == "123")
 
         job.cancel()
     }

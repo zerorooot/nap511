@@ -292,14 +292,14 @@ class UnzipAllFileWorker(
     }
 
     /**
-     * 重新拉取指定目录最新数据并更新 FileCacheManager
-     * 纯粹走单一数据源（SSOT），底层自动广播 ContentUpdated 事件驱动前台 UI 原地热更新，零重复请求
+     * 通知指定目录发生远端文件变动并更新 FileCacheManager
+     * 广播 RemoteRefreshRequired 事件驱动前台 UI 在该目录下重新拉取远端数据
      */
     private suspend fun updateDirectoryCache(targetCid: String) {
         if (targetCid.isEmpty()) return
         try {
-            FileCacheManager.notifyContentUpdated(targetCid)
-            XLog.i("UnzipAllFileWorker 成功更新目录缓存并同步UI: $targetCid")
+            FileCacheManager.notifyRemoteRefresh(targetCid)
+            XLog.i("UnzipAllFileWorker 成功触发远程刷新目录缓存: $targetCid")
         } catch (e: Exception) {
             XLog.e("UnzipAllFileWorker 更新目录缓存失败: $targetCid, error: ${e.message}")
             // 兜底：若网络请求异常，至少移除旧缓存避免脏读

@@ -138,8 +138,7 @@ class RecycleViewModel : ViewModel() {
                 val revert = fileService.revert(item.id)
                 val message = if (revert.state) {
                     XLog.i("RecycleViewModel revert $revert")
-                    val cid = item.cid
-                    FileCacheManager.notifyContentUpdated(cid)
+                    FileCacheManager.notifyRemoteRefresh(item.cid)
                     _recycleFileList.update { list -> list.filterIndexed { i, _ -> i != index } }
                     "恢复成功"
                 } else {

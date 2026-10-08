@@ -456,21 +456,48 @@ class FileViewModel(
     private fun handleCacheEvent(event: CacheEvent) {
         XLog.d("handleCacheEvent $event")
         when (event) {
-            //todo 需要修改。有时候需要刷新（getFile，请求115 api），比如新建了一个文件。
-            // 有时候只需要更新ui,比如文件被删除，只需要把cache里的文件删除就行，完全不需要getFile。这两个在这块混为一谈了
-            is CacheEvent.ContentUpdated -> {
-                val updatedCache = FileCacheManager.getDate(event.cid)
-                XLog.d("handleCacheEvent ContentUpdated currentCid $currentCid , updatedCache=${updatedCache?.cid}")
-                if (updatedCache == null) {
-                    refresh(event.cid)
-                    return
-                }
+            is CacheEvent.LocalUiUpdated -> {
+                // 【本地 UI 刷新逻辑】：
+                // 1. 若 event.cid == currentCid：
+                //    当前展示目录与变动目录一致（如终端在此目录执行 rm 删除文件、改名或视频播放进度更新）。
+                //    FileCacheManager 已经完成就地缓存维护，此时仅需从缓存读取并原地刷新 fileBeanList 即可，绝不发起远程 115 API 请求！
+                //    若发生意外缓存未命中（如极端并发或内存淘汰），优雅降级调用 getFiles(currentCid) 兜底拉取。
+                //
+                // 2. 若 event.cid != currentCid：
+                //    为什么会出现这种情况？主要源于“操作发生的目录”与“当前 UI 展示的目录”不一致：
+                //    - 场景 A（终端跨目录操作）：用户当前在目录 A，但终端工作目录在目录 B，或在终端输入了跨路径命令（如 rm ../other/file.txt），操作发生在其他目录；
+                //    - 场景 B（跨目录移动/剪切）：文件从源目录移动到目标目录时，源目录被扣减条目（FileCacheManager.removeItems），会发出源目录的 LocalUiUpdated 事件，而此时 UI 已经进入了目标目录；
+                //    - 场景 C（子文件夹重命名）：重命名子文件夹时，不仅父目录会触发更新，子目录自身缓存的面包屑路径也会更新并发出子目录自身的 LocalUiUpdated 事件；
+                //    - 场景 D（后台视频播放进度同步）：视频在后台播放更新进度时，若用户已切出该目录，进度通知的 cid 亦非当前目录。
+                //    处理策略：FileCacheManager 已经在后台内存和磁盘中维护好了 event.cid 对应的最新数据；由于用户当前并没有在看 event.cid，
+                //    因此当前屏幕展示的 fileBeanList 绝对不需要变动，无需做任何处理。待用户未来切入该目录时即可天然读到已更新好的最新缓存。
                 if (event.cid == currentCid) {
-                    recoverFromLongPress()
-                    unSelect()
-                    fileBeanList.clear()
-                    fileBeanList.addAll(updatedCache.fileBeanList)
-                    pathList = updatedCache.path
+                    val updatedCache = FileCacheManager.getDate(event.cid)
+                    if (updatedCache != null) {
+                        recoverFromLongPress()
+                        unSelect()
+                        fileBeanList.clear()
+                        fileBeanList.addAll(updatedCache.fileBeanList)
+                        pathList = updatedCache.path
+                    } else {
+                        // 优雅降级容错：若本地内存缓存意外丢失，兜底触发网络拉取
+                        getFiles(currentCid)
+                    }
+                }
+            }
+
+            is CacheEvent.RemoteRefreshRequired -> {
+                // 【远程 API 刷新逻辑】：
+                // 针对新增文件、解压完成、离线下载完成、字幕上传、回收站还原等场景，云端生成了新文件或变动：
+                if (event.cid == currentCid) {
+                    // 若正处于当前展示目录，立即重新请求 115 API 全量更新整个目录列表及 UI
+                    getFiles(currentCid)
+                } else {
+                    // 延迟失效策略：若非当前展示目录，直接清理 FileCacheManager 该 cid 的旧缓存，
+                    // 避免无意义的后台网络流量消耗与 API 频控，待用户切入该目录时按需触发最新拉取。
+                    viewModelScope.launch {
+                        FileCacheManager.remove(event.cid)
+                    }
                 }
             }
 
