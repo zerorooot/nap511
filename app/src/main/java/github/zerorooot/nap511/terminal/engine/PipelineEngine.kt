@@ -41,18 +41,6 @@ class PipelineEngine(
             return emptyFlow()
         }
 
-        // 仅在存在未经引号包裹的 Glob 通配符（* 和 ?）时才按需查询目录候选集，避免无谓的网络与缓存开销
-        val hasUnquotedWildcards = stages.any { stage ->
-            stage.tokens.any { token -> !token.isQuoted && GlobMatcher.hasGlobWildcards(token.text) }
-        }
-        val candidates = if (hasUnquotedWildcards) {
-            runCatching {
-                ctx.listDirectory(ctx.currentCid).map { it.name }
-            }.getOrDefault(emptyList())
-        } else {
-            emptyList()
-        }
-
         var currentStdin: Flow<String> = emptyFlow()
         var lastStdout: Flow<TerminalOutput> = emptyFlow()
 
@@ -72,13 +60,11 @@ class PipelineEngine(
 
             // 2. 安全 Glob 展开：仅对未加引号的位置参数（路径/文件名）执行通配符展开；
             // 选项名称与选项参数值严格禁止展开，从源头杜绝参数注入。
+            // 完美支持当前目录（如 *.zip）以及子目录路径前缀（如 smll/*.zip、../dir/*.txt）。
             val expandedPositional = mutableListOf<PositionalArgumentNode>()
             for (posNode in rawAst.positionalArgs) {
-                if (!posNode.isQuoted && !posNode.fromDelimiter && GlobMatcher.hasGlobWildcards(
-                        posNode.text
-                    )
-                ) {
-                    val expanded = GlobMatcher.expand(posNode.text, candidates)
+                if (!posNode.isQuoted && !posNode.fromDelimiter && GlobMatcher.hasGlobWildcards(posNode.text)) {
+                    val expanded = expandPositionalGlob(posNode.text, ctx)
                     for (item in expanded) {
                         expandedPositional.add(
                             PositionalArgumentNode(
@@ -155,6 +141,48 @@ class PipelineEngine(
             }
         } catch (e: Exception) {
             emitError("${command.name}: error: ${e.message ?: e.javaClass.simpleName}")
+        }
+    }
+
+    /**
+     * 对位置参数执行支持路径前缀的 Glob 通配符展开（如 `*.zip`、`dir/` 下通配符）
+     */
+    private suspend fun expandPositionalGlob(pattern: String, ctx: TerminalContext): List<String> {
+        if (!GlobMatcher.hasGlobWildcards(pattern)) return listOf(pattern)
+
+        return if (!pattern.contains('/')) {
+            // 当前工作目录下的通配符（如 *.zip）
+            val candidates = runCatching {
+                ctx.listDirectory(ctx.currentCid).map { it.name }
+            }.getOrDefault(emptyList())
+            GlobMatcher.expand(pattern, candidates)
+        } else {
+            // 包含目录路径前缀的通配符（如 smll/*.zip、../sub/*.mp4）
+            val dirPart = pattern.substringBeforeLast('/')
+            val filePattern = pattern.substringAfterLast('/')
+
+            // 若父路径自身亦包含通配符（如 dir*/*.zip），暂不支持跨多层级模糊递归展开，安全保持原样
+            if (GlobMatcher.hasGlobWildcards(dirPart)) {
+                return listOf(pattern)
+            }
+
+            val prefix = if (dirPart.isEmpty()) "/" else "$dirPart/"
+            val targetDirCid = if (dirPart.isEmpty()) {
+                "0"
+            } else {
+                ctx.resolveDirectory(dirPart)?.cid
+            } ?: return listOf(pattern)
+
+            val dirFiles = runCatching {
+                ctx.listDirectory(targetDirCid).map { it.name }
+            }.getOrDefault(emptyList())
+
+            val matched = GlobMatcher.expand(filePattern, dirFiles)
+            if (matched == listOf(filePattern) && !dirFiles.contains(filePattern)) {
+                listOf(pattern)
+            } else {
+                matched.map { "$prefix$it" }
+            }
         }
     }
 }

@@ -15,6 +15,7 @@ import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
 import github.zerorooot.nap511.terminal.engine.GlobMatcher
+import github.zerorooot.nap511.terminal.engine.StreamTargetCollector
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.engine.completion.CommandCompleter
@@ -36,6 +37,7 @@ import java.util.Locale
  * 支持双模式：
  * 1. 结构预览模式（-l）：通过 115 网盘接口直接预览压缩包内文件结构与目录清单。
  * 2. 异步解压模式：支持多文件、通配符批量匹配，并可通过 -p 传递解压密码，任务统一提交至后台 WorkManager (UnzipAllFileWorker)。
+ * 支持管道输入（如 `find -name '*.zip' -print0 | unzip`），自动批量收集并统一提交云端解压。
  */
 class UnzipCommand : TerminalCommand {
 
@@ -61,7 +63,10 @@ class UnzipCommand : TerminalCommand {
     ): Flow<TerminalOutput> = flow {
         val isList = ast.hasFlag("-l")
         val password = ast.getOption("-p") ?: ""
-        val fileArgs = ast.rawPositionalValues
+        val fileArgs = ast.rawPositionalValues.toMutableList()
+        // 管道支持：通过 StreamTargetCollector 摄取来自 stdin 的目标，自动兼容 \0 (NUL) 与 \n 定界
+        val stdinFiles = StreamTargetCollector.collectFromStdin(stdin)
+        fileArgs.addAll(stdinFiles)
 
         if (fileArgs.isEmpty()) {
             emitError("unzip: missing file operand")

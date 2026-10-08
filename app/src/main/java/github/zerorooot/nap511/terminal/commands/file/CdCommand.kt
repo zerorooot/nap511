@@ -30,8 +30,13 @@ class CdCommand : TerminalCommand {
         ast: CommandInvocationAst,
         stdin: Flow<String>
     ): Flow<TerminalOutput> = flow {
+        val targets = ast.rawPositionalValues
+        if (targets.size > 1) {
+            emitError("cd: too many arguments")
+            return@flow
+        }
         // 若缺省目标路径，默认切换至根目录 "/"
-        val target = ast.firstPositional ?: "/"
+        val target = targets.firstOrNull() ?: "/"
         val resolved = ctx.resolveDirectory(target)
         if (resolved == null) {
             emitError("cd: no such file or directory: $target")

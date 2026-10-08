@@ -30,11 +30,16 @@ class OpenCommand : TerminalCommand {
         ast: CommandInvocationAst,
         stdin: Flow<String>
     ): Flow<TerminalOutput> = flow {
-        val fileName = ast.firstPositional
-        if (fileName == null) {
+        val targets = ast.rawPositionalValues
+        if (targets.isEmpty()) {
             emitError("open: missing file operand")
             return@flow
         }
+        if (targets.size > 1) {
+            emitError("open: too many arguments")
+            return@flow
+        }
+        val fileName = targets.first()
 
         val resolved = ctx.resolveTarget(fileName)
         if (resolved == null) {

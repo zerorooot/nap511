@@ -4,6 +4,8 @@ import github.zerorooot.nap511.bean.RenameBean
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.context.TerminalPath
+import github.zerorooot.nap511.terminal.engine.CommandFlag
+import github.zerorooot.nap511.terminal.engine.StreamTargetCollector
 import github.zerorooot.nap511.terminal.engine.archetype.MutationCommand
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
@@ -29,6 +31,8 @@ data class MvPlan(
  * 继承 [MutationCommand]，在编译期提取位置参数与管道 stdin 输入，组装为不可变 [MvPlan]。
  * 支持双模式操作：
  * 1. 移动模式：当目标为已存在的目录时，支持单个或批量移动源文件至目标目录；
+ *    - 支持 GNU 标准 `-t <dir>` / `--target-directory <dir>` 语法，使目标目录可前置声明，完美契约 `xargs -0 mv -t <dir>` 单批聚合；
+ *    - 支持从管道 stdin 直连读取待移动项（如 `find ... -print0 | mv <dir>`），自动感知并剥离 `\0` NUL 定界符；
  *    - 委托 [TerminalBatchFileOps.moveGroup] 批量执行，避免 N 次串行 HTTP 往返；
  *    - 内置前置安全防御：拦截原地移动、拦截将目录移入自身或其下属子目录；
  *    - 细粒度回显：单项移动展示源与目标明细，批量移动展示汇总摘要。
@@ -40,37 +44,48 @@ class MvCommand : MutationCommand<MvPlan>() {
 
     override val description: String = "重命名文件或将文件/目录移动至其他目录"
 
-    override val usage: String = "mv <source...> <target>"
+    override val usage: String = "mv [-t <dir>] <source...> [target]"
+
+    override val flags: List<CommandFlag> = listOf(
+        CommandFlag("-t <dir>, --target-directory <dir>", "指定移动的目标目录，允许后续所有参数均作为待移动源文件")
+    )
+
+    override val valueOptions: Set<String> = setOf("-t", "--target-directory")
 
     override suspend fun compilePlan(
         ast: CommandInvocationAst,
         stdin: Flow<String>
     ): Result<MvPlan> {
-        val targets = ast.rawPositionalValues.toMutableList()
+        val targetDirectoryOpt = ast.getOption("-t") ?: ast.getOption("--target-directory")
+        val positional = ast.rawPositionalValues
+        // 通过通用 StreamTargetCollector 提取管道标准输入，自动支持 \0 (NUL) 与 \n 定界
+        val stdinSources = StreamTargetCollector.collectFromStdin(stdin)
 
-        // 管道支持：若命令行参数仅提供了 1 个目标目录（例如 find ... | mv ../），且上游管道存在输入，智能从 stdin 获取源列表
-        if (targets.size < 2) {
-            val stdinSources = mutableListOf<String>()
-            stdin.collect { line ->
-                val trimmed = line.trim()
-                if (trimmed.isNotEmpty()) {
-                    stdinSources.add(trimmed)
-                }
-            }
-            if (stdinSources.isNotEmpty() && targets.size == 1) {
-                val destination = targets[0]
-                targets.clear()
-                targets.addAll(stdinSources)
-                targets.add(destination)
+        val destination: String
+        val sources: List<String>
+
+        if (targetDirectoryOpt != null) {
+            // 分支 1：GNU 标准前置目标目录模式 (mv -t <dest> <src...>)
+            destination = targetDirectoryOpt
+            sources = positional + stdinSources
+        } else {
+            // 分支 2：传统 POSIX 模式 (mv <src...> <dest>) 或 单目标管道输入 (find ... | mv <dest>)
+            val combinedTargets = positional.toMutableList()
+            if (combinedTargets.size == 1 && stdinSources.isNotEmpty()) {
+                destination = combinedTargets[0]
+                sources = stdinSources
+            } else if (combinedTargets.size >= 2) {
+                destination = combinedTargets.last()
+                sources = combinedTargets.dropLast(1) + stdinSources
+            } else {
+                return Result.failure(Exception("missing file operand"))
             }
         }
 
-        if (targets.size < 2) {
+        if (sources.isEmpty()) {
             return Result.failure(Exception("missing file operand"))
         }
 
-        val destination = targets.last()
-        val sources = targets.dropLast(1)
         return Result.success(MvPlan(sources = sources, destination = destination))
     }
 

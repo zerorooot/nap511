@@ -157,4 +157,71 @@ class MvCommandTest {
         assertEquals(1, bFiles?.size)
         assertEquals("a", bFiles?.first()?.name)
     }
+
+    /**
+     * 测试带子目录路径前缀的 Glob 通配符批量移动
+     */
+    @Test
+    fun testMvSubdirectoryGlobExpansion() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+
+        // 构造目录树：根目录(0) -> 工作目录 ta(50) -> 子目录 smll(60)
+        val dirTa = createMockFolder("ta", "50")
+        val dirSmll = createMockFolder("smll", "60").copy(parentId = "50")
+        val zip1 = createMockFile("package_alpha.zip", "601", categoryId = "60")
+        val zip2 = createMockFile("package_beta.zip", "602", categoryId = "60")
+
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        // ta 目录下包含子目录 smll
+        ctx.fileCacheManager.put(
+            "50",
+            FilesBean(
+                fileBeanList = arrayListOf(dirSmll),
+                cid = "50",
+                count = 1,
+                order = "",
+                path = listOf(PathBean("0", "根目录", "0"), PathBean("50", "ta", "0"))
+            )
+        )
+
+        // smll 目录下包含 2 个 zip 文件
+        ctx.fileCacheManager.put(
+            "60",
+            FilesBean(
+                fileBeanList = arrayListOf(zip1, zip2),
+                cid = "60",
+                count = 2,
+                order = "",
+                path = listOf(PathBean("0", "根目录", "0"), PathBean("50", "ta", "0"), PathBean("60", "smll", "50"))
+            )
+        )
+
+        // 根目录
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(
+                fileBeanList = arrayListOf(dirTa),
+                cid = "0",
+                count = 1,
+                order = "",
+                path = listOf(PathBean("0", "根目录", "0"))
+            )
+        )
+
+        // 在 /根目录/ta 下执行：mv smll/*.zip ../
+        engine.executeStrings("cd ta", ctx)
+        val out = engine.executeStrings("mv smll/*.zip ../", ctx)
+
+        // 验证通配符成功展开并批量移入上级目录
+        assertEquals(listOf("mv: 已成功移动 2 个文件/文件夹至 '根目录/'"), out)
+
+        // 验证发起 1 次批量移动请求，pid 为根目录 0
+        assertEquals(1, mockRepo.movedItems.size)
+        val call = mockRepo.movedItems[0]
+        assertEquals("0", call["pid"])
+        assertEquals("601", call["fid[0]"])
+        assertEquals("602", call["fid[1]"])
+    }
 }

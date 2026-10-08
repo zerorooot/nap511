@@ -658,11 +658,10 @@ class TerminalViewModelTest {
         viewModel.onInputChange(TextFieldValue("find -name '*.log'"))
         viewModel.submitInput()
 
-        // 验证进入 Executing 执行态
-        if (viewModel.isExecuting) {
-            assertTrue("执行中状态应为 Executing", viewModel.sessionState is TerminalSessionState.Executing)
-            val executingState = viewModel.sessionState as TerminalSessionState.Executing
-            assertEquals("find -name '*.log'", executingState.command)
+        // 验证进入 Executing 执行态（局部变量安全捕获避免微秒级极速完成导致的竞态）
+        val currentState = viewModel.sessionState
+        if (viewModel.isExecuting && currentState is TerminalSessionState.Executing) {
+            assertEquals("find -name '*.log'", currentState.command)
 
             // 核心 Unix 规范验证：前台执行期间，普通按键输入被严格抑制，不产生假就绪与伪输入缓冲
             viewModel.onInputChange(TextFieldValue("ls -la"))

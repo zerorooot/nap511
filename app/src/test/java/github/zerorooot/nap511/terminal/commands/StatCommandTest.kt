@@ -182,4 +182,40 @@ class StatCommandTest {
         val outXargsStat = engine.executeStrings("echo 'data.csv' | xargs stat", ctx)
         assertTrue(outXargsStat.any { it.contains("File: data.csv") })
     }
+
+    /**
+     * 测试多文件参数（含带空格脱敏文件名）批量展示元数据及容错
+     */
+    @Test
+    fun testStatMultipleFiles() = runBlocking {
+        val engine = createTestEngine()
+        val ctx = createTestContext()
+
+        val f1 = createMockFile("album photo pisces.zip", "101", size = "1024")
+        val f2 = createMockFile("album photo christmas.zip", "102", size = "2048")
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(
+                fileBeanList = arrayListOf(f1, f2),
+                cid = "0",
+                count = 2,
+                order = "",
+                path = emptyList()
+            )
+        )
+
+        // 同时查看 2 个合法文件和 1 个不存在文件
+        val out = engine.executeStrings("stat \"album photo pisces.zip\" no_such_file.zip \"album photo christmas.zip\"", ctx)
+
+        // 验证 f1 元数据输出
+        assertTrue(out.any { it.contains("File: album photo pisces.zip") })
+        assertTrue(out.any { it.contains("1024 bytes") })
+
+        // 验证不存在项报错但不阻断
+        assertTrue(out.any { it.contains("stat: cannot stat 'no_such_file.zip': No such file or directory") })
+
+        // 验证 f2 元数据输出
+        assertTrue(out.any { it.contains("File: album photo christmas.zip") })
+        assertTrue(out.any { it.contains("2048 bytes") })
+    }
 }

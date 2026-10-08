@@ -4,6 +4,7 @@ import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.context.TerminalPath
 import github.zerorooot.nap511.terminal.engine.CommandFlag
+import github.zerorooot.nap511.terminal.engine.StreamTargetCollector
 import github.zerorooot.nap511.terminal.engine.archetype.ConfirmPolicy
 import github.zerorooot.nap511.terminal.engine.archetype.MutationCommand
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
@@ -29,6 +30,7 @@ data class RmPlan(
  *
  * 继承 [MutationCommand]，在编译期根据 `-f` / `-rf` 开关提取安全确认策略，校验待删除操作数。
  * 针对危险操作执行前置安全校验（禁止删除根目录、禁止删除当前工作目录），默认触发交互式二次确认。
+ * 支持从标准输入（stdin）管道读取待删除目标列表（如 `find ... -print0 | rm -f`），实现批量删除。
  */
 class RmCommand : MutationCommand<RmPlan>() {
 
@@ -47,7 +49,11 @@ class RmCommand : MutationCommand<RmPlan>() {
         ast: CommandInvocationAst,
         stdin: Flow<String>
     ): Result<RmPlan> {
-        val targets = ast.rawPositionalValues
+        val targets = ast.rawPositionalValues.toMutableList()
+        // 管道支持：通过 StreamTargetCollector 摄取来自 stdin 的目标，自动兼容 \0 (NUL) 与 \n 定界
+        val stdinTargets = StreamTargetCollector.collectFromStdin(stdin)
+        targets.addAll(stdinTargets)
+
         if (targets.isEmpty()) {
             return Result.failure(Exception("missing operand"))
         }

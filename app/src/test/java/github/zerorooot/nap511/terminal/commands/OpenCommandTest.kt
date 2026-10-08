@@ -30,6 +30,10 @@ class OpenCommandTest {
         val outNotFound = engine.executeStrings("open no_such_file.mp4", ctx)
         assertEquals(listOf("open: cannot find 'no_such_file.mp4': No such file or directory"), outNotFound)
 
+        // open 传入多个参数时拦截报错
+        val outTooMany = engine.executeStrings("open test.txt another.txt", ctx)
+        assertEquals(listOf("open: too many arguments"), outTooMany)
+
         // 未配置文件打开器时的提示信息
         val outNoOpener = engine.executeStrings("open test.txt", ctx)
         assertEquals(listOf("open: 当前终端环境未配置文件打开器"), outNoOpener)

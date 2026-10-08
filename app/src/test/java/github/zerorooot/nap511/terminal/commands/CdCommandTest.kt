@@ -241,7 +241,7 @@ class CdCommandTest {
 
         // 传入多个参数报错处理
         val out34 = engine.executeStrings("cd a b", ctx)
-        assertTrue(out34.isNotEmpty())
+        assertEquals(listOf("cd: too many arguments"), out34)
 
         // 切换受限/非法权限路径报错处理
         val out35 = engine.executeStrings("cd /受限目录", ctx)
