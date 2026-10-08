@@ -9,8 +9,8 @@ import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
 import github.zerorooot.nap511.terminal.viewmodel.emitPath
 import github.zerorooot.nap511.terminal.viewmodel.emitSystem
-import github.zerorooot.nap511.terminal.commands.file.DeleteTargetItem
-import github.zerorooot.nap511.terminal.commands.file.TerminalFileDeleter
+import github.zerorooot.nap511.terminal.commands.file.BatchTargetItem
+import github.zerorooot.nap511.terminal.commands.file.TerminalBatchFileOps
 import github.zerorooot.nap511.viewmodel.formatFileBeanList
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
@@ -314,13 +314,13 @@ class FindCommand : TerminalCommand {
         resolved: ResolvedTarget.File
     ) {
         val effectivePid = resolved.parentCid.ifEmpty { resolved.file.categoryId }
-        val item = DeleteTargetItem(
+        val item = BatchTargetItem(
             parentCid = effectivePid,
             fid = resolved.file.fileId,
             displayName = resolved.file.name,
             isFolder = false
         )
-        val res = TerminalFileDeleter.deleteGroup(ctx, effectivePid, listOf(item))
+        val res = TerminalBatchFileOps.deleteGroup(ctx, effectivePid, listOf(item))
         if (res.state) {
             emitSystem("find: 已成功删除 '${resolved.file.name}' 至回收站")
         } else {
@@ -447,7 +447,7 @@ class FindCommand : TerminalCommand {
         }
 
         val convertedItems = targets.map {
-            DeleteTargetItem(
+            BatchTargetItem(
                 parentCid = it.parentCid,
                 fid = it.fid,
                 displayName = it.name,
@@ -460,7 +460,7 @@ class FindCommand : TerminalCommand {
 
         for ((parentCid, items) in grouped) {
             try {
-                val res = TerminalFileDeleter.deleteGroup(ctx, parentCid, items)
+                val res = TerminalBatchFileOps.deleteGroup(ctx, parentCid, items)
                 if (res.state) {
                     successCount += items.size
                 } else {

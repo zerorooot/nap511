@@ -370,7 +370,7 @@ object FileCacheManager {
             cache.count = (cache.count - removedCount).coerceAtLeast(0)
             flushToDiskInternal(parentCid)
 
-           // _cacheEvents.tryEmit(CacheEvent.ContentUpdated(parentCid))
+            _cacheEvents.tryEmit(CacheEvent.ContentUpdated(parentCid))
             deletedFolders.forEach { _cacheEvents.tryEmit(CacheEvent.FolderDeleted(it)) }
 
             CacheRollback {

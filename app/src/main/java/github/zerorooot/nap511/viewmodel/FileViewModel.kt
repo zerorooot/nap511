@@ -456,24 +456,21 @@ class FileViewModel(
     private fun handleCacheEvent(event: CacheEvent) {
         XLog.d("handleCacheEvent $event")
         when (event) {
+            //todo 需要修改。有时候需要刷新（getFile，请求115 api），比如新建了一个文件。
+            // 有时候只需要更新ui,比如文件被删除，只需要把cache里的文件删除就行，完全不需要getFile。这两个在这块混为一谈了
             is CacheEvent.ContentUpdated -> {
-                if (event.cid == currentCid) {
-                    val updatedCache = FileCacheManager.getDate(currentCid)
-                    if (updatedCache != null) {
-                        XLog.d("handleCacheEvent ContentUpdated currentCid updatedCache != null")
-                        recoverFromLongPress()
-                        unSelect()
-                        fileBeanList.clear()
-                        fileBeanList.addAll(updatedCache.fileBeanList)
-                        pathList = updatedCache.path
-                    } else {
-                        // 本地缓存已被失效/清除，主动拉取网络最新文件列表
-                        XLog.d("handleCacheEvent ContentUpdated !currentCid refresh")
-                        refresh(currentCid)
-                    }
-                } else {
-                    XLog.d("handleCacheEvent ContentUpdated 更新非当目录")
+                val updatedCache = FileCacheManager.getDate(event.cid)
+                XLog.d("handleCacheEvent ContentUpdated currentCid $currentCid , updatedCache=${updatedCache?.cid}")
+                if (updatedCache == null) {
                     refresh(event.cid)
+                    return
+                }
+                if (event.cid == currentCid) {
+                    recoverFromLongPress()
+                    unSelect()
+                    fileBeanList.clear()
+                    fileBeanList.addAll(updatedCache.fileBeanList)
+                    pathList = updatedCache.path
                 }
             }
 

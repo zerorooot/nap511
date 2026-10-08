@@ -64,7 +64,7 @@ class RmCommand : MutationCommand<RmPlan>() {
         plan: RmPlan,
         collector: FlowCollector<TerminalOutput>
     ) {
-        val confirmedItems = mutableListOf<DeleteTargetItem>()
+        val confirmedItems = mutableListOf<BatchTargetItem>()
 
         // 阶段一：目标解析、前置安全校验及交互确认（收集确认删除项）
         for (target in plan.targets) {
@@ -123,7 +123,7 @@ class RmCommand : MutationCommand<RmPlan>() {
             }
 
             confirmedItems.add(
-                DeleteTargetItem(
+                BatchTargetItem(
                     parentCid = parentCid,
                     fid = actualFid,
                     displayName = displayName,
@@ -142,7 +142,7 @@ class RmCommand : MutationCommand<RmPlan>() {
             try {
                 if (items.size > 1 && parentCid.isNotEmpty()) {
                     // 同目录多项：组装 deleteMultiple 批量删除
-                    val res = TerminalFileDeleter.deleteGroup(ctx, parentCid, items)
+                    val res = TerminalBatchFileOps.deleteGroup(ctx, parentCid, items)
                     if (res.state) {
                         collector.emitText("rm: 已成功批量删除目录下的 ${items.size} 个项目至回收站")
                     } else {
@@ -152,7 +152,7 @@ class RmCommand : MutationCommand<RmPlan>() {
                 } else {
                     // 单项处理：保持传统单项提示
                     val single = items.first()
-                    val res = TerminalFileDeleter.deleteGroup(ctx, parentCid, listOf(single))
+                    val res = TerminalBatchFileOps.deleteGroup(ctx, parentCid, listOf(single))
                     if (res.state) {
                         collector.emitText("rm: 已移入回收站 '${single.displayName}'")
                     } else {

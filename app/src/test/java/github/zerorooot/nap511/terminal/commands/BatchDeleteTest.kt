@@ -2,8 +2,8 @@ package github.zerorooot.nap511.terminal.commands
 
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.PathBean
-import github.zerorooot.nap511.terminal.commands.file.DeleteTargetItem
-import github.zerorooot.nap511.terminal.commands.file.TerminalFileDeleter
+import github.zerorooot.nap511.terminal.commands.file.BatchTargetItem
+import github.zerorooot.nap511.terminal.commands.file.TerminalBatchFileOps
 import github.zerorooot.nap511.terminal.commands.file.resolveEffectiveParentCid
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -67,12 +67,12 @@ class BatchDeleteTest {
         )
 
         val items = listOf(
-            DeleteTargetItem("100", "1", "a.txt", isFolder = false),
-            DeleteTargetItem("100", "2", "b.txt", isFolder = false),
-            DeleteTargetItem("100", "3", "c.txt", isFolder = false)
+            BatchTargetItem("100", "1", "a.txt", isFolder = false),
+            BatchTargetItem("100", "2", "b.txt", isFolder = false),
+            BatchTargetItem("100", "3", "c.txt", isFolder = false)
         )
 
-        val result = TerminalFileDeleter.deleteGroup(ctx, "100", items)
+        val result = TerminalBatchFileOps.deleteGroup(ctx, "100", items)
         assertTrue(result.state)
 
         // 验证网络请求：调用了 1 次 deleteMultiple，包含了所有 3 个项
@@ -99,17 +99,17 @@ class BatchDeleteTest {
         val ctx = createTestContext(fileRepository = mockRepo)
 
         // 单项场景：降级为 delete(pid, fid)
-        val singleItem = DeleteTargetItem("100", "1", "single.txt", isFolder = false)
-        val res1 = TerminalFileDeleter.deleteGroup(ctx, "100", listOf(singleItem))
+        val singleItem = BatchTargetItem("100", "1", "single.txt", isFolder = false)
+        val res1 = TerminalBatchFileOps.deleteGroup(ctx, "100", listOf(singleItem))
         assertTrue(res1.state)
         assertEquals(0, mockRepo.deletedMultipleCalls.size)
         assertEquals(1, mockRepo.deletedItems.size)
         assertEquals("100" to "1", mockRepo.deletedItems[0])
 
         // parentCid 为空场景：降级为单项删除
-        val emptyPidItem1 = DeleteTargetItem("", "2", "orphan1.txt", isFolder = false)
-        val emptyPidItem2 = DeleteTargetItem("", "3", "orphan2.txt", isFolder = false)
-        val res2 = TerminalFileDeleter.deleteGroup(ctx, "", listOf(emptyPidItem1, emptyPidItem2))
+        val emptyPidItem1 = BatchTargetItem("", "2", "orphan1.txt", isFolder = false)
+        val emptyPidItem2 = BatchTargetItem("", "3", "orphan2.txt", isFolder = false)
+        val res2 = TerminalBatchFileOps.deleteGroup(ctx, "", listOf(emptyPidItem1, emptyPidItem2))
         assertTrue(res2.state)
         assertEquals(0, mockRepo.deletedMultipleCalls.size)
     }
@@ -145,8 +145,8 @@ class BatchDeleteTest {
         assertTrue(ctx.fileCacheManager.containsKey("200"))
         assertTrue(ctx.fileCacheManager.containsKey("300"))
 
-        val folderItem = DeleteTargetItem("100", "200", "sub_dir", isFolder = true)
-        val res = TerminalFileDeleter.deleteGroup(ctx, "100", listOf(folderItem))
+        val folderItem = BatchTargetItem("100", "200", "sub_dir", isFolder = true)
+        val res = TerminalBatchFileOps.deleteGroup(ctx, "100", listOf(folderItem))
         assertTrue(res.state)
 
         // 验证父目录条目被剔除

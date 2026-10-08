@@ -28,8 +28,11 @@ data class MvPlan(
  *
  * 继承 [MutationCommand]，在编译期提取位置参数与管道 stdin 输入，组装为不可变 [MvPlan]。
  * 支持双模式操作：
- * 1. 移动模式：当目标为已存在的目录时，支持单个或批量移动源文件至目标目录；亦支持从标准输入（stdin）管道读取待移动源文件列表。
- * 2. 重命名模式：当仅有一个源文件且目标非目录时，执行文件重命名操作。
+ * 1. 移动模式：当目标为已存在的目录时，支持单个或批量移动源文件至目标目录；
+ *    - 委托 [TerminalBatchFileOps.moveGroup] 批量执行，避免 N 次串行 HTTP 往返；
+ *    - 内置前置安全防御：拦截原地移动、拦截将目录移入自身或其下属子目录；
+ *    - 细粒度回显：单项移动展示源与目标明细，批量移动展示汇总摘要。
+ * 2. 重命名模式：当仅有一个源文件且目标非目录时，执行文件/文件夹就地重命名操作。
  */
 class MvCommand : MutationCommand<MvPlan>() {
 
@@ -81,97 +84,119 @@ class MvCommand : MutationCommand<MvPlan>() {
         val currentFiles = ctx.listDirectory(ctx.currentCid)
         val destParsed = TerminalPath.parse(destination)
 
-        // 解析源文件/目录信息封装体（包含其原本所在目录的 parentCid 与是否为文件夹）
-        data class ResolvedSource(
-            val fid: String,
-            val name: String,
-            val parentCid: String?,
-            val isFolder: Boolean
-        )
-
-        suspend fun resolveSourceItem(rawSrc: String): ResolvedSource? {
+        /**
+         * 解析源文件/目录，将其统一转换为 [BatchTargetItem] 元数据实体
+         */
+        suspend fun resolveSourceItem(rawSrc: String): BatchTargetItem? {
             val srcParsed = TerminalPath.parse(rawSrc)
             val localFile = currentFiles.firstOrNull { it.name == srcParsed.targetName || it.name == rawSrc.trim() }
             if (localFile != null && !srcParsed.isMultiSegment && !srcParsed.isAbsolute) {
                 val fid = if (localFile.isFolder) localFile.categoryId else localFile.fileId
-                return ResolvedSource(fid, localFile.name, ctx.currentCid, localFile.isFolder)
+                return BatchTargetItem(
+                    parentCid = ctx.currentCid,
+                    fid = fid,
+                    displayName = localFile.name,
+                    isFolder = localFile.isFolder
+                )
             }
 
             // 尝试路径解析（支持绝对路径与相对路径）
             return when (val resolved = ctx.resolveTarget(rawSrc)) {
-                is ResolvedTarget.Directory -> ResolvedSource(
-                    resolved.cid,
-                    resolved.name.ifEmpty { srcParsed.targetName.ifEmpty { "/" } },
-                    resolved.parentCid,
-                    isFolder = true
-                )
+                is ResolvedTarget.Directory -> {
+                    val effectiveParentCid = resolved.parentCid
+                        ?: resolved.pathList.dropLast(1).lastOrNull()?.cid
+                        ?: ctx.currentCid
+                    BatchTargetItem(
+                        parentCid = effectiveParentCid,
+                        fid = resolved.cid,
+                        displayName = resolved.name.ifEmpty { srcParsed.targetName.ifEmpty { "/" } },
+                        isFolder = true
+                    )
+                }
 
-                is ResolvedTarget.File -> ResolvedSource(
-                    resolved.file.fileId,
-                    resolved.file.name,
-                    resolved.parentCid,
-                    isFolder = false
-                )
+                is ResolvedTarget.File -> {
+                    val effectiveParentCid = resolved.parentCid.ifEmpty { resolved.file.categoryId }
+                    BatchTargetItem(
+                        parentCid = effectiveParentCid,
+                        fid = resolved.file.fileId,
+                        displayName = resolved.file.name,
+                        isFolder = false
+                    )
+                }
 
                 null -> null
             }
         }
 
-        // 判断目标是否为目录（支持当前目录下文件夹、上级目录 .. / ../、绝对路径或 ~）
-        var targetDestCid: String? = null
-        var destDisplayName = destination
+        // 解析目标目录（通过强类型 Directory 返回完整路径面包屑 pathList）
+        val resolvedDestDir = ctx.resolveDirectory(destination)
 
-        val destFolder = currentFiles.firstOrNull { it.isFolder && (it.name == destParsed.targetName || it.name == destination.trim()) }
-        if (destFolder != null && !destParsed.isMultiSegment && !destParsed.isAbsolute && !destParsed.isRoot && !destParsed.isCurrentDirectory) {
-            targetDestCid = destFolder.categoryId
-            destDisplayName = destFolder.name
-        } else {
-            val resolvedDestDir = ctx.resolveDirectory(destination)
-            if (resolvedDestDir != null) {
-                targetDestCid = resolvedDestDir.cid
-                destDisplayName = resolvedDestDir.path
+        if (resolvedDestDir != null) {
+            // === 模式 1：移动模式（目标为有效目录） ===
+            val targetDestCid = resolvedDestDir.cid
+            val destDisplayName = if (!destParsed.isMultiSegment && !destParsed.isAbsolute && !destParsed.isRoot && !destParsed.isCurrentDirectory && resolvedDestDir.name.isNotEmpty()) {
+                resolvedDestDir.name
+            } else {
+                resolvedDestDir.path
             }
-        }
+            val formattedDest = if (destDisplayName == "/") "/" else "${destDisplayName.trimEnd('/')}/"
 
-        if (targetDestCid != null) {
-            // 移动操作：将所有 sources 移入 targetDestCid 目录
-            var anyMoved = false
+            val validItems = mutableListOf<BatchTargetItem>()
+            val validRawSources = mutableListOf<String>()
+
+            // 阶段一：前置多源安全校验与合法条目收集
             for (src in sources) {
                 val resolvedSrc = resolveSourceItem(src)
                 if (resolvedSrc == null) {
                     collector.emitError("mv: cannot stat '$src': No such file or directory")
                     continue
                 }
-                try {
-                    val moveMap = hashMapOf<String, String>()
-                    moveMap["pid"] = targetDestCid
-                    moveMap["fid[0]"] = resolvedSrc.fid
-                    val res = ctx.fileRepository.move(moveMap)
-                    if (res.state) {
-                        // 1. 在源父目录中删除该条目缓存；若为文件夹则同步递归删除该文件夹自身的缓存
-                        val srcParentCid = resolvedSrc.parentCid ?: ctx.currentCid
-                        ctx.fileCacheManager.removeItem(
-                            parentCid = srcParentCid,
-                            fid = resolvedSrc.fid,
-                            isFolder = resolvedSrc.isFolder
-                        )
-                        anyMoved = true
-                        collector.emitText("mv: '$src' -> '$destDisplayName/'")
-                    } else {
-                        val err =
-                            res.error.ifEmpty { res.errorMsg.ifEmpty { res.message } }
-                        collector.emitError("mv: 移动 '$src' 失败: $err")
+
+                // 前置安全校验 1：原地移动防护（源条目已位于目标目录中）
+                if (resolvedSrc.parentCid == targetDestCid) {
+                    collector.emitText("mv: '$src' 与目标目录相同，已跳过")
+                    continue
+                }
+
+                // 前置安全校验 2：自嵌套与移入子目录防护（目标目录自身包含在源目录的层级链条中）
+                if (resolvedSrc.isFolder && resolvedDestDir.pathList.any { it.cid == resolvedSrc.fid }) {
+                    collector.emitError("mv: 无法将目录 '$src' 移动至其自身或子目录下")
+                    continue
+                }
+
+                validItems.add(resolvedSrc)
+                validRawSources.add(src)
+            }
+
+            if (validItems.isEmpty()) return
+
+            // 阶段二：委托 TerminalBatchFileOps 执行批量移动与缓存维护
+            if (validItems.size == 1) {
+                val single = validItems.first()
+                val singleRaw = validRawSources.first()
+                val result = TerminalBatchFileOps.moveGroup(ctx, targetDestCid, listOf(single))
+                if (result.isAllSuccess) {
+                    collector.emitText("mv: '$singleRaw' -> '$formattedDest'")
+                } else {
+                    collector.emitError("mv: 移动 '$singleRaw' 失败: ${result.error}")
+                }
+            } else {
+                val result = TerminalBatchFileOps.moveGroup(ctx, targetDestCid, validItems)
+                when {
+                    result.isAllSuccess -> {
+                        collector.emitText("mv: 已成功移动 ${result.successCount} 个文件/文件夹至 '$formattedDest'")
                     }
-                } catch (e: Exception) {
-                    collector.emitError("mv: 移动 '$src' 失败: ${e.message}")
+                    result.isPartialSuccess -> {
+                        collector.emitText("mv: 部分移动成功 (${result.successCount}/${result.totalCount}) 至 '$formattedDest'")
+                        collector.emitError("mv: 其余 ${result.failureCount} 个项目移动失败: ${result.error}")
+                    }
+                    else -> {
+                        collector.emitError("mv: 批量移动失败 (${validItems.size} 个项目): ${result.error}")
+                    }
                 }
             }
-            if (anyMoved) {
-                // 2. 移动完成后强制刷新目标目录 b 的缓存，拉取服务端最新数据并落盘和通知 UI
-                ctx.listDirectory(cid = targetDestCid, forceRefresh = true)
-            }
         } else if (sources.size == 1) {
-            // 单源且目标不是现有目录：执行重命名
+            // === 模式 2：重命名模式（单源且目标不是现有目录） ===
             if (destParsed.hasTrailingSlash) {
                 collector.emitError("mv: target '$destination' is not a directory")
                 return
@@ -188,7 +213,7 @@ class MvCommand : MutationCommand<MvPlan>() {
                 val renameBean = RenameBean(resolvedSrc.fid, newName)
                 val res = ctx.fileRepository.rename(renameBean.toRequestBody())
                 if (res.state) {
-                    val parentCid = resolvedSrc.parentCid ?: ctx.currentCid
+                    val parentCid = resolvedSrc.parentCid.ifEmpty { ctx.currentCid }
                     // 就地在父目录缓存中重命名该文件/文件夹（对齐 FileViewModel 的 rename 逻辑）
                     ctx.fileCacheManager.renameItem(parentCid = parentCid, fid = resolvedSrc.fid, newName = newName)
                     collector.emitText("mv: '$src' renamed to '$newName'")
@@ -200,6 +225,7 @@ class MvCommand : MutationCommand<MvPlan>() {
                 collector.emitError("mv: 重命名失败: ${e.message}")
             }
         } else {
+            // 多源但目标非目录，无法执行移动
             collector.emitError("mv: target '$destination' is not a directory")
         }
     }
