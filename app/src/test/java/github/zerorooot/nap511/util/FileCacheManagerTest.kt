@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.util
 
+import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.PathBean
@@ -193,6 +194,92 @@ class FileCacheManagerTest {
         assertFalse(FileCacheManager.containsKey("200"))
     }
 
+    @Test
+    fun testRemoveFolderRecursively_SilentModeDoesNotEmitFolderDeleted() = runBlocking {
+        val folder = FileBean(fileId = "100", categoryId = "100", name = "sub1", isFolder = true)
+        FileCacheManager.put("100", FilesBean(fileBeanList = arrayListOf(folder), cid = "100", count = 1, order = "", path = emptyList()))
+
+        var receivedFolderDeleted: CacheEvent.FolderDeleted? = null
+        val job = launch(kotlinx.coroutines.Dispatchers.Unconfined) {
+            FileCacheManager.cacheEvents.collect {
+                if (it is CacheEvent.FolderDeleted) {
+                    receivedFolderDeleted = it
+                }
+            }
+        }
+
+        // 静默模式清理缓存
+        FileCacheManager.removeFolderRecursively("100", emitFolderDeleted = false)
+
+        assertFalse(FileCacheManager.containsKey("100"))
+        // 验证静默模式下未向外发射 FolderDeleted
+        assertTrue(receivedFolderDeleted == null)
+
+        job.cancel()
+    }
+
+    @Test
+    fun testRemoveFolderRecursively_DefaultEmitsFolderDeleted() = runBlocking {
+        val folder = FileBean(fileId = "100", categoryId = "100", name = "sub1", isFolder = true)
+        FileCacheManager.put("100", FilesBean(fileBeanList = arrayListOf(folder), cid = "100", count = 1, order = "", path = emptyList()))
+
+        var receivedFolderDeleted: CacheEvent.FolderDeleted? = null
+        val job = launch(kotlinx.coroutines.Dispatchers.Unconfined) {
+            FileCacheManager.cacheEvents.collect {
+                if (it is CacheEvent.FolderDeleted) {
+                    receivedFolderDeleted = it
+                }
+            }
+        }
+
+        // 默认模式（真实删除）清理缓存
+        FileCacheManager.removeFolderRecursively("100", emitFolderDeleted = true)
+
+        assertFalse(FileCacheManager.containsKey("100"))
+        // 验证向外广播了 FolderDeleted
+        assertEquals("100", receivedFolderDeleted?.folderCid)
+
+        job.cancel()
+    }
+
+    @Test
+    fun testRemoveFolderRecursively_RootDirectoryNeverEmitsFolderDeleted() = runBlocking {
+        FileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(), cid = "0", count = 0, order = "", path = emptyList()))
+
+        var receivedFolderDeleted: CacheEvent.FolderDeleted? = null
+        val job = launch(kotlinx.coroutines.Dispatchers.Unconfined) {
+            FileCacheManager.cacheEvents.collect {
+                if (it is CacheEvent.FolderDeleted) {
+                    receivedFolderDeleted = it
+                }
+            }
+        }
+
+        // 针对根目录执行递归清理，即便 emitFolderDeleted = true 也绝对不应发射 FolderDeleted("0")
+        FileCacheManager.removeFolderRecursively("0", emitFolderDeleted = true)
+
+        assertFalse(FileCacheManager.containsKey("0"))
+        assertTrue(receivedFolderDeleted == null)
+
+        job.cancel()
+    }
+
+    @Test
+    fun testRemoveFolderRecursively_CycleProtectionPreventsInfiniteRecursion() = runBlocking {
+        // 构建成环依赖：subA (100) 引用 subB (200)，subB (200) 又反向引用 subA (100)
+        val toB = FileBean(fileId = "200", categoryId = "200", name = "subB", isFolder = true)
+        val toA = FileBean(fileId = "100", categoryId = "100", name = "subA", isFolder = true)
+
+        FileCacheManager.put("100", FilesBean(fileBeanList = arrayListOf(toB), cid = "100", count = 1, order = "", path = emptyList()))
+        FileCacheManager.put("200", FilesBean(fileBeanList = arrayListOf(toA), cid = "200", count = 1, order = "", path = emptyList()))
+
+        // 执行清理，验证依靠 visited 集合能正常退出而不发生 StackOverflowError
+        FileCacheManager.removeFolderRecursively("100")
+
+        assertFalse(FileCacheManager.containsKey("100"))
+        assertFalse(FileCacheManager.containsKey("200"))
+    }
+
 
     @Test
     fun testUpdateVideoProgress() = runBlocking {
@@ -218,7 +305,7 @@ class FileCacheManagerTest {
             "pick_v1" to VideoBean(currentDuration = 50, pickCode = "pick_v1"),
             "pick_v2" to VideoBean(currentDuration = 20, pickCode = "pick_v2")
         )
-
+        XLog.init()
         FileCacheManager.updateVideoProgress("0", videoHistoryMap)
 
         val updatedList = FileCacheManager.getDate("0")?.fileBeanList
@@ -229,5 +316,42 @@ class FileCacheManagerTest {
         assertEquals("▶️ 50%", updatedV1?.playLongRatio)
         // 非视频文件保持原样
         assertEquals("", updatedV2?.playLongRatio)
+    }
+
+    @Test
+    fun testNotifyContentUpdated_ClearsCacheAndEmitsEvent() = runBlocking {
+        val fb = FilesBean(fileBeanList = arrayListOf(), cid = "123", count = 0, order = "", path = emptyList())
+        FileCacheManager.put("123", fb)
+        assertTrue(FileCacheManager.containsKey("123"))
+
+        var receivedEvent: CacheEvent? = null
+        val job = launch(kotlinx.coroutines.Dispatchers.Unconfined) {
+            FileCacheManager.cacheEvents.collect {
+                receivedEvent = it
+            }
+        }
+
+        FileCacheManager.notifyContentUpdated("123", clearCache = true)
+
+        assertFalse(FileCacheManager.containsKey("123"))
+        assertTrue(receivedEvent is CacheEvent.ContentUpdated && (receivedEvent as CacheEvent.ContentUpdated).cid == "123")
+
+        job.cancel()
+    }
+
+    @Test
+    fun testNotifyCacheEvent_EmitsCustomEvent() = runBlocking {
+        var receivedEvent: CacheEvent? = null
+        val job = launch(kotlinx.coroutines.Dispatchers.Unconfined) {
+            FileCacheManager.cacheEvents.collect {
+                receivedEvent = it
+            }
+        }
+
+        FileCacheManager.notifyCacheEvent(CacheEvent.AllCleared)
+
+        assertEquals(CacheEvent.AllCleared, receivedEvent)
+
+        job.cancel()
     }
 }

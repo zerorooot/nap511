@@ -38,7 +38,6 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.annotation.ExperimentalCoilApi
 import coil.imageLoader
-import coil.memory.MemoryCache
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBannerActions
 import github.zerorooot.nap511.bean.FileBannerState
@@ -326,16 +325,7 @@ fun FileScreen(
     )
 
     fun refresh(forceCache: Boolean = false) {
-        if (forceCache) {
-            fileBeanList.forEach { fileBean ->
-                //文件列表的里图片，ico、thumb图片
-                imageLoader.memoryCache?.remove(MemoryCache.Key(fileBean.fileId))
-                imageLoader.diskCache?.remove(fileBean.fileId)
-                //MyPhotoScreen、大图模式高清模式的图片
-                imageLoader.memoryCache?.remove(MemoryCache.Key(fileBean.pickCode))
-                imageLoader.diskCache?.remove(fileBean.pickCode)
-            }
-        }
+        // Coil 内存与磁盘清理已全部收拢至 FileViewModel 的 IO 协程中执行，此处纯粹发起刷新
         fileViewModel.refresh(forceCache)
     }
 

@@ -20,8 +20,7 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.subtitle.SubtitleEntry
 import github.zerorooot.nap511.util.AudioEvent
 import github.zerorooot.nap511.util.AudioEventBus
-import github.zerorooot.nap511.util.DialogEvent
-import github.zerorooot.nap511.util.DialogEventBus
+import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.subtitle.SubtitleDelegate
 import kotlinx.coroutines.Job
@@ -391,7 +390,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             targetCid = targetCid,
             onSuccess = {
                 viewModelScope.launch {
-                    DialogEventBus.getInstance().emit(DialogEvent.RefreshFileList(targetCid))
+                    FileCacheManager.notifyContentUpdated(targetCid)
                 }
             }
         )

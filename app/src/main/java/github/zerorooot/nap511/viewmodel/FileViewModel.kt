@@ -45,8 +45,6 @@ import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.CacheEvent
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DialogEvent
-import github.zerorooot.nap511.util.DialogEventBus
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.LazyScrollState
 import github.zerorooot.nap511.util.copy
@@ -64,6 +62,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import retrofit2.HttpException
 
 @SuppressLint("MutableCollectionMutableState")
@@ -102,11 +101,6 @@ class FileViewModel(
     var torrentBean by mutableStateOf(TorrentFileBean())
     val torrentBeanCache = hashMapOf<String, TorrentFileBean>()
 
-    /**
-     * 打开对话框相关（状态下沉到 ViewModel 本地）
-     */
-    internal val dialogEventBus = DialogEventBus.getInstance()
-
     var activeDialog by mutableStateOf<FileDialogState>(FileDialogState.None)
         internal set
 
@@ -132,13 +126,6 @@ class FileViewModel(
         viewModelScope.launch {
             settingUiStateFlow.collect { settings ->
                 saveRequestCache = settings.saveRequestCache
-            }
-        }
-        viewModelScope.launch {
-            dialogEventBus.events.collect { event ->
-                when (event) {
-                    is DialogEvent.RefreshFileList -> refresh(event.cid)
-                }
             }
         }
         // 监听 FileCacheManager 全局缓存变动事件（如终端操作、视频进度更新等），实现 UI 实时同步
@@ -429,15 +416,31 @@ class FileViewModel(
         refresh(currentCid, forceCache)
     }
 
+    @OptIn(ExperimentalCoilApi::class)
     internal fun refresh(cid: String, forceCache: Boolean = false) {
         isSearchState = false
         recoverFromLongPress()
         val refreshCurrent = (cid == currentCid)
+        XLog.d("refresh refreshCurrent:$refreshCurrent, settingUiState.forceLoadCache:${settingUiState.forceLoadCache}, forceCache:$forceCache")
         viewModelScope.launch {
             if (settingUiState.forceLoadCache || forceCache) {
-                removeFolderCacheRecursively(cid)
+                if (cid == "0") {
+                    // 【根目录全量重置】：直接在 IO 协程中清空 Coil 内存与磁盘缓存，并清空全部文件缓存。
+                    // 秒级完成，彻底避免无意义的逐层树遍历及 ANR / StackOverflowError。
+                    withContext(Dispatchers.IO) {
+                        context.imageLoader.memoryCache?.clear()
+                        context.imageLoader.diskCache?.clear()
+                        FileCacheManager.clearAll()
+                    }
+                } else {
+                    // 【子目录精准定向清理】：在 IO 线程异步清理当前展示条目图标与原图缩略图，并静默递归清理子树缓存
+                    cleanFileListCoilCache(fileBeanList.toList())
+                    removeFolderCacheRecursively(cid)
+                }
+            } else {
+                FileCacheManager.remove(cid)
             }
-            FileCacheManager.remove(cid)
+
             if (refreshCurrent) {
                 getFiles(currentCid)
             } else {
@@ -451,26 +454,37 @@ class FileViewModel(
      * 响应 FileCacheManager 的全局缓存变更事件，实现 UI 实时同步
      */
     private fun handleCacheEvent(event: CacheEvent) {
+        XLog.d("handleCacheEvent $event")
         when (event) {
             is CacheEvent.ContentUpdated -> {
-                // 仅当变动的目录是当前正在展示的目录时同步
                 if (event.cid == currentCid) {
-                    val updatedCache = FileCacheManager.getDate(currentCid) ?: return
-                    // 状态重置：退出多选模式，确保列表状态绝对纯净无残留
-                    recoverFromLongPress()
-                    unSelect()
-
-                    // 更新 Compose 响应式列表与面包屑（包括视频进度更新）
-                    fileBeanList.clear()
-                    fileBeanList.addAll(updatedCache.fileBeanList)
-                    pathList = updatedCache.path
+                    val updatedCache = FileCacheManager.getDate(currentCid)
+                    if (updatedCache != null) {
+                        XLog.d("handleCacheEvent ContentUpdated currentCid updatedCache != null")
+                        recoverFromLongPress()
+                        unSelect()
+                        fileBeanList.clear()
+                        fileBeanList.addAll(updatedCache.fileBeanList)
+                        pathList = updatedCache.path
+                    } else {
+                        // 本地缓存已被失效/清除，主动拉取网络最新文件列表
+                        XLog.d("handleCacheEvent ContentUpdated !currentCid refresh")
+                        refresh(currentCid)
+                    }
+                } else {
+                    XLog.d("handleCacheEvent ContentUpdated 更新非当目录")
+                    refresh(event.cid)
                 }
             }
 
             is CacheEvent.FolderDeleted -> {
+                // 根目录 "0" 永远不可被判定为删除
+                if (event.folderCid == "0") return
+
                 // 判断当前所在目录或其祖先目录是否被删除
                 val isCurrentDeleted = (currentCid == event.folderCid)
                 val isAncestorDeleted = pathList.any { it.cid == event.folderCid }
+                XLog.d("CacheEvent.FolderDeleted isCurrentDeleted=$isCurrentDeleted, isAncestorDeleted=$isAncestorDeleted")
 
                 if (isCurrentDeleted || isAncestorDeleted) {
                     App.instance.toast("当前所在目录已被删除")
@@ -490,21 +504,53 @@ class FileViewModel(
         }
     }
 
+    /**
+     * 在 IO 调度器下彻底清理指定文件列表对应的 Coil 内存与磁盘缓存
+     * （对应原 FileScreen 在主线程执行的缓存操作，现统一收口至 ViewModel 异步执行）
+     */
     @OptIn(ExperimentalCoilApi::class)
-    suspend fun removeFolderCacheRecursively(categoryId: String) {
-        fun cleanCoilCache(cid: String) {
-            val fileBeanList = FileCacheManager.getDate(cid)?.fileBeanList ?: emptyList()
+    suspend fun cleanFileListCoilCache(list: List<FileBean>) = withContext(Dispatchers.IO) {
+        list.forEach { bean ->
+            // 文件列表条目图标/缩略图缓存 Key
+            if (bean.fileId.isNotEmpty()) {
+                context.imageLoader.deleteCoilCache(bean.fileId)
+            }
+            // 大图模式/原图缓存 Key
+            if (bean.pickCode.isNotEmpty()) {
+                context.imageLoader.deleteCoilCache(bean.pickCode)
+            }
+        }
+    }
+
+    @OptIn(ExperimentalCoilApi::class)
+    suspend fun removeFolderCacheRecursively(categoryId: String) = withContext(Dispatchers.IO) {
+        if (categoryId == "0") return@withContext
+        val visited = HashSet<String>()
+
+        suspend fun cleanCoilCache(cid: String) {
+            if (cid.isEmpty() || !visited.add(cid)) return
+
+            val fileBeanList = FileCacheManager[cid]?.fileBeanList ?: emptyList()
             fileBeanList.forEach {
                 if (it.isFolder) {
-                    cleanCoilCache(it.categoryId)
-                } else if (it.photoThumb.isNotEmpty()) {
-                    context.imageLoader.deleteCoilCache(it.pickCode)
+                    val nextCid = it.categoryId.ifEmpty { it.fileId }
+                    if (nextCid.isNotEmpty() && nextCid != "0") {
+                        cleanCoilCache(nextCid)
+                    }
+                } else {
+                    if (it.fileId.isNotEmpty()) {
+                        context.imageLoader.deleteCoilCache(it.fileId)
+                    }
+                    if (it.photoThumb.isNotEmpty() && it.pickCode.isNotEmpty()) {
+                        context.imageLoader.deleteCoilCache(it.pickCode)
+                    }
                 }
             }
         }
+
         cleanCoilCache(categoryId)
-        // 委托 FileCacheManager 进行底层缓存的递归深度清理及广播事件
-        FileCacheManager.removeFolderRecursively(categoryId)
+        // 关键：以静默模式 (emitFolderDeleted = false) 清理缓存，防止误发 FolderDeleted 导致 UI 退出
+        FileCacheManager.removeFolderRecursively(categoryId, emitFolderDeleted = false)
     }
 
     /**

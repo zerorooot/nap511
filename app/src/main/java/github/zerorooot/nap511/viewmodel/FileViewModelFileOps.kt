@@ -46,11 +46,11 @@ internal fun FileViewModel.removeFile() {
     }
 
     //提前保存cid,防止进入其他文件夹后刷新当前目录
-    val tempCid = currentCid
+    val targetCid = currentCid
     isCutState = false
 
-    val cid = cutFileList[0].let { if (it.isFolder) it.parentId else it.categoryId }
-    if (cid == tempCid) {
+    val fileCid = cutFileList[0].let { if (it.isFolder) it.parentId else it.categoryId }
+    if (fileCid == targetCid) {
         App.instance.toast("禁止原地移动～")
         return
     }
@@ -58,12 +58,12 @@ internal fun FileViewModel.removeFile() {
     setRefreshingStatus(true)
     viewModelScope.launch {
         runCatching {
-            val move = fileRepository.removeFile(tempCid, cutFileList)
+            val move = fileRepository.removeAllFile(targetCid, cutFileList)
             if (move.state) {
                 cutFileList = cutFileList.map { it.copy(isSelect = false) }
                 // 统一委托 FileCacheManager 移除剪切的文件并清理子文件夹缓存
-                FileCacheManager.removeItems(cid, cutFileList.map { it.fileId })
-                refresh(tempCid)
+                FileCacheManager.removeItems(fileCid, cutFileList.map { it.fileId })
+                refresh(targetCid)
                 "移动${cutFileList.size}个文件成功"
             } else {
                 "移动失败~"

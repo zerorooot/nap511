@@ -25,8 +25,7 @@ import github.zerorooot.nap511.activity.OfflineTaskActivity
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DialogEvent
-import github.zerorooot.nap511.util.DialogEventBus
+import github.zerorooot.nap511.util.FileCacheManager
 import java.util.StringJoiner
 
 class OfflineTaskWorker(
@@ -94,7 +93,7 @@ class OfflineTaskWorker(
             .putString("return", message)
             .build()
         return if (state) {
-            DialogEventBus.getInstance().emit(DialogEvent.RefreshFileList(cid))
+            FileCacheManager.notifyContentUpdated(cid)
             Result.success(addTaskData)
         } else {
             Result.failure(addTaskData)

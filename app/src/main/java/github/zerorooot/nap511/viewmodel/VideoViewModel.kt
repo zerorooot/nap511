@@ -15,8 +15,7 @@ import github.zerorooot.nap511.bean.VideoUiState
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.DialogEvent
-import github.zerorooot.nap511.util.DialogEventBus
+import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.keyWord
 import github.zerorooot.nap511.util.network.parseOssErrorWithDom
 import github.zerorooot.nap511.util.onFailureToastAndLog
@@ -493,7 +492,7 @@ class VideoViewModel : ViewModel() {
             targetCid = parentCid,
             onSuccess = {
                 viewModelScope.launch {
-                    DialogEventBus.getInstance().emit(DialogEvent.RefreshFileList(parentCid))
+                    FileCacheManager.notifyContentUpdated(parentCid)
                 }
             }
         )

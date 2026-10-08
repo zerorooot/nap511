@@ -2,9 +2,7 @@ package github.zerorooot.nap511.util
 
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
-import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FilesBean
-import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.VideoBean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -72,6 +70,30 @@ object FileCacheManager {
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
     val cacheEvents: SharedFlow<CacheEvent> = _cacheEvents.asSharedFlow()
+
+    /**
+     * 手动向外广播指定 CacheEvent 事件
+     */
+    fun notifyCacheEvent(event: CacheEvent) {
+        _cacheEvents.tryEmit(event)
+    }
+
+    /**
+     * 标注指定 CID 的目录内容发生变动。
+     * @param clearCache 是否清理本地对应 CID 的缓存（默认为 true）。若远端文件数据已更新
+     *                   且本地未有最新的 FilesBean，传入 true 可使缓存失效，促使界面拉取最新网络数据；
+     *                   若仅需要广播更新通知，可传入 false。
+     */
+    suspend fun notifyContentUpdated(cid: String, clearCache: Boolean = true) =
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                if (clearCache) {
+                    memoryCache.remove(cid)
+                    deleteDiskFile(cid)
+                }
+                _cacheEvents.tryEmit(CacheEvent.ContentUpdated(cid))
+            }
+        }
 
     fun init(cacheDir: File) {
         this.cacheDir = cacheDir
@@ -221,9 +243,13 @@ object FileCacheManager {
                 val entry = CacheWrapper(data = value)
                 memoryCache[key] = entry
                 flushToDiskInternal(key)
-                _cacheEvents.tryEmit(CacheEvent.ContentUpdated(key))
             }
         }
+
+    suspend fun putAndNotify(key: String, value: FilesBean) {
+        put(key, value)
+        _cacheEvents.tryEmit(CacheEvent.ContentUpdated(key))
+    }
 
     /**
      * 就地重命名父目录缓存中的文件或子目录，若为目录则同步更新子目录自身缓存中的面包屑末级名称。
@@ -275,7 +301,8 @@ object FileCacheManager {
     ): CacheRollback? = withContext(Dispatchers.IO) {
         mutex.withLock {
             val cache = memoryCache[parentCid]?.data ?: return@withContext null
-            val targetIndex = cache.fileBeanList.indexOfFirst { it.fileId == fid || it.categoryId == fid }
+            val targetIndex =
+                cache.fileBeanList.indexOfFirst { it.fileId == fid || it.categoryId == fid }
             if (targetIndex < 0) return@withContext null
 
             val originalList = ArrayList(cache.fileBeanList)
@@ -343,7 +370,7 @@ object FileCacheManager {
             cache.count = (cache.count - removedCount).coerceAtLeast(0)
             flushToDiskInternal(parentCid)
 
-            _cacheEvents.tryEmit(CacheEvent.ContentUpdated(parentCid))
+           // _cacheEvents.tryEmit(CacheEvent.ContentUpdated(parentCid))
             deletedFolders.forEach { _cacheEvents.tryEmit(CacheEvent.FolderDeleted(it)) }
 
             CacheRollback {
@@ -360,22 +387,43 @@ object FileCacheManager {
     }
 
     /**
-     * 递归深度清理目录及其所有子孙目录在 FileCacheManager 中的缓存，并向外广播 FolderDeleted 事件。
+     * 递归深度清理目录及其所有子孙目录在 FileCacheManager 中的缓存。
+     *
+     * @param folderCid 待清理的目录 CID
+     * @param emitFolderDeleted 是否向外广播 FolderDeleted 事件。
+     *                          真实物理删除目录（如 rm -r、批量删除）时传 true；
+     *                          仅清理本地缓存（如强制刷新、缓存失效）时必须传 false！
      */
-    suspend fun removeFolderRecursively(folderCid: String) = withContext(Dispatchers.IO) {
+    suspend fun removeFolderRecursively(
+        folderCid: String,
+        emitFolderDeleted: Boolean = true
+    ) = withContext(Dispatchers.IO) {
+        val visited = HashSet<String>()
         mutex.withLock {
-            removeFolderRecursivelyInternal(folderCid)
+            removeFolderRecursivelyInternal(folderCid, visited)
         }
-        _cacheEvents.tryEmit(CacheEvent.FolderDeleted(folderCid))
+        if (emitFolderDeleted && folderCid != "0") {
+            _cacheEvents.tryEmit(CacheEvent.FolderDeleted(folderCid))
+        }
     }
 
-    private fun removeFolderRecursivelyInternal(folderCid: String) {
+    private fun removeFolderRecursivelyInternal(
+        folderCid: String,
+        visited: MutableSet<String> = HashSet()
+    ) {
+        if (folderCid.isEmpty() || !visited.add(folderCid)) {
+            return
+        }
         val list = memoryCache[folderCid]?.data?.fileBeanList ?: emptyList()
         for (item in list) {
             if (item.isFolder) {
                 val subFolderCid = item.categoryId.ifEmpty { item.fileId }
-                if (subFolderCid.isNotEmpty()) {
-                    removeFolderRecursivelyInternal(subFolderCid)
+                // 严格边界保护：非空、非根目录且未访问过
+                if (subFolderCid.isNotEmpty() && subFolderCid != "0" && !visited.contains(
+                        subFolderCid
+                    )
+                ) {
+                    removeFolderRecursivelyInternal(subFolderCid, visited)
                 }
             }
         }
@@ -417,6 +465,7 @@ object FileCacheManager {
 
             if (hasChanges) {
                 flushToDiskInternal(cid)
+                XLog.d("updateVideoProgress CacheEvent.ContentUpdated")
                 _cacheEvents.tryEmit(CacheEvent.ContentUpdated(cid))
             }
         }

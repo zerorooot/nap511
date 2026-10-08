@@ -11,8 +11,7 @@ import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.DialogEvent
-import github.zerorooot.nap511.util.DialogEventBus
+import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -29,8 +28,6 @@ class RecycleViewModel : ViewModel() {
     private val _recycleInfo = MutableStateFlow(RecycleInfo())
     private val _recycleFileList = MutableStateFlow<List<RecycleBean>>(emptyList())
     private val _isOpenRecyclePasswordDialog = MutableStateFlow(false)
-
-    private val dialogEventBus = DialogEventBus.getInstance()
 
     private val fileService: FileService by lazy {
         FileService.getInstance()
@@ -142,7 +139,7 @@ class RecycleViewModel : ViewModel() {
                 val message = if (revert.state) {
                     XLog.i("RecycleViewModel revert $revert")
                     val cid = item.cid
-                    dialogEventBus.emit(DialogEvent.RefreshFileList(cid))
+                    FileCacheManager.notifyContentUpdated(cid)
                     _recycleFileList.update { list -> list.filterIndexed { i, _ -> i != index } }
                     "恢复成功"
                 } else {

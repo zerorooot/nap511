@@ -1,6 +1,5 @@
 package github.zerorooot.nap511.viewmodel
 
-import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
 import androidx.work.Constraints
 import androidx.work.Data
@@ -8,7 +7,6 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OutOfQuotaPolicy
-import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.elvishew.xlog.XLog
 import com.google.common.reflect.TypeToken
@@ -109,7 +107,7 @@ internal fun FileViewModel.unzipFile(fileBeansList: List<FileBean>, cid: String,
         }
 
         //获取离线失败移动目录cid
-        val errorCid = settingUiState.moveFailFile
+        settingUiState.moveFailFile
             .takeIf { it.isNotEmpty() }
             ?.let { data ->
                 fileBeanList.firstOrNull { it.isFolder && it.name == data }?.categoryId
@@ -131,33 +129,10 @@ internal fun FileViewModel.unzipFile(fileBeansList: List<FileBean>, cid: String,
             .setInputData(dataBuilder.build())
             .build()
 
-        startUnzipWorker(request, cid, errorCid)
-    }
-}
-
-internal fun FileViewModel.startUnzipWorker(
-    request: OneTimeWorkRequest,
-    cid: String,
-    errorCid: String?
-) {
-    val workManager = WorkManager.getInstance(context.applicationContext)
-    workManager.enqueueUniqueWork(
-        "unzipAllFileWorker", ExistingWorkPolicy.APPEND_OR_REPLACE, request
-    )
-    viewModelScope.launch(Dispatchers.IO) {
-        // 将 LiveData 转为 Flow 或者直接观察（这里利用 WorkManager 提供的 LiveData 转换为 Flow）
-        // 注意：需要引入 androidx.lifecycle:lifecycle-livedata-ktx 依赖
-        workManager.getWorkInfoByIdLiveData(request.id).asFlow() // 将 LiveData 转换为 Flow
-            .collect { workInfo ->
-                if (workInfo != null) {
-                    if (workInfo.state == WorkInfo.State.SUCCEEDED || workInfo.state == WorkInfo.State.FAILED) {
-                        refresh(cid)
-                        errorCid?.let {
-                            refresh(it)
-                        }
-                    }
-                }
-            }
+        val workManager = WorkManager.getInstance(context.applicationContext)
+        workManager.enqueueUniqueWork(
+            "unzipAllFileWorker", ExistingWorkPolicy.APPEND_OR_REPLACE, request
+        )
     }
 }
 

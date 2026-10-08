@@ -27,6 +27,8 @@ import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.FileCacheManager
+import github.zerorooot.nap511.viewmodel.formatFileBeanList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -163,15 +165,25 @@ class UnzipAllFileWorker(
         XLog.i("showCompletionNotification $message $unzipResult")
         App.instance.toast(message)
 
-        // 3. 统一构建返回的 Data
-        val moveResultMsg = handleFailedFiles(unzipFailList)
+        // 3. 统一处理失败文件的移动
+        val moveFailResult = handleFailedFiles(unzipFailList)
+
+        // 4. 【核心闭环】更新当前解压目录和错误文件目录的缓存
+        updateDirectoryCache(cid)
+        moveFailResult?.targetErrorCid?.let { errorCid ->
+            if (errorCid.isNotEmpty() && errorCid != cid) {
+                updateDirectoryCache(errorCid)
+            }
+        }
+
+        // 5. 统一构建返回的 Data
         val finalData = Data.Builder()
             .putBoolean("state", isAllSuccess)
             .putString("message", message)
-            .apply { moveResultMsg?.let { putString("moveResult", it) } }
+            .apply { moveFailResult?.message?.let { putString("moveResult", it) } }
             .build()
 
-        // 4. 根据状态返回成功或失败
+        // 6. 根据状态返回成功或失败
         return if (isAllSuccess) Result.success(finalData) else Result.failure(finalData)
     }
 
@@ -230,40 +242,69 @@ class UnzipAllFileWorker(
         return Result.failure(failureData)
     }
 
-    private suspend fun handleFailedFiles(unzipFailList: List<FileBean>): String? {
+    private data class MoveFailResult(
+        val message: String,
+        val targetErrorCid: String?
+    )
+
+    private suspend fun handleFailedFiles(unzipFailList: List<FileBean>): MoveFailResult? {
         val data = SettingsRepository.getDataSuspend(ConfigKeyUtil.MOVE_FAIL_FILE, "")
         if (data.isEmpty()) {
             XLog.d("handleFailedFiles 不移动解压失败的文件")
+            return null
         }
-        if (unzipFailList.isNotEmpty() && data.isNotEmpty()) {
+        if (unzipFailList.isNotEmpty()) {
             return moveFailFile(cid, data, unzipFailList)
         }
         return null
     }
 
     /**
-     * 解压失败的压缩包移动到某文件
+     * 解压失败的压缩包移动到某文件夹，并返回目标错误文件夹的 cid
      */
     private suspend fun moveFailFile(
         cid: String, folderName: String, unzipFailList: List<FileBean>
-    ): String {
+    ): MoveFailResult {
         XLog.d("UnzipAllFileWorker moveFailFile unzipFailList $unzipFailList")
         try {
-            val createFolderCid = inputData.getString("errorCid")
-                ?: fileRepository.createFolder(cid, folderName)
-                    .run { XLog.d("UnzipAllFileWorker createFolder $this"); this.cid }
+            var createFolderCid = inputData.getString("errorCid")
+            if (createFolderCid.isNullOrEmpty()) {
+                val createFolderMsg = fileRepository.createFolder(cid, folderName)
+                XLog.d("UnzipAllFileWorker create error folder $createFolderMsg")
+                createFolderCid = createFolderMsg.cid
+            }
 
-            val removeFile = fileRepository.removeFile(createFolderCid, unzipFailList)
+            if (createFolderCid.isEmpty()) {
+                return MoveFailResult("创建或获取错误文件夹失败！", null)
+            }
+
+            val removeFile = fileRepository.removeAllFile(createFolderCid, unzipFailList)
                 .also { XLog.d("UnzipAllFileWorker moveFailFile $it") }
 
             if (!removeFile.state) {
-                return "移动文件失败！ $removeFile"
+                return MoveFailResult("移动文件失败！ $removeFile", null)
             }
-        } catch (e: Exception) {
-            return "移动失败！${e.message}"
-        }
 
-        return "移动成功！"
+            return MoveFailResult("移动成功！", createFolderCid)
+        } catch (e: Exception) {
+            return MoveFailResult("移动失败！${e.message}", null)
+        }
+    }
+
+    /**
+     * 重新拉取指定目录最新数据并更新 FileCacheManager
+     * 纯粹走单一数据源（SSOT），底层自动广播 ContentUpdated 事件驱动前台 UI 原地热更新，零重复请求
+     */
+    private suspend fun updateDirectoryCache(targetCid: String) {
+        if (targetCid.isEmpty()) return
+        try {
+            FileCacheManager.notifyContentUpdated(targetCid)
+            XLog.i("UnzipAllFileWorker 成功更新目录缓存并同步UI: $targetCid")
+        } catch (e: Exception) {
+            XLog.e("UnzipAllFileWorker 更新目录缓存失败: $targetCid, error: ${e.message}")
+            // 兜底：若网络请求异常，至少移除旧缓存避免脏读
+            FileCacheManager.remove(targetCid)
+        }
     }
 
     private fun parseFileList(taskFilePath: String): List<FileBean>? {

@@ -49,8 +49,6 @@ import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.StringJoiner
-import kotlin.math.log10
-import kotlin.math.pow
 import kotlin.time.Duration.Companion.milliseconds
 
 open class FileRepository {
@@ -253,10 +251,14 @@ open class FileRepository {
         }
     }
 
-    suspend fun removeFile(currentCid: String, removeFileList: List<FileBean>): BaseReturnMessage {
+    /**
+     *  @param currentCid 要移动到的目录
+     *  @param removeAllFile 要移动的文件
+     */
+    suspend fun removeAllFile(currentCid: String, removeAllFile: List<FileBean>): BaseReturnMessage {
         val hashMapOf = hashMapOf<String, String>()
         hashMapOf["pid"] = currentCid
-        removeFileList.forEachIndexed { index, fileBean ->
+        removeAllFile.forEachIndexed { index, fileBean ->
             hashMapOf["fid[$index]"] = fileBean.fileId
         }
         return move(hashMapOf)

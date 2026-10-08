@@ -122,7 +122,7 @@ class TerminalContext(
                 // 规范化 isFolder
                 val normalizedList = formatFileBeanList(filesBean.fileBeanList)
                 filesBean.fileBeanList = normalizedList
-                fileCacheManager.put(cid, filesBean)
+                fileCacheManager.putAndNotify(cid, filesBean)
                 normalizedList
             } catch (e: Exception) {
                 // 如果网络请求失败且之前有旧缓存，尽量兜底返回
