@@ -6,6 +6,7 @@ import github.zerorooot.nap511.terminal.engine.CommandRegistry
 import github.zerorooot.nap511.terminal.engine.Lexer
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.engine.Token
+import github.zerorooot.nap511.terminal.engine.TokenizeResult
 import github.zerorooot.nap511.terminal.engine.ast.CommandAstParser
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
@@ -129,7 +130,7 @@ class XargsCommand(
         } else {
             val positional = ast.rawPositionalValues
             if (positional.isNotEmpty()) {
-                positional.drop(1).map { Token(it, isQuoted = false) }
+                positional.drop(1).map { Token.raw(it) }
             } else {
                 emptyList()
             }
@@ -251,7 +252,8 @@ class XargsCommand(
                         stopReading = true
                         return@collect
                     }
-                    val lineTokens = Lexer.tokenizeWithQuoteInfo(clean)
+                    val tokenResult = Lexer.tokenizeWithQuoteMask(clean)
+                    val lineTokens = if (tokenResult is TokenizeResult.Success) tokenResult.tokens else emptyList()
                     for (t in lineTokens) {
                         if (plan.eofStr != null && t.text == plan.eofStr) {
                             stopReading = true
@@ -271,21 +273,18 @@ class XargsCommand(
                 for (item in items) {
                     val hasPlaceholder = plan.initialArgTokens.any { it.text.contains(mode.placeholder) }
                     // 【参数注入防护机制】：
-                    // 将占位符替换结果以及追加项显式标记为 isQuoted = true。
+                    // 将占位符替换结果以及追加项显式标记为受保护字面量 Token.quoted。
                     // 确保下发给 CommandAstParser 时无条件作为位置参数，杜绝 "-filename" 等短横线文件名被误判为命令选项 (Option)。
                     val substitutedTokens = if (hasPlaceholder) {
                         plan.initialArgTokens.map { token ->
                             if (token.text.contains(mode.placeholder)) {
-                                token.copy(
-                                    text = token.text.replace(mode.placeholder, item),
-                                    isQuoted = true
-                                )
+                                Token.quoted(token.text.replace(mode.placeholder, item))
                             } else {
                                 token
                             }
                         }
                     } else {
-                        plan.initialArgTokens + Token(item, isQuoted = true)
+                        plan.initialArgTokens + Token.quoted(item)
                     }
                     executeBatch(substitutedTokens)
                 }
@@ -293,7 +292,7 @@ class XargsCommand(
 
             is XargsBatchMode.ByLines -> {
                 for (batch in items.chunked(mode.maxLines)) {
-                    val batchTokens = plan.initialArgTokens + batch.map { Token(it, isQuoted = true) }
+                    val batchTokens = plan.initialArgTokens + batch.map { Token.quoted(it) }
                     executeBatch(batchTokens)
                 }
             }
@@ -305,7 +304,7 @@ class XargsCommand(
                     listOf(items)
                 }
                 for (batch in batches) {
-                    val batchTokens = plan.initialArgTokens + batch.map { Token(it, isQuoted = true) }
+                    val batchTokens = plan.initialArgTokens + batch.map { Token.quoted(it) }
                     executeBatch(batchTokens)
                 }
             }

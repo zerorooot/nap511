@@ -124,21 +124,34 @@ class CommandOptionDelimiterTest {
 
     @Test
     fun testWcWithDelimiter() = runBlocking {
+        val repo = TestMockFileRepository().apply {
+            mockDownloadStreams["303"] = "hello world\n"
+        }
         val engine = createTestEngine()
-        val ctx = createTestContext()
+        val ctx = createTestContext(fileRepository = repo)
 
-        // wc -- -l: -l 在 "--" 之后不生效，输出默认三列统计信息
-        val out = engine.executeStrings("echo 'hello world' | wc -- -l", ctx)
+        val dashFile = createMockFile("-l", "303", size = "12", icoString = "txt")
+        ctx.putMockFiles("0", listOf(dashFile))
+
+        // wc -- -l: -l 在 "--" 之后作为待统计文件名，不作为仅统计行数标志，输出多列统计信息及文件名
+        val out = engine.executeStrings("wc -- -l", ctx)
         assertTrue(out.any { it.contains("Lines") && it.contains("Words") && it.contains("Chars") })
+        assertTrue(out.any { it.contains("-l") })
     }
 
     @Test
     fun testSortWithDelimiter() = runBlocking {
+        val repo = TestMockFileRepository().apply {
+            mockDownloadStreams["901"] = "2\n1\n3"
+        }
         val engine = createTestEngine()
-        val ctx = createTestContext()
+        val ctx = createTestContext(fileRepository = repo)
 
-        // sort -- -r: -r 在 "--" 之后不作为逆序排序选项
-        val out = engine.executeStrings("echo '2\n1\n3' | sort -- -r", ctx)
+        val rFile = createMockFile("-r", "901", size = "5", icoString = "txt")
+        ctx.putMockFiles("0", listOf(rFile))
+
+        // sort -- -r: -r 在 "--" 之后作为待排序文件名，不作为逆序选项，输出升序结果
+        val out = engine.executeStrings("sort -- -r", ctx)
         assertEquals(listOf("1", "2", "3"), out)
     }
 

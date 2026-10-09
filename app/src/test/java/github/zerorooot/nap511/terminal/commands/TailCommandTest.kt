@@ -87,13 +87,14 @@ class TailCommandTest {
         val out16 = engine.executeStrings("echo 'a#b' | tail -n 1", ctx)
         assertEquals(listOf("a#b"), out16)
 
-        // 未知选项容错处理
+        // 未知选项处理（无输入流时正常结束）
         val out17 = engine.executeStrings("tail -x", ctx)
         assertNotNull(out17)
 
-        // 多余位置参数容错处理
+        // 多文件参数但文件不存在时的标准错误输出
         val out18 = engine.executeStrings("tail -n 1 a b", ctx)
-        assertNotNull(out18)
+        assertTrue(out18.any { it.contains("tail: a: No such file or directory") })
+        assertTrue(out18.any { it.contains("tail: b: No such file or directory") })
     }
 
     /**
@@ -229,5 +230,41 @@ class TailCommandTest {
         // 路径含中文文件截取
         val out50 = engine.executeStrings("tail -n 1 测试.txt", ctx)
         assertNotNull(out50)
+    }
+
+    /**
+     * 5. POSIX 多文件操作数与标头测试
+     */
+    @Test
+    fun testTailMultiFilesHeaders() = runBlocking {
+        val repo = TestMockFileRepository().apply {
+            mockDownloadStreams["tail_101"] = "a\nb\nc"
+            mockDownloadStreams["tail_102"] = "x\ny\nz"
+        }
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = repo)
+
+        val f1 = createMockFile("f1.txt", "tail_101", icoString = "txt")
+        val f2 = createMockFile("f2.txt", "tail_102", icoString = "txt")
+        ctx.putMockFiles("0", listOf(f1, f2))
+
+        // 单文件：无 ==> 标头
+        val outSingle = engine.executeStrings("tail -n 2 f1.txt", ctx)
+        assertEquals(listOf("b", "c"), outSingle)
+
+        // 多文件：必须包含 ==> f1.txt <== 与 ==> f2.txt <== 标头，且块间有空行隔离
+        val outMulti = engine.executeStrings("tail -n 2 f1.txt f2.txt", ctx)
+        assertEquals(
+            listOf(
+                "==> f1.txt <==",
+                "b",
+                "c",
+                "",
+                "==> f2.txt <==",
+                "y",
+                "z"
+            ),
+            outMulti
+        )
     }
 }

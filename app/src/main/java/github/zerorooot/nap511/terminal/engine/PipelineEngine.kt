@@ -7,6 +7,8 @@ import github.zerorooot.nap511.terminal.engine.ast.PositionalArgumentNode
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
 import github.zerorooot.nap511.terminal.viewmodel.emitHelp
+import github.zerorooot.nap511.terminal.viewmodel.emitText
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.emptyFlow
@@ -18,7 +20,8 @@ import kotlinx.coroutines.flow.flow
  * 遵循强类型流模型规范：
  * 1. 管道中继传递纯文本 (Flow<String>) 保证 Unix 流式计算互操作性；
  * 2. 管道终点输出保留强类型语义 (Flow<TerminalOutput>) 供给上层 ViewModel 精准渲染；
- * 3. 引擎直接解析生成 CommandInvocationAst 抽象语法树，严格控制 Glob 仅对位置参数生效。
+ * 3. 引擎直接解析生成 CommandInvocationAst 抽象语法树，严格控制 Glob 仅对位置参数生效；
+ * 4. 协程取消严格透传：遇到流截断或管道破裂时立即重抛 CancellationException，杜绝虚假终端报错。
  */
 class PipelineEngine(
     val registry: CommandRegistry
@@ -36,7 +39,17 @@ class PipelineEngine(
             return emptyFlow()
         }
 
-        val stages = Lexer.parsePipeline(trimmed)
+        val stages = when (val parseResult = Lexer.parsePipeline(trimmed)) {
+            is PipelineParseResult.SyntaxError -> {
+                return flow {
+                    emitError(parseResult.message)
+                }
+            }
+            is PipelineParseResult.Success -> {
+                parseResult.stages
+            }
+        }
+
         if (stages.isEmpty()) {
             return emptyFlow()
         }
@@ -58,18 +71,20 @@ class PipelineEngine(
                 isWrapperCommand = command.isWrapperCommand
             )
 
-            // 2. 安全 Glob 展开：仅对未加引号的位置参数（路径/文件名）执行通配符展开；
+            // 2. 安全多级 Glob 展开：仅对未加引号且未受保护的位置参数执行通配符展开；
             // 选项名称与选项参数值严格禁止展开，从源头杜绝参数注入。
-            // 完美支持当前目录（如 *.zip）以及子目录路径前缀（如 smll/*.zip、../dir/*.txt）。
+            val warnings = mutableListOf<String>()
             val expandedPositional = mutableListOf<PositionalArgumentNode>()
             for (posNode in rawAst.positionalArgs) {
-                if (!posNode.isQuoted && !posNode.fromDelimiter && GlobMatcher.hasGlobWildcards(posNode.text)) {
-                    val expanded = expandPositionalGlob(posNode.text, ctx)
+                if (!posNode.fromDelimiter && posNode.hasUnquotedWildcards) {
+                    val expanded = MultiLevelGlobExpander.expand(ctx, posNode) { warn ->
+                        warnings.add(warn)
+                    }
                     for (item in expanded) {
                         expandedPositional.add(
                             PositionalArgumentNode(
-                                item,
-                                isQuoted = false,
+                                text = item,
+                                quoteMask = BooleanArray(item.length) { false },
                                 fromDelimiter = false
                             )
                         )
@@ -83,7 +98,7 @@ class PipelineEngine(
             // 【关键机制 - 不可变局部变量绑定】：
             // 使用局部只读 val stageStdout 接收当前阶段的输出流，保证随后赋值给 currentStdin 的流闭包
             // 严格捕获上一级的只读引用，绝不会因为外层 var 变量被下一轮循环重写而导致死锁。
-            val stageStdout = executeStage(command, ctx, finalAst, currentStdin)
+            val stageStdout = executeStage(command, ctx, finalAst, currentStdin, warnings)
             lastStdout = stageStdout
 
             // 将当前阶段的输出转换为纯文本行流供给下一阶段作为 stdin
@@ -115,8 +130,14 @@ class PipelineEngine(
         command: TerminalCommand,
         ctx: TerminalContext,
         ast: CommandInvocationAst,
-        stdin: Flow<String>
+        stdin: Flow<String>,
+        warnings: List<String> = emptyList()
     ): Flow<TerminalOutput> = flow {
+        // 先行发射阶梯展开过程中的安全告警信息
+        for (warning in warnings) {
+            emitText(warning)
+        }
+
         try {
             // 拦截 --help 与 -h 帮助输出（若命令自身未占用 -h 作为功能选项）
             val hasHOption = command.flags.any { it.optionName == "-h" }
@@ -139,50 +160,13 @@ class PipelineEngine(
             stdoutFlow.collect { output ->
                 emit(output)
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // 【POSIX 协程异常安全规范】：
+            // 协程取消异常（包括 AbortFlowException）必须重抛，保持正常管道短路熔断，杜绝虚假报错！
+            if (e is CancellationException) {
+                throw e
+            }
             emitError("${command.name}: error: ${e.message ?: e.javaClass.simpleName}")
-        }
-    }
-
-    /**
-     * 对位置参数执行支持路径前缀的 Glob 通配符展开（如 `*.zip`、`dir/` 下通配符）
-     */
-    private suspend fun expandPositionalGlob(pattern: String, ctx: TerminalContext): List<String> {
-        if (!GlobMatcher.hasGlobWildcards(pattern)) return listOf(pattern)
-
-        return if (!pattern.contains('/')) {
-            // 当前工作目录下的通配符（如 *.zip）
-            val candidates = runCatching {
-                ctx.listDirectory(ctx.currentCid).map { it.name }
-            }.getOrDefault(emptyList())
-            GlobMatcher.expand(pattern, candidates)
-        } else {
-            // 包含目录路径前缀的通配符（如 smll/*.zip、../sub/*.mp4）
-            val dirPart = pattern.substringBeforeLast('/')
-            val filePattern = pattern.substringAfterLast('/')
-
-            // 若父路径自身亦包含通配符（如 dir*/*.zip），暂不支持跨多层级模糊递归展开，安全保持原样
-            if (GlobMatcher.hasGlobWildcards(dirPart)) {
-                return listOf(pattern)
-            }
-
-            val prefix = if (dirPart.isEmpty()) "/" else "$dirPart/"
-            val targetDirCid = if (dirPart.isEmpty()) {
-                "0"
-            } else {
-                ctx.resolveDirectory(dirPart)?.cid
-            } ?: return listOf(pattern)
-
-            val dirFiles = runCatching {
-                ctx.listDirectory(targetDirCid).map { it.name }
-            }.getOrDefault(emptyList())
-
-            val matched = GlobMatcher.expand(filePattern, dirFiles)
-            if (matched == listOf(filePattern) && !dirFiles.contains(filePattern)) {
-                listOf(pattern)
-            } else {
-                matched.map { "$prefix$it" }
-            }
         }
     }
 }

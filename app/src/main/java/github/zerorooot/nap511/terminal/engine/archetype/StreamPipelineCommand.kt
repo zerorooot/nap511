@@ -1,6 +1,8 @@
 package github.zerorooot.nap511.terminal.engine.archetype
 
 import github.zerorooot.nap511.terminal.context.TerminalContext
+import github.zerorooot.nap511.terminal.engine.StreamSourceItem
+import github.zerorooot.nap511.terminal.engine.StreamSourceResolver
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
@@ -12,23 +14,31 @@ import kotlinx.coroutines.flow.flow
 /**
  * 流式处理命令执行计划接口
  *
- * 封装已在编译期合成好的过滤、排序或聚合逻辑，数据在热循环中无分支流转
+ * 接收统一归一化后的数据源列表（包含 stdin 或多个文件流），在执行期无分支流转
  */
 fun interface StreamPlan {
-    suspend fun process(stdin: Flow<String>, collector: FlowCollector<TerminalOutput>)
+    suspend fun process(sources: List<StreamSourceItem>, collector: FlowCollector<TerminalOutput>)
 }
 
 /**
  * 流式管道命令原型抽象基类 (Stream Pipeline Archetype)
  *
- * 适用于：grep, sort, wc, head, tail 等标准 Unix 数据流过滤与转换工具。
+ * 适用于：grep, sort, wc, head, tail 等标准 Unix 数据流过滤、转换与聚合工具。
  *
  * 核心特性与架构收益：
- * 1. 编译与执行两阶段解耦：子类仅需实现 [compilePlan]，在编译期一次性解析 AST 并组装为不可变 [StreamPlan]；
- * 2. 异常与参数拦截下沉：基类统一捕获编译期参数缺失并标准报错，消除每个命令各自手写的防御性样板代码；
- * 3. 彻底终结热循环分支：命令执行期数据直接流过合成闭包，循环体内部 0 个 hasFlag，0 个 if 分支。
+ * 1. 编译与执行两阶段解耦：子类在编译期一次性解析 AST 并组装为不可变 [StreamPlan]；
+ * 2. 混合源统一注入：基类在 execute 阶段通过 [StreamSourceResolver] 统一解析文件操作数与 stdin，并隔离单个文件错误；
+ * 3. 灵活操作数提取：子类可通过覆盖 [extractFileOperands] 明确哪些参数属于待读取的文件操作数；
+ * 4. 彻底终结热循环分支：命令执行期数据直接流过合成闭包。
  */
 abstract class StreamPipelineCommand : TerminalCommand {
+
+    /**
+     * 声明当前命令中作为待读取文件操作数的位置参数列表
+     * 默认将 AST 中的全部位置参数作为文件路径；子类可按需覆盖（如 grep 排除首个模式参数）
+     */
+    protected open fun extractFileOperands(ast: CommandInvocationAst): List<String> =
+        ast.rawPositionalValues
 
     /**
      * 编译期语法分析：将输入的 AST 编译为不可变的流式执行计划
@@ -47,6 +57,8 @@ abstract class StreamPipelineCommand : TerminalCommand {
             emitError("${name}: ${it.message ?: "invalid arguments"}")
             return@flow
         }
-        plan.process(stdin, this)
+        val fileOperands = extractFileOperands(ast)
+        val sources = StreamSourceResolver.resolveSources(ctx, fileOperands, stdin)
+        plan.process(sources, this)
     }
 }

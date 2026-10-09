@@ -203,7 +203,8 @@ object CompletionEngine {
 
         // 计算当前 Token 前已存在的位置参数数量 (argIndex)
         val segmentPrefix = segment.substring(0, tokenStartInSegment)
-        val prevTokens = Lexer.tokenizeWithQuoteInfo(segmentPrefix)
+        val tokenResult = Lexer.tokenizeWithQuoteMask(segmentPrefix)
+        val prevTokens = if (tokenResult is TokenizeResult.Success) tokenResult.tokens else emptyList()
         var positionalArgIndex = 0
         if (prevTokens.size > 1) {
             var skipNext = false
@@ -213,7 +214,7 @@ object CompletionEngine {
                     continue
                 }
                 val text = token.text
-                if (!token.isQuoted && text.startsWith("-") && !text.contains("/")) {
+                if (!token.isExplicitlyQuoted && token.quoteMask.none { it } && text.startsWith("-") && !text.contains("/")) {
                     val optName = text.substringBefore('=')
                     if (valueOptions.contains(optName) && !text.contains('=')) {
                         skipNext = true

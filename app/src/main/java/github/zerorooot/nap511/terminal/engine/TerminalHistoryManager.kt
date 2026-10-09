@@ -56,7 +56,11 @@ class TerminalHistoryManager(
         val trimmed = rawInput.trim()
         if (trimmed.isEmpty()) return false
 
-        val stages = runCatching { Lexer.parsePipeline(trimmed) }.getOrNull() ?: return false
+        val parseResult = runCatching { Lexer.parsePipeline(trimmed) }.getOrNull() ?: return false
+        val stages = when (parseResult) {
+            is PipelineParseResult.Success -> parseResult.stages
+            is PipelineParseResult.SyntaxError -> return false
+        }
         if (stages.isEmpty()) return false
 
         // 校验管道中的所有命令阶段名称是否均已注册

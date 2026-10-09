@@ -2,6 +2,7 @@ package github.zerorooot.nap511.terminal.commands
 
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -237,5 +238,33 @@ class WcCommandTest {
         // wc 多选项组合接 wc
         val out50 = engine.executeStrings("echo 'a b' | wc -l -w | wc -w", ctx)
         assertNotNull(out50)
+    }
+
+    /**
+     * 3. POSIX 多文件操作数与 total 汇总测试
+     */
+    @Test
+    fun testWcMultiFilesTotal() = runBlocking {
+        val repo = TestMockFileRepository().apply {
+            mockDownloadStreams["101"] = "hello world\nline two"
+            mockDownloadStreams["102"] = "third line"
+        }
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = repo)
+
+        val f1 = createMockFile("f1.txt", "101", icoString = "txt")
+        val f2 = createMockFile("f2.txt", "102", icoString = "txt")
+        ctx.putMockFiles("0", listOf(f1, f2))
+
+        // 单文件：包含文件名，但不含 total
+        val outSingle = engine.executeStrings("wc -l f1.txt", ctx)
+        assertTrue(outSingle.any { it.contains("f1.txt") })
+        assertFalse(outSingle.any { it.contains("total") })
+
+        // 多文件：逐个输出并在末尾输出 total
+        val outMulti = engine.executeStrings("wc -l f1.txt f2.txt", ctx)
+        assertTrue(outMulti.any { it.contains("f1.txt") })
+        assertTrue(outMulti.any { it.contains("f2.txt") })
+        assertTrue(outMulti.any { it.contains("total") })
     }
 }

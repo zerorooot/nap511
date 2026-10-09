@@ -52,30 +52,31 @@ object CommandAstParser {
                 if (isWrapperCommand) {
                     val subTokens = if (i + 1 < tokens.size) tokens.subList(i + 1, tokens.size) else emptyList()
                     subcommandAst = SubcommandAst(text, subTokens)
-                    positional.add(PositionalArgumentNode(text, token.isQuoted, fromDelimiter = true))
+                    positional.add(PositionalArgumentNode(text, token.quoteMask, fromDelimiter = true))
                     for (st in subTokens) {
-                        positional.add(PositionalArgumentNode(st.text, st.isQuoted, fromDelimiter = true))
+                        positional.add(PositionalArgumentNode(st.text, st.quoteMask, fromDelimiter = true))
                     }
                     break
                 }
                 // 非包装命令直接作为普通位置参数
-                positional.add(PositionalArgumentNode(text, token.isQuoted, fromDelimiter = true))
+                positional.add(PositionalArgumentNode(text, token.quoteMask, fromDelimiter = true))
                 i++
                 continue
             }
 
-            if (token.isQuoted) {
+            val isTokenQuoted = token.isExplicitlyQuoted || token.quoteMask.any { it }
+            if (isTokenQuoted) {
                 // 被引号包裹的 Token 视为位置参数
                 if (isWrapperCommand) {
                     val subTokens = if (i + 1 < tokens.size) tokens.subList(i + 1, tokens.size) else emptyList()
                     subcommandAst = SubcommandAst(text, subTokens)
-                    positional.add(PositionalArgumentNode(text, true))
+                    positional.add(PositionalArgumentNode(text, token.quoteMask, fromDelimiter = false))
                     for (st in subTokens) {
-                        positional.add(PositionalArgumentNode(st.text, st.isQuoted, fromDelimiter = false))
+                        positional.add(PositionalArgumentNode(st.text, st.quoteMask, fromDelimiter = false))
                     }
                     break
                 }
-                positional.add(PositionalArgumentNode(text, true))
+                positional.add(PositionalArgumentNode(text, token.quoteMask, fromDelimiter = false))
                 i++
                 continue
             }
@@ -95,7 +96,7 @@ object CommandAstParser {
                         // 长选项且带值，如 --suffix apk
                         if (i + 1 < tokens.size) {
                             val next = tokens[++i]
-                            options[text] = OptionValueNode(text, next.text, next.isQuoted)
+                            options[text] = OptionValueNode(text, next.text, isQuoted = next.isExplicitlyQuoted)
                         } else {
                             flags.add(text)
                         }
@@ -116,7 +117,7 @@ object CommandAstParser {
                             // 分离形式：-n 10
                             if (i + 1 < tokens.size) {
                                 val next = tokens[++i]
-                                options[matchedValueOpt] = OptionValueNode(matchedValueOpt, next.text, next.isQuoted)
+                                options[matchedValueOpt] = OptionValueNode(matchedValueOpt, next.text, isQuoted = next.isExplicitlyQuoted)
                             }
                         } else {
                             // 紧贴形式：-n10
@@ -139,13 +140,13 @@ object CommandAstParser {
                         // POSIX Guideline 13：首个位置操作数即为目标子命令，后续所有 Token 无损封包为子命令参数
                         val subTokens = if (i + 1 < tokens.size) tokens.subList(i + 1, tokens.size) else emptyList()
                         subcommandAst = SubcommandAst(text, subTokens)
-                        positional.add(PositionalArgumentNode(text, false))
+                        positional.add(PositionalArgumentNode(text, token.quoteMask, fromDelimiter = false))
                         for (st in subTokens) {
-                            positional.add(PositionalArgumentNode(st.text, st.isQuoted, fromDelimiter = false))
+                            positional.add(PositionalArgumentNode(st.text, st.quoteMask, fromDelimiter = false))
                         }
                         break
                     } else {
-                        positional.add(PositionalArgumentNode(text, false))
+                        positional.add(PositionalArgumentNode(text, token.quoteMask, fromDelimiter = false))
                     }
                 }
             }

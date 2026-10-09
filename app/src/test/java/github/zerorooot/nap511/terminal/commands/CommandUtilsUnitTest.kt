@@ -4,7 +4,9 @@ import github.zerorooot.nap511.terminal.commands.stream.EchoCommand
 import github.zerorooot.nap511.terminal.commands.util.CommandFormatUtil
 import github.zerorooot.nap511.terminal.commands.util.SizeParser
 import github.zerorooot.nap511.terminal.engine.Lexer
+import github.zerorooot.nap511.terminal.engine.PipelineParseResult
 import github.zerorooot.nap511.terminal.engine.Token
+import github.zerorooot.nap511.terminal.engine.TokenizeResult
 import github.zerorooot.nap511.terminal.engine.ast.CommandAstParser
 import github.zerorooot.nap511.terminal.viewmodel.TerminalLineType
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
@@ -41,8 +43,8 @@ import java.util.Locale
  */
 class CommandUtilsUnitTest {
 
-    private fun tokensOf(vararg texts: String): List<Token> = texts.map { Token(it) }
-    private fun quotedToken(text: String): Token = Token(text, isQuoted = true)
+    private fun tokensOf(vararg texts: String): List<Token> = texts.map { Token.raw(it) }
+    private fun quotedToken(text: String): Token = Token.quoted(text)
 
     /**
      * 测试 CommandAstParser 参数与选项提取解析器
@@ -138,7 +140,7 @@ class CommandUtilsUnitTest {
                 quotedToken("-l"),
                 quotedToken("--output"),
                 quotedToken("-n"),
-                Token("target.txt", isQuoted = false)
+                Token.raw("target.txt")
             ),
             allowedValueOptions = setOf("-n")
         )
@@ -149,11 +151,11 @@ class CommandUtilsUnitTest {
         assertFalse(ast1.hasFlag("--output"))
         assertNull(ast1.getOption("-n"))
         assertEquals(listOf("-rf", "-l", "--output", "-n", "target.txt"), ast1.rawPositionalValues)
-        assertTrue(ast1.positionalArgs[0].isQuoted)
-        assertTrue(ast1.positionalArgs[1].isQuoted)
-        assertTrue(ast1.positionalArgs[2].isQuoted)
-        assertTrue(ast1.positionalArgs[3].isQuoted)
-        assertFalse(ast1.positionalArgs[4].isQuoted)
+        assertTrue(ast1.positionalArgs[0].quoteMask.all { it })
+        assertTrue(ast1.positionalArgs[1].quoteMask.all { it })
+        assertTrue(ast1.positionalArgs[2].quoteMask.all { it })
+        assertTrue(ast1.positionalArgs[3].quoteMask.all { it })
+        assertFalse(ast1.positionalArgs[4].quoteMask.any { it })
 
         // 2. 单独的 "-" 常在 Unix 命令行代表 stdin（如 cat -），必须作为位置参数而非 Flag
         val ast2 = CommandAstParser.parse("cat", tokensOf("-"))
@@ -299,50 +301,54 @@ class CommandUtilsUnitTest {
      */
     @Test
     fun testLexerTokenizeQuoteAndEscapeEdgeCases() {
-        // 1. 空参数解析："" 与 '' 应该产出 text="" 且 isQuoted=true 的 Token
-        val emptyTokens = Lexer.tokenizeWithQuoteInfo("echo \"\" ''")
+        // 1. 空参数解析："" 与 '' 应该产出 text="" 且 isExplicitlyQuoted=true 的 Token
+        val res1 = Lexer.tokenizeWithQuoteMask("echo \"\" ''")
+        assertTrue(res1 is TokenizeResult.Success)
+        val emptyTokens = (res1 as TokenizeResult.Success).tokens
         assertEquals(3, emptyTokens.size)
         assertEquals("echo", emptyTokens[0].text)
-        assertFalse(emptyTokens[0].isQuoted)
+        assertFalse(emptyTokens[0].isExplicitlyQuoted)
         assertEquals("", emptyTokens[1].text)
-        assertTrue(emptyTokens[1].isQuoted)
+        assertTrue(emptyTokens[1].isExplicitlyQuoted)
         assertEquals("", emptyTokens[2].text)
-        assertTrue(emptyTokens[2].isQuoted)
+        assertTrue(emptyTokens[2].isExplicitlyQuoted)
 
         // 2. 空格反斜杠转义：dir\ name
-        val escapedSpaceTokens = Lexer.tokenizeWithQuoteInfo("ls dir\\ name")
+        val res2 = Lexer.tokenizeWithQuoteMask("ls dir\\ name")
+        assertTrue(res2 is TokenizeResult.Success)
+        val escapedSpaceTokens = (res2 as TokenizeResult.Success).tokens
         assertEquals(2, escapedSpaceTokens.size)
         assertEquals("dir name", escapedSpaceTokens[1].text)
-        assertFalse(escapedSpaceTokens[1].isQuoted)
+        assertFalse(escapedSpaceTokens[1].isExplicitlyQuoted)
+        assertTrue(escapedSpaceTokens[1].quoteMask[3]) // 空格受转义保护
 
         // 3. 双引号内嵌单引号与单引号内嵌双引号
-        val nestedQuotes = Lexer.tokenizeWithQuoteInfo("echo \"it's fine\" 'say \"hello\"'")
+        val res3 = Lexer.tokenizeWithQuoteMask("echo \"it's fine\" 'say \"hello\"'")
+        assertTrue(res3 is TokenizeResult.Success)
+        val nestedQuotes = (res3 as TokenizeResult.Success).tokens
         assertEquals(3, nestedQuotes.size)
         assertEquals("it's fine", nestedQuotes[1].text)
-        assertTrue(nestedQuotes[1].isQuoted)
+        assertTrue(nestedQuotes[1].isExplicitlyQuoted)
         assertEquals("say \"hello\"", nestedQuotes[2].text)
-        assertTrue(nestedQuotes[2].isQuoted)
+        assertTrue(nestedQuotes[2].isExplicitlyQuoted)
 
         // 4. 转义双引号：\"
-        val escapedQuoteTokens = Lexer.tokenizeWithQuoteInfo("echo \"foo\\\"bar\"")
+        val res4 = Lexer.tokenizeWithQuoteMask("echo \"foo\\\"bar\"")
+        assertTrue(res4 is TokenizeResult.Success)
+        val escapedQuoteTokens = (res4 as TokenizeResult.Success).tokens
         assertEquals(2, escapedQuoteTokens.size)
         assertEquals("foo\"bar", escapedQuoteTokens[1].text)
-        assertTrue(escapedQuoteTokens[1].isQuoted)
+        assertTrue(escapedQuoteTokens[1].isExplicitlyQuoted)
 
-        // 5. 未闭合引号容错：到字符串末尾自动闭合
-        val unclosedTokens = Lexer.tokenizeWithQuoteInfo("echo \"unclosed text")
-        assertEquals(2, unclosedTokens.size)
-        assertEquals("unclosed text", unclosedTokens[1].text)
-        assertTrue(unclosedTokens[1].isQuoted)
+        // 5. 未闭合引号：必须严格报错拦截语法错误
+        val unclosedResult = Lexer.tokenizeWithQuoteMask("echo \"unclosed text")
+        assertTrue(unclosedResult is TokenizeResult.Error)
+        assertEquals("\"", (unclosedResult as TokenizeResult.Error).token)
 
-        // 6. 末尾未消费反斜杠保留
-        val trailingSlash = Lexer.tokenizeWithQuoteInfo("cmd\\")
-        assertEquals(1, trailingSlash.size)
-        assertEquals("cmd\\", trailingSlash[0].text)
-
-        // 7. tokenize 纯文本转换验证
-        val pureStrings = Lexer.tokenize("git commit -m 'initial refactor'")
-        assertEquals(listOf("git", "commit", "-m", "initial refactor"), pureStrings)
+        // 6. 末尾未消费反斜杠：必须严格报错拦截语法错误
+        val trailingSlashResult = Lexer.tokenizeWithQuoteMask("cmd\\")
+        assertTrue(trailingSlashResult is TokenizeResult.Error)
+        assertEquals("\\", (trailingSlashResult as TokenizeResult.Error).token)
     }
 
     /**
@@ -351,37 +357,43 @@ class CommandUtilsUnitTest {
     @Test
     fun testLexerPipelineSplittingEdgeCases() {
         // 1. 引号内部包含管道符：绝不能误切分管道阶段
-        val stages1 = Lexer.parsePipeline("echo \"hello | world\" | grep hello")
+        val res1 = Lexer.parsePipeline("echo \"hello | world\" | grep hello")
+        assertTrue(res1 is PipelineParseResult.Success)
+        val stages1 = (res1 as PipelineParseResult.Success).stages
         assertEquals(2, stages1.size)
         assertEquals("echo", stages1[0].command)
         assertEquals(listOf("hello | world"), stages1[0].args)
-        assertEquals(listOf(Token("hello | world", isQuoted = true)), stages1[0].tokens)
+        assertEquals(listOf(Token.quoted("hello | world")), stages1[0].tokens)
         assertEquals("grep", stages1[1].command)
         assertEquals(listOf("hello"), stages1[1].args)
 
         // 2. 转义管道符：\| 视为普通参数
-        val stages2 = Lexer.parsePipeline("echo a \\| b")
+        val res2 = Lexer.parsePipeline("echo a \\| b")
+        assertTrue(res2 is PipelineParseResult.Success)
+        val stages2 = (res2 as PipelineParseResult.Success).stages
         assertEquals(1, stages2.size)
         assertEquals("echo", stages2[0].command)
         assertEquals(listOf("a", "|", "b"), stages2[0].args)
 
         // 3. 多阶段管道串联：4 级流水线
-        val stages3 = Lexer.parsePipeline("cat file.txt | grep error | sort -r | head -n 5")
+        val res3 = Lexer.parsePipeline("cat file.txt | grep error | sort -r | head -n 5")
+        assertTrue(res3 is PipelineParseResult.Success)
+        val stages3 = (res3 as PipelineParseResult.Success).stages
         assertEquals(4, stages3.size)
         assertEquals("cat", stages3[0].command)
         assertEquals("grep", stages3[1].command)
         assertEquals("sort", stages3[2].command)
         assertEquals("head", stages3[3].command)
 
-        // 4. 冗余管道符与空白行容错过滤
-        val stages4 = Lexer.parsePipeline("  |  ls -l  |   | grep txt |  ")
-        assertEquals(2, stages4.size)
-        assertEquals("ls", stages4[0].command)
-        assertEquals("grep", stages4[1].command)
+        // 4. POSIX 语法错误防御：前置/悬挂/连续空管道
+        val res4 = Lexer.parsePipeline("  |  ls -l  |   | grep txt |  ")
+        assertTrue(res4 is PipelineParseResult.SyntaxError)
 
         // 5. 空串或纯空白输入
-        assertTrue(Lexer.parsePipeline("").isEmpty())
-        assertTrue(Lexer.parsePipeline("   \t  \n  ").isEmpty())
+        val resEmpty = Lexer.parsePipeline("")
+        assertTrue(resEmpty is PipelineParseResult.Success && resEmpty.stages.isEmpty())
+        val resBlank = Lexer.parsePipeline("   \t  \n  ")
+        assertTrue(resBlank is PipelineParseResult.Success && resBlank.stages.isEmpty())
     }
 
     /**

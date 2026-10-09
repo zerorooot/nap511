@@ -2,6 +2,8 @@ package github.zerorooot.nap511.terminal.commands.file
 
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.terminal.commands.util.CommandFormatUtil
+import github.zerorooot.nap511.terminal.commands.util.TableAlignment
+import github.zerorooot.nap511.terminal.commands.util.TableFormatter
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
@@ -290,13 +292,10 @@ class LsCommand : EntityListingCommand<LsEntry>() {
         val sizeStr = if (file.isFolder) "-" else (file.size.toLongOrNull() ?: 0L).formatFileSize()
         val timeStr = CommandFormatUtil.formatTimestamp(file.modifiedTime)
         val nameStr = formatDisplayName(entry)
-        return String.format(
-            Locale.getDefault(),
-            "%-11s %10s %16s %s",
-            perm,
-            sizeStr,
-            timeStr,
-            nameStr
-        )
+
+        val paddedPerm = TableFormatter.padCell(perm, 11, TableAlignment.LEFT)
+        val paddedSize = TableFormatter.padCell(sizeStr, 10, TableAlignment.RIGHT)
+        val paddedTime = TableFormatter.padCell(timeStr, 16, TableAlignment.LEFT)
+        return "$paddedPerm $paddedSize $paddedTime $nameStr"
     }
 }

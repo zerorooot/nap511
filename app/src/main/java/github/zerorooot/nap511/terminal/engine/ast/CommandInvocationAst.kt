@@ -26,9 +26,41 @@ data class OptionValueNode(
  */
 data class PositionalArgumentNode(
     val text: String,
-    val isQuoted: Boolean = false,
+    val quoteMask: BooleanArray = BooleanArray(text.length) { false },
     val fromDelimiter: Boolean = false
-)
+) {
+    /** 是否包含未受引号或转义保护的真实通配符 ('*' 或 '?') */
+    val hasUnquotedWildcards: Boolean
+        get() = text.indices.any { idx ->
+            val c = text[idx]
+            (c == '*' || c == '?') && !quoteMask.getOrElse(idx) { false }
+        }
+
+    companion object {
+        /** 构造未受引号保护的常规原始位置参数节点 */
+        fun raw(text: String, fromDelimiter: Boolean = false): PositionalArgumentNode =
+            PositionalArgumentNode(text, BooleanArray(text.length) { false }, fromDelimiter)
+
+        /** 构造显式受引号保护的位置参数节点 */
+        fun quoted(text: String, fromDelimiter: Boolean = false): PositionalArgumentNode =
+            PositionalArgumentNode(text, BooleanArray(text.length) { true }, fromDelimiter)
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is PositionalArgumentNode) return false
+        return text == other.text &&
+                quoteMask.contentEquals(other.quoteMask) &&
+                fromDelimiter == other.fromDelimiter
+    }
+
+    override fun hashCode(): Int {
+        var result = text.hashCode()
+        result = 31 * result + quoteMask.contentHashCode()
+        result = 31 * result + fromDelimiter.hashCode()
+        return result
+    }
+}
 
 /**
  * 包装命令（Wrapper/Meta Command）持有的嵌套子命令语法节点

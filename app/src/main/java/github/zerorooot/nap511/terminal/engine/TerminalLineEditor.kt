@@ -197,12 +197,16 @@ object TerminalLineEditor {
 
     /**
      * 从上一条历史命令中提取最后一个参数 (Alt+.)
-     * 复用现有的 Lexer.tokenize 进行参数解析
+     * 基于 Lexer.tokenizeWithQuoteMask 进行精确参数解析
      */
     fun extractLastArgument(lastCommand: String?): String? {
         if (lastCommand.isNullOrBlank()) return null
-        val tokens = Lexer.tokenize(lastCommand)
-        return tokens.lastOrNull()
+        val tokenResult = Lexer.tokenizeWithQuoteMask(lastCommand)
+        return if (tokenResult is TokenizeResult.Success) {
+            tokenResult.tokens.lastOrNull()?.text
+        } else {
+            null
+        }
     }
 
     /**

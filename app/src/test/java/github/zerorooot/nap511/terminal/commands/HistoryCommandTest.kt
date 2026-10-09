@@ -83,11 +83,11 @@ class HistoryCommandTest {
         val outPostClear = engine.executeStrings("history", ctx)
         assertTrue(outPostClear.isEmpty())
 
-        // 未知选项容错处理
+        // 未知选项测试（安全处理，不产生崩溃）
         val out09 = engine.executeStrings("history -x", ctx)
         assertTrue(out09.size <= 5)
 
-        // 多余位置参数容错处理
+        // 多位置参数测试（按首个有效数字限制条数）
         val out10 = engine.executeStrings("history 5 6", ctx)
         assertTrue(out10.size <= 5)
     }

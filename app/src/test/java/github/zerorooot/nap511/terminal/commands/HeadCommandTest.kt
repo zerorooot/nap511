@@ -90,9 +90,10 @@ class HeadCommandTest {
         val out17 = engine.executeStrings("head -x", ctx)
         assertTrue(out17.isEmpty() || out17.any { it.contains("head") })
 
-        // 多余位置参数容错处理
+        // 多位置参数作为文件操作数解析（文件不存在时隔离报错）
         val out18 = engine.executeStrings("head -n 1 a b", ctx)
-        assertTrue(out18.size <= 1)
+        assertEquals(2, out18.size)
+        assertTrue(out18.all { it.contains("No such file or directory") })
     }
 
     /**
@@ -130,5 +131,41 @@ class HeadCommandTest {
         // 多级管道 find | grep | head | wc -l
         val out25 = engine.executeStrings("find | grep txt | head -n 2 | wc -l", ctx)
         assertEquals(1, out25.size)
+    }
+
+    /**
+     * 3. POSIX 多文件操作数与标头测试
+     */
+    @Test
+    fun testHeadMultiFilesHeaders() = runBlocking {
+        val repo = TestMockFileRepository().apply {
+            mockDownloadStreams["head_101"] = "a\nb\nc"
+            mockDownloadStreams["head_102"] = "x\ny\nz"
+        }
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = repo)
+
+        val f1 = createMockFile("f1.txt", "head_101", icoString = "txt")
+        val f2 = createMockFile("f2.txt", "head_102", icoString = "txt")
+        ctx.putMockFiles("0", listOf(f1, f2))
+
+        // 单文件：无 ==> 标头
+        val outSingle = engine.executeStrings("head -n 2 f1.txt", ctx)
+        assertEquals(listOf("a", "b"), outSingle)
+
+        // 多文件：必须包含 ==> f1.txt <== 与 ==> f2.txt <== 标头，且块间有空行隔离
+        val outMulti = engine.executeStrings("head -n 2 f1.txt f2.txt", ctx)
+        assertEquals(
+            listOf(
+                "==> f1.txt <==",
+                "a",
+                "b",
+                "",
+                "==> f2.txt <==",
+                "x",
+                "y"
+            ),
+            outMulti
+        )
     }
 }

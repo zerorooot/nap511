@@ -110,6 +110,11 @@ object TextFileHelper {
     /** 全局共享的小文本内容内存缓存（按 fileId/pickCode 索引），避免同一文件在终端与界面间重复发起网络 I/O */
     private val memoryTextCache = java.util.concurrent.ConcurrentHashMap<String, ByteArray>()
 
+    /** 清空内存文本缓存（供单元测试重置及清理时调用） */
+    fun clearMemoryCache() {
+        memoryTextCache.clear()
+    }
+
     suspend fun fetchBytes(
         repository: FileRepository,
         fileBean: FileBean,

@@ -1,6 +1,9 @@
 package github.zerorooot.nap511.terminal.commands.cloud
 
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.terminal.commands.util.TableAlignment
+import github.zerorooot.nap511.terminal.commands.util.TableFormatter
+import github.zerorooot.nap511.terminal.commands.util.TerminalExceptionHandler
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
 import github.zerorooot.nap511.terminal.engine.ParsedContext
@@ -125,7 +128,7 @@ class TrashCommand : ActionDispatchCommand<TrashAction>() {
                 }
                 collector.emitSystem(successMessage)
             } else {
-                collector.emitError("trash: 还原失败: ${res.error.ifEmpty { res.message }}")
+                collector.emitError("trash: 还原失败: ${TerminalExceptionHandler.extractErrorMessage(res, "操作失败")}")
             }
         } catch (e: Exception) {
             collector.emitError("trash: 还原异常: ${e.message}")
@@ -146,7 +149,7 @@ class TrashCommand : ActionDispatchCommand<TrashAction>() {
             if (res.state) {
                 collector.emitSystem("trash: 回收站已成功清空")
             } else {
-                collector.emitError("trash: 清空失败: ${res.error}")
+                collector.emitError("trash: 清空失败: ${TerminalExceptionHandler.extractErrorMessage(res, "操作失败")}")
             }
         } catch (e: Exception) {
             collector.emitError("trash: 清空异常: ${e.message}")
@@ -164,15 +167,8 @@ class TrashCommand : ActionDispatchCommand<TrashAction>() {
             } else {
                 collector.emitSystem("回收站项目列表（共 ${list.recycleBeanList.size} 项）：")
                 for (item in list.recycleBeanList) {
-                    collector.emitText(
-                        String.format(
-                            Locale.getDefault(),
-                            "rid: %-15s %s (%s)",
-                            item.id,
-                            item.fileName,
-                            item.fileSize
-                        )
-                    )
+                    val paddedRid = TableFormatter.padCell("rid: ${item.id}", 20, TableAlignment.LEFT)
+                    collector.emitText("$paddedRid ${item.fileName} (${item.fileSize})")
                 }
             }
         } catch (e: Exception) {

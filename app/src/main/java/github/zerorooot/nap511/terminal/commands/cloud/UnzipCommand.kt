@@ -2,12 +2,13 @@ package github.zerorooot.nap511.terminal.commands.cloud
 
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.repository.SettingsRepository
+import github.zerorooot.nap511.terminal.commands.util.TableAlignment
+import github.zerorooot.nap511.terminal.commands.util.TableFormatter
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
-import github.zerorooot.nap511.terminal.engine.GlobMatcher
 import github.zerorooot.nap511.terminal.engine.StreamTargetCollector
-import github.zerorooot.nap511.terminal.engine.TerminalCommand
+import github.zerorooot.nap511.terminal.engine.archetype.ActionDispatchCommand
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.engine.completion.CommandCompleter
 import github.zerorooot.nap511.terminal.engine.completion.StandardCompleter
@@ -18,18 +19,32 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.worker.UnzipQueueManager
 import github.zerorooot.nap511.worker.UnzipTaskItem
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import java.util.Locale
+import kotlinx.coroutines.flow.FlowCollector
+
+/**
+ * 115 云端解压动作密封接口
+ */
+sealed interface UnzipAction {
+    /** 查看压缩包目录清单 (-l) */
+    data class ListEntries(val filePaths: List<String>) : UnzipAction
+
+    /** 提交后台异步解压任务 */
+    data class SubmitExtract(
+        val filePaths: List<String>,
+        val password: String
+    ) : UnzipAction
+}
 
 /**
  * 115 云端解压命令（unzip）
  *
- * 支持双模式：
- * 1. 结构预览模式（-l）：通过 115 网盘接口直接预览压缩包内文件结构与目录清单。
- * 2. 异步解压模式：支持多文件、通配符批量匹配，并可通过 -p 传递解压密码，任务统一提交至后台 WorkManager (UnzipAllFileWorker)。
- * 支持管道输入（如 `find -name '*.zip' -print0 | unzip`），自动批量收集并统一提交云端解压。
+ * 继承 [ActionDispatchCommand]，彻底切分预览与排队两类动作：
+ * 1. 结构预览模式（-l）：通过 115 网盘接口直接预览压缩包内文件结构与目录清单；
+ * 2. 异步解压模式：支持多文件解压，并可通过 -p 传递解压密码，任务统一提交至后台 WorkManager；
+ * 3. 彻底废除内部手写通配符搜索，参数交由管道引擎统一多级展开；
+ * 4. 支持管道输入（如 `find -name '*.zip' -print0 | unzip`），自动批量收集并处理。
  */
-class UnzipCommand : TerminalCommand {
+class UnzipCommand : ActionDispatchCommand<UnzipAction>() {
 
     override val name: String = "unzip"
 
@@ -46,73 +61,56 @@ class UnzipCommand : TerminalCommand {
 
     override val completer: CommandCompleter = StandardCompleter.ARCHIVE_FILES
 
-    override suspend fun execute(
-        ctx: TerminalContext,
-        ast: CommandInvocationAst,
-        stdin: Flow<String>
-    ): Flow<TerminalOutput> = flow {
+    override fun compileAction(ast: CommandInvocationAst): Result<UnzipAction> {
         val isList = ast.hasFlag("-l")
         val password = ast.getOption("-p") ?: ""
-        val fileArgs = ast.rawPositionalValues.toMutableList()
-        // 管道支持：通过 StreamTargetCollector 摄取来自 stdin 的目标，自动兼容 \0 (NUL) 与 \n 定界
-        val stdinFiles = StreamTargetCollector.collectFromStdin(stdin)
-        fileArgs.addAll(stdinFiles)
+        val filePaths = ast.rawPositionalValues
 
-        if (fileArgs.isEmpty()) {
-            emitError("unzip: missing file operand")
-            return@flow
+        val action = if (isList) {
+            UnzipAction.ListEntries(filePaths)
+        } else {
+            UnzipAction.SubmitExtract(filePaths, password)
+        }
+        return Result.success(action)
+    }
+
+    override suspend fun dispatch(
+        ctx: TerminalContext,
+        action: UnzipAction,
+        stdin: Flow<String>,
+        collector: FlowCollector<TerminalOutput>
+    ) {
+        val targetPaths = when (action) {
+            is UnzipAction.ListEntries -> action.filePaths.toMutableList()
+            is UnzipAction.SubmitExtract -> action.filePaths.toMutableList()
         }
 
-        // 收集匹配的所有 FileBean
+        // 管道支持：通过 StreamTargetCollector 摄取来自 stdin 的目标
+        val stdinFiles = StreamTargetCollector.collectFromStdin(stdin)
+        targetPaths.addAll(stdinFiles)
+
+        if (targetPaths.isEmpty()) {
+            collector.emitError("unzip: missing file operand")
+            return
+        }
+
+        // 解析并收集所有 FileBean
         val fileBeansList = mutableListOf<FileBean>()
         var targetCid = ctx.currentCid
 
-        for (fileArg in fileArgs) {
-            if (GlobMatcher.hasGlobWildcards(fileArg)) {
-                // 包含通配符，在当前目录（或指定父目录）按 GlobMatcher 匹配展开
-                val parsed = github.zerorooot.nap511.terminal.context.TerminalPath.parse(fileArg)
-                val dirPath = parsed.parentPathString
-                val pattern = parsed.targetName
-
-                val searchCid = if (dirPath.isEmpty()) {
-                    ctx.currentCid
-                } else {
-                    ctx.resolvePath(dirPath)?.first
+        for (path in targetPaths) {
+            when (val resolved = ctx.resolveTarget(path)) {
+                is ResolvedTarget.File -> {
+                    targetCid = resolved.parentCid
+                    fileBeansList.add(resolved.file)
                 }
 
-                if (searchCid == null) {
-                    emitError("unzip: '$dirPath': No such directory")
-                    continue
+                is ResolvedTarget.Directory -> {
+                    collector.emitError("unzip: '$path' is a directory, not an archive")
                 }
 
-                targetCid = searchCid
-                val dirFiles = ctx.listDirectory(searchCid)
-                val matched = dirFiles.filter {
-                    !it.isFolder && GlobMatcher.matches(
-                        pattern,
-                        it.name
-                    )
-                }
-                if (matched.isEmpty()) {
-                    emitError("unzip: no match found for '$fileArg'")
-                } else {
-                    fileBeansList.addAll(matched)
-                }
-            } else {
-                // 非通配符直接解析目标
-                when (val resolved = ctx.resolveTarget(fileArg)) {
-                    is ResolvedTarget.File -> {
-                        targetCid = resolved.parentCid
-                        fileBeansList.add(resolved.file)
-                    }
-
-                    is ResolvedTarget.Directory -> {
-                        emitError("unzip: '$fileArg' is a directory, not an archive")
-                    }
-
-                    null -> {
-                        emitError("unzip: cannot find '$fileArg': No such file")
-                    }
+                null -> {
+                    collector.emitError("unzip: cannot find '$path': No such file")
                 }
             }
         }
@@ -123,82 +121,73 @@ class UnzipCommand : TerminalCommand {
         }
 
         if (distinctFileBeans.isEmpty()) {
-            emitError("unzip: 未找到可解压的文件")
-            return@flow
+            collector.emitError("unzip: 未找到可解压的文件")
+            return
         }
 
-        if (isList) {
-            // 预览压缩包内文件结构列表
-            for (file in distinctFileBeans) {
-                val pickCode = file.pickCode
-                if (pickCode.isEmpty()) {
-                    emitError("unzip: 文件 '${file.name}' 缺失 pickCode，无法预览")
-                    continue
-                }
-                try {
-                    val zipBeanList = ctx.fileRepository.getZipListFile(
-                        pickCode = pickCode
-                    )
-                    emitText("Archive: ${file.name}")
-                    if (zipBeanList.list.isNotEmpty()) {
-                        emitText(
-                            String.format(
-                                Locale.getDefault(),
-                                "%-12s %-16s %s",
-                                "Length",
-                                "Date",
-                                "Name"
-                            )
-                        )
-                        emitText("--------------------------------------------------")
-                        for (item in zipBeanList.list) {
-                            emitText(
-                                String.format(
-                                    Locale.getDefault(),
-                                    "%-12s %-16s %s",
-                                    item.sizeString.trim(),
-                                    item.timeString,
-                                    item.fileName
-                                )
-                            )
-                        }
-                    } else {
-                        emitText("unzip: 压缩包内无可显示文件或暂未完成分析")
+        when (action) {
+            is UnzipAction.ListEntries -> {
+                for (file in distinctFileBeans) {
+                    val pickCode = file.pickCode
+                    if (pickCode.isEmpty()) {
+                        collector.emitError("unzip: 文件 '${file.name}' 缺失 pickCode，无法预览")
+                        continue
                     }
-                } catch (e: Exception) {
-                    emitError("unzip: 预览 '${file.name}' 失败: ${e.message}")
+                    try {
+                        val zipBeanList = ctx.fileRepository.getZipListFile(pickCode = pickCode)
+                        collector.emitText("Archive: ${file.name}")
+                        if (zipBeanList.list.isNotEmpty()) {
+                            val table = TableFormatter.Builder()
+                                .addColumn("Length", TableAlignment.LEFT, minWidth = 12)
+                                .addColumn("Date", TableAlignment.LEFT, minWidth = 16)
+                                .addColumn("Name", TableAlignment.LEFT, minWidth = 4)
+                            for (item in zipBeanList.list) {
+                                table.addRow(item.sizeString.trim(), item.timeString, item.fileName)
+                            }
+                            collector.emitText("--------------------------------------------------")
+                            for (line in table.build()) {
+                                collector.emitText(line)
+                            }
+                        } else {
+                            collector.emitText("unzip: 压缩包内无可显示文件或暂未完成分析")
+                        }
+                    } catch (e: Exception) {
+                        collector.emitError("unzip: 预览 '${file.name}' 失败: ${e.message}")
+                    }
                 }
             }
-        } else {
-            // 提交云端解压任务至 UnzipQueueManager 统一调度
-            try {
-                emitText("正在提交 ${distinctFileBeans.size} 个解压任务至后台...")
 
-                // 查找失败移动目录 CID
-                val moveFailFile =
-                    SettingsRepository.getDataSuspend(ConfigKeyUtil.MOVE_FAIL_FILE, "")
-                val errorCid = if (moveFailFile.isNotEmpty()) {
-                    val currentFiles = ctx.listDirectory(targetCid)
-                    currentFiles.firstOrNull { it.isFolder && it.name == moveFailFile }?.categoryId
-                } else null
+            is UnzipAction.SubmitExtract -> {
+                try {
+                    collector.emitText("正在提交 ${distinctFileBeans.size} 个解压任务至后台...")
 
-                // 1. 构造独立任务项
-                val taskItems = distinctFileBeans.map { file ->
-                    UnzipTaskItem(
-                        fileBean = file,
-                        targetCid = targetCid,
-                        password = password.takeIf { it.isNotEmpty() },
-                        errorCid = errorCid
+                    // 查找失败移动目录 CID
+                    val moveFailFile = SettingsRepository.getDataSuspend(ConfigKeyUtil.MOVE_FAIL_FILE, "")
+                    val errorCid = if (moveFailFile.isNotEmpty()) {
+                        val currentFiles = ctx.listDirectory(targetCid)
+                        currentFiles.firstOrNull { it.isFolder && it.name == moveFailFile }?.categoryId
+                    } else null
+
+                    // 1. 构造独立任务项
+                    val taskItems = distinctFileBeans.map { file ->
+                        UnzipTaskItem(
+                            fileBean = file,
+                            targetCid = targetCid,
+                            password = action.password.takeIf { it.isNotEmpty() },
+                            errorCid = errorCid
+                        )
+                    }
+
+                    // 2. 追加至全局解压队列并触发 Worker (KEEP 策略)
+                    UnzipQueueManager.enqueueAndStartWorker(taskItems)
+
+                    ctx.invalidateCache(targetCid)
+                    collector.emitText(
+                        "unzip: 已成功提交 ${distinctFileBeans.size} 个解压任务到后台 UnzipAllFileWorker 处理 (${distinctFileBeans.joinToString { it.name }})"
                     )
+                } catch (e: Exception) {
+                    collector.emitError("unzip: 提交解压任务失败: ${e.message}")
                 }
-
-                // 2. 追加至全局解压队列并触发 Worker (KEEP 策略)
-                UnzipQueueManager.enqueueAndStartWorker(taskItems)
-
-                ctx.invalidateCache(targetCid)
-                emitText("unzip: 已成功提交 ${distinctFileBeans.size} 个解压任务到后台 UnzipAllFileWorker 处理 (${distinctFileBeans.joinToString { it.name }})")
-            } catch (e: Exception) {
-                emitError("unzip: 提交解压任务失败: ${e.message}")
             }
         }
     }

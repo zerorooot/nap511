@@ -237,4 +237,29 @@ class GrepCommandTest {
         val out50 = engine.executeStrings("echo 测试 | grep 测 | wc -l", ctx)
         assertEquals(listOf("1"), out50)
     }
+
+    /**
+     * 3. POSIX 多文件操作数与前缀测试
+     */
+    @Test
+    fun testGrepMultiFilesPrefix() = runBlocking {
+        val repo = TestMockFileRepository().apply {
+            mockDownloadStreams["grep_101"] = "apple\nbanana"
+            mockDownloadStreams["grep_102"] = "pineapple\norange"
+        }
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = repo)
+
+        val f1 = createMockFile("f1.txt", "grep_101", icoString = "txt")
+        val f2 = createMockFile("f2.txt", "grep_102", icoString = "txt")
+        ctx.putMockFiles("0", listOf(f1, f2))
+
+        // 单文件：不输出文件名作为前缀
+        val outSingle = engine.executeStrings("grep apple f1.txt", ctx)
+        assertEquals(listOf("apple"), outSingle)
+
+        // 多文件：必须按 POSIX 规范输出 <文件名>:<内容> 前缀
+        val outMulti = engine.executeStrings("grep apple f1.txt f2.txt", ctx)
+        assertEquals(listOf("f1.txt:apple", "f2.txt:pineapple"), outMulti)
+    }
 }

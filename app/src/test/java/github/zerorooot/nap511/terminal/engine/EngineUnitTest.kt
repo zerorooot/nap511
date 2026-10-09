@@ -18,50 +18,63 @@ class EngineUnitTest {
     @Test
     fun testLexerTokenize() {
         val input = """ls -l "My Documents" 'Another Folder' file\ with\ space.txt"""
-        val tokens = Lexer.tokenize(input)
+        val tokenizeResult = Lexer.tokenizeWithQuoteMask(input)
+        assertTrue(tokenizeResult is TokenizeResult.Success)
+        val tokens = (tokenizeResult as TokenizeResult.Success).tokens
         assertEquals(5, tokens.size)
-        assertEquals("ls", tokens[0])
-        assertEquals("-l", tokens[1])
-        assertEquals("My Documents", tokens[2])
-        assertEquals("Another Folder", tokens[3])
-        assertEquals("file with space.txt", tokens[4])
+        assertEquals("ls", tokens[0].text)
+        assertEquals("-l", tokens[1].text)
+        assertEquals("My Documents", tokens[2].text)
+        assertEquals("Another Folder", tokens[3].text)
+        assertEquals("file with space.txt", tokens[4].text)
     }
 
     @Test
     fun testLexerQuoteState() {
         val input = """find -name '*.txt' *.mp4 "quoted_arg""""
-        val tokenNodes = Lexer.tokenizeWithQuoteInfo(input)
+        val tokenizeResult = Lexer.tokenizeWithQuoteMask(input)
+        assertTrue(tokenizeResult is TokenizeResult.Success)
+        val tokenNodes = (tokenizeResult as TokenizeResult.Success).tokens
         assertEquals(5, tokenNodes.size)
         assertEquals("find", tokenNodes[0].text)
-        assertFalse(tokenNodes[0].isQuoted)
+        assertFalse(tokenNodes[0].isExplicitlyQuoted)
+        assertFalse(tokenNodes[0].quoteMask.any { it })
 
         assertEquals("-name", tokenNodes[1].text)
-        assertFalse(tokenNodes[1].isQuoted)
+        assertFalse(tokenNodes[1].isExplicitlyQuoted)
+        assertFalse(tokenNodes[1].quoteMask.any { it })
 
         assertEquals("*.txt", tokenNodes[2].text)
-        assertTrue("带单引号的通配符应当被标记为 isQuoted = true", tokenNodes[2].isQuoted)
+        assertTrue("带单引号的通配符应当被标记为 isExplicitlyQuoted = true", tokenNodes[2].isExplicitlyQuoted)
+        assertTrue("带单引号的通配符应当具有全 true 的 quoteMask", tokenNodes[2].quoteMask.all { it })
 
         assertEquals("*.mp4", tokenNodes[3].text)
-        assertFalse("未带引号的通配符应当被标记为 isQuoted = false", tokenNodes[3].isQuoted)
+        assertFalse("未带引号的通配符应当被标记为 isExplicitlyQuoted = false", tokenNodes[3].isExplicitlyQuoted)
+        assertFalse("未带引号的通配符 quoteMask 应当全为 false", tokenNodes[3].quoteMask.any { it })
 
         assertEquals("quoted_arg", tokenNodes[4].text)
-        assertTrue("带双引号的参数应当被标记为 isQuoted = true", tokenNodes[4].isQuoted)
+        assertTrue("带双引号的参数应当被标记为 isExplicitlyQuoted = true", tokenNodes[4].isExplicitlyQuoted)
+        assertTrue("带双引号的参数应当具有全 true 的 quoteMask", tokenNodes[4].quoteMask.all { it })
 
         // 测试空双引号/单引号参数（'' 与 ""）不丢失
-        val emptyTokens = Lexer.tokenizeWithQuoteInfo("find -name '' \"\"")
+        val emptyResult = Lexer.tokenizeWithQuoteMask("find -name '' \"\"")
+        assertTrue(emptyResult is TokenizeResult.Success)
+        val emptyTokens = (emptyResult as TokenizeResult.Success).tokens
         assertEquals(4, emptyTokens.size)
         assertEquals("find", emptyTokens[0].text)
         assertEquals("-name", emptyTokens[1].text)
         assertEquals("", emptyTokens[2].text)
-        assertTrue(emptyTokens[2].isQuoted)
+        assertTrue(emptyTokens[2].isExplicitlyQuoted)
         assertEquals("", emptyTokens[3].text)
-        assertTrue(emptyTokens[3].isQuoted)
+        assertTrue(emptyTokens[3].isExplicitlyQuoted)
     }
 
     @Test
     fun testLexerPipeline() {
         val input = """ls -l "Folder | Name" | grep "mp4" | wc -l"""
-        val stages = Lexer.parsePipeline(input)
+        val result = Lexer.parsePipeline(input)
+        assertTrue(result is PipelineParseResult.Success)
+        val stages = (result as PipelineParseResult.Success).stages
         assertEquals(3, stages.size)
         assertEquals("ls", stages[0].command)
         assertEquals(listOf("-l", "Folder | Name"), stages[0].args)

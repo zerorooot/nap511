@@ -1,18 +1,23 @@
 package github.zerorooot.nap511.terminal.commands.stream
 
 import github.zerorooot.nap511.terminal.engine.CommandFlag
+import github.zerorooot.nap511.terminal.engine.StreamSourceItem
 import github.zerorooot.nap511.terminal.engine.archetype.StreamPipelineCommand
 import github.zerorooot.nap511.terminal.engine.archetype.StreamPlan
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
-import github.zerorooot.nap511.terminal.viewmodel.emitText
-import kotlinx.coroutines.flow.toList
 import github.zerorooot.nap511.terminal.engine.completion.CommandCompleter
 import github.zerorooot.nap511.terminal.engine.completion.StandardCompleter
+import github.zerorooot.nap511.terminal.viewmodel.emitError
+import github.zerorooot.nap511.terminal.viewmodel.emitText
+import kotlinx.coroutines.flow.toList
+
 /**
  * 文本行排序命令（sort）
  *
- * 继承 [StreamPipelineCommand]，在编译期根据 `-n` 与 `-r` 一次性构建静态不可变的比较器 Comparator，
- * 执行期无条件复用已编译好的比较器，完全消除比较过程中的分支判断与动态标志判定。
+ * 继承 [StreamPipelineCommand]，遵循 POSIX.1-2017 规范：
+ * 1. 支持指定操作数 `sort [-r] [-n] [-u] [files...]`；
+ * 2. 汇聚所有输入数据源（stdin 或多文件）至同一个全局列表进行统一排序；
+ * 3. 编译期构建比较器（数值 `-n` / 逆序 `-r` / 去重 `-u`）。
  */
 class SortCommand : StreamPipelineCommand() {
 
@@ -20,7 +25,7 @@ class SortCommand : StreamPipelineCommand() {
 
     override val description: String = "对输入行进行文本排序"
 
-    override val usage: String = "sort [-r] [-n] [-u]"
+    override val usage: String = "sort [-r] [-n] [-u] [file...]"
 
     override val flags: List<CommandFlag> = listOf(
         CommandFlag("-r", "逆序排序"),
@@ -48,9 +53,22 @@ class SortCommand : StreamPipelineCommand() {
 
         val finalComparator = if (reverse) baseComparator.reversed() else baseComparator
 
-        val plan = StreamPlan { stdin, collector ->
-            val lines = stdin.toList()
-            val sorted = lines.sortedWith(finalComparator)
+        val plan = StreamPlan { sources, collector ->
+            val allLines = mutableListOf<String>()
+
+            for (source in sources) {
+                when (source) {
+                    is StreamSourceItem.Error -> {
+                        collector.emitError("sort: ${source.message}")
+                    }
+
+                    is StreamSourceItem.DataStream -> {
+                        allLines.addAll(source.lines.toList())
+                    }
+                }
+            }
+
+            val sorted = allLines.sortedWith(finalComparator)
             val finalLines = if (unique) sorted.distinct() else sorted
             finalLines.forEach { collector.emitText(it) }
         }

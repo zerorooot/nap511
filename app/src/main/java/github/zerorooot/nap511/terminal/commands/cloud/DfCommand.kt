@@ -2,6 +2,8 @@ package github.zerorooot.nap511.terminal.commands.cloud
 
 import com.google.gson.Gson
 import github.zerorooot.nap511.bean.RemainingSpaceBean
+import github.zerorooot.nap511.terminal.commands.util.TableAlignment
+import github.zerorooot.nap511.terminal.commands.util.TableFormatter
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
@@ -64,30 +66,18 @@ class DfCommand : TerminalCommand {
                     "${bean.remain.size} B"
                 }
 
-                emitText(
-                    String.format(
-                        Locale.getDefault(),
-                        "%-18s %10s %10s %10s %5s %s",
-                        "Filesystem",
-                        "Size",
-                        "Used",
-                        "Avail",
-                        "Use%",
-                        "Mounted on"
-                    )
-                )
-                emitText(
-                    String.format(
-                        Locale.getDefault(),
-                        "%-18s %10s %10s %10s %4d%% %s",
-                        "115:CloudDrive",
-                        totalStr,
-                        usedStr,
-                        availStr,
-                        pct,
-                        "/"
-                    )
-                )
+                val table = TableFormatter.Builder()
+                    .addColumn("Filesystem", TableAlignment.LEFT, minWidth = 18)
+                    .addColumn("Size", TableAlignment.RIGHT, minWidth = 10)
+                    .addColumn("Used", TableAlignment.RIGHT, minWidth = 10)
+                    .addColumn("Avail", TableAlignment.RIGHT, minWidth = 10)
+                    .addColumn("Use%", TableAlignment.RIGHT, minWidth = 5)
+                    .addColumn("Mounted on", TableAlignment.LEFT, minWidth = 10)
+                    .addRow("115:CloudDrive", totalStr, usedStr, availStr, "$pct%", "/")
+                    .build()
+                for (line in table) {
+                    emitText(line)
+                }
             } else {
                 emitError("df: 无法解析网盘空间配额数据")
             }

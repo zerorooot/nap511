@@ -1,19 +1,24 @@
 package github.zerorooot.nap511.terminal.commands.stream
 
 import github.zerorooot.nap511.terminal.engine.CommandFlag
+import github.zerorooot.nap511.terminal.engine.StreamSourceItem
 import github.zerorooot.nap511.terminal.engine.archetype.StreamPipelineCommand
 import github.zerorooot.nap511.terminal.engine.archetype.StreamPlan
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
-import github.zerorooot.nap511.terminal.viewmodel.emitText
 import github.zerorooot.nap511.terminal.engine.completion.CommandCompleter
 import github.zerorooot.nap511.terminal.engine.completion.FileFilters
 import github.zerorooot.nap511.terminal.engine.completion.PathFilter
+import github.zerorooot.nap511.terminal.viewmodel.emitError
+import github.zerorooot.nap511.terminal.viewmodel.emitText
 
 /**
  * 文本过滤匹配命令（grep）
  *
- * 继承 [StreamPipelineCommand]，在编译期将模式匹配与开关选项静态装配为不可变 [StreamPlan]。
- * 消除数据处理热循环中的分支判断（无 hasFlag、无 if(countOnly)、无 if(invertMatch)），实现高性能流式过滤。
+ * 继承 [StreamPipelineCommand]，遵循 POSIX.1-2017 规范：
+ * 1. 语法：`grep [-i] [-v] [-c] <pattern> [file...]`；
+ * 2. 位置参数划分：首个位置参数为模式 pattern，后续位置参数为待匹配文件；若未指定文件则读取标准输入 stdin；
+ * 3. 多文件输出前缀：当指定 2 个及以上输入源时，每行匹配项自动附带文件名 `<file>:<content>`（若 -c 则为 `<file>:<count>`）；
+ *    单文件或 stdin 输入时不附带文件名前缀。
  */
 class GrepCommand : StreamPipelineCommand() {
 
@@ -21,7 +26,7 @@ class GrepCommand : StreamPipelineCommand() {
 
     override val description: String = "文本匹配与正则过滤"
 
-    override val usage: String = "grep [-i] [-v] [-c] <pattern>"
+    override val usage: String = "grep [-i] [-v] [-c] <pattern> [file...]"
 
     override val flags: List<CommandFlag> = listOf(
         CommandFlag("-i", "忽略大小写"),
@@ -39,6 +44,14 @@ class GrepCommand : StreamPipelineCommand() {
                 }
             }
         }
+
+    override fun extractFileOperands(ast: CommandInvocationAst): List<String> {
+        return if (ast.positionalArgs.size > 1) {
+            ast.rawPositionalValues.drop(1)
+        } else {
+            emptyList()
+        }
+    }
 
     override fun compilePlan(ast: CommandInvocationAst): Result<StreamPlan> {
         val ignoreCase = ast.hasFlag("-i")
@@ -69,22 +82,39 @@ class GrepCommand : StreamPipelineCommand() {
             rawPredicate
         }
 
-        // 编译期分离计划实现，彻底避免热循环内 if (countOnly) 分支判断
-        val plan = if (countOnly) {
-            StreamPlan { stdin, collector ->
-                var matchCount = 0
-                stdin.collect { line ->
-                    if (matchPredicate(line)) {
-                        matchCount++
+        val plan = StreamPlan { sources, collector ->
+            val hasMultipleSources = sources.size > 1
+
+            for (source in sources) {
+                when (source) {
+                    is StreamSourceItem.Error -> {
+                        collector.emitError("grep: ${source.message}")
                     }
-                }
-                collector.emitText(matchCount.toString())
-            }
-        } else {
-            StreamPlan { stdin, collector ->
-                stdin.collect { line ->
-                    if (matchPredicate(line)) {
-                        collector.emitText(line)
+
+                    is StreamSourceItem.DataStream -> {
+                        if (countOnly) {
+                            var matchCount = 0
+                            source.lines.collect { line ->
+                                if (matchPredicate(line)) {
+                                    matchCount++
+                                }
+                            }
+                            if (hasMultipleSources) {
+                                collector.emitText("${source.sourceName}:$matchCount")
+                            } else {
+                                collector.emitText(matchCount.toString())
+                            }
+                        } else {
+                            source.lines.collect { line ->
+                                if (matchPredicate(line)) {
+                                    if (hasMultipleSources) {
+                                        collector.emitText("${source.sourceName}:$line")
+                                    } else {
+                                        collector.emitText(line)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -95,13 +125,6 @@ class GrepCommand : StreamPipelineCommand() {
 
     /**
      * 将 POSIX BRE（基本正则表达式）规则转换为 Kotlin/Java 标准正则表达式（ERE）规则
-     *
-     * 规则说明：
-     * 1. 在 POSIX BRE 中，`\+`, `\?`, `\|`, `\(`, `\)`, `\{`, `\}` 代表正则元字符（加号、问号、分支、分组、限定符），
-     *    而在 Java/Kotlin Regex 中这些元字符不需要前缀反斜杠，因此转换时去掉反斜杠。
-     * 2. 其他带反斜杠的转义（如 `\.`, `\*`, `\\`, `\$`, `\[`）保留反斜杠，供 Kotlin Regex 精准匹配字面量字符。
-     * 3. 在 POSIX BRE 中未转义的 `+`, `?`, `|`, `(`, `)` 是普通字面量字符，但在 Kotlin Regex 中是元字符，
-     *    因此转换时自动加上反斜杠 `\+`, `\?`, `\|`, `\(`, `\)` 进行转义。
      */
     private fun convertBreToRegexPattern(bre: String): String {
         val sb = StringBuilder()
@@ -111,12 +134,10 @@ class GrepCommand : StreamPipelineCommand() {
             when (val c = bre[i]) {
                 '\\' if i + 1 < len -> {
                     when (val next = bre[i + 1]) {
-                        // BRE 中的 \+, \?, \|, \(, \), \{, \} 转换为标准正则元字符 +, ?, |, (, ), {, }
                         '+', '?', '|', '(', ')', '{', '}' -> {
                             sb.append(next)
                             i += 2
                         }
-                        // 其他反斜杠转义（如 \., \*, \\, \$ 等）保留原样，作为 Kotlin Regex 的字面量转义
                         else -> {
                             sb.append('\\').append(next)
                             i += 2
@@ -124,12 +145,10 @@ class GrepCommand : StreamPipelineCommand() {
                     }
                 }
                 '+', '?', '|', '(', ')' -> {
-                    // BRE 中未经转义的 +, ?, |, (, ) 是普通字面量字符，在 Kotlin Regex 中需要加反斜杠转义
                     sb.append('\\').append(c)
                     i++
                 }
                 else -> {
-                    // 其他普通字符（如字母、数字、点号 .、星号 * 等保持原样）
                     sb.append(c)
                     i++
                 }
