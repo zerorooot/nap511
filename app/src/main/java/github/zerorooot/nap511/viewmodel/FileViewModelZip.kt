@@ -1,26 +1,17 @@
 package github.zerorooot.nap511.viewmodel
 
 import androidx.lifecycle.viewModelScope
-import androidx.work.Constraints
-import androidx.work.Data
-import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequest
-import androidx.work.OutOfQuotaPolicy
-import androidx.work.WorkManager
 import com.elvishew.xlog.XLog
-import com.google.common.reflect.TypeToken
-import com.google.gson.Gson
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.util.resolveCallerTag
 import github.zerorooot.nap511.util.toUserFriendlyMessage
-import github.zerorooot.nap511.worker.UnzipAllFileWorker
+import github.zerorooot.nap511.worker.UnzipQueueManager
+import github.zerorooot.nap511.worker.UnzipTaskItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.io.File
 
 /**
  * FileViewModel 的扩展函数：解压相关
@@ -93,46 +84,21 @@ internal fun FileViewModel.unzipFile(fileBean: FileBean) {
 
 internal fun FileViewModel.unzipFile(fileBeansList: List<FileBean>, cid: String, pwd: String = "") {
     viewModelScope.launch(Dispatchers.IO) {
-        val listType = object : TypeToken<List<FileBean>>() {}.type
-        val listJson = Gson().toJson(fileBeansList, listType)
-        val dataBuilder: Data.Builder = Data.Builder()
-        //防止输入太多导致崩溃
-        val cacheFile =
-            File(App.instance.cacheDir, "unzip_tasks_${System.currentTimeMillis()}.json")
-        cacheFile.writeText(listJson)
-        dataBuilder.putString("listPath", cacheFile.absolutePath)
-        dataBuilder.putString("cid", cid)
-        if (pwd != "") {
-            dataBuilder.putString("pwd", pwd)
+        val errorCid = settingUiState.moveFailFile.takeIf { it.isNotEmpty() }?.let { data ->
+            fileBeanList.firstOrNull { it.isFolder && it.name == data }?.categoryId
         }
 
-        //获取离线失败移动目录cid
-        settingUiState.moveFailFile
-            .takeIf { it.isNotEmpty() }
-            ?.let { data ->
-                fileBeanList.firstOrNull { it.isFolder && it.name == data }?.categoryId
-            }
-            ?.let { errorCid ->
-                XLog.d("FileViewModel.unzipFile设置errorCid $errorCid")
-                dataBuilder.putString("errorCid", errorCid)
-                errorCid
-            }
+        val taskItems = fileBeansList.map { file ->
+            UnzipTaskItem(
+                fileBean = file,
+                targetCid = cid,
+                password = pwd.takeIf { it.isNotEmpty() },
+                errorCid = errorCid
+            )
+        }
 
-        val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
-            .build()
-        val request: OneTimeWorkRequest = OneTimeWorkRequest
-            .Builder(UnzipAllFileWorker::class.java)
-            .setConstraints(constraints)
-            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-            .addTag("UnzipAllFileWorkerOneTimeWorkRequest")
-            .setInputData(dataBuilder.build())
-            .build()
-
-        val workManager = WorkManager.getInstance(context.applicationContext)
-        workManager.enqueueUniqueWork(
-            "unzipAllFileWorker", ExistingWorkPolicy.APPEND_OR_REPLACE, request
-        )
+        // 统一入队并触发 Worker（KEEP 策略保证单 Worker 循环消费动态队列）
+        UnzipQueueManager.enqueueAndStartWorker(taskItems, context)
     }
 }
 

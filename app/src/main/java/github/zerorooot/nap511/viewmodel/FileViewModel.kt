@@ -489,6 +489,7 @@ class FileViewModel(
             is CacheEvent.RemoteRefreshRequired -> {
                 // 【远程 API 刷新逻辑】：
                 // 针对新增文件、解压完成、离线下载完成、字幕上传、回收站还原等场景，云端生成了新文件或变动：
+                /**不需要删除缓存，因为在 [FileCacheManager.notifyRemoteRefresh] 里已经删除了**/
                 if (event.cid == currentCid) {
                     // 若正处于当前展示目录，立即重新请求 115 API 全量更新整个目录列表及 UI
                     getFiles(currentCid)

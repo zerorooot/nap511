@@ -1,14 +1,5 @@
 package github.zerorooot.nap511.terminal.commands.cloud
 
-import androidx.work.Constraints
-import androidx.work.Data
-import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequest
-import androidx.work.OutOfQuotaPolicy
-import androidx.work.WorkManager
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
@@ -23,12 +14,11 @@ import github.zerorooot.nap511.terminal.engine.completion.StandardCompleter
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
 import github.zerorooot.nap511.terminal.viewmodel.emitText
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.worker.UnzipAllFileWorker
+import github.zerorooot.nap511.worker.UnzipQueueManager
+import github.zerorooot.nap511.worker.UnzipTaskItem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import java.io.File
 import java.util.Locale
 
 /**
@@ -180,54 +170,30 @@ class UnzipCommand : TerminalCommand {
                 }
             }
         } else {
-            // 提交云端解压任务至 UnzipAllFileWorker 统一处理
+            // 提交云端解压任务至 UnzipQueueManager 统一调度
             try {
                 emitText("正在提交 ${distinctFileBeans.size} 个解压任务至后台...")
-
-                val listType = object : TypeToken<List<FileBean>>() {}.type
-                val listJson = Gson().toJson(distinctFileBeans, listType)
-                val cacheFile = File(
-                    App.instance.cacheDir,
-                    "unzip_tasks_${System.currentTimeMillis()}.json"
-                )
-                cacheFile.writeText(listJson)
-
-                val dataBuilder = Data.Builder()
-                    .putString("listPath", cacheFile.absolutePath)
-                    .putString("cid", targetCid)
-
-                if (password.isNotEmpty()) {
-                    dataBuilder.putString("pwd", password)
-                }
 
                 // 查找失败移动目录 CID
                 val moveFailFile =
                     SettingsRepository.getDataSuspend(ConfigKeyUtil.MOVE_FAIL_FILE, "")
-                if (moveFailFile.isNotEmpty()) {
+                val errorCid = if (moveFailFile.isNotEmpty()) {
                     val currentFiles = ctx.listDirectory(targetCid)
-                    val errorCid =
-                        currentFiles.firstOrNull { it.isFolder && it.name == moveFailFile }?.categoryId
-                    if (errorCid != null) {
-                        dataBuilder.putString("errorCid", errorCid)
-                    }
+                    currentFiles.firstOrNull { it.isFolder && it.name == moveFailFile }?.categoryId
+                } else null
+
+                // 1. 构造独立任务项
+                val taskItems = distinctFileBeans.map { file ->
+                    UnzipTaskItem(
+                        fileBean = file,
+                        targetCid = targetCid,
+                        password = password.takeIf { it.isNotEmpty() },
+                        errorCid = errorCid
+                    )
                 }
 
-                val constraints = Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
-                    .build()
-
-                val request = OneTimeWorkRequest.Builder(UnzipAllFileWorker::class.java)
-                    .setConstraints(constraints)
-                    .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                    .addTag("UnzipAllFileWorkerOneTimeWorkRequest")
-                    .setInputData(dataBuilder.build())
-                    .build()
-
-                val workManager =
-                    WorkManager.getInstance(App.instance.applicationContext)
-                workManager.enqueueUniqueWork(
-                    "unzipAllFileWorker", ExistingWorkPolicy.APPEND_OR_REPLACE, request
-                )
+                // 2. 追加至全局解压队列并触发 Worker (KEEP 策略)
+                UnzipQueueManager.enqueueAndStartWorker(taskItems)
 
                 ctx.invalidateCache(targetCid)
                 emitText("unzip: 已成功提交 ${distinctFileBeans.size} 个解压任务到后台 UnzipAllFileWorker 处理 (${distinctFileBeans.joinToString { it.name }})")
