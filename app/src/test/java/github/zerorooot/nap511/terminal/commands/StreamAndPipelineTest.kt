@@ -14,6 +14,14 @@ import org.junit.Test
  */
 class StreamAndPipelineTest {
 
+    @org.junit.Before
+    fun setUp() {
+        github.zerorooot.nap511.util.TextFileHelper.clearMemoryCache()
+        runBlocking {
+            github.zerorooot.nap511.util.FileCacheManager.clearAll()
+        }
+    }
+
     /**
      * 测试常用流式命令基础管道传递
      */
@@ -188,5 +196,96 @@ class StreamAndPipelineTest {
         // 当管道连接到 wc -l 时，System.INFO 行不会进入下游，下游计数应为 0
         val outEmptyFindPipe = engine.executeStrings("find -suffix nonexistent | wc -l", ctx)
         assertEquals(listOf("0"), outEmptyFindPipe)
+    }
+
+    /**
+     * 测试非流式/不消费 stdin 的命令防御 (pwd, cd, mkdir 忽略管道输入)
+     */
+    @Test
+    fun testNonStreamingCommandsIgnoreStdin() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        // pwd 忽略管道输入
+        val outPwd = engine.executeStrings("echo 'unwanted input' | pwd", ctx)
+        assertEquals(listOf("/根目录"), outPwd)
+
+        // cd 忽略管道输入，正常按显式参数切换
+        engine.executeStrings("echo 'target_folder' | cd /", ctx)
+        assertEquals(listOf("/根目录"), engine.executeStrings("pwd", ctx))
+
+        // mkdir 忽略管道输入，正常按显式参数创建目录
+        val outMkdir = engine.executeStrings("echo 'extra' | mkdir new_dir", ctx)
+        assertTrue(outMkdir.any { it.contains("已创建文件夹") || it.contains("new_dir") })
+    }
+
+    /**
+     * 测试管道中继阶段命令未找到时的防御性收尾
+     */
+    @Test
+    fun testPipelineIntermediateStageFailureBehavior() = runBlocking {
+        val engine = createTestEngine()
+        val ctx = createTestContext()
+
+        val out = engine.executeStrings("echo 'test' | invalid_command_xyz | wc -l", ctx)
+        assertTrue(out.any { it.contains("terminal: command not found: invalid_command_xyz") })
+    }
+
+    /**
+     * 测试混合标准输出与标准错误时的管道隔离 (混流隔离)
+     */
+    @Test
+    fun testPipelineMixedStdoutAndStderrIsolation() = runBlocking {
+        val mockRepo = TestMockFileRepository().apply {
+            mockDownloadStreams["stream_good_501"] = "good text content"
+        }
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        val f = createMockFile("good.txt", "stream_good_501")
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(fileBeanList = arrayListOf(f), cid = "0", count = 1, order = "", path = emptyList())
+        )
+
+        val outMatch = engine.executeStrings("cat good.txt absent.txt | grep good", ctx)
+        assertEquals(listOf("good text content"), outMatch)
+
+        val outErrorLeak = engine.executeStrings("cat good.txt absent.txt | grep -c 'No such file'", ctx)
+        assertEquals(listOf("0"), outErrorLeak)
+    }
+
+    /**
+     * 测试管道输入与显式位置文件参数的优先级行为 (优先读文件并安全忽略管道输入)
+     */
+    @Test
+    fun testPipelineStdinVsPositionalArgumentPriority() = runBlocking {
+        val mockRepo = TestMockFileRepository().apply {
+            mockDownloadStreams["stream_disk_601"] = "file_body"
+        }
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        val f = createMockFile("file.txt", "stream_disk_601")
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(fileBeanList = arrayListOf(f), cid = "0", count = 1, order = "", path = emptyList())
+        )
+
+        val out = engine.executeStrings("echo 'pipe_body' | cat file.txt", ctx)
+        assertEquals(listOf("file_body"), out)
+    }
+
+    /**
+     * 测试管道下游截断时的协程短路与 Broken Pipe 安全收尾
+     */
+    @Test
+    fun testPipelineUpstreamCancellationOnBrokenPipe() = runBlocking {
+        val engine = createTestEngine()
+        val ctx = createTestContext()
+
+        val out = engine.executeStrings("echo -e '1\\n2\\n3\\n4\\n5\\n6\\n7\\n8\\n9\\n10' | head -n 2 | wc -l", ctx)
+        assertEquals(listOf("2"), out)
     }
 }

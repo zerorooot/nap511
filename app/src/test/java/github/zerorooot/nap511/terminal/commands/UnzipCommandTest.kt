@@ -292,4 +292,24 @@ class UnzipCommandTest {
         val out60 = engine.executeStrings("find -name '*.zip' | xargs unzip -l", ctx)
         assertNotNull(out60)
     }
+
+    /**
+     * 测试通配符匹配多个压缩包并统一收集发起解压 (unzip *.zip)
+     */
+    @Test
+    fun testUnzipWildcardMultipleArchives() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        val zip1 = createMockFile("pack1.zip", "401").copy(pickCode = "PK101")
+        val zip2 = createMockFile("pack2.zip", "402").copy(pickCode = "PK102")
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(fileBeanList = arrayListOf(zip1, zip2), cid = "0", count = 2, order = "", path = emptyList())
+        )
+
+        val out = engine.executeStrings("unzip *.zip", ctx)
+        assertTrue(out.any { it.contains("正在提交 2 个解压任务至后台...") })
+    }
 }

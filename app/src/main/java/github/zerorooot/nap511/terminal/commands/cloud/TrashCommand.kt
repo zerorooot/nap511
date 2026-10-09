@@ -72,6 +72,22 @@ class TrashCommand : ActionDispatchCommand<TrashAction>() {
         }
 
     override fun compileAction(ast: CommandInvocationAst): Result<TrashAction> {
+        // 1. 位置参数防御性拦截（高内聚、职责分明）：
+        // trash 仅作为回收站内部数据管理工具（查看、还原、清空），不支持通过操作数移入回收站。
+        // 工作区文件移入回收站的职责严格归属于 rm 命令，此处进行 Fail-Fast 拦截并友好指引。
+        if (ast.positionalArgs.isNotEmpty()) {
+            return Result.failure(
+                IllegalArgumentException("不支持位置参数，若需将文件移入回收站请使用 'rm' 命令")
+            )
+        }
+
+        // 2. 键值选项参数完整性校验：-r 必须附带待还原的 RID 或文件名
+        if (ast.hasFlag("-r") && ast.getOption("-r") == null) {
+            return Result.failure(
+                IllegalArgumentException("option requires an argument -- r")
+            )
+        }
+
         val ridToRevert = ast.getOption("-r")
         if (ridToRevert != null) {
             return Result.success(TrashAction.Revert(ridToRevert))

@@ -1,9 +1,11 @@
 package github.zerorooot.nap511.terminal.commands
 
+import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.PathBean
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -95,5 +97,103 @@ class RmCommandTest {
         // Emoji 表情文件名删除
         val outEmoji = engine.executeStrings("rm -f '😀.png'", ctx)
         assertEquals(listOf("rm: 已移入回收站 '😀.png'"), outEmoji)
+    }
+
+    /**
+     * 测试当前目录下的通配符批量删除 (rm -f *.log)
+     */
+    @Test
+    fun testRmWildcardCurrentDirectory() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        val log1 = createMockFile("temp1.log", "101")
+        val log2 = createMockFile("temp2.log", "102")
+        val keep = createMockFile("keep.txt", "103")
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(fileBeanList = arrayListOf<FileBean>(log1, log2, keep), cid = "0", count = 3, order = "", path = emptyList())
+        )
+
+        val out = engine.executeStrings("rm -f *.log", ctx)
+        assertEquals(listOf("rm: 已成功批量删除目录下的 2 个项目至回收站"), out)
+        assertEquals(1, mockRepo.deletedMultipleCalls.size)
+        val call = mockRepo.deletedMultipleCalls[0]
+        assertEquals("0", call["pid"])
+        assertTrue(call.values.contains("101"))
+        assertTrue(call.values.contains("102"))
+        assertFalse(call.values.contains("103"))
+    }
+
+    /**
+     * 测试子目录前缀通配符批量删除 (rm -f build/`*.tmp`)
+     */
+    @Test
+    fun testRmWildcardSubDirectoryPrefix() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        val buildFolder = createMockFolder("build", "50")
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(fileBeanList = arrayListOf<FileBean>(buildFolder), cid = "0", count = 1, order = "", path = listOf(PathBean("0", "根目录", "0")))
+        )
+
+        val tmpA = createMockFile("a.tmp", "501")
+        val tmpB = createMockFile("b.tmp", "502")
+        ctx.fileCacheManager.put(
+            "50",
+            FilesBean(fileBeanList = arrayListOf<FileBean>(tmpA, tmpB), cid = "50", count = 2, order = "", path = listOf(PathBean("0", "根目录", "0"), PathBean("50", "build", "0")))
+        )
+
+        val out = engine.executeStrings("rm -f build/*.tmp", ctx)
+        assertEquals(listOf("rm: 已成功批量删除目录下的 2 个项目至回收站"), out)
+        assertEquals(1, mockRepo.deletedMultipleCalls.size)
+        val call = mockRepo.deletedMultipleCalls[0]
+        assertEquals("50", call["pid"])
+        assertTrue(call.values.contains("501"))
+        assertTrue(call.values.contains("502"))
+    }
+
+    /**
+     * 测试通配符无匹配保留字面量回退 (rm *.bak)
+     */
+    @Test
+    fun testRmWildcardNomatch() = runBlocking {
+        val engine = createTestEngine()
+        val ctx = createTestContext()
+
+        val f = createMockFile("data.txt", "1")
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(fileBeanList = arrayListOf<FileBean>(f), cid = "0", count = 1, order = "", path = emptyList())
+        )
+
+        val out = engine.executeStrings("rm *.bak", ctx)
+        assertTrue(out.any { it.contains("cannot remove '*.bak': No such file or directory") })
+    }
+
+    /**
+     * 测试引号保护通配符不被展开误删 (rm -f "*.txt")
+     */
+    @Test
+    fun testRmWildcardQuotedProtection() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        val f = createMockFile("file.txt", "1")
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(fileBeanList = arrayListOf<FileBean>(f), cid = "0", count = 1, order = "", path = emptyList())
+        )
+
+        val out = engine.executeStrings("rm -f \"*.txt\"", ctx)
+        assertTrue(out.any { it.contains("cannot remove '*.txt': No such file or directory") })
+        // 验证物理文件 file.txt 未被删除
+        assertTrue(mockRepo.deletedItems.isEmpty())
+        assertTrue(mockRepo.deletedMultipleCalls.isEmpty())
     }
 }

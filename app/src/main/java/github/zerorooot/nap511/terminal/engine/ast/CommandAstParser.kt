@@ -118,6 +118,8 @@ object CommandAstParser {
                             if (i + 1 < tokens.size) {
                                 val next = tokens[++i]
                                 options[matchedValueOpt] = OptionValueNode(matchedValueOpt, next.text, isQuoted = next.isExplicitlyQuoted)
+                            } else {
+                                flags.add(text)
                             }
                         } else {
                             // 紧贴形式：-n10

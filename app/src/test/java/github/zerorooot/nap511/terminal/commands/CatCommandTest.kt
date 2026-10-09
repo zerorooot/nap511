@@ -208,4 +208,58 @@ class CatCommandTest {
 
         assertTrue(output.isEmpty())
     }
+
+    /**
+     * 测试通配符读取多个文件并保持全局连续行号编号 (cat *.txt -n)
+     */
+    @Test
+    fun testCatWildcardMultipleFiles() = runBlocking {
+        val repo = TestMockFileRepository().apply {
+            mockDownloadStreams["cat_wild_801"] = "line 1"
+            mockDownloadStreams["cat_wild_802"] = "line 2"
+        }
+        val ctx = createTestContext(fileRepository = repo)
+        val f1 = createMockFile(name = "doc1.txt", fileId = "cat_wild_801", size = "10")
+        val f2 = createMockFile(name = "doc2.txt", fileId = "cat_wild_802", size = "10")
+        ctx.putMockFiles("0", listOf(f1, f2))
+
+        val engine = createTestEngine()
+        val output = engine.executeStrings("cat *.txt -n", ctx)
+
+        assertEquals(2, output.size)
+        assertEquals("     1\tline 1", output[0])
+        assertEquals("     2\tline 2", output[1])
+    }
+
+    /**
+     * 测试通配符无匹配保留字面量报错 (cat *.md)
+     */
+    @Test
+    fun testCatWildcardNomatch() = runBlocking {
+        val engine = createTestEngine()
+        val ctx = createTestContext()
+
+        val output = engine.executeStrings("cat *.md", ctx)
+        assertTrue(output.any { it.contains("cat: *.md: No such file or directory") })
+    }
+
+    /**
+     * 测试通配符混合命中文件与子目录时的容错跳过 (cat *)
+     */
+    @Test
+    fun testCatWildcardMixedFilesAndDirectories() = runBlocking {
+        val repo = TestMockFileRepository().apply {
+            mockDownloadStreams["cat_wild_901"] = "normal text content"
+        }
+        val ctx = createTestContext(fileRepository = repo)
+        val f = createMockFile(name = "doc1.txt", fileId = "cat_wild_901", size = "20")
+        val folder = createMockFolder(name = "sub_folder", categoryId = "902")
+        ctx.putMockFiles("0", listOf(folder, f))
+
+        val engine = createTestEngine()
+        val output = engine.executeStrings("cat *", ctx)
+
+        assertTrue("对子目录应报错 Is a directory", output.any { it.contains("cat: sub_folder: Is a directory") })
+        assertTrue("对普通文本文件应继续正常读取输出", output.contains("normal text content"))
+    }
 }

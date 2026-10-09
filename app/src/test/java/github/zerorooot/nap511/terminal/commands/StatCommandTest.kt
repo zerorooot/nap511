@@ -218,4 +218,32 @@ class StatCommandTest {
         assertTrue(out.any { it.contains("File: album photo christmas.zip") })
         assertTrue(out.any { it.contains("2048 bytes") })
     }
+
+    /**
+     * 测试通配符多文件批量查看元数据 (stat *.csv)
+     */
+    @Test
+    fun testStatWildcardMultipleFiles() = runBlocking {
+        val engine = createTestEngine()
+        val ctx = createTestContext()
+
+        val f1 = createMockFile("f1.csv", "301", size = "512")
+        val f2 = createMockFile("f2.csv", "302", size = "1024")
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(
+                fileBeanList = arrayListOf(f1, f2),
+                cid = "0",
+                count = 2,
+                order = "",
+                path = emptyList()
+            )
+        )
+
+        val out = engine.executeStrings("stat *.csv", ctx)
+        assertTrue(out.any { it.contains("File: f1.csv") })
+        assertTrue(out.any { it.contains("512 bytes") })
+        assertTrue(out.any { it.contains("File: f2.csv") })
+        assertTrue(out.any { it.contains("1024 bytes") })
+    }
 }

@@ -85,4 +85,79 @@ class TrashCommandTest {
         val outList = engine.executeStrings("trash", ctx)
         assertNotNull(outList)
     }
+
+    /**
+     * 测试通配符参数非法拦截 (trash *.bak)
+     *
+     * 架构契约：明确 trash 命令仅作为回收站内部数据管理工具（-l 查看、-r 还原、-c 清空），
+     * 不支持直接通过操作数删除文件（文件删除与移入回收站统一归属 rm 命令）。
+     * 当传入通配符展开的文件位置参数时，进行 Fail-Fast 拦截并友好指引使用 rm 命令。
+     */
+    @Test
+    fun testTrashWildcardItems() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        val bak1 = createMockFile("item1.bak", "701")
+        val bak2 = createMockFile("item2.bak", "702")
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(fileBeanList = arrayListOf(bak1, bak2), cid = "0", count = 2, order = "", path = emptyList())
+        )
+
+        val out = engine.executeStrings("trash *.bak", ctx)
+        assertEquals(
+            listOf("trash: 不支持位置参数，若需将文件移入回收站请使用 'rm' 命令"),
+            out
+        )
+
+        // 验证原工作区文件未被误删，缓存保持完整
+        assertEquals(2, ctx.fileCacheManager["0"]!!.fileBeanList.size)
+    }
+
+    /**
+     * 测试位置参数与选项完整性校验
+     * 覆盖：单文件位置参数、选项多余参数混用以及 -r 缺少参数场景
+     */
+    @Test
+    fun testTrashPositionalArgumentsAndOptionValidation() = runBlocking {
+        val engine = createTestEngine()
+        val ctx = createTestContext()
+
+        // 1. 单个位置参数拦截
+        val outSingle = engine.executeStrings("trash single.txt", ctx)
+        assertEquals(
+            listOf("trash: 不支持位置参数，若需将文件移入回收站请使用 'rm' 命令"),
+            outSingle
+        )
+
+        // 2. -l 携带多余位置参数拦截
+        val outListExtra = engine.executeStrings("trash -l extra.txt", ctx)
+        assertEquals(
+            listOf("trash: 不支持位置参数，若需将文件移入回收站请使用 'rm' 命令"),
+            outListExtra
+        )
+
+        // 3. -c 携带多余位置参数拦截
+        val outCleanExtra = engine.executeStrings("trash -c extra.txt", ctx)
+        assertEquals(
+            listOf("trash: 不支持位置参数，若需将文件移入回收站请使用 'rm' 命令"),
+            outCleanExtra
+        )
+
+        // 4. -r 携带多余位置参数拦截
+        val outRevertExtra = engine.executeStrings("trash -r 8801 extra.txt", ctx)
+        assertEquals(
+            listOf("trash: 不支持位置参数，若需将文件移入回收站请使用 'rm' 命令"),
+            outRevertExtra
+        )
+
+        // 5. -r 缺少必选参数拦截
+        val outMissingArg = engine.executeStrings("trash -r", ctx)
+        assertEquals(
+            listOf("trash: option requires an argument -- r"),
+            outMissingArg
+        )
+    }
 }
