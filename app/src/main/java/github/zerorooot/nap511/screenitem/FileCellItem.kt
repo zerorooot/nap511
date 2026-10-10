@@ -2,7 +2,6 @@ package github.zerorooot.nap511.screenitem
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -75,16 +73,12 @@ fun FileCellItem(
         tonalElevation = 10.dp,
         modifier = modifier
             .padding(1.dp)
-            .combinedClickable(
-                onClick = {
-                    itemActions.onItemClick.invoke(index)
-                },
-                onLongClick = {
-                    itemActions.onItemLongClick.invoke(index)
-                }
-            ),
-        color = if (fileBean.isSelect) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-    ) {
+            .combinedClickable(onClick = {
+                itemActions.onItemClick.invoke(index)
+            }, onLongClick = {
+                itemActions.onItemLongClick.invoke(index)
+            }),
+        color = if (fileBean.isSelect) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface) {
         Card(
             modifier = Modifier
                 .padding(4.dp, 4.dp)
@@ -94,8 +88,7 @@ fun FileCellItem(
             ),
         ) {
             Row(
-                Modifier
-                    .fillMaxSize()
+                Modifier.fillMaxSize()
             ) {
                 Box(
                     Modifier
@@ -117,15 +110,11 @@ fun FileCellItem(
                             ?: fileBean.photoThumb.ifEmpty { image }
 
                         AsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(imageData)
-                                .memoryCacheKey(fileBean.fileId)
-                                .diskCacheKey(fileBean.fileId)
-                                .scale(coil.size.Scale.FILL)
-                                .placeholder(image)
-                                .error(R.drawable.ic_image_broken) // 加载失败时也显示占位图
-                                .crossfade(true)
-                                .build(),
+                            model = ImageRequest.Builder(context).data(imageData)
+                            .memoryCacheKey(fileBean.fileId).diskCacheKey(fileBean.fileId)
+                            .scale(coil.size.Scale.FILL).placeholder(image)
+                            .error(R.drawable.ic_image_broken) // 加载失败时也显示占位图
+                            .crossfade(true).build(),
                             onSuccess = { successState ->
                                 XLog.d("FileCellItem [图片加载成功] index=$index, name=${fileBean.name}, imageData=$imageData, source=${successState.result.dataSource}")
                             },
@@ -143,12 +132,13 @@ fun FileCellItem(
                 val playLongRatio = fileBean.playLongRatio
                 val isMedia = fileBean.isVideo == 1 || fileBean.fileIco == R.drawable.mp3
                 val hasMediaInfo = isMedia && (playLong.isNotEmpty() || playLongRatio.isNotEmpty())
-                val hasSubInfo = size.isNotEmpty() || hasMediaInfo
+                val hasSubInfo = size.isNotEmpty() || time.isNotEmpty() || hasMediaInfo
+
 
                 Column(
                     verticalArrangement = Arrangement.SpaceEvenly,
                     modifier = Modifier
-                        .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
+                        .padding(start = 8.dp, top = 2.dp, bottom = 2.dp)
                         .fillMaxHeight()
                         .weight(1f)
                 ) {
@@ -156,60 +146,31 @@ fun FileCellItem(
                     AutoSizableTextField(
                         value = name,
                         modifier = Modifier.fillMaxWidth(),
+                        fontSize = 15.sp,
                         minFontSize = 10.sp,
-                        maxLines = if (hasSubInfo) 1 else 2
+                        maxLines = 3
                     )
-                    // 2. 大小与时长信息（仅在有内容时渲染 Row）
-                    if (hasSubInfo) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            if (isMedia) {
-                                if (playLong.isNotEmpty()) {
-                                    Box(
-                                        modifier = Modifier
-                                            .background(
-                                                color = MaterialTheme.colorScheme.secondaryContainer,
-                                                shape = RoundedCornerShape(4.dp)
-                                            )
-                                    ) {
-                                        Text(
-                                            text = playLong,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                            modifier = Modifier.padding(
-                                                horizontal = 2.dp,
-                                                vertical = 1.dp
-                                            ),
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-                                if (playLongRatio.isNotEmpty()) {
-                                    Text(
-                                        text = playLongRatio,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.padding(
-                                            horizontal = 1.dp,
-                                            vertical = 1.dp
-                                        ),
-                                        maxLines = 1
-                                    )
-                                }
-                            }
-                        }
+
+                    // 2.3 文件大小与修改时间（紧凑合并）
+                    val metaText = buildString {
+                        if (isMedia && playLong.isNotEmpty()) append(playLong)
+                        if (isMedia && playLongRatio.isNotEmpty()) append("$playLongRatio ")
+                        if (size.isNotEmpty()) append(size)
+                        if (size.isNotEmpty() && time.isNotEmpty()) append(" ")
+                        if (time.isNotEmpty()) append(time)
                     }
-                    // 3. 修改时间
-                    Text(
-                        text = size + time,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    if (metaText.isNotEmpty()) {
+                        Text(
+                            text = metaText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                    }
+
+
                 }
 
                 val dispatchMenuClick: (MenuItemAction, Int) -> Unit = { action, _ ->
@@ -288,6 +249,7 @@ fun AutoSizableTextField(
             text = value,
             style = TextStyle(fontSize = nFontSize),
             maxLines = maxLines,
+            overflow = TextOverflow.Ellipsis, // 确保超出 2 行时末尾正常显示省略号
             fontWeight = FontWeight.Bold,
         )
     }

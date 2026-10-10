@@ -449,7 +449,7 @@ class FindCommandTest {
     }
 
     /**
-     * 测试 -time 时长过滤及有效音视频判断
+     * 测试 -playlong 时长过滤及有效音视频判断
      */
     @Test
     fun testFindTimeFilter() = runBlocking {
@@ -466,51 +466,51 @@ class FindCommandTest {
         ctx.putMockFiles("0", listOf(longMovie, shortMovie, audioTrack, docFile, emptyVideo, folder))
 
         // 1. 大于 1 小时：+1h 仅匹配 2 小时的 movie_long.mp4
-        val outGt1h = engine.executeStrings("find -time +1h", ctx)
+        val outGt1h = engine.executeStrings("find -playlong +1h", ctx)
         assertEquals(listOf("/根目录/movie_long.mp4"), outGt1h)
 
         // 2. 小于 10 分钟：-10m 匹配 5 分钟的 movie_short.mp4 与 3 分钟的 audio.mp3
         // 关键验证：普通文档、0 时长损坏视频、文件夹不得被错误匹配
-        val outLt10m = engine.executeStrings("find -time -10m", ctx)
+        val outLt10m = engine.executeStrings("find -playlong -10m", ctx)
         assertEquals(2, outLt10m.size)
         assertTrue(outLt10m.contains("/根目录/movie_short.mp4"))
         assertTrue(outLt10m.contains("/根目录/audio.mp3"))
 
         // 3. 冒号时间戳格式：+01:00:00（大于 1 小时）
-        val outColonGt = engine.executeStrings("find -time +01:00:00", ctx)
+        val outColonGt = engine.executeStrings("find -playlong +01:00:00", ctx)
         assertEquals(listOf("/根目录/movie_long.mp4"), outColonGt)
 
         // 4. 冒号时间戳格式：-04:00（小于 4 分钟，仅 audio.mp3）
-        val outColonLt = engine.executeStrings("find -time -04:00", ctx)
+        val outColonLt = engine.executeStrings("find -playlong -04:00", ctx)
         assertEquals(listOf("/根目录/audio.mp3"), outColonLt)
 
         // 5. 纯数字无单位（默认秒）：300 等于 300 秒（5分钟）
-        val outExactSec = engine.executeStrings("find -time 300", ctx)
+        val outExactSec = engine.executeStrings("find -playlong 300", ctx)
         assertEquals(listOf("/根目录/movie_short.mp4"), outExactSec)
 
-        // 6. 复合条件联动：find -filter video -time -10m (排除音频)
-        val outVideoOnly = engine.executeStrings("find -filter video -time -10m", ctx)
+        // 6. 复合条件联动：find -filter video -playlong-10m (排除音频)
+        val outVideoOnly = engine.executeStrings("find -filter video -playlong -10m", ctx)
         assertEquals(listOf("/根目录/movie_short.mp4"), outVideoOnly)
     }
 
     /**
-     * 测试 -iname 与 -time 的参数缺失与非法格式报错
+     * 测试 -iname 与 -playlong 的参数缺失与非法格式报错
      */
     @Test
     fun testFindInameAndTimeErrorHandling() = runBlocking {
         val engine = createTestEngine()
         val ctx = createTestContext()
 
-        // 1. -iname 缺少参数
+        // 1. -playlong 缺少参数
         val outMissingIname = engine.executeStrings("find -iname", ctx)
         assertTrue(outMissingIname.any { it.contains("'-iname' 缺少参数") })
 
-        // 2. -time 缺少参数
-        val outMissingTime = engine.executeStrings("find -time", ctx)
-        assertTrue(outMissingTime.any { it.contains("'-time' 缺少参数") })
+        // 2. -playlong 缺少参数
+        val outMissingTime = engine.executeStrings("find -playlong", ctx)
+        assertTrue(outMissingTime.any { it.contains("'-playlong' 缺少参数") })
 
-        // 3. -time 非法格式
-        val outInvalidTime = engine.executeStrings("find -time abc", ctx)
+        // 3. -playlong 非法格式
+        val outInvalidTime = engine.executeStrings("find -playlong abc", ctx)
         assertTrue(outInvalidTime.any { it.contains("无效的时间格式 'abc'") })
     }
 

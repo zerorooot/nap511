@@ -141,7 +141,7 @@ class FindCommand : TerminalCommand {
         CommandFlag("-maxdepth <N>", "限制递归搜索的最大层级深度，默认为5"),
         CommandFlag("-empty", "只匹配空文件（大小为 0）或空目录（内容为空）"),
         CommandFlag("-size <[+|-]N[k|M|G]>", "按文件大小筛选（如 +100M 大于 100MB，-10k 小于 10KB）"),
-        CommandFlag("-time <[+|-]N[s|m|h]|HH:mm:ss>", "按视频/音频时长筛选（如 +30m 大于 30 分钟，-10:00 小于 10 分钟）"),
+        CommandFlag("-playlong <[+|-]N[s|m|h]|HH:mm:ss>", "按视频/音频时长筛选（如 +30m 大于 30 分钟，-10:00 小于 10 分钟）"),
         CommandFlag("-not / !", "对后续条件取反（非运算）"),
         CommandFlag("-or / -o", "逻辑或运算，匹配两边任一条件"),
         CommandFlag("-global", "在整个 115 网盘根目录进行全局云端搜索"),

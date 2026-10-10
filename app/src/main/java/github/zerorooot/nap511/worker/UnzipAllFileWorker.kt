@@ -37,7 +37,7 @@ class UnzipAllFileWorker(
 ) : CoroutineWorker(appContext, workerParams) {
     private val NOTIFICATION_ID = 1001
     private val CHANNEL_ID = "unzip_completion_channel"
-
+   private val maxWaitMs = 20 * 1000L // 最大轮询等待 20 秒
     @Volatile
     private var lastUpdateTime: Long = 0
     private val UPDATE_INTERVAL = 500L // 500毫秒更新一次，避免频繁刷新导致系统丢弃更新
@@ -237,7 +237,6 @@ class UnzipAllFileWorker(
 
         try {
             var zipListFile: ZipBeanList?
-            val maxWaitMs = 5 * 60 * 1000L // 最大轮询等待 5 分钟
             val startTime = System.currentTimeMillis()
 
             // 轮询检查解压状态 (支持云端异步 Loading 状态轮询)

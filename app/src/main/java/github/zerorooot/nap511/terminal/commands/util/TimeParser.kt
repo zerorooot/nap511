@@ -3,7 +3,7 @@ package github.zerorooot.nap511.terminal.commands.util
 /**
  * 视频/音频时长解析与比对工具
  *
- * 用于解析 find 命令中的 "-time +10m"、"-time -30s"、"-time +01:30:00" 等参数规范，
+ * 用于解析 find 命令中的 "-playlong +10m"、"-playlong -30s"、"-playlong +01:30:00" 等参数规范，
  * 并将其转换为秒数（Double）比对逻辑。
  */
 object TimeParser {

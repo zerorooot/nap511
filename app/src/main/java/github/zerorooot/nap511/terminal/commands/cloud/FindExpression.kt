@@ -92,7 +92,7 @@ internal class SuffixPredicate(val suffix: String) : FindExpression {
 /**
  * 通用数值度量比较 AST 谓词节点
  *
- * 统一承载文件大小（-size）、媒体时长（-time）等所有基于单值数值度量的匹配评估。
+ * 统一承载文件大小（-size）、媒体时长（-playlong）等所有基于单值数值度量的匹配评估。
  *
  * @param filter 统一的数值比较过滤器
  * @param extractor 从 FileBean 中提取比对数值的函数；若文件不具备该属性或不满足前置条件则返回 null
@@ -510,9 +510,9 @@ internal object FindCommandArgsParser {
                     }))
                 }
 
-                arg == "-time" -> {
+                arg == "-playlong" -> {
                     if (i + 1 >= args.size) {
-                        return Result.failure(FindParseException("find: '-time' 缺少参数"))
+                        return Result.failure(FindParseException("find: '-playlong' 缺少参数"))
                     }
                     val spec = args[++i]
                     val filter = TimeParser.parse(spec)
