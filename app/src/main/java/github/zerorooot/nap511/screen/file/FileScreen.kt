@@ -106,8 +106,9 @@ fun FileScreen(
         else -> FabPosition.End
     }
 
-    val fileBeanList = fileViewModel.fileBeanList
-    val refreshing by fileViewModel.isRefreshing.collectAsStateWithLifecycle()
+    val contentState by fileViewModel.contentState.collectAsStateWithLifecycle()
+    val fileBeanList = contentState.fileBeanList
+    val refreshing = contentState.isRefreshing
     val context = LocalContext.current
     var showForceOpenDialog by rememberSaveable { mutableIntStateOf(-1) }
 
@@ -120,9 +121,9 @@ fun FileScreen(
     var isImagePreviewMode by rememberSaveable { mutableStateOf<Boolean?>(null) }
     var isAutoImagePreview by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(
-        fileViewModel.pathList,
+        contentState.pathList,
         refreshing,
-        fileBeanList.toList(),
+        fileBeanList,
         settingUiState.autoImagePreviewCount
     ) {
         val threshold = settingUiState.autoImagePreviewCount.toIntOrNull() ?: 0
@@ -132,7 +133,7 @@ fun FileScreen(
         }
     }
 
-    LaunchedEffect(fileViewModel.pathList) {
+    LaunchedEffect(contentState.pathList) {
         isImagePreviewMode = null
     }
 
@@ -149,7 +150,7 @@ fun FileScreen(
         isNotificationEnabled = context.isNotificationEnabled()
     }
 
-    val isIgnoringBatteryOptimizations = fileViewModel.isIgnoringBatteryOptimizations
+    val isIgnoringBatteryOptimizations by fileViewModel.isIgnoringBatteryOptimizations.collectAsStateWithLifecycle()
     val isBatteryBannerDismissed = settingUiState.hideBatteryBanner
 
     val batterySettingLauncher = rememberLauncherForActivityResult(
@@ -158,18 +159,18 @@ fun FileScreen(
         fileViewModel.refreshBatteryOptimizations()
     }
 
-    val listLocation = fileViewModel.getListLocation(fileViewModel.currentCid)
-    val listState = key(fileViewModel.currentCid) {
+    val listLocation = fileViewModel.getListLocation(contentState.currentCid)
+    val listState = key(contentState.currentCid) {
         rememberLazyListState(
             listLocation.firstVisibleItemIndex, listLocation.firstVisibleItemScrollOffset
         )
     }
-    val gridState = key(fileViewModel.currentCid) {
+    val gridState = key(contentState.currentCid) {
         rememberLazyGridState(
             listLocation.firstVisibleItemIndex, listLocation.firstVisibleItemScrollOffset
         )
     }
-    val staggeredGrid = key(fileViewModel.currentCid) {
+    val staggeredGrid = key(contentState.currentCid) {
         rememberLazyStaggeredGridState(
             listLocation.firstVisibleItemIndex, listLocation.firstVisibleItemScrollOffset
         )
@@ -304,8 +305,8 @@ fun FileScreen(
         if (drawerState.invoke()) {
             return
         }
-        if (fileViewModel.currentCid != "0" && !fileViewModel.isLongClickState) {
-            val currentCid = fileViewModel.currentCid
+        if (contentState.currentCid != "0" && !contentState.isLongClickState) {
+            val currentCid = contentState.currentCid
             val state = when {
                 isPreviewActive -> staggeredGrid.asScrollState
                 isGridScreen -> gridState.asScrollState
@@ -320,7 +321,7 @@ fun FileScreen(
     }
 
     BackHandler(
-        fileViewModel.currentCid != "0" || fileViewModel.isLongClickState || fileViewModel.isSearchState,
+        contentState.currentCid != "0" || contentState.isLongClickState || contentState.isSearchState,
         ::onBack
     )
 
@@ -332,7 +333,7 @@ fun FileScreen(
     fun myAppBarOnClick(action: AppBarAction) {
         when (action) {
             TopBarAction.BACK -> {
-                if (fileViewModel.currentCid == "0" && !fileViewModel.isLongClickState) {
+                if (contentState.currentCid == "0" && !contentState.isLongClickState) {
                     openDrawer()
                     return
                 }
@@ -373,11 +374,10 @@ fun FileScreen(
     }
 
     fun itemOnLongClick(i: Int) {
-        fileViewModel.isLongClickState = !fileViewModel.isLongClickState
-        if (fileViewModel.isLongClickState) {
-            fileViewModel.select(i)
+        if (!contentState.isLongClickState) {
+            fileViewModel.startMultiSelect(i)
         } else {
-            fileViewModel.appBarTitle = "nap511"
+            fileViewModel.clearSelection()
         }
     }
 
@@ -406,7 +406,7 @@ fun FileScreen(
 
         val pathActions = FilePathActions(
             onPathClick = {
-                val pathString = fileViewModel.pathList.joinToString("/") { it.name }
+                val pathString = contentState.pathList.joinToString("/") { it.name }
                 pathString.copy(context)
                 App.instance.toast("$pathString 已复制到剪切板")
             },
@@ -418,15 +418,15 @@ fun FileScreen(
             onPathLongClick = { name, cid ->
                 scope.launch {
                     SettingsRepository.saveData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, cid)
-                    val index = fileViewModel.pathList.indexOfFirst { it.cid == cid }
-                    val pathString = fileViewModel.pathList.take(index + 1)
+                    val index = contentState.pathList.indexOfFirst { it.cid == cid }
+                    val pathString = contentState.pathList.take(index + 1)
                         .joinToString(separator = "/") { it.name }
                     SettingsRepository.saveData(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, pathString)
                 }
                 App.instance.toast("设置默认离线位置为: $name")
             },
             onPathItemClick = {
-                if (it != fileViewModel.currentCid) {
+                if (it != contentState.currentCid) {
                     fileViewModel.getFiles(it)
                 }
             }
@@ -441,8 +441,9 @@ fun FileScreen(
             onCut = { fileViewModel.cut(it) },
             onDelete = { fileViewModel.delete(it) },
             onRename = { index ->
-                fileViewModel.selectIndex = index
-                fileViewModel.openRenameFileDialog()
+                contentState.fileBeanList.getOrNull(index)?.let { fileBean ->
+                    fileViewModel.openRenameFileDialog(fileBean)
+                }
             },
             onFileInfo = { fileBean ->
                 fileViewModel.getFileInfo(fileBean)
@@ -464,7 +465,7 @@ fun FileScreen(
                         ConfigKeyUtil.DEFAULT_OFFLINE_CID, fileBean.categoryId
                     )
                     val pathString =
-                        fileViewModel.pathList.joinToString(separator = "/") { it.name } + "/${fileBean.name}"
+                        contentState.pathList.joinToString(separator = "/") { it.name } + "/${fileBean.name}"
                     SettingsRepository.saveData(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, pathString)
                 }
                 App.instance.toast("设置默认离线位置为: ${fileBean.name}")
@@ -489,23 +490,24 @@ fun FileScreen(
         imageLoader,
         clipboardManager,
         scope,
-        context
+        context,
+        contentState
     ) {
         fileContentActions()
     }
 
     val scaffoldState = FileScaffoldState(
-        isLongClickState = fileViewModel.isLongClickState,
-        appBarTitle = fileViewModel.appBarTitle,
+        isLongClickState = contentState.isLongClickState,
+        appBarTitle = contentState.appBarTitle,
         isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE,
         isGridScreen = isGridScreen,
         isBottomBarShow = isBottomBarShow,
         isTopBarShow = isTopBarShow,
         hasCurrentMusic = audioViewModel.uiState.playback.currentMusic != null,
-        isCutState = fileViewModel.isCutState,
+        isCutState = contentState.isCutState,
         fabPosition = fabPosition,
         nestedScrollConnection = nestedScrollConnection,
-        currentCid = fileViewModel.currentCid
+        currentCid = contentState.currentCid
     )
 
     val currentAppBarOnClick by rememberUpdatedState(::myAppBarOnClick)
@@ -519,12 +521,12 @@ fun FileScreen(
     }
 
     val contentDataState = FileListDataState(
-        currentCid = fileViewModel.currentCid,
-        pathList = fileViewModel.pathList,
+        currentCid = contentState.currentCid,
+        pathList = contentState.pathList,
         fileBeanList = fileBeanList,
         refreshing = refreshing,
-        clickIndex = fileViewModel.clickMap.getOrDefault(fileViewModel.currentCid, -1),
-        imageCache = fileViewModel.imageBeanCache[fileViewModel.currentCid]
+        clickIndex = fileViewModel.clickMap.getOrDefault(contentState.currentCid, -1),
+        imageCache = fileViewModel.imageBeanCache[contentState.currentCid]
     )
 
     val bannerState = FileBannerState(

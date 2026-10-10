@@ -3,6 +3,7 @@ package github.zerorooot.nap511.viewmodel
 import androidx.lifecycle.viewModelScope
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.onFailureToastAndLog
@@ -14,22 +15,25 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * FileViewModel 的扩展函数：解压相关
+ * FileViewModel 的扩展函数：解压相关（淘汰全局 selectIndex，全面显式接收 FileBean 参数）
  */
 internal fun FileViewModel.getZipListFile(
-    fileName: String = "", paths: String = "文件", isCheck: Boolean = true
+    fileBean: FileBean? = dialogState.value.targetFileBean,
+    fileName: String = "",
+    paths: String = "文件",
+    isCheck: Boolean = true
 ) {
+    val targetBean = fileBean ?: dialogState.value.targetFileBean ?: return
     viewModelScope.launch {
-        val fileBean = fileBeanList[selectIndex]
         if (isCheck && paths == "文件") {
             var isInterrupted = false
             runCatching {
-                fileRepository.checkZipStatus(fileBean.pickCode)
+                fileRepository.checkZipStatus(targetBean.pickCode)
             }.onSuccess { status ->
                 when (status) {
                     is ZipStatus.Encrypted -> {
-                        XLog.i("${fileBean.name} 是加密压缩包，拦截流程并弹窗")
-                        openUnzipPasswordDialog()
+                        XLog.i("${targetBean.name} 是加密压缩包，拦截流程并弹窗")
+                        openUnzipPasswordDialog(targetBean)
                         setRefreshingStatus(false)
                         isInterrupted = true
                     }
@@ -42,12 +46,12 @@ internal fun FileViewModel.getZipListFile(
                     }
 
                     is ZipStatus.Normal -> {
-                        XLog.d("${fileBean.name} 为普通压缩包，准备直接打开")
+                        XLog.d("${targetBean.name} 为普通压缩包，准备直接打开")
                     }
 
                     is ZipStatus.Loading -> {
                         val message = "正在进行云解压，请稍等...(${status.progress}%)"
-                        XLog.i("${fileBean.name} 要云解压，$message")
+                        XLog.i("${targetBean.name} 要云解压，$message")
                         App.instance.toast(message)
                         setRefreshingStatus(false)
                         isInterrupted = true
@@ -59,10 +63,15 @@ internal fun FileViewModel.getZipListFile(
         }
 
         runCatching {
-            fileRepository.getZipListFile(fileBean.pickCode, fileName, paths)
+            fileRepository.getZipListFile(targetBean.pickCode, fileName, paths)
         }.onSuccess { zipList ->
-            unzipBeanList.value = zipList
-            openUnzipDialog()
+            updateDialogState {
+                copy(
+                    unzipBeanList = zipList,
+                    activeDialog = FileDialogState.Unzip,
+                    targetFileBean = targetBean
+                )
+            }
         }.onFailure { e ->
             setRefreshingStatus(false) // 失败时也确保关闭
             val logTag = resolveCallerTag()
@@ -80,7 +89,6 @@ internal fun FileViewModel.unzipFile(fileBean: FileBean) {
         unzipFile(arrayListOf, cid)
     }
 }
-
 
 internal fun FileViewModel.unzipFile(fileBeansList: List<FileBean>, cid: String, pwd: String = "") {
     viewModelScope.launch(Dispatchers.IO) {
@@ -102,10 +110,10 @@ internal fun FileViewModel.unzipFile(fileBeansList: List<FileBean>, cid: String,
     }
 }
 
-internal fun FileViewModel.decryptZip(secret: String) {
+internal fun FileViewModel.decryptZip(fileBean: FileBean? = dialogState.value.targetFileBean, secret: String) {
+    val targetBean = fileBean ?: dialogState.value.targetFileBean ?: return
     viewModelScope.launch {
-        val fileBean = fileBeanList[selectIndex]
-        val pickCode = fileBean.pickCode
+        val pickCode = targetBean.pickCode
         closeUnzipPasswordDialog()
         runCatching {
             val decryptZip = fileRepository.decryptZip(pickCode, secret)
@@ -115,7 +123,7 @@ internal fun FileViewModel.decryptZip(secret: String) {
             }
 
             if (fileRepository.tryToExtract(pickCode)) {
-                getZipListFile(isCheck = true)
+                getZipListFile(targetBean, isCheck = true)
             } else {
                 App.instance.toast("服务器解压中～")
             }

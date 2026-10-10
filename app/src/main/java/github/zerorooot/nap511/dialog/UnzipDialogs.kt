@@ -18,6 +18,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -47,8 +48,9 @@ fun UnzipPassword(fileBean: FileBean, enter: (String?) -> Unit) {
 
 @Composable
 fun UnzipDialog(fileViewModel: FileViewModel) {
-    val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
-    val zipBeanList by fileViewModel.unzipBeanList
+    val dialogState by fileViewModel.dialogState.collectAsStateWithLifecycle()
+    val fileBean = dialogState.targetFileBean ?: return
+    val zipBeanList = dialogState.unzipBeanList
     LaunchedEffect(Unit) {
         fileViewModel.setRefreshingStatus(false)
     }
@@ -68,7 +70,7 @@ fun UnzipDialog(fileViewModel: FileViewModel) {
                         paths = path.subList(0, path.size - 2).joinToString(separator = "/")
                     } catch (_: Exception) {
                     }
-                    fileViewModel.getZipListFile(fileName, paths)
+                    fileViewModel.getZipListFile(fileBean, fileName, paths)
                 }
 
                 "unzipAll" -> {
@@ -78,7 +80,7 @@ fun UnzipDialog(fileViewModel: FileViewModel) {
             }
         } else {
             fileViewModel.getZipListFile(
-                it.second, paths = zipBeanList.pathString
+                fileBean, it.second, paths = zipBeanList.pathString
             )
         }
     }
@@ -108,8 +110,7 @@ fun UnzipAllFile(
             }
         App.instance.toast(message)
 
-        fileViewModel.recoverFromLongPress()
-        fileViewModel.unSelect()
+        fileViewModel.clearSelection()
     }
 }
 

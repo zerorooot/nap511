@@ -2,6 +2,7 @@ package github.zerorooot.nap511.viewmodel
 
 import androidx.lifecycle.viewModelScope
 import com.elvishew.xlog.XLog
+import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.network.UserSessionManager
@@ -10,11 +11,16 @@ import kotlinx.coroutines.launch
 
 
 internal fun FileViewModel.getTorrentTask(sha1: String) {
-    torrentBean = TorrentFileBean()
+    updateDialogState { copy(torrentBean = TorrentFileBean()) }
     // 命中缓存的情况
-    if (torrentBeanCache.contains(sha1)) {
-        torrentBean = torrentBeanCache[sha1]!!
-        openCreateSelectTorrentFileDialog()
+    val cached = torrentBeanCache[sha1]
+    if (cached != null) {
+        updateDialogState {
+            copy(
+                torrentBean = cached,
+                activeDialog = FileDialogState.CreateSelectTorrentFile
+            )
+        }
         setRefreshingStatus(false)
         return
     }
@@ -42,10 +48,12 @@ internal fun FileViewModel.getTorrentTask(sha1: String) {
             torrentBeanCache[sha1] = torrentTask
             torrentTask.torrentFileListWeb.removeIf { f -> f.wanted == -1 }
             torrentTask.fileCount = torrentTask.torrentFileListWeb.size
-            torrentBean = torrentTask
-
-            // 数据准备完毕后打开对话框并关闭 Loading
-            openCreateSelectTorrentFileDialog()
+            updateDialogState {
+                copy(
+                    torrentBean = torrentTask,
+                    activeDialog = FileDialogState.CreateSelectTorrentFile
+                )
+            }
             setRefreshingStatus(false)
         }.onFailure {
             setRefreshingStatus(false)

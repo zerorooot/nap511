@@ -7,6 +7,7 @@ import coil.imageLoader
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.RenameBean
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.FileCacheManager
@@ -22,34 +23,42 @@ import kotlin.math.roundToInt
  * FileViewModel 的扩展函数：文件操作（创建、删除、重命名、剪切、文件信息）
  */
 internal fun FileViewModel.cut(index: Int = -1) {
-    cutFileList = if (index == -1) {
-        fileBeanList.filter { i -> i.isSelect }
+    val itemsToCut = if (index == -1) {
+        fileBeanList.filter { it.isSelect }
     } else {
-        select(index)
-        arrayListOf(fileBeanList[index])
+        fileBeanList.getOrNull(index)?.let { listOf(it) } ?: emptyList()
     }
-    isCutState = true
-    recoverFromLongPress()
-    unSelect()
+    updateContentState {
+        copy(
+            isCutState = true,
+            cutFileList = itemsToCut,
+            isLongClickState = false,
+            fileBeanList = fileBeanList.map { it.copy(isSelect = false) },
+            appBarTitle = if (isSearchState) "搜索" else context.getString(R.string.app_name)
+        )
+    }
 }
 
 internal fun FileViewModel.cancelCut() {
-    unSelect()
-    isCutState = false
-    cutFileList = emptyList()
+    updateContentState {
+        copy(
+            isCutState = false,
+            cutFileList = emptyList()
+        )
+    }
 }
 
 internal fun FileViewModel.removeFile() {
-    if (cutFileList.isEmpty()) {
-        isCutState = false
+    val cutList = contentState.value.cutFileList
+    if (cutList.isEmpty()) {
+        updateContentState { copy(isCutState = false) }
         return
     }
 
-    //提前保存cid,防止进入其他文件夹后刷新当前目录
     val targetCid = currentCid
-    isCutState = false
+    updateContentState { copy(isCutState = false) }
 
-    val fileCid = cutFileList[0].let { if (it.isFolder) it.parentId else it.categoryId }
+    val fileCid = cutList[0].let { if (it.isFolder) it.parentId else it.categoryId }
     if (fileCid == targetCid) {
         App.instance.toast("禁止原地移动～")
         return
@@ -58,13 +67,13 @@ internal fun FileViewModel.removeFile() {
     setRefreshingStatus(true)
     viewModelScope.launch {
         runCatching {
-            val move = fileRepository.removeAllFile(targetCid, cutFileList)
+            val move = fileRepository.removeAllFile(targetCid, cutList)
             if (move.state) {
-                cutFileList = cutFileList.map { it.copy(isSelect = false) }
                 // 统一委托 FileCacheManager 移除剪切的文件并清理子文件夹缓存
-                FileCacheManager.removeItems(fileCid, cutFileList.map { it.fileId })
+                FileCacheManager.removeItems(fileCid, cutList.map { it.fileId })
+                updateContentState { copy(cutFileList = emptyList()) }
                 refresh(targetCid)
-                "移动${cutFileList.size}个文件成功"
+                "移动${cutList.size}个文件成功"
             } else {
                 "移动失败~"
             }
@@ -94,51 +103,58 @@ internal fun FileViewModel.createFolder(folderName: String) {
 
 internal fun FileViewModel.getFileInfo(fileBean: FileBean) {
     viewModelScope.launch {
-        _isRefreshing.value = true
+        setRefreshingStatus(true)
         runCatching {
-            fileInfo = if (fileBean.isFolder) {
+            val info = if (fileBean.isFolder) {
                 fileRepository.getFileInfo(fileBean.categoryId)
             } else {
                 fileRepository.getFileInfo(fileBean.fileId)
             }
-            XLog.d("file ${fileBean.name} fileInfo $fileInfo ; file bean $fileBean")
-            openFileInfoDialog()
+            XLog.d("file ${fileBean.name} fileInfo $info ; file bean $fileBean")
+            updateDialogState {
+                copy(
+                    fileInfo = info,
+                    targetFileBean = fileBean,
+                    activeDialog = FileDialogState.FileInfo
+                )
+            }
         }.onFailureToastAndLog()
-        _isRefreshing.value = false
+        setRefreshingStatus(false)
     }
 }
 
 @OptIn(ExperimentalCoilApi::class)
 internal fun FileViewModel.delete(fileBean: FileBean) {
     viewModelScope.launch {
+        val cid = currentCid
         val beforeList = fileBeanList
-        val beforeClickMap = clickMap.getOrDefault(currentCid, 0)
-        val beforeImageBeanCache = imageBeanCache.getOrDefault(currentCid, hashMapOf())
+        val beforeClickMap = clickMap.getOrDefault(cid, 0)
 
-        // 提前删除，优化速度并取得安全撤销句柄
-        fileBeanList.remove(fileBean)
-        val rollback = FileCacheManager.removeItem(currentCid, fileBean.fileId, fileBean.isFolder)
-        clickMap[currentCid] = clickMap.getOrDefault(currentCid, 0) - 1
+        // 提前更新内存不可变列表，优化交互响应速度并取得安全撤销句柄
+        updateContentState {
+            copy(fileBeanList = fileBeanList.filterNot { it.fileId == fileBean.fileId })
+        }
+        val rollback = FileCacheManager.removeItem(cid, fileBean.fileId, fileBean.isFolder)
+        clickMap[cid] = clickMap.getOrDefault(cid, 0) - 1
 
         // delete image bean
-        imageBeanCache[currentCid]?.remove(fileBean.pickCode)
+        imageBeanCache[cid]?.remove(fileBean.pickCode)
 
         val fid = fileBean.fileId
-        val pid = currentCid
+        val pid = cid
 
         runCatching {
             val delete = fileRepository.delete(pid, fid)
             if (delete.state) {
                 // 删除coil图片缓存
-                if (fileBean.photoThumb != "") {
+                if (fileBean.photoThumb.isNotEmpty()) {
                     context.imageLoader.deleteCoilCache(fileBean.pickCode)
                 }
                 "删除 ${fileBean.name} 成功"
             } else {
-                fileBeanList = beforeList
+                updateContentState { copy(fileBeanList = beforeList) }
                 rollback?.rollback()
-                clickMap[currentCid] = beforeClickMap
-                imageBeanCache[currentCid] = beforeImageBeanCache
+                clickMap[cid] = beforeClickMap
                 "删除 ${fileBean.name} 失败~${delete.errorMsg}"
             }
         }.onSuccess { message ->
@@ -147,20 +163,27 @@ internal fun FileViewModel.delete(fileBean: FileBean) {
     }
 }
 
-internal fun FileViewModel.rename(name: String) {
+internal fun FileViewModel.rename(fileBean: FileBean? = dialogState.value.targetFileBean, name: String) {
+    val targetBean = fileBean ?: dialogState.value.targetFileBean ?: return
     viewModelScope.launch {
         val cid = currentCid
-        val fileBean = fileBeanList[selectIndex]
-        // 提前重命名，提升响应速度并获取回滚闭包
-        fileBeanList[selectIndex] = fileBean.copy(name = name)
-        val rollback = FileCacheManager.renameItem(cid, fileBean.fileId, name)
+        val beforeList = fileBeanList
+        // 提前在不可变列表替换，提升响应速度并获取回滚闭包
+        updateContentState {
+            copy(
+                fileBeanList = fileBeanList.map {
+                    if (it.fileId == targetBean.fileId) it.copy(name = name) else it
+                }
+            )
+        }
+        val rollback = FileCacheManager.renameItem(cid, targetBean.fileId, name)
 
         runCatching {
-            val rename = fileRepository.rename(RenameBean(fileBean.fileId, name).toRequestBody())
+            val rename = fileRepository.rename(RenameBean(targetBean.fileId, name).toRequestBody())
             if (rename.state) {
                 "重命名成功"
             } else {
-                fileBeanList[selectIndex] = fileBean
+                updateContentState { copy(fileBeanList = beforeList) }
                 rollback?.rollback()
                 "重命名失败"
             }
@@ -175,13 +198,15 @@ internal fun FileViewModel.deleteMultiple() {
     viewModelScope.launch {
         val cid = currentCid
         val beforeList = fileBeanList
-        val beforeClickMap = clickMap.getOrDefault(currentCid, 0)
+        val beforeClickMap = clickMap.getOrDefault(cid, 0)
 
         val mapOf = hashMapOf<String, String>()
         mapOf["ignore_warn"] = "1"
         mapOf["pid"] = cid
-        val filter = fileBeanList.filter { i -> i.isSelect }
-        filter.forEachIndexed { index: Int, fileBean: FileBean ->
+        val selectedFiles = fileBeanList.filter { it.isSelect }
+        if (selectedFiles.isEmpty()) return@launch
+
+        selectedFiles.forEachIndexed { index: Int, fileBean: FileBean ->
             mapOf["fid[$index]"] = fileBean.fileId
             // update image cache
             imageBeanCache[cid]?.remove(fileBean.pickCode)
@@ -190,21 +215,26 @@ internal fun FileViewModel.deleteMultiple() {
             }
         }
         // 提前删除并获取批量回滚闭包
-        fileBeanList.removeAll(filter)
-        val rollback = FileCacheManager.removeItems(cid, filter.map { it.fileId })
-        clickMap[currentCid] = clickMap.getOrDefault(currentCid, 0) - filter.size
-
-        recoverFromLongPress()
+        val selectedIds = selectedFiles.map { it.fileId }.toSet()
+        updateContentState {
+            copy(
+                fileBeanList = fileBeanList.filterNot { it.fileId in selectedIds },
+                isLongClickState = false,
+                appBarTitle = if (isSearchState) "搜索" else context.getString(R.string.app_name)
+            )
+        }
+        val rollback = FileCacheManager.removeItems(cid, selectedFiles.map { it.fileId })
+        clickMap[cid] = clickMap.getOrDefault(cid, 0) - selectedFiles.size
 
         runCatching {
             val deleteMultiple = fileRepository.deleteMultiple(mapOf)
             if (deleteMultiple.state) {
-                "成功删除 ${filter.size} 个文件"
+                "成功删除 ${selectedFiles.size} 个文件"
             } else {
-                fileBeanList = beforeList
+                updateContentState { copy(fileBeanList = beforeList) }
                 rollback?.rollback()
-                clickMap[currentCid] = beforeClickMap
-                "删除 ${filter.size} 个文件失败~"
+                clickMap[cid] = beforeClickMap
+                "删除 ${selectedFiles.size} 个文件失败~"
             }
         }.onSuccess { message ->
             App.instance.toast(message)

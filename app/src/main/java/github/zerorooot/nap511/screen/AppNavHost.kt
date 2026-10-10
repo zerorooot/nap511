@@ -115,12 +115,8 @@ fun AppNavHost(
             }
 
             override fun openZip(fileBean: FileBean) {
-                val index =
-                    fileViewModel.fileBeanList.indexOfFirst { it.pickCode == fileBean.pickCode }
-                if (index >= 0) {
-                    fileViewModel.selectIndex = index
-                }
-                fileViewModel.getZipListFile()
+                // 直接传递目标 fileBean，避免索引脆弱性与越界异常
+                fileViewModel.getZipListFile(fileBean)
             }
         }
     }
@@ -350,8 +346,7 @@ fun AppNavHost(
             }
 
             entry<Route.Photo> {
-                val photoList =
-                    mediaViewerStateHolder.photoFileBeanList.ifEmpty { fileViewModel.photoFileBeanList }
+                val photoList = mediaViewerStateHolder.photoFileBeanList
                 val photoIndex = mediaViewerStateHolder.photoIndexOf
                 val photoCid = mediaViewerStateHolder.photoCid.ifEmpty { fileViewModel.currentCid }
                 MyPhotoScreen(
@@ -377,8 +372,7 @@ fun AppNavHost(
             }
 
             entry<Route.TxtReader> { route ->
-                val byteArray =
-                    mediaViewerStateHolder.textBodyByteArray ?: fileViewModel.textBodyByteArray
+                val byteArray = mediaViewerStateHolder.textBodyByteArray
 
                 LaunchedEffect(byteArray) {
                     if (byteArray == null) {
@@ -402,8 +396,7 @@ fun AppNavHost(
             }
 
             entry<Route.HtmlWebViewScreen> { route ->
-                val byteArray =
-                    mediaViewerStateHolder.webBodyByteArray ?: fileViewModel.webBodyByteArray
+                val byteArray = mediaViewerStateHolder.webBodyByteArray
 
                 LaunchedEffect(byteArray) {
                     if (byteArray == null) {

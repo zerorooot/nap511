@@ -62,7 +62,6 @@ import androidx.compose.ui.window.DialogProperties
 import com.google.gson.JsonObject
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
-import github.zerorooot.nap511.viewmodel.closeTextBodyDialog
 import kotlinx.coroutines.delay
 import java.nio.charset.Charset
 import kotlin.system.exitProcess

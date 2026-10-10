@@ -26,7 +26,9 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.FileContentUiState
 import github.zerorooot.nap511.bean.FileDialogState
+import github.zerorooot.nap511.bean.FileDialogUiState
 import github.zerorooot.nap511.bean.FileInfo
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.ImageBean
@@ -61,9 +63,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
+import java.util.concurrent.ConcurrentHashMap
 
 @SuppressLint("MutableCollectionMutableState")
 class FileViewModel(
@@ -76,52 +80,63 @@ class FileViewModel(
     val settingUiState: SettingUiState
         get() = settingUiStateFlow.value
 
-    var fileBeanList = mutableStateListOf<FileBean>()
-    var unzipBeanList = mutableStateOf(ZipBeanList())
-    var remainingSpace by mutableStateOf(RemainingSpaceBean())
-    var textBodyByteArray by mutableStateOf<ByteArray?>(null)
-    var webBodyByteArray by mutableStateOf<ByteArray?>(null)
+    // ==================== 核心状态流 (分域双 Flow 规范) ====================
 
-    var appBarTitle by mutableStateOf(context.getString(R.string.app_name))
+    /** 1. 文件列表核心浏览与模式状态流 */
+    private val _contentState = MutableStateFlow(FileContentUiState(appBarTitle = context.getString(R.string.app_name)))
+    val contentState: StateFlow<FileContentUiState> = _contentState.asStateFlow()
 
-    var currentCid by mutableStateOf("0")
+    /** 2. 弹窗交互独立状态流（与列表展示彻底物理隔离） */
+    private val _dialogState = MutableStateFlow(FileDialogUiState())
+    val dialogState: StateFlow<FileDialogUiState> = _dialogState.asStateFlow()
 
-    internal var saveRequestCache by mutableStateOf(true)
+    /** 3. 存储空间状态流（供 MainScreen 抽屉独立观察） */
+    private val _remainingSpace = MutableStateFlow(RemainingSpaceBean())
+    val remainingSpace: StateFlow<RemainingSpaceBean> = _remainingSpace.asStateFlow()
 
-    var pathList by mutableStateOf<List<PathBean>>(emptyList())
-        private set
+    /** 4. 电池优化状态流（初始化与手动刷新时发射） */
+    private val _isIgnoringBatteryOptimizations = MutableStateFlow(false)
+    val isIgnoringBatteryOptimizations: StateFlow<Boolean> = _isIgnoringBatteryOptimizations.asStateFlow()
 
-    internal var cutFileList = emptyList<FileBean>()
+    // 便捷只读属性访问器（供内部方法与平滑过渡）
+    val fileBeanList: List<FileBean>
+        get() = _contentState.value.fileBeanList
+    val currentCid: String
+        get() = _contentState.value.currentCid
+    val pathList: List<PathBean>
+        get() = _contentState.value.pathList
+    val isLongClickState: Boolean
+        get() = _contentState.value.isLongClickState
+    val isCutState: Boolean
+        get() = _contentState.value.isCutState
+    val isSearchState: Boolean
+        get() = _contentState.value.isSearchState
+    val isRefreshing: StateFlow<Boolean>
+        get() = MutableStateFlow(_contentState.value.isRefreshing).asStateFlow()
+    val orderBean: OrderBean
+        get() = _contentState.value.orderBean
 
 
-    internal val _isRefreshing = MutableStateFlow(false)
-    var isRefreshing = _isRefreshing.asStateFlow()
+    // ==================== 内部线程安全缓存（解耦，不触发 UI 整体重组） ====================
+    val clickMap = ConcurrentHashMap<String, Int>()
+    val imageBeanCache = ConcurrentHashMap<String, MutableMap<String, ImageBean>>()
+    internal val imageLoadingSet = hashSetOf<String>()
+    val torrentBeanCache = ConcurrentHashMap<String, TorrentFileBean>()
+    private val currentLocation = ConcurrentHashMap<String, LocationBean>()
 
-
-    var torrentBean by mutableStateOf(TorrentFileBean())
-    val torrentBeanCache = hashMapOf<String, TorrentFileBean>()
-
-    var activeDialog by mutableStateOf<FileDialogState>(FileDialogState.None)
-        internal set
+    internal var saveRequestCache: Boolean = true
 
     fun closeDialog() {
-        activeDialog = FileDialogState.None
+        _dialogState.update { FileDialogUiState() }
     }
 
-
-    /**
-     * 电池优化状态（整个应用生命周期内只在初始化时检测一次）
-     */
-    var isIgnoringBatteryOptimizations by mutableStateOf(false)
-        private set
-
     fun refreshBatteryOptimizations() {
-        isIgnoringBatteryOptimizations = context.isIgnoringBatteryOptimizations()
+        _isIgnoringBatteryOptimizations.value = context.isIgnoringBatteryOptimizations()
     }
 
     init {
         // 仅在进程启动/ViewModel 初始化时执行唯一一次检测
-        isIgnoringBatteryOptimizations = context.isIgnoringBatteryOptimizations()
+        _isIgnoringBatteryOptimizations.value = context.isIgnoringBatteryOptimizations()
 
         viewModelScope.launch {
             settingUiStateFlow.collect { settings ->
@@ -136,34 +151,14 @@ class FileViewModel(
         }
     }
 
+    /** 内部状态更新减速器助手 */
+    internal fun updateContentState(reducer: FileContentUiState.() -> FileContentUiState) {
+        _contentState.update(reducer)
+    }
 
-    /**
-     *所选中的文件/文件夹
-     */
-    var selectIndex by mutableIntStateOf(0)
-
-    //图片浏览相关
-    var photoFileBeanList = mutableListOf<FileBean>()
-    var photoIndexOf by mutableIntStateOf(-1)
-
-    val imageBeanCache = mutableStateMapOf<String, HashMap<String, ImageBean>>()
-    internal val imageLoadingSet = hashSetOf<String>()
-
-    //位置与点击记录相关
-    val clickMap = mutableStateMapOf<String, Int>()
-    private var currentLocation = hashMapOf<String, LocationBean>()
-
-    //相关状态
-    var isLongClickState: Boolean by mutableStateOf(false)
-        internal set
-    var isCutState: Boolean by mutableStateOf(false)
-        internal set
-    var isSearchState: Boolean by mutableStateOf(false)
-        internal set
-
-    var fileInfo by mutableStateOf(FileInfo())
-
-    var orderBean = OrderBean(OrderEnum.name, 1)
+    internal fun updateDialogState(reducer: FileDialogUiState.() -> FileDialogUiState) {
+        _dialogState.update(reducer)
+    }
     internal val fileRepository: FileRepository by lazy {
         FileRepository.getInstance()
     }
@@ -226,11 +221,11 @@ class FileViewModel(
     fun loadCacheFile() {
         if (isInitialized) return
         isInitialized = true
-        _isRefreshing.value = true
+        setRefreshingStatus(true)
         viewModelScope.launch(Dispatchers.IO) {
             // 优先校验登录状态
             if (UserSessionManager.cookie.isBlank()) {
-                _isRefreshing.value = false
+                setRefreshingStatus(false)
                 // 未登录：静默发送跳转登录页事件
                 _navigationEvent.send(NavEvent.NavigateToScreen(Route.Login))
                 return@launch
@@ -260,26 +255,31 @@ class FileViewModel(
 
     fun back() {
         if (isLongClickState) {
-            recoverFromLongPress()
-            unSelect()
+            clearSelection()
             return
         }
 
         if (isSearchState) {
-            fileBeanList.clear()
-            setFiles(FileCacheManager.getDate(currentCid)!!)
-            appBarTitle = context.getString(R.string.app_name)
-            isSearchState = false
+            val cache = FileCacheManager.getDate(currentCid)
+            if (cache != null) {
+                setFiles(cache)
+            }
+            updateContentState {
+                copy(
+                    isSearchState = false,
+                    appBarTitle = context.getString(R.string.app_name)
+                )
+            }
             return
         }
 
-        if (currentCid != "0") {
+        if (currentCid != "0" && pathList.size >= 2) {
             getFiles(pathList[pathList.size - 2].cid)
             return
         }
 
         if (isCutState) {
-            isCutState = false
+            updateContentState { copy(isCutState = false, cutFileList = emptyList()) }
             return
         }
     }
@@ -297,14 +297,11 @@ class FileViewModel(
     }
 
     fun getListLocation(currentCid: String): LocationBean {
-        return currentLocation[currentCid] ?: run {
-            LocationBean(0, 0)
-        }
+        return currentLocation[currentCid] ?: LocationBean(0, 0)
     }
 
-
     fun setRefreshingStatus(status: Boolean) {
-        _isRefreshing.value = status
+        updateContentState { copy(isRefreshing = status) }
     }
 
     /**
@@ -316,7 +313,7 @@ class FileViewModel(
                 val gson = fileRepository.remainingSpace()
                 if (gson.get("state").asBoolean) {
                     val spaceInfoJson = gson.getAsJsonObject("data").get("space_info")
-                    remainingSpace = Gson().fromJson(spaceInfoJson, RemainingSpaceBean::class.java)
+                    _remainingSpace.value = Gson().fromJson(spaceInfoJson, RemainingSpaceBean::class.java)
                 }
             }.onFailureToastAndLog()
         }
@@ -327,11 +324,11 @@ class FileViewModel(
      */
     fun getFiles(cid: String) {
         viewModelScope.launch {
-            _isRefreshing.value = true
+            setRefreshingStatus(true)
             // 1. 尝试读取缓存
             if (FileCacheManager.containsKey(cid)) {
                 setFiles(FileCacheManager[cid]!!)
-                _isRefreshing.value = false
+                setRefreshingStatus(false)
                 return@launch
             }
 
@@ -351,17 +348,18 @@ class FileViewModel(
                     is HttpException if it.code() == 405 -> "HttpException 405，建议更新您的Cookie"
                     else -> null
                 }
-                if (expiredTip != null) {
+                val message=if (expiredTip != null) {
                     FileCacheManager.clearAll()
                     UserSessionManager.clearSession()
                     _navigationEvent.send(NavEvent.NavigateToScreen(Route.Login))
+                    expiredTip
                 } else {
                     XLog.e("getFiles Exception ", it)
-                    App.instance.toast("${it.message}，请重试～")
+                    "${it.message}，请重试～"
                 }
+                App.instance.toast(message)
             }
-            _isRefreshing.value = false
-
+            setRefreshingStatus(false)
         }
     }
 
@@ -384,28 +382,39 @@ class FileViewModel(
         }
     }
 
-    fun selectToUp() {
-        try {
-            val indexOf = fileBeanList.indexOf(fileBeanList.filter { i -> i.isSelect }[0])
-            for (i in 0..indexOf) {
-                select(i)
-            }
-        } catch (_: Exception) {
-            App.instance.toast("????????")
-        }
+    fun updateOrder(order: OrderBean) {
+        updateContentState { copy(orderBean = order) }
+        this.order()
+    }
 
+    fun selectToUp() {
+        updateContentState {
+            val firstSelectedIndex = fileBeanList.indexOfFirst { it.isSelect }
+            if (firstSelectedIndex == -1) return@updateContentState this
+
+            val list = fileBeanList.mapIndexed { idx, item ->
+                if (idx <= firstSelectedIndex) item.copy(isSelect = true) else item
+            }
+            copy(
+                fileBeanList = list,
+                appBarTitle = list.count { it.isSelect }.toString()
+            )
+        }
     }
 
     fun selectToDown() {
-        try {
-            val indexOf = fileBeanList.indexOf(fileBeanList.filter { i -> i.isSelect }[0])
-            for (i in indexOf until fileBeanList.size) {
-                select(i)
-            }
-        } catch (_: Exception) {
-            App.instance.toast("????????")
-        }
+        updateContentState {
+            val firstSelectedIndex = fileBeanList.indexOfFirst { it.isSelect }
+            if (firstSelectedIndex == -1) return@updateContentState this
 
+            val list = fileBeanList.mapIndexed { idx, item ->
+                if (idx >= firstSelectedIndex) item.copy(isSelect = true) else item
+            }
+            copy(
+                fileBeanList = list,
+                appBarTitle = list.count { it.isSelect }.toString()
+            )
+        }
     }
 
     fun deleteIndividualFile() {
@@ -418,8 +427,8 @@ class FileViewModel(
 
     @OptIn(ExperimentalCoilApi::class)
     internal fun refresh(cid: String, forceCache: Boolean = false) {
-        isSearchState = false
-        recoverFromLongPress()
+        clearSelection()
+        updateContentState { copy(isSearchState = false) }
         val refreshCurrent = (cid == currentCid)
         XLog.d("refresh refreshCurrent:$refreshCurrent, settingUiState.forceLoadCache:${settingUiState.forceLoadCache}, forceCache:$forceCache")
         viewModelScope.launch {
@@ -434,7 +443,7 @@ class FileViewModel(
                     }
                 } else {
                     // 【子目录精准定向清理】：在 IO 线程异步清理当前展示条目图标与原图缩略图，并静默递归清理子树缓存
-                    cleanFileListCoilCache(fileBeanList.toList())
+                    cleanFileListCoilCache(fileBeanList)
                     removeFolderCacheRecursively(cid)
                 }
             } else {
@@ -453,8 +462,14 @@ class FileViewModel(
     /**
      * 响应 FileCacheManager 的全局缓存变更事件，实现 UI 实时同步
      */
-    private fun handleCacheEvent(event: CacheEvent) {
-        XLog.d("handleCacheEvent $event")
+    private suspend fun handleCacheEvent(event: CacheEvent) {
+        val dirName = when (event) {
+            is CacheEvent.LocalUiUpdated -> resolveDirName(event.cid)
+            is CacheEvent.RemoteRefreshRequired -> resolveDirName(event.cid)
+            is CacheEvent.FolderDeleted -> resolveDirName(event.folderCid)
+            is CacheEvent.AllCleared -> "全部目录"
+        }
+        XLog.d("handleCacheEvent $event (dir: $dirName)")
         when (event) {
             is CacheEvent.LocalUiUpdated -> {
                 // 【本地 UI 刷新逻辑】：
@@ -472,15 +487,19 @@ class FileViewModel(
                 //    处理策略：FileCacheManager 已经在后台内存和磁盘中维护好了 event.cid 对应的最新数据；由于用户当前并没有在看 event.cid，
                 //    因此当前屏幕展示的 fileBeanList 绝对不需要变动，无需做任何处理。待用户未来切入该目录时即可天然读到已更新好的最新缓存。
                 if (event.cid == currentCid) {
-                    val updatedCache = FileCacheManager.getDate(event.cid)
+                    val updatedCache = FileCacheManager[event.cid]
                     if (updatedCache != null) {
-                        recoverFromLongPress()
-                        unSelect()
-                        fileBeanList.clear()
-                        fileBeanList.addAll(updatedCache.fileBeanList)
-                        pathList = updatedCache.path
+                        updateContentState {
+                            val unselectedList = updatedCache.fileBeanList.map { it.copy(isSelect = false) }
+                            copy(
+                                fileBeanList = unselectedList,
+                                pathList = updatedCache.path,
+                                isLongClickState = false,
+                                appBarTitle = if (isSearchState) "搜索" else context.getString(R.string.app_name)
+                            )
+                        }
                     } else {
-                        // 优雅降级容错：若本地内存缓存意外丢失，兜底触发网络拉取
+                        // 若本地内存缓存意外丢失，兜底触发网络拉取
                         getFiles(currentCid)
                     }
                 }
@@ -528,7 +547,11 @@ class FileViewModel(
             }
         }
     }
-
+    private suspend fun resolveDirName(cid: String): String {
+        if (cid == currentCid) return pathList.lastOrNull()?.name ?: "当前目录($cid)"
+        // 尝试从内存缓存中获取其面包屑末级名称
+        return FileCacheManager[cid]?.path?.lastOrNull()?.name ?: "cid=$cid"
+    }
     /**
      * 在 IO 调度器下彻底清理指定文件列表对应的 Coil 内存与磁盘缓存
      * （对应原 FileScreen 在主线程执行的缓存操作，现统一收口至 ViewModel 异步执行）
@@ -582,41 +605,44 @@ class FileViewModel(
      * 从长按状态恢复
      */
     fun recoverFromLongPress() {
-        isLongClickState = false
-        appBarTitle = if (isSearchState) {
-            "搜索"
-        } else {
-            context.getString(R.string.app_name)
-        }
+        clearSelection()
     }
 
     fun search(searchKey: String) {
-        _isRefreshing.value = true
+        setRefreshingStatus(true)
         viewModelScope.launch {
-            isSearchState = true
             runCatching {
                 val files = fileRepository.search(currentCid, searchKey)
-                files.fileBeanList = formatFileBeanList(files.fileBeanList)
-                fileBeanList.clear()
-                fileBeanList.addAll(files.fileBeanList)
-                appBarTitle = "搜索 - $searchKey"
+                val formattedList = formatFileBeanList(files.fileBeanList)
+                updateContentState {
+                    copy(
+                        isSearchState = true,
+                        isLongClickState = false,
+                        fileBeanList = formattedList,
+                        appBarTitle = "搜索 - $searchKey"
+                    )
+                }
             }.onFailureToastAndLog()
-            _isRefreshing.value = false
+            setRefreshingStatus(false)
         }
     }
 
     fun filterFile(type: Int, name: String) {
-        _isRefreshing.value = true
+        setRefreshingStatus(true)
         viewModelScope.launch {
-            isSearchState = true
             runCatching {
                 val files = fileRepository.filterFile(currentCid, type)
-                files.fileBeanList = formatFileBeanList(files.fileBeanList)
-                fileBeanList.clear()
-                fileBeanList.addAll(files.fileBeanList)
-                appBarTitle = "过滤 - $name"
+                val formattedList = formatFileBeanList(files.fileBeanList)
+                updateContentState {
+                    copy(
+                        isSearchState = true,
+                        isLongClickState = false,
+                        fileBeanList = formattedList,
+                        appBarTitle = "过滤 - $name"
+                    )
+                }
             }.onFailureToastAndLog()
-            _isRefreshing.value = false
+            setRefreshingStatus(false)
         }
     }
 
@@ -632,38 +658,80 @@ class FileViewModel(
 //        appBarTitle = fileBeanList.size.toString()
 //    }
     fun sortByVideoTime() {
-        val sorted = fileBeanList.sortedByDescending { it.playLong }
-        fileBeanList.clear()
-        fileBeanList.addAll(sorted)
+        updateContentState {
+            copy(fileBeanList = fileBeanList.sortedByDescending { it.playLong })
+        }
     }
 
     fun selectReverse() {
-        val updatedList = fileBeanList.map { it.copy(isSelect = !it.isSelect) }
-        fileBeanList.clear()
-        fileBeanList.addAll(updatedList)
-
-        appBarTitle = fileBeanList.filter { i -> i.isSelect }.size.toString()
+        updateContentState {
+            val updatedList = fileBeanList.map { it.copy(isSelect = !it.isSelect) }
+            val count = updatedList.count { it.isSelect }
+            copy(
+                fileBeanList = updatedList,
+                appBarTitle = if (count > 0) count.toString() else "nap511"
+            )
+        }
     }
 
     fun select(index: Int) {
-        val fb = fileBeanList[index]
-        fileBeanList[index] = fb.copy(isSelect = !fb.isSelect)
-        appBarTitle = fileBeanList.filter { i -> i.isSelect }.size.toString()
+        toggleSelect(index)
     }
 
-    fun unSelect() {
-        val updatedList = fileBeanList.map { it.copy(isSelect = false) }
-        fileBeanList.clear()
-        fileBeanList.addAll(updatedList)
+    fun toggleSelect(index: Int) {
+        updateContentState {
+            val list = fileBeanList.toMutableList()
+            if (index in list.indices) {
+                val item = list[index]
+                list[index] = item.copy(isSelect = !item.isSelect)
+                val count = list.count { it.isSelect }
+                copy(
+                    fileBeanList = list,
+                    appBarTitle = if (count > 0) count.toString() else "nap511"
+                )
+            } else {
+                this
+            }
+        }
     }
 
+    fun startMultiSelect(index: Int) {
+        updateContentState {
+            val list = fileBeanList.toMutableList()
+            if (index in list.indices) {
+                list[index] = list[index].copy(isSelect = true)
+            }
+            copy(
+                isLongClickState = true,
+                fileBeanList = list,
+                appBarTitle = "1"
+            )
+        }
+    }
+
+    fun clearSelection() {
+        updateContentState {
+            val updatedList = fileBeanList.map { it.copy(isSelect = false) }
+            copy(
+                fileBeanList = updatedList,
+                isLongClickState = false,
+                appBarTitle = if (isSearchState) "搜索" else context.getString(R.string.app_name)
+            )
+        }
+    }
 
     private fun setFiles(files: FilesBean) {
-        fileBeanList.clear()
-        fileBeanList.addAll(files.fileBeanList)
-        currentCid = files.cid
-        pathList = files.path
-        viewModelScope.launch { FileCacheManager[currentCid] = files }
+        updateContentState {
+            copy(
+                fileBeanList = files.fileBeanList,
+                currentCid = files.cid,
+                pathList = files.path,
+                isRefreshing = false,
+                isLongClickState = false,
+                appBarTitle = if (isSearchState) "搜索" else context.getString(R.string.app_name)
+            )
+        }
+        viewModelScope.launch { FileCacheManager[files.cid] = files }
     }
 
 
@@ -728,17 +796,6 @@ class FileViewModel(
                 .build()
 
             workManager.enqueue(request)
-
-
-            // 将 LiveData 转为 Flow 或者直接观察（这里利用 WorkManager 提供的 LiveData 转换为 Flow）
-//            workManager.getWorkInfoByIdLiveData(request.id).asFlow() // 将 LiveData 转换为 Flow
-//                .collect { workInfo ->
-//                    if (workInfo != null) {
-//                        if (workInfo.state == WorkInfo.State.SUCCEEDED || workInfo.state == WorkInfo.State.FAILED) {
-//                            refresh(defaultOfflineCid)
-//                        }
-//                    }
-//                }
         }
     }
 }

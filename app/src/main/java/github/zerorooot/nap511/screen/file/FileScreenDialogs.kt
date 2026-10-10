@@ -2,8 +2,12 @@ package github.zerorooot.nap511.screen.file
 
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elvishew.xlog.XLog
 import com.google.gson.JsonParser
+import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
@@ -19,6 +23,7 @@ import github.zerorooot.nap511.dialog.SearchDialog
 import github.zerorooot.nap511.dialog.UnzipAllFile
 import github.zerorooot.nap511.dialog.UnzipDialog
 import github.zerorooot.nap511.dialog.UnzipPassword
+import github.zerorooot.nap511.repository.AuthRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
@@ -32,8 +37,6 @@ import github.zerorooot.nap511.viewmodel.closeRenameFileDialog
 import github.zerorooot.nap511.viewmodel.closeSearchDialog
 import github.zerorooot.nap511.viewmodel.closeUnzipPasswordDialog
 import github.zerorooot.nap511.viewmodel.createFolder
-import androidx.compose.runtime.rememberCoroutineScope
-import github.zerorooot.nap511.repository.AuthRepository
 import github.zerorooot.nap511.viewmodel.decryptZip
 import github.zerorooot.nap511.viewmodel.rename
 import kotlinx.coroutines.launch
@@ -46,50 +49,54 @@ fun CreateDialogs(
     onNav: (Route) -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    when (fileViewModel.activeDialog) {
-        //重命名
+    val dialogState by fileViewModel.dialogState.collectAsStateWithLifecycle()
+    val targetBean = dialogState.targetFileBean
+
+    when (dialogState.activeDialog) {
+        // 重命名
         is FileDialogState.RenameFile -> {
-            val name = fileViewModel.fileBeanList[fileViewModel.selectIndex].name
+            val name = targetBean?.name.orEmpty()
             RenameFileDialog(name, settingUiState.positionAfterAt) {
-                if (it != null && it != "") {
-                    fileViewModel.rename(it)
+                if (!it.isNullOrEmpty()) {
+                    fileViewModel.rename(targetBean, it)
                 }
                 fileViewModel.closeRenameFileDialog()
             }
         }
-        //新建文件夹
+        // 新建文件夹
         is FileDialogState.CreateFolder -> {
             CreateFolderDialog {
-                if (it != null && it != "") {
+                if (!it.isNullOrEmpty()) {
                     fileViewModel.createFolder(it)
                 }
                 fileViewModel.closeCreateFolderDialog()
             }
         }
-        //文件信息
+        // 文件信息
         is FileDialogState.FileInfo -> {
-            val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
-            val fileInfo = fileViewModel.fileInfo
-            FileInfoDialog(fileBean, fileInfo) {
-                if (it == null) {
+            if (targetBean != null) {
+                FileInfoDialog(targetBean, dialogState.fileInfo) {
+                    if (it == null) {
+                        fileViewModel.closeFileInfoDialog()
+                        return@FileInfoDialog
+                    }
+                    if (fileViewModel.isSearchState) {
+                        fileViewModel.recoverFromLongPress()
+                    }
+                    fileViewModel.getFiles(it)
                     fileViewModel.closeFileInfoDialog()
-                    return@FileInfoDialog
                 }
-                if (fileViewModel.isSearchState) {
-                    fileViewModel.isSearchState = false
-                    fileViewModel.recoverFromLongPress()
-                }
-                fileViewModel.getFiles(it)
+            } else {
                 fileViewModel.closeFileInfoDialog()
             }
         }
 
         is FileDialogState.FileOrder -> {
-            //文件排序
+            // 文件排序
             val orderBean = fileViewModel.orderBean.toString()
             FileOrderDialog(orderBean) {
                 fileViewModel.closeFileOrderDialog()
-                if (it != "") {
+                if (it.isNotEmpty()) {
                     val asc = if (it.subSequence(it.length - 2, it.length) == "⬆️") 1 else 0
                     val type = when (it.subSequence(0, it.length - 2)) {
                         "文件名称" -> OrderEnum.name
@@ -98,9 +105,7 @@ fun CreateDialogs(
                         "文件大小" -> OrderEnum.size
                         else -> OrderEnum.name
                     }
-                    fileViewModel.orderBean = OrderBean(type, asc)
-                    fileViewModel.order()
-
+                    fileViewModel.updateOrder(OrderBean(type, asc))
                 }
             }
         }
@@ -111,7 +116,7 @@ fun CreateDialogs(
                 context = aria2Url
             ) {
                 fileViewModel.closeAria2Dialog()
-                if (it != "") {
+                if (it.isNotEmpty()) {
                     val jsonObject = JsonParser.parseString(it).asJsonObject
                     val url = jsonObject.get(ConfigKeyUtil.ARIA2_URL).asString
                     val token = jsonObject.get(ConfigKeyUtil.ARIA2_TOKEN).asString
@@ -125,9 +130,9 @@ fun CreateDialogs(
         }
 
         is FileDialogState.Search -> {
-            //搜索
+            // 搜索
             SearchDialog({
-                if (it != null && it != "") {
+                if (!it.isNullOrEmpty()) {
                     fileViewModel.search(it)
                 }
                 fileViewModel.closeSearchDialog()
@@ -145,7 +150,7 @@ fun CreateDialogs(
         }
 
         is FileDialogState.CreateSelectTorrentFile -> {
-            val torrentBean = fileViewModel.torrentBean
+            val torrentBean = dialogState.torrentBean
             CreateSelectTorrentFileDialog(
                 torrentBean,
             ) { infoHash, savePath, wanted ->
@@ -164,18 +169,21 @@ fun CreateDialogs(
         }
 
         is FileDialogState.UnzipPassword -> {
-            val fileBean = fileViewModel.fileBeanList[fileViewModel.selectIndex]
-            fileViewModel.setRefreshingStatus(false)
-            UnzipPassword(fileBean) {
-                XLog.d("云解压 ${fileBean.name} password $it")
-                if (it != null && it != "") {
-                    fileViewModel.decryptZip(it)
-                } else {
-                    fileViewModel.closeUnzipPasswordDialog()
+            if (targetBean != null) {
+                fileViewModel.setRefreshingStatus(false)
+                UnzipPassword(targetBean) {
+                    XLog.d("云解压 ${targetBean.name} password $it")
+                    if (!it.isNullOrEmpty()) {
+                        fileViewModel.decryptZip(targetBean, it)
+                    } else {
+                        fileViewModel.closeUnzipPasswordDialog()
+                    }
                 }
+            } else {
+                fileViewModel.closeUnzipPasswordDialog()
             }
         }
-        //解压文件
+        // 解压文件
         is FileDialogState.Unzip -> {
             UnzipDialog(fileViewModel)
         }
@@ -188,5 +196,4 @@ fun CreateDialogs(
             fileViewModel.closeDialog()
         }
     }
-
 }

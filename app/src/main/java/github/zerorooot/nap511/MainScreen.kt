@@ -67,7 +67,8 @@ fun MainScreen(
     var navGesturesEnabled by remember { mutableStateOf(true) }
     var lastBackPressTime by remember { mutableLongStateOf(0L) }
 
-    val remainingSpaceBean = fileViewModel.remainingSpace
+    val remainingSpaceBean by fileViewModel.remainingSpace.collectAsStateWithLifecycle()
+    val fileContentState by fileViewModel.contentState.collectAsStateWithLifecycle()
     val avatarJson by SettingsRepository.getDataFlow(ConfigKeyUtil.AVATAR_BEAN, "{}")
         .collectAsStateWithLifecycle(initialValue = "{}")
     val avatarBean = remember(avatarJson) {
@@ -200,7 +201,7 @@ fun MainScreen(
         slideTwoBackHome(null)
     }
     //MyFile页面的再滑一次返回桌面
-    BackHandler(drawerState.isClosed && backStack.size == 1 && fileViewModel.pathList.size == 1) {
+    BackHandler(drawerState.isClosed && backStack.size == 1 && fileContentState.pathList.size == 1) {
         slideTwoBackHome(fileViewModel)
     }
 

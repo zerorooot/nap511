@@ -57,8 +57,6 @@ import com.smarttoolfactory.zoom.enhancedZoom
 import com.smarttoolfactory.zoom.rememberEnhancedZoomState
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ImageBean
-import github.zerorooot.nap511.viewmodel.FileViewModel
-import github.zerorooot.nap511.viewmodel.getImage
 import kotlin.math.absoluteValue
 
 @Composable
@@ -80,21 +78,6 @@ fun MyPhotoScreen(
         currentIndex = currentIndex,
         onLoadImage = onLoadImage,
         onBack = onNav
-    )
-}
-
-@Composable
-fun MyPhotoScreen(
-    fileViewModel: FileViewModel,
-    onNav: () -> Unit
-) {
-    MyPhotoScreen(
-        photoList = fileViewModel.photoFileBeanList,
-        currentIndex = fileViewModel.photoIndexOf,
-        cid = fileViewModel.currentCid,
-        imageCache = fileViewModel.imageBeanCache[fileViewModel.currentCid] ?: emptyMap(),
-        onLoadImage = { fileViewModel.getImage(it) },
-        onNav = onNav
     )
 }
 
