@@ -150,6 +150,14 @@ fun LazyListScope.mediaPlaybackPreferenceItems(
     }
     item {
         SwitchPreferenceItem(
+            title = "字幕自动加载",
+            summary = "自动加载与视频文件同名/同前缀的 SRT 字幕（如果字幕存在）",
+            checked = uiState.automaticSubtitle,
+            onCheckedChange = { onSaveConfig(ConfigKeyUtil.AUTOMATIC_SUBTITLE, it) }
+        )
+    }
+    item {
+        SwitchPreferenceItem(
             title = "隐藏电池提醒",
             summary = "关闭首页弹出的后台电池优化提醒 Banner",
             checked = uiState.hideBatteryBanner,

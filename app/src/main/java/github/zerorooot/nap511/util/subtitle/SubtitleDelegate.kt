@@ -195,12 +195,14 @@ class SubtitleDelegate(
         }
 
         val offsetMs = state.offsetMs
+        val baseName= videoFileName.substringBeforeLast('.').trim()
         // 构造上传至 115 的同名字幕文件名（例如 VideoName.srt）
-        val subtitleCount = state.currentLocalSubtitles.size
-        val baseName = videoFileName.substringBeforeLast(".") +
-                if (subtitleCount > 0) "($subtitleCount)" else ""
+        val subtitleCount = state.currentLocalSubtitles.filter {
+            it.name.startsWith(baseName)
+        }.size
+        val numberName = baseName + if (subtitleCount > 0) "($subtitleCount)" else ""
 
-        val uploadFileName = "$baseName.srt"
+        val uploadFileName = "$numberName.srt"
 
         scope.launch {
             App.instance.toast("正在处理并保存字幕至 115 网盘...")

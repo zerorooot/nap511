@@ -462,14 +462,14 @@ class FileViewModel(
     /**
      * 响应 FileCacheManager 的全局缓存变更事件，实现 UI 实时同步
      */
-    private suspend fun handleCacheEvent(event: CacheEvent) {
+    private fun handleCacheEvent(event: CacheEvent) {
         val dirName = when (event) {
             is CacheEvent.LocalUiUpdated -> resolveDirName(event.cid)
             is CacheEvent.RemoteRefreshRequired -> resolveDirName(event.cid)
             is CacheEvent.FolderDeleted -> resolveDirName(event.folderCid)
             is CacheEvent.AllCleared -> "全部目录"
         }
-        XLog.d("handleCacheEvent $event (dir: $dirName)")
+        XLog.d("handleCacheEvent $event (dir: $dirName) currentCid $currentCid")
         when (event) {
             is CacheEvent.LocalUiUpdated -> {
                 // 【本地 UI 刷新逻辑】：
@@ -487,7 +487,7 @@ class FileViewModel(
                 //    处理策略：FileCacheManager 已经在后台内存和磁盘中维护好了 event.cid 对应的最新数据；由于用户当前并没有在看 event.cid，
                 //    因此当前屏幕展示的 fileBeanList 绝对不需要变动，无需做任何处理。待用户未来切入该目录时即可天然读到已更新好的最新缓存。
                 if (event.cid == currentCid) {
-                    val updatedCache = FileCacheManager[event.cid]
+                    val updatedCache = FileCacheManager.getDate(event.cid)
                     if (updatedCache != null) {
                         updateContentState {
                             val unselectedList = updatedCache.fileBeanList.map { it.copy(isSelect = false) }
@@ -547,10 +547,10 @@ class FileViewModel(
             }
         }
     }
-    private suspend fun resolveDirName(cid: String): String {
+    private  fun resolveDirName(cid: String): String {
         if (cid == currentCid) return pathList.lastOrNull()?.name ?: "当前目录($cid)"
         // 尝试从内存缓存中获取其面包屑末级名称
-        return FileCacheManager[cid]?.path?.lastOrNull()?.name ?: "cid=$cid"
+        return FileCacheManager.getDate(cid)?.path?.lastOrNull()?.name ?: "cid=$cid"
     }
     /**
      * 在 IO 调度器下彻底清理指定文件列表对应的 Coil 内存与磁盘缓存
@@ -723,7 +723,7 @@ class FileViewModel(
     private fun setFiles(files: FilesBean) {
         updateContentState {
             copy(
-                fileBeanList = files.fileBeanList,
+                fileBeanList = files.fileBeanList.toList(),// 使用 .toList() 生成不可变浅拷贝，切断引用共享
                 currentCid = files.cid,
                 pathList = files.path,
                 isRefreshing = false,

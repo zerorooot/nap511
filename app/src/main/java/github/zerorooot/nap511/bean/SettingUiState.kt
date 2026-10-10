@@ -102,4 +102,7 @@ data class SettingUiState(
 
     /** 是否隐藏电池提醒（关闭首页弹出的后台电池优化提醒 Banner） */
     @SerializedName(ConfigKeyUtil.HIDE_BATTERY_BANNER) val hideBatteryBanner: Boolean = false,
+
+    /** 自动加载字幕 Automatic subtitle */
+    @SerializedName(ConfigKeyUtil.AUTOMATIC_SUBTITLE) val automaticSubtitle: Boolean = false,
 )

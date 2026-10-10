@@ -206,7 +206,8 @@ class FileOpener(
             videoLinkMode = settings.videoLinkMode,
             autoJumpRetry = settings.autoJumpRetry,
             hideLoading = settings.hideLoadingView,
-            positionAfterAt = settings.positionAfterAt
+            positionAfterAt = settings.positionAfterAt,
+            automaticSubtitle = settings.automaticSubtitle
         )
         val launchVideoParams = LaunchVideoParams(
             videoInfo = video,

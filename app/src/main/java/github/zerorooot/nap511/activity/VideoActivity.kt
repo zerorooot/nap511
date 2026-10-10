@@ -87,6 +87,7 @@ class VideoActivity : AppCompatActivity() {
     /** 115 账号安全验证码 WebView 弹窗实例 */
     private var captchaDialog: Dialog? = null
 
+    private lateinit var launchVideoParams: LaunchVideoParams
 
     /** 标记视频是否正在加载中（用于上一集/下一集按钮防止重复点击） */
     private var isEpisodeLoading = false
@@ -132,7 +133,7 @@ class VideoActivity : AppCompatActivity() {
         // 2. 解析启动参数并初始化 ViewModel
         // ----------------------------------------------------
         val paramsJson = intent.getStringExtra("bean")
-        val launchVideoParams = Gson().fromJson(paramsJson, LaunchVideoParams::class.java)
+        launchVideoParams = Gson().fromJson(paramsJson, LaunchVideoParams::class.java)
 
         // 判断当前屏幕方向是否为竖屏
         val isPortrait = resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
@@ -235,10 +236,8 @@ class VideoActivity : AppCompatActivity() {
         // 若传入了本地字幕列表，默认加载并应用首条本地字幕
         if (launchVideoParams.localSubtitleItem.isNotEmpty()) {
             viewModel.loadSubtitles(0L, false)
-            subtitlePanelController.applySubtitle(
-                launchVideoParams.localSubtitleItem.first(),
-                showToast = false
-            )
+            // 为初次播放的视频匹配字幕（不显示 Toast）
+            loadMatchingSubtitleForVideo(title)
         }
 
         // ----------------------------------------------------
@@ -292,6 +291,9 @@ class VideoActivity : AppCompatActivity() {
                                     App.instance.toast("获取视频链接失败，视频可能被删除，请刷新重试！")
                                     isEpisodeLoading = false
                                     updatePrevNextButtons()
+                                } else {
+                                    // 切换集数时的字幕联动：为新集数匹配并自动加载对应字幕
+                                    loadMatchingSubtitleForVideo(event.title)
                                 }
                             }
 
@@ -329,6 +331,38 @@ class VideoActivity : AppCompatActivity() {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * 根据视频文件名自动寻找并联动本地对应的字幕文件
+     *
+     * @param videoFileName 当前/新集数的视频文件名（含后缀，如 "b.mp4"）
+     */
+    private fun loadMatchingSubtitleForVideo(
+        videoFileName: String
+    ) {
+        if (launchVideoParams.localSubtitleItem.isEmpty() || !launchVideoParams.videoAttribute.automaticSubtitle) return
+
+        // 提取视频主文件名（去除后缀，如 "b.mp4" -> "b"）
+        val videoBaseName = videoFileName.substringBeforeLast('.').trim()
+
+        // 匹配规则：
+        // 1. 完全同名（如 b.mp4 <-> b.srt）
+        // 2. 带语言扩展后缀（如 b.mp4 <-> b.zh.srt 或 b.chs.vtt）
+        val matchedSubtitle = launchVideoParams.localSubtitleItem.find { item ->
+            val subtitleBaseName = item.name.substringBeforeLast('.').trim()
+            subtitleBaseName.equals(videoBaseName, ignoreCase = true) ||
+                    subtitleBaseName.startsWith("$videoBaseName.", ignoreCase = true)
+        }
+
+        // 清除上一集残留的字幕，并重置 ViewModel 状态
+        videoPlayer.setSubtitleEnabled(false)
+        viewModel.removeSubtitle()
+        viewModel.loadSubtitles(0L, false)
+        if (matchedSubtitle != null) {
+            // 匹配到新集数对应的本地字幕：自动挂载应用
+            subtitlePanelController.applySubtitle(matchedSubtitle, showToast = false)
         }
     }
 

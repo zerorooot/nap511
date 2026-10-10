@@ -187,6 +187,11 @@ class ConfigKeyUtil {
          */
         const val HIDE_BATTERY_BANNER = "hideBatteryBanner"
 
+        /**
+         * 自动加载字幕
+         */
+        const val AUTOMATIC_SUBTITLE = "automaticSubtitle"
+
 
         /**
          * 登录

@@ -117,7 +117,8 @@ class SettingsRepository {
                 gridScreenEnabled = pref[booleanPreferencesKey(ConfigKeyUtil.GRID_SCREEN)] ?: default.gridScreenEnabled,
                 gridCellMinSize = pref[stringPreferencesKey(ConfigKeyUtil.GRID_CELL_MIN_SIZE)] ?: default.gridCellMinSize,
                 autoImagePreviewCount = pref[stringPreferencesKey(ConfigKeyUtil.AUTO_IMAGE_PREVIEW_COUNT)] ?: default.autoImagePreviewCount,
-                hideBatteryBanner = pref[booleanPreferencesKey(ConfigKeyUtil.HIDE_BATTERY_BANNER)] ?: default.hideBatteryBanner
+                hideBatteryBanner = pref[booleanPreferencesKey(ConfigKeyUtil.HIDE_BATTERY_BANNER)] ?: default.hideBatteryBanner,
+                automaticSubtitle = pref[booleanPreferencesKey(ConfigKeyUtil.AUTOMATIC_SUBTITLE)] ?: default.automaticSubtitle
             )
         }.stateIn(
             scope = repositoryScope,
