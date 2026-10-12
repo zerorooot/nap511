@@ -180,8 +180,8 @@ class UnzipCommand : ActionDispatchCommand<UnzipAction>() {
 
                     // 2. 追加至全局解压队列并触发 Worker (KEEP 策略)
                     UnzipQueueManager.enqueueAndStartWorker(taskItems)
-
-                    ctx.invalidateCache(targetCid)
+                    //不用失效缓存，所有的缓存会在UnzipAllFileWorker中统一更新
+                   // ctx.invalidateCache(targetCid)
                     collector.emitText(
                         "unzip: 已成功提交 ${distinctFileBeans.size} 个解压任务到后台 UnzipAllFileWorker 处理 (${distinctFileBeans.joinToString { it.name }})"
                     )

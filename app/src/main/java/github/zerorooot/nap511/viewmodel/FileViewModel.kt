@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.concurrent.futures.await
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -117,9 +118,10 @@ class FileViewModel(
         get() = _contentState.value.orderBean
 
 
-    // ==================== 内部线程安全缓存（解耦，不触发 UI 整体重组） ====================
+    // ==================== 内部线程安全与细粒度响应式缓存（解耦，不触发 UI 整体重组） ====================
     val clickMap = ConcurrentHashMap<String, Int>()
-    val imageBeanCache = ConcurrentHashMap<String, MutableMap<String, ImageBean>>()
+    // 二级 Compose SnapshotStateMap：外层按目录 cid 隔离，内层按文件 pickCode 触发列表单条目精准重组
+    val imageBeanCache = mutableStateMapOf<String, SnapshotStateMap<String, ImageBean>>()
     internal val imageLoadingSet = hashSetOf<String>()
     val torrentBeanCache = ConcurrentHashMap<String, TorrentFileBean>()
     private val currentLocation = ConcurrentHashMap<String, LocationBean>()
@@ -340,6 +342,9 @@ class FileViewModel(
                     App.instance.toast("当前文件夹被删除！")
                 }
                 files.fileBeanList = formatFileBeanList(files.fileBeanList)
+                // 网络请求返回最新文件列表后，同步清空该目录旧的高清图缓存，
+                // 避免在等待网络期间提前清空导致屏幕上的旧列表条目闪烁或抢跑发起重复请求
+                clearImageCache(cid)
                 // 3. 网络请求成功后写入缓存
                 setFiles(files)
             }.onFailure {
@@ -451,11 +456,12 @@ class FileViewModel(
             }
 
             if (refreshCurrent) {
+                // 当前目录由 getFiles(currentCid) 在新列表返回时同步调用 clearImageCache(currentCid)
                 getFiles(currentCid)
             } else {
+                clearImageCache(cid)
                 updateFileCache(cid)
             }
-            imageBeanCache.remove(cid)
         }
     }
 
@@ -509,21 +515,14 @@ class FileViewModel(
                 // 【远程 API 刷新逻辑】：
                 // 针对新增文件、解压完成、离线下载完成、字幕上传、回收站还原等场景，云端生成了新文件或变动：
                 /**不需要删除缓存，因为在 [FileCacheManager.notifyRemoteRefresh] 里已经删除了**/
-                if (event.cid == currentCid) {
-                    // 若正处于当前展示目录，立即重新请求 115 API 全量更新整个目录列表及 UI
-                    getFiles(currentCid)
-                } else {
-                    // 延迟失效策略：若非当前展示目录，直接清理 FileCacheManager 该 cid 的旧缓存，
-                    // 避免无意义的后台网络流量消耗与 API 频控，待用户切入该目录时按需触发最新拉取。
-                    viewModelScope.launch {
-                        FileCacheManager.remove(event.cid)
-                    }
-                }
+                refresh(event.cid,true)
             }
 
             is CacheEvent.FolderDeleted -> {
                 // 根目录 "0" 永远不可被判定为删除
                 if (event.folderCid == "0") return
+
+                imageBeanCache.remove(event.folderCid)
 
                 // 判断当前所在目录或其祖先目录是否被删除
                 val isCurrentDeleted = (currentCid == event.folderCid)
@@ -541,6 +540,9 @@ class FileViewModel(
             }
 
             is CacheEvent.AllCleared -> {
+                // 保留当前正在刷新目录的条目直至新列表返回，避免刷新中途 UI 抢跑，其余目录直接移除
+                val keysToRemove = imageBeanCache.keys.filter { it != currentCid }
+                keysToRemove.forEach { imageBeanCache.remove(it) }
                 if (currentCid != "0") {
                     getFiles("0")
                 }

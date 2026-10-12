@@ -57,16 +57,15 @@ fun ImageCellItem(
     itemActions: FileItemActions,
 ) {
     val image = fileBean.fileIco
-    var name by remember(fileBean.name) {
-        mutableStateOf(fileBean.name)
-    }
+    var name by rememberFileDisplayName(fileBean)
     val hdUrl = imageBean?.url
     val isHdLoaded = isImageHdPreview && !hdUrl.isNullOrEmpty()
     val cacheKey = fileBean.fileId.ifEmpty { fileBean.pickCode.ifEmpty { name } }
 
-    // 开启高清模式且 photoThumb 非空且未缓存过 ImageBean 时发起请求
+    // 开启高清模式且 photoThumb 非空且未缓存过 ImageBean 时发起请求；
+    // 将 fileBean.photoThumb 纳入 Key，确保此前请求失败（imageBean 仍为 null）并在下拉刷新获取新缩略图后能重新触发请求
     if (isImageHdPreview && fileBean.photoThumb.isNotEmpty() && imageBean == null) {
-        LaunchedEffect(fileBean.pickCode, index) {
+        LaunchedEffect(fileBean.pickCode, index, fileBean.photoThumb) {
             //  XLog.d("ImageCellItem [触发高清图请求] index=$index, name=${fileBean.name}, pickCode=${fileBean.pickCode}")
             itemActions.onLoadImage?.invoke(fileBean)
         }
@@ -149,6 +148,10 @@ fun ImageCellItem(
                         model = imageRequestBuilder.build(),
                         contentDescription = "File Thumbnail",
                         onSuccess = { successState ->
+                            // 缩略图或高清图加载成功时，若名称处于过期提示状态则立即恢复为真实文件名
+                            if (name != fileBean.name) {
+                                name = fileBean.name
+                            }
                             XLog.d("ImageCellItem [图片加载成功] index=$index, name=${fileBean.name}, isLoaded=$isHdLoaded, imageData=$imageData, source=${successState.result.dataSource}")
                             val drawable = successState.result.drawable
                             if (drawable.intrinsicWidth > 0 && drawable.intrinsicHeight > 0) {
@@ -161,7 +164,7 @@ fun ImageCellItem(
                             }
                         },
                         onError = { errorState ->
-                            name = "图片已过期，请刷新"
+                            name = EXPIRED_IMAGE_TIP
                             XLog.e(
                                 "ImageCellItem [图片加载失败] index=$index, name=${fileBean.name}, isLoaded=$isHdLoaded, url=$imageData, error=${errorState.result.throwable.message}"
                             )

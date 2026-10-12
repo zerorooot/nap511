@@ -27,6 +27,7 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileCacheManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.util.StringJoiner
@@ -156,7 +157,7 @@ class UnzipAllFileWorker(
                     val (updatedProcessed, updatedTotal) = UnzipQueueManager.getProgress()
 
                     // 4. 单任务即时热更新
-                    FileCacheManager.notifyRemoteRefresh(targetCid)
+                   // FileCacheManager.notifyRemoteRefresh(targetCid)
 
                     if (!isSuccess) {
                         resultSummary.add("${fileBean.name} 解压失败！原因：$stateMessage")
@@ -208,17 +209,19 @@ class UnzipAllFileWorker(
 
         } catch (e: CancellationException) {
             XLog.w("UnzipAllFileWorker 任务被取消: ${e.message}")
-            UnzipQueueManager.clear()
-            val (finalProcessed, _) = UnzipQueueManager.getProgress()
-            sentMessage(
-                unzipResult = resultSummary.toString(),
-                isCancel = true,
-                name = lastProcessedItem?.fileBean?.name ?: "文件",
-                size = finalProcessed,
-                unzipFailList = unzipFailList,
-                targetCid = lastProcessedItem?.targetCid ?: "0",
-                explicitErrorCid = lastProcessedItem?.errorCid
-            )
+            withContext(NonCancellable) {
+                UnzipQueueManager.clear()
+                val (finalProcessed, _) = UnzipQueueManager.getProgress()
+                sentMessage(
+                    unzipResult = resultSummary.toString(),
+                    isCancel = true,
+                    name = lastProcessedItem?.fileBean?.name ?: "文件",
+                    size = finalProcessed,
+                    unzipFailList = unzipFailList,
+                    targetCid = lastProcessedItem?.targetCid ?: "0",
+                    explicitErrorCid = lastProcessedItem?.errorCid
+                )
+            }
         }
     }
 
@@ -308,7 +311,9 @@ class UnzipAllFileWorker(
             // 若解压未成功（报错或被 CancellationException 取消），立即删除预建的空目录
             if (!isExtracted && zipFileCid.isNotEmpty() && zipFileCid != cid) {
                 try {
-                    fileRepository.delete(cid, zipFileCid)
+                    withContext(NonCancellable) {
+                        fileRepository.delete(cid, zipFileCid)
+                    }
                     XLog.d("成功清理未完成或解压失败产生的空目录: $zipFileCid")
                 } catch (cleanupEx: Exception) {
                     XLog.w("清理空目录异常: ${cleanupEx.message}")

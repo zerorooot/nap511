@@ -20,9 +20,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +54,19 @@ import github.zerorooot.nap511.screen.components.FolderMoreMenu
 import github.zerorooot.nap511.screen.components.MenuItemAction
 import github.zerorooot.nap511.util.getCoilCacheUrl
 
+internal const val EXPIRED_IMAGE_TIP = "图片已过期，请刷新"
+
+/**
+ * 统一管理文件条目展示名称的响应式状态（供 FileCellItem 与 ImageCellItem 复用）：
+ * 以 fileBean.name 与 fileBean.photoThumb 作为联合 Key。
+ * 当文件重命名或下拉刷新获取到新的缩略图 URL 时，自动重置为最新文件名。
+ */
+@Composable
+internal fun rememberFileDisplayName(fileBean: FileBean): MutableState<String> =
+    remember(fileBean.name, fileBean.photoThumb) {
+        mutableStateOf(fileBean.name)
+    }
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FileCellItem(
@@ -63,9 +78,7 @@ fun FileCellItem(
     itemActions: FileItemActions,
 ) {
     val image = fileBean.fileIco
-    var name by remember(fileBean.name) {
-        mutableStateOf(fileBean.name)
-    }
+    var name by rememberFileDisplayName(fileBean)
     val size = fileBean.sizeString
     val time = fileBean.createTimeString
     Surface(
@@ -116,10 +129,14 @@ fun FileCellItem(
                             .error(R.drawable.ic_image_broken) // 加载失败时也显示占位图
                             .crossfade(true).build(),
                             onSuccess = { successState ->
+                                // 图片重新加载成功时，若名称处于过期提示状态则立即恢复为真实文件名
+                                if (name != fileBean.name) {
+                                    name = fileBean.name
+                                }
                                 XLog.d("FileCellItem [图片加载成功] index=$index, name=${fileBean.name}, imageData=$imageData, source=${successState.result.dataSource}")
                             },
                             onError = {
-                                name = "图片已过期，请刷新"
+                                name = EXPIRED_IMAGE_TIP
                             },
                             contentDescription = "File Thumbnail",
                             modifier = Modifier.size(60.dp), // 用 size 替代 height + width
@@ -131,9 +148,6 @@ fun FileCellItem(
                 val playLong = fileBean.playLongString
                 val playLongRatio = fileBean.playLongRatio
                 val isMedia = fileBean.isVideo == 1 || fileBean.fileIco == R.drawable.mp3
-                val hasMediaInfo = isMedia && (playLong.isNotEmpty() || playLongRatio.isNotEmpty())
-                val hasSubInfo = size.isNotEmpty() || time.isNotEmpty() || hasMediaInfo
-
 
                 Column(
                     verticalArrangement = Arrangement.SpaceEvenly,
@@ -211,9 +225,14 @@ fun AutoSizableTextField(
     minFontSize: TextUnit,
     scaleFactor: Float = 0.9f,
 ) {
+    // 将普通 String 包装为 Compose State，使 BoxWithConstraints（底层为 SubcomposeLayout）
+    // 的独立子组合在测量阶段建立对状态的直接 Snapshot 订阅，从而在文本变化时自动触发重测与重绘
+    val currentValue by rememberUpdatedState(value)
+
     BoxWithConstraints(
         modifier = modifier
     ) {
+        val textValue = currentValue
         var nFontSize = fontSize
 
         // 1. 将 Composable 环境的变量提取到 lambda 外部
@@ -223,7 +242,7 @@ fun AutoSizableTextField(
         // 2. 移除 @Composable 注解，直接作为普通 lambda
         val calculateParagraph = {
             Paragraph(
-                text = value,
+                text = textValue,
                 style = TextStyle(fontSize = nFontSize),
                 // 3. 直接使用 BoxWithConstraints 提供的 constraints
                 constraints = Constraints(maxWidth = constraints.maxWidth),
@@ -246,7 +265,7 @@ fun AutoSizableTextField(
         }
 
         Text(
-            text = value,
+            text = textValue,
             style = TextStyle(fontSize = nFontSize),
             maxLines = maxLines,
             overflow = TextOverflow.Ellipsis, // 确保超出 2 行时末尾正常显示省略号

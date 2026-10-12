@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.viewmodel
 
 import android.content.Intent
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.lifecycle.viewModelScope
 import coil.imageLoader
 import com.elvishew.xlog.XLog
@@ -16,6 +17,24 @@ import github.zerorooot.nap511.util.getCoilCacheUrl
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+
+/**
+ * 写入指定目录与 pickCode 的高清图缓存：
+ * 采用二级 SnapshotStateMap 结构，外层按 cid 隔离目录，内层按 pickCode 细粒度通知对应条目重组，
+ * 避免单张高清图加载完成时引发整个 FileScreen 重组。
+ */
+internal fun FileViewModel.putImageCache(cid: String, pickCode: String, imageBean: ImageBean) {
+    val cidMap = imageBeanCache.getOrPut(cid) { mutableStateMapOf() }
+    cidMap[pickCode] = imageBean
+}
+
+/**
+ * 清空指定目录的高清图缓存：
+ * 直接清空内层 SnapshotStateMap 条目而保留外层 Map 引用，减少不必要的外层容器重组。
+ */
+internal fun FileViewModel.clearImageCache(cid: String) {
+    imageBeanCache[cid]?.clear()
+}
 
 /**
  * FileViewModel 的扩展函数：媒体与文件查看相关
@@ -47,10 +66,7 @@ internal fun FileViewModel.getImage(fileBean: FileBean) {
         val cachedImageBean = ImageBean(
             url = cachedUrl, fileName = fileBean.name, pickCode = pickCode
         )
-        val oldMap = imageBeanCache[cid] ?: hashMapOf()
-        val newMap = HashMap(oldMap)
-        newMap[pickCode] = cachedImageBean
-        imageBeanCache[cid] = newMap
+        putImageCache(cid, pickCode, cachedImageBean)
         return
     }
 
@@ -70,11 +86,7 @@ internal fun FileViewModel.getImage(fileBean: FileBean) {
                     pickCode, System.currentTimeMillis() / 1000
                 ).imageBean
 
-                val oldMap = imageBeanCache[cid] ?: hashMapOf()
-                val newMap = HashMap(oldMap)
-                newMap[pickCode] = imageBean
-
-                imageBeanCache[cid] = newMap
+                putImageCache(cid, pickCode, imageBean)
                 XLog.d("FileViewModel.getImage request success: fileBean=${fileBean.name}, imageBean=$imageBean")
             }.onFailureToastAndLog()
         } finally {
