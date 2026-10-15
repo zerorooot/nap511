@@ -1,6 +1,8 @@
 package github.zerorooot.nap511.terminal.commands.cloud
 
+import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
+import github.zerorooot.nap511.terminal.context.parentCid
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
@@ -42,8 +44,12 @@ internal data class DeletableTarget(
  * 抽象并隔离 3 种完全异构的数据拉取途径，避免多层条件嵌套穿透：
  */
 private sealed interface FindSearchStrategy {
-    /** 1. 常规目录树递归检索（通过 DFS 逐层下潜扫描网盘目录，限制深度为 [maxDepth]） */
-    data class Tree(val maxDepth: Int) : FindSearchStrategy
+    /** 1. 常规目录树递归检索（通过 DFS 逐层下潜扫描网盘目录，限制深度在 [minDepth] 至 [maxDepth] 之间） */
+    data class Tree(
+        val minDepth: Int,
+        val maxDepth: Int,
+        val isMaxDepthAutoAdjusted: Boolean
+    ) : FindSearchStrategy
 
     /** 2. 全盘云端全局搜索（调用官方 search API 在网盘根目录下全文检索指定关键词） */
     data class Global(val keyword: String) : FindSearchStrategy
@@ -70,7 +76,12 @@ private sealed interface FindDeletePolicy {
  */
 private sealed interface TargetResolution {
     /** 目标解析为目录：以此目录作为遍历起点 */
-    data class Directory(val targetCid: String, val searchRootPath: String) : TargetResolution
+    data class Directory(
+        val targetCid: String,
+        val searchRootPath: String,
+        val targetParentCid: String?,
+        val depth0Name: String
+    ) : TargetResolution
 
     /** 目标解析为单个独立文件：已就地完成求值与处理，流程可直接退出 */
     object SingleFileFinished : TargetResolution
@@ -143,7 +154,8 @@ class FindCommand : TerminalCommand {
                 "               dir/directory/folder/目录/文件夹 -> 目录\n" +
                 "               other/其它/其他 -> 其它"
         ),
-        CommandFlag("-maxdepth <N>", "限制递归搜索的最大层级深度，默认为5"),
+        CommandFlag("-mindepth <N>", "限制递归搜索的最小层级深度，起始项本身为 0，默认为 0"),
+        CommandFlag("-maxdepth <N>", "限制递归搜索的最大层级深度，默认为 5"),
         CommandFlag("-empty", "只匹配空文件（大小为 0）或空目录（内容为空）"),
         CommandFlag("-size <[+|-]N[k|M|G]>", "按文件大小筛选（如 +100M 大于 100MB，-10k 小于 10KB）"),
         CommandFlag("-playlong <[+|-]N[s|m|h]|HH:mm:ss>", "按视频/音频时长筛选（如 +30m 大于 30 分钟，-10:00 小于 10 分钟）"),
@@ -153,6 +165,24 @@ class FindCommand : TerminalCommand {
         CommandFlag("-print0", "以 NUL (\\0) 字符作为各匹配项的结尾，配合 xargs -0 安全处理含空格文件名"),
         CommandFlag("-delete", "将查找到的匹配项批量删除至回收站（默认执行前进行交互式二次确认）"),
         CommandFlag("-f", "配合 -delete 使用，强制直接删除免二次确认（同 rm -f）")
+    )
+
+    /**
+     * 该命令支持带参数值的选项集合
+     *
+     * 明确声明后，AST 解析器 [CommandAstParser] 会将 "-mindepth" 等连同后置值规范提取，
+     * 避免将其当作复合布尔开关（例如拆分为 -m, -i, -n, -d, -e, -p, -t, -h）而意外触发帮助拦截。
+     */
+    override val valueOptions: Set<String> = setOf(
+        "-name",
+        "-iname",
+        "-type",
+        "-suffix",
+        "-filter",
+        "-mindepth",
+        "-maxdepth",
+        "-size",
+        "-playlong"
     )
 
     /**
@@ -188,7 +218,22 @@ class FindCommand : TerminalCommand {
                 executeGlobalSearch(ctx, strategy.keyword, plan, deletableTargets)
             }
             is FindSearchStrategy.Tree -> {
-                executeTreeSearch(ctx, dirResolution.targetCid, dirResolution.searchRootPath, strategy.maxDepth, plan, deletableTargets)
+                // 倒置深度区间短路优化：minDepth > maxDepth 时直接短路返回空，绝不发起网络请求
+                if (strategy.minDepth > strategy.maxDepth) {
+                    return@flow
+                }
+                executeTreeSearch(
+                    ctx = ctx,
+                    targetCid = dirResolution.targetCid,
+                    searchRootPath = dirResolution.searchRootPath,
+                    targetParentCid = dirResolution.targetParentCid,
+                    depth0Name = dirResolution.depth0Name,
+                    minDepth = strategy.minDepth,
+                    maxDepth = strategy.maxDepth,
+                    isMaxDepthAutoAdjusted = strategy.isMaxDepthAutoAdjusted,
+                    plan = plan,
+                    deletableTargets = deletableTargets
+                )
             }
         }
 
@@ -218,7 +263,11 @@ class FindCommand : TerminalCommand {
                 }
                 FindSearchStrategy.Global(keyword)
             }
-            else -> FindSearchStrategy.Tree(parsed.maxDepth)
+            else -> FindSearchStrategy.Tree(
+                minDepth = parsed.minDepth,
+                maxDepth = parsed.maxDepth,
+                isMaxDepthAutoAdjusted = parsed.isMaxDepthAutoAdjusted
+            )
         }
 
         // 决议删除安全策略
@@ -240,6 +289,16 @@ class FindCommand : TerminalCommand {
     }
 
     /**
+     * 提取路径参数的基准文件名（basename）
+     * 严格对标 GNU find：用于 Depth 0 虚拟 FileBean 的名称评估
+     */
+    private fun extractBasename(path: String): String {
+        val trimmed = path.trimEnd('/')
+        if (trimmed.isEmpty()) return "/"
+        return trimmed.substringAfterLast('/')
+    }
+
+    /**
      * 起始路径解析：将输入的路径字符串转换为目标 CID 与规范化路径
      * 若目标直接为一个文件，则就地执行表达式求值并处理输出或删除，返回 [TargetResolution.SingleFileFinished]。
      */
@@ -249,21 +308,36 @@ class FindCommand : TerminalCommand {
     ): TargetResolution {
         // 全局搜索固定从根目录 ("0") 展开
         if (plan.strategy is FindSearchStrategy.Global) {
-            return TargetResolution.Directory(targetCid = "0", searchRootPath = "/根目录")
+            return TargetResolution.Directory(
+                targetCid = "0",
+                searchRootPath = "/根目录",
+                targetParentCid = null,
+                depth0Name = "根目录"
+            )
         }
 
+        // 遵循 GNU find 标准：若用户未显式传起始路径参数，默认以 "." 作为相对路径基准前缀
         val pathArg = plan.targetPath ?: return TargetResolution.Directory(
             targetCid = ctx.currentCid,
-            searchRootPath = ctx.currentPath
+            searchRootPath = ".",
+            targetParentCid = ctx.currentPathList.parentCid(),
+            depth0Name = "."
         )
 
         return when (val resolved = ctx.resolveTarget(pathArg)) {
             is ResolvedTarget.Directory -> {
-                TargetResolution.Directory(targetCid = resolved.cid, searchRootPath = resolved.path)
+                TargetResolution.Directory(
+                    targetCid = resolved.cid,
+                    searchRootPath = pathArg,
+                    targetParentCid = resolved.parentCid,
+                    depth0Name = extractBasename(pathArg)
+                )
             }
 
             is ResolvedTarget.File -> {
-                handleSingleFile(ctx, resolved, plan)
+                val minDepth = if (plan.strategy is FindSearchStrategy.Tree) plan.strategy.minDepth else 0
+                val maxDepth = if (plan.strategy is FindSearchStrategy.Tree) plan.strategy.maxDepth else 5
+                handleSingleFile(ctx, resolved, plan, minDepth, maxDepth)
                 TargetResolution.SingleFileFinished
             }
 
@@ -276,19 +350,30 @@ class FindCommand : TerminalCommand {
 
     /**
      * 单文件目标处理：对目标单个文件执行 AST 表达式匹配，并在命中时执行输出或二次确认删除
+     *
+     * 遵循 GNU find 语义：单个文件目标被视为 Depth 0。
+     * 当且仅当 minDepth <= 0 <= maxDepth 时才执行求值与输出，否则跳过。
      */
     private suspend fun FlowCollector<TerminalOutput>.handleSingleFile(
         ctx: TerminalContext,
         resolved: ResolvedTarget.File,
-        plan: FindPlan
+        plan: FindPlan,
+        minDepth: Int,
+        maxDepth: Int
     ) {
+        // 单文件视为 Depth 0，超出范围直接返回
+        if (minDepth > 0 || maxDepth < 0) {
+            return
+        }
+
         if (!plan.expression.evaluate(resolved.file, ctx)) {
             return
         }
 
         when (plan.deletePolicy) {
             is FindDeletePolicy.None -> {
-                val pathStr = resolved.fullPath
+                // 保留用户原始输入路径（例如 find file.txt 输出 file.txt 而非展开为全路径）
+                val pathStr = plan.targetPath ?: resolved.file.name
                 if (plan.isPrint0) {
                     emitPath("$pathStr\u0000")
                 } else {
@@ -374,8 +459,8 @@ class FindCommand : TerminalCommand {
                     emitSystem("全局搜索结果（共 ${matchedList.size} 项）：")
                 }
                 matchedList.forEach { file ->
-                    val isFolder = file.fileId.isEmpty()
-                    val pathStr = file.name + if (isFolder) "/" else ""
+                    // 遵循 GNU find 标准：目录输出无尾随斜杠
+                    val pathStr = file.name
                     if (plan.isPrint0) {
                         emitPath("$pathStr\u0000")
                     } else {
@@ -390,55 +475,112 @@ class FindCommand : TerminalCommand {
     }
 
     /**
-     * 分支 B：常规递归目录树检索（DFS 深度优先扫描，内置短路求值）
+     * 分支 B：常规递归目录树检索（DFS 深度优先扫描，内置短路求值与 Depth 0 评估）
      */
     private suspend fun FlowCollector<TerminalOutput>.executeTreeSearch(
         ctx: TerminalContext,
         targetCid: String,
         searchRootPath: String,
+        targetParentCid: String?,
+        depth0Name: String,
+        minDepth: Int,
         maxDepth: Int,
+        isMaxDepthAutoAdjusted: Boolean,
         plan: FindPlan,
         deletableTargets: MutableList<DeletableTarget>
     ) {
-        suspend fun searchRecursive(currentCid: String, currentPrefix: String, currentDepth: Int) {
-            if (currentDepth > maxDepth) return
-            val files = ctx.listDirectory(currentCid)
-            for (file in files) {
-                val fullPath = if (currentPrefix == "/") "/${file.name}" else "$currentPrefix/${file.name}"
+        // 1. 若触发了云端防雪崩动态滑动窗口扩展，且非 print0 纯净模式，输出系统友好提醒
+        if (isMaxDepthAutoAdjusted && !plan.isPrint0) {
+            emitSystem("find: 已自动将最大搜索深度 -maxdepth 设置为 $maxDepth（如需调整请显式指定 -maxdepth）")
+        }
 
-                // 统一评估 AST 条件表达式（内置短路逻辑）
-                val matches = plan.expression.evaluate(file, ctx)
+        // 2. Depth 0 起始项本身评估（遵循 GNU find 标准：当且仅当 minDepth <= 0 时评估起始目录本身）
+        if (minDepth <= 0) {
+            // 构造规范的 Depth 0 虚拟 FileBean：
+            // - name 提取自用户命令行输入的 basename，保证 find . -name "." 正确命中
+            // - categoryId 设为真实 targetCid，支持 -empty 空目录检测
+            // - parentId 设为 targetParentCid，保证待删除信息完整
+            val depth0Bean = FileBean(
+                fileId = "",
+                categoryId = targetCid,
+                parentId = targetParentCid ?: "",
+                name = depth0Name,
+                size = "0",
+                playLong = 0.0,
+                isFolder = true
+            )
 
-                if (matches) {
-                    if (plan.deletePolicy != FindDeletePolicy.None) {
-                        val fid = if (file.isFolder) file.categoryId else file.fileId
+            if (plan.expression.evaluate(depth0Bean, ctx)) {
+                if (plan.deletePolicy != FindDeletePolicy.None) {
+                    // 双重永久安全保护：网盘根目录 ("0") 与当前工作目录 (ctx.currentCid) 严禁加入删除队列
+                    if (targetCid != "0" && targetCid != ctx.currentCid) {
                         deletableTargets.add(
                             DeletableTarget(
-                                parentCid = currentCid.takeIf { it.isNotEmpty() },
-                                fid = fid,
-                                name = file.name,
-                                isFolder = file.isFolder,
-                                path = fullPath
+                                parentCid = targetParentCid?.takeIf { it.isNotEmpty() },
+                                fid = targetCid,
+                                name = depth0Name,
+                                isFolder = true,
+                                path = searchRootPath
                             )
                         )
-                    } else {
-                        val pathStr = fullPath + if (file.isFolder) "/" else ""
-                        if (plan.isPrint0) {
-                            emitPath("$pathStr\u0000")
-                        } else {
-                            emitPath(pathStr)
-                        }
                     }
-                }
-
-                // 只要当前项为目录且未达到最大层级深度，继续向下递归搜索
-                if (file.isFolder && currentDepth < maxDepth) {
-                    searchRecursive(file.categoryId, fullPath, currentDepth + 1)
+                } else {
+                    // 只读模式：输出基准起始路径（无尾随斜杠）
+                    if (plan.isPrint0) {
+                        emitPath("$searchRootPath\u0000")
+                    } else {
+                        emitPath(searchRootPath)
+                    }
                 }
             }
         }
 
-        searchRecursive(targetCid, searchRootPath, 1)
+        // 3. Depth 1..N 递归子项扫描（仅当 maxDepth >= 1 时才需要发起 DFS 递归）
+        if (maxDepth >= 1) {
+            suspend fun searchRecursive(currentCid: String, currentPrefix: String, currentDepth: Int) {
+                if (currentDepth > maxDepth) return
+                val files = ctx.listDirectory(currentCid)
+                for (file in files) {
+                    // 防双斜杠规范化路径拼接：去除当前前缀末尾多余斜杠
+                    val prefixForChild = if (currentPrefix == "/") "" else currentPrefix.trimEnd('/')
+                    val fullPath = "$prefixForChild/${file.name}"
+
+                    // 仅在 currentDepth >= minDepth 时执行条件表达式评估与输出/收集
+                    if (currentDepth >= minDepth) {
+                        val matches = plan.expression.evaluate(file, ctx)
+                        if (matches) {
+                            if (plan.deletePolicy != FindDeletePolicy.None) {
+                                val fid = if (file.isFolder) file.categoryId else file.fileId
+                                deletableTargets.add(
+                                    DeletableTarget(
+                                        parentCid = currentCid.takeIf { it.isNotEmpty() },
+                                        fid = fid,
+                                        name = file.name,
+                                        isFolder = file.isFolder,
+                                        path = fullPath
+                                    )
+                                )
+                            } else {
+                                // 遵循 GNU find 标准：目录输出无尾随斜杠
+                                val pathStr = fullPath
+                                if (plan.isPrint0) {
+                                    emitPath("$pathStr\u0000")
+                                } else {
+                                    emitPath(pathStr)
+                                }
+                            }
+                        }
+                    }
+
+                    // 只要当前项为目录且未达到最大层级深度，继续向下递归搜索
+                    if (file.isFolder && currentDepth < maxDepth) {
+                        searchRecursive(file.categoryId, fullPath, currentDepth + 1)
+                    }
+                }
+            }
+
+            searchRecursive(targetCid, searchRootPath, 1)
+        }
     }
 
     /**

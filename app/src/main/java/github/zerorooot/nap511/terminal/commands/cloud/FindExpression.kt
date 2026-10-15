@@ -374,10 +374,23 @@ internal class FindExpressionParser(private val tokens: List<FindToken>) {
  * find 完整命令行参数解析后实体载体
  *
  * 将全局搜索范围/控制选项与过滤表达式 AST 分离解耦。
+ *
+ * @param pathArg 用户指定的搜索起始路径，未指定时为 null
+ * @param minDepth 搜索最小深度（起始项本身为 Depth 0），默认为 0
+ * @param maxDepth 搜索最大深度，默认针对云端防雪崩限制为 5
+ * @param isMaxDepthAutoAdjusted 是否由 minDepth > 5 触发自动滑动窗口扩展（用于控制台提示）
+ * @param isGlobal 是否为 115 全盘云端搜索模式
+ * @param isDelete 是否启用 -delete 批量移入回收站
+ * @param isForce 是否启用 -f 免二次确认强制删除
+ * @param isPrint0 是否启用 -print0，以 NUL 字符定界输出
+ * @param expression AST 过滤表达式语法树
+ * @param firstKeyword 首个搜索关键词（供全局搜索使用）
  */
 internal data class ParsedFindCommand(
     val pathArg: String?,
-    val maxDepth: Int,
+    val minDepth: Int = 0,
+    val maxDepth: Int = 5,
+    val isMaxDepthAutoAdjusted: Boolean = false,
     val isGlobal: Boolean,
     val isDelete: Boolean,
     val isForce: Boolean,
@@ -399,7 +412,10 @@ internal object FindCommandArgsParser {
      */
     fun parse(args: List<String>): Result<ParsedFindCommand> {
         var pathArg: String? = null
+        var minDepth = 0
+        var minDepthSpecified = false
         var maxDepth = 5
+        var maxDepthSpecified = false
         var isGlobal = false
         var isDelete = false
         var isForce = false
@@ -422,6 +438,20 @@ internal object FindCommandArgsParser {
                     break
                 }
 
+                arg == "-mindepth" -> {
+                    if (i + 1 >= args.size) {
+                        return Result.failure(FindParseException("find: '-mindepth' 缺少参数"))
+                    }
+                    val depthStr = args[++i]
+                    val depth = depthStr.toIntOrNull()
+                    if (depth == null || depth < 0) {
+                        return Result.failure(FindParseException("find: 非法的深度值 '$depthStr'"))
+                    }
+                    // 严格遵循 GNU find 规则：多次指定时后出现的参数覆盖先前参数（Last-wins）
+                    minDepth = depth
+                    minDepthSpecified = true
+                }
+
                 arg == "-maxdepth" -> {
                     if (i + 1 >= args.size) {
                         return Result.failure(FindParseException("find: '-maxdepth' 缺少参数"))
@@ -431,7 +461,9 @@ internal object FindCommandArgsParser {
                     if (depth == null || depth < 0) {
                         return Result.failure(FindParseException("find: 非法的深度值 '$depthStr'"))
                     }
+                    // 严格遵循 GNU find 规则：多次指定时后出现的参数覆盖先前参数（Last-wins）
                     maxDepth = depth
+                    maxDepthSpecified = true
                 }
 
                 arg == "-global" -> {
@@ -562,12 +594,27 @@ internal object FindCommandArgsParser {
             i++
         }
 
+        // 校验 115 全局云端搜索与深度控制选项互斥性
+        if (isGlobal && (minDepthSpecified || maxDepthSpecified)) {
+            return Result.failure(FindParseException("find: -global 全局搜索不支持与 -mindepth/-maxdepth 深度选项同时使用"))
+        }
+
+        // 云端防雪崩动态滑动窗口：若用户未显式指定 -maxdepth 但指定了 minDepth > 5，
+        // 自动维持 5 层动态探测窗口并标记 autoAdjusted（在非 print0 模式下输出控制台提醒）
+        var isMaxDepthAutoAdjusted = false
+        if (!maxDepthSpecified && minDepthSpecified && minDepth > 5) {
+            maxDepth = minDepth + 5
+            isMaxDepthAutoAdjusted = true
+        }
+
         return try {
             val ast = FindExpressionParser(expressionTokens).parse()
             Result.success(
                 ParsedFindCommand(
                     pathArg = pathArg,
+                    minDepth = minDepth,
                     maxDepth = maxDepth,
+                    isMaxDepthAutoAdjusted = isMaxDepthAutoAdjusted,
                     isGlobal = isGlobal,
                     isDelete = isDelete,
                     isForce = isForce,

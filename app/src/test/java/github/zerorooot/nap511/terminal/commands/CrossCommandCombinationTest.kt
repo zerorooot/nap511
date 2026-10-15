@@ -154,7 +154,7 @@ class CrossCommandCombinationTest {
         assertEquals(listOf("b.txt"), outY004)
 
         val outY005 = engine.executeStrings("find -name b.txt | head -n 1", ctx)
-        assertEquals(listOf("/根目录/b.txt"), outY005)
+        assertEquals(listOf("./b.txt"), outY005)
 
         // rm -f 强行删除后校验目录为空
         engine.executeStrings("rm -f b.txt", ctx)
