@@ -35,9 +35,13 @@ class RmCommandTest {
         val rmNotFound = engine.executeStrings("rm 't1/non_existent/'", ctx)
         assertTrue(rmNotFound[0].contains("cannot remove 't1/non_existent/': No such file or directory"))
 
-        // rm -f 强行删除不存在的文件提示不可用
+        // POSIX 标准：rm -f 强行删除不存在的文件时静默且不输出错误
         val rmNotFoundForce = engine.executeStrings("rm -f notexist_file.txt", ctx)
-        assertEquals(listOf("rm: cannot remove 'notexist_file.txt': No such file or directory"), rmNotFoundForce)
+        assertTrue(rmNotFoundForce.isEmpty())
+
+        // 无 -f 参数删除不存在的文件报错
+        val rmNotFoundFile = engine.executeStrings("rm notexist_file.txt", ctx)
+        assertEquals(listOf("rm: cannot remove 'notexist_file.txt': No such file or directory"), rmNotFoundFile)
     }
 
     /**
@@ -53,17 +57,22 @@ class RmCommandTest {
         val targetFolder = createMockFolder("important_dir", "10")
         cancelCtx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(targetFolder), cid = "0", count = 1, order = "", path = emptyList()))
 
-        val outCancel = engine.executeStrings("rm important_dir", cancelCtx)
+        // POSIX 标准：未提供 -r/-R 时尝试删除目录直接报错，不触发交互确认
+        val outDirNoR = engine.executeStrings("rm important_dir", cancelCtx)
+        assertEquals(listOf("rm: 'important_dir': Is a directory"), outDirNoR)
+
+        // 提供 -r 参数时触发交互式确认，回调取消删除操作
+        val outCancel = engine.executeStrings("rm -r important_dir", cancelCtx)
         assertEquals(listOf("rm: 已取消删除 'important_dir'"), outCancel)
 
-        // 尝试删除当前工作目录 '.' 受保护阻退
+        // 尝试删除当前工作目录 '.' 受保护阻退（严格对齐 POSIX 拒绝删除 . 或 .. 规范）
         val outCurrent = engine.executeStrings("rm .", cancelCtx)
-        assertTrue(outCurrent[0].contains("Cannot remove root directory") || outCurrent[0].contains("Cannot remove current working directory"))
+        assertTrue(outCurrent[0].contains("refusing to remove '.' or '..' directory"))
 
         // 在子目录下尝试删除当前工作目录
         cancelCtx.updateDirectory(listOf(PathBean("0", "根目录", "0"), PathBean("10", "important_dir", "0")))
         val outCurrentSub = engine.executeStrings("rm .", cancelCtx)
-        assertTrue(outCurrentSub[0].contains("Cannot remove current working directory"))
+        assertTrue(outCurrentSub[0].contains("refusing to remove '.' or '..' directory"))
     }
 
     /**
@@ -176,7 +185,7 @@ class RmCommandTest {
     }
 
     /**
-     * 测试引号保护通配符不被展开误删 (rm -f "*.txt")
+     * 测试引号保护通配符不被展开误删 (rm "*.txt" vs rm -f "*.txt")
      */
     @Test
     fun testRmWildcardQuotedProtection() = runBlocking {
@@ -190,10 +199,116 @@ class RmCommandTest {
             FilesBean(fileBeanList = arrayListOf<FileBean>(f), cid = "0", count = 1, order = "", path = emptyList())
         )
 
-        val out = engine.executeStrings("rm -f \"*.txt\"", ctx)
-        assertTrue(out.any { it.contains("cannot remove '*.txt': No such file or directory") })
+        // 1. 无 -f 保护：未展开的 "*.txt" 字面量未找到，报错
+        val outNoForce = engine.executeStrings("rm \"*.txt\"", ctx)
+        assertTrue(outNoForce.any { it.contains("cannot remove '*.txt': No such file or directory") })
+
+        // 2. 有 -f 保护：POSIX 规范静默
+        val outForce = engine.executeStrings("rm -f \"*.txt\"", ctx)
+        assertTrue(outForce.isEmpty())
+
         // 验证物理文件 file.txt 未被删除
         assertTrue(mockRepo.deletedItems.isEmpty())
         assertTrue(mockRepo.deletedMultipleCalls.isEmpty())
+    }
+
+    /**
+     * 测试 -i 交互式确认及 -f/-i 参数先后顺序优先级（后出现的参数优先）
+     */
+    @Test
+    fun testRmInteractiveAndFlagPrecedence() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+
+        // 1. -i 交互确认删除：用户点击确认
+        var promptMsg = ""
+        val confirmCtx = createTestContext(fileRepository = mockRepo, onConfirmRequest = { msg ->
+            promptMsg = msg
+            true
+        })
+        val f1 = createMockFile("f1.txt", "1")
+        confirmCtx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(f1), cid = "0", count = 1, order = "", path = emptyList()))
+
+        val outConfirm = engine.executeStrings("rm -i f1.txt", confirmCtx)
+        assertEquals("rm: 是否确认删除 'f1.txt'? (yes/no): ", promptMsg)
+        assertEquals(listOf("rm: 已移入回收站 'f1.txt'"), outConfirm)
+
+        // 2. 参数先后顺序：rm -f -i（-i 在后，后出现者胜出，触发交互提示）
+        val f2 = createMockFile("f2.txt", "2")
+        val cancelCtx = createTestContext(fileRepository = mockRepo, onConfirmRequest = { false })
+        cancelCtx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(f2), cid = "0", count = 1, order = "", path = emptyList()))
+
+        val outFi = engine.executeStrings("rm -f -i f2.txt", cancelCtx)
+        assertEquals(listOf("rm: 已取消删除 'f2.txt'"), outFi)
+
+        // 3. 参数先后顺序：rm -i -f（-f 在后，后出现者胜出，强制删除无需确认）
+        val f3 = createMockFile("f3.txt", "3")
+        var prompted = false
+        val forceCtx = createTestContext(fileRepository = mockRepo, onConfirmRequest = {
+            prompted = true
+            false
+        })
+        forceCtx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(f3), cid = "0", count = 1, order = "", path = emptyList()))
+
+        val outIf = engine.executeStrings("rm -i -f f3.txt", forceCtx)
+        assertFalse("rm -i -f 后缀为 -f，不应触发确认交互", prompted)
+        assertEquals(listOf("rm: 已移入回收站 'f3.txt'"), outIf)
+    }
+
+    /**
+     * 测试祖先目录、根目录及特殊目录（. 与 ..）删除防护
+     */
+    @Test
+    fun testRmAncestorAndSpecialDirectoryProtection() = runBlocking {
+        val engine = createTestEngine()
+        val ctx = createTestContext()
+
+        val folderA = createMockFolder("folderA", "10")
+        val subFolder = createMockFolder("subFolder", "20")
+        ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(folderA), cid = "0", count = 1, order = "", path = emptyList()))
+        ctx.fileCacheManager.put("10", FilesBean(fileBeanList = arrayListOf(subFolder), cid = "10", count = 1, order = "", path = emptyList()))
+        ctx.fileCacheManager.put("20", FilesBean(fileBeanList = arrayListOf(), cid = "20", count = 0, order = "", path = emptyList()))
+
+        // 切换到 /folderA/subFolder 目录
+        ctx.updateDirectory(listOf(
+            PathBean("0", "根目录", "0"),
+            PathBean("10", "folderA", "0"),
+            PathBean("20", "subFolder", "10")
+        ))
+
+        // 1. 删除 . 与 .. 保护
+        val outDot = engine.executeStrings("rm -r .", ctx)
+        assertTrue(outDot.any { it.contains("refusing to remove '.' or '..' directory") })
+
+        val outDotDot = engine.executeStrings("rm -rf ..", ctx)
+        assertTrue(outDotDot.any { it.contains("refusing to remove '.' or '..' directory") })
+
+        // 2. 尝试删除当前工作目录的祖先目录 /folderA
+        val outAncestor = engine.executeStrings("rm -rf /folderA", ctx)
+        assertTrue(outAncestor.any { it.contains("Cannot remove ancestor of current working directory") })
+    }
+
+    /**
+     * 测试 rm -f 在遇到网络异常时绝不静默，必须透传网络错误
+     */
+    @Test
+    fun testRmForceSurfacesNetworkError() = runBlocking {
+        val mockRepo = object : TestMockFileRepository() {
+            override suspend fun delete(pid: String, fid: String): github.zerorooot.nap511.bean.BaseReturnMessage {
+                throw java.io.IOException("Connection timed out")
+            }
+            override suspend fun deleteMultiple(data: Map<String, String>): github.zerorooot.nap511.bean.BaseReturnMessage {
+                throw java.io.IOException("Connection timed out")
+            }
+        }
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        val f = createMockFile("file.txt", "1")
+        ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(f), cid = "0", count = 1, order = "", path = emptyList()))
+
+        val out = engine.executeStrings("rm -f file.txt", ctx)
+        // 验证 -f 模式下网络异常仍然向终端输出错误，避免静默失败造成误删假象
+        assertTrue(out.any { it.contains("Connection timed out") || it.contains("cannot access") })
     }
 }

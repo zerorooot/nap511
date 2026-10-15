@@ -131,14 +131,14 @@ class PosixWildcardPipelineComplianceTest {
         val outDouble = engine.executeStrings("cat \"*.txt\"", ctx)
         assertTrue(
             "双引号通配符不应展开，系统应尝试查找名为 *.txt 的物理文件并报错",
-            outDouble.any { it.contains("cat: *.txt: No such file or directory") }
+            outDouble.any { it.contains("cat: '*.txt': No such file or directory") }
         )
 
         // 单引号保护
         val outSingle = engine.executeStrings("cat '*.txt'", ctx)
         assertTrue(
             "单引号通配符不应展开，系统应尝试查找名为 *.txt 的物理文件并报错",
-            outSingle.any { it.contains("cat: *.txt: No such file or directory") }
+            outSingle.any { it.contains("cat: '*.txt': No such file or directory") }
         )
     }
 
@@ -262,7 +262,7 @@ class PosixWildcardPipelineComplianceTest {
 
         val out = engine.executeStrings("cat *.txt *.bak", ctx)
         assertTrue("成功匹配的项应正常读取并输出", out.contains("alpha text"))
-        assertTrue("无匹配的模式保留字面量并由下游命令报错", out.any { it.contains("cat: *.bak: No such file or directory") })
+        assertTrue("无匹配的模式保留字面量并由下游命令报错", out.any { it.contains("cat: '*.bak': No such file or directory") })
     }
 
     /**

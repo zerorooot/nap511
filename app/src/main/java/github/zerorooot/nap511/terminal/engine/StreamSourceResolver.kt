@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.terminal.engine
 
+import github.zerorooot.nap511.terminal.commands.util.CommandMessages
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.util.TextFileHelper
@@ -68,19 +69,19 @@ object StreamSourceResolver {
             } else {
                 val resolved = ctx.resolveTarget(path)
                 when (resolved) {
-                    null -> StreamSourceItem.Error(path, "$path: No such file or directory")
-                    is ResolvedTarget.Directory -> StreamSourceItem.Error(path, "$path: Is a directory")
+                    null -> StreamSourceItem.Error(path, CommandMessages.noSuchFile("", path))
+                    is ResolvedTarget.Directory -> StreamSourceItem.Error(path, CommandMessages.isADirectory("", path))
                     is ResolvedTarget.File -> {
                         val fileBean = resolved.file
                         when (val valid = TextFileHelper.validate(fileBean, maxKb)) {
                             is TextValidationResult.NotTextFile -> {
-                                StreamSourceItem.Error(path, "${fileBean.name}: Not a text file")
+                                StreamSourceItem.Error(path, CommandMessages.notATextFile("", fileBean.name))
                             }
                             is TextValidationResult.ExceedsSizeLimit -> {
                                 val sizeStr = fileBean.sizeString.ifEmpty { "${fileBean.size}B" }
                                 StreamSourceItem.Error(
                                     path,
-                                    "${fileBean.name}: File exceeds size limit ($sizeStr >= ${valid.limitKb}KB)"
+                                    CommandMessages.fileExceedsLimit("", fileBean.name, sizeStr, valid.limitKb)
                                 )
                             }
                             is TextValidationResult.Valid -> {

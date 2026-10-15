@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.terminal.commands.cloud
 
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.terminal.commands.util.CommandMessages
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.context.TerminalPath
@@ -33,7 +34,7 @@ class StatCommand : TerminalCommand {
     ): Flow<TerminalOutput> = flow {
         val targets = ast.rawPositionalValues
         if (targets.isEmpty()) {
-            emitError("stat: missing operand")
+            emitError(CommandMessages.missingOperand("stat"))
             return@flow
         }
 
@@ -52,7 +53,7 @@ class StatCommand : TerminalCommand {
                 }
 
                 null -> {
-                    emitError("stat: cannot stat '$targetName': No such file or directory")
+                    emitError(CommandMessages.cannotStat("stat", targetName))
                     continue
                 }
             }

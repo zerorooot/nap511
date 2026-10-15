@@ -258,7 +258,16 @@ internal open class TestMockFileRepository(
         return BaseReturnMessage(state = true)
     }
 
+    val renamedBodies = mutableListOf<RequestBody>()
+    val renamedItems = mutableListOf<String>()
+    var onRename: ((RequestBody) -> Unit)? = null
+
     override suspend fun rename(renameBean: RequestBody): BaseReturnMessage {
+        renamedBodies.add(renameBean)
+        val buffer = okio.Buffer()
+        renameBean.writeTo(buffer)
+        renamedItems.add(buffer.readUtf8())
+        onRename?.invoke(renameBean)
         return BaseReturnMessage(state = true)
     }
 

@@ -9,13 +9,14 @@ import github.zerorooot.nap511.terminal.engine.CommandFlag
 import github.zerorooot.nap511.terminal.engine.ParsedContext
 import github.zerorooot.nap511.terminal.engine.archetype.ActionDispatchCommand
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
+import github.zerorooot.nap511.terminal.engine.completion.CommandCompleter
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
 import github.zerorooot.nap511.terminal.viewmodel.emitSystem
 import github.zerorooot.nap511.terminal.viewmodel.emitText
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.FlowCollector
 import java.util.Locale
-import github.zerorooot.nap511.terminal.engine.completion.CommandCompleter
 
 /**
  * 回收站操作密封类定义
@@ -147,7 +148,8 @@ class TrashCommand : ActionDispatchCommand<TrashAction>() {
                 collector.emitError("trash: 还原失败: ${TerminalExceptionHandler.extractErrorMessage(res, "操作失败")}")
             }
         } catch (e: Exception) {
-            collector.emitError("trash: 还原异常: ${e.message}")
+            if (e is CancellationException) throw e
+            collector.emitError("trash: 还原异常: ${TerminalExceptionHandler.extractErrorMessage(e)}")
         }
     }
 
@@ -168,7 +170,8 @@ class TrashCommand : ActionDispatchCommand<TrashAction>() {
                 collector.emitError("trash: 清空失败: ${TerminalExceptionHandler.extractErrorMessage(res, "操作失败")}")
             }
         } catch (e: Exception) {
-            collector.emitError("trash: 清空异常: ${e.message}")
+            if (e is CancellationException) throw e
+            collector.emitError("trash: 清空异常: ${TerminalExceptionHandler.extractErrorMessage(e)}")
         }
     }
 
@@ -188,7 +191,8 @@ class TrashCommand : ActionDispatchCommand<TrashAction>() {
                 }
             }
         } catch (e: Exception) {
-            collector.emitError("trash: 获取回收站列表失败: ${e.message}")
+            if (e is CancellationException) throw e
+            collector.emitError("trash: 获取回收站列表失败: ${TerminalExceptionHandler.extractErrorMessage(e)}")
         }
     }
 }

@@ -48,7 +48,7 @@ class MkdirCommandTest {
 
         // -p 模式下创建已存在目录正常返回成功
         val outPExist = engine.executeStrings("mkdir -p docs", ctx)
-        assertEquals(listOf("mkdir: created directory 'docs'"), outPExist)
+        assertEquals(listOf("mkdir: 已成功创建目录 'docs'"), outPExist)
     }
 
     /**
@@ -63,19 +63,19 @@ class MkdirCommandTest {
 
         // 新建单个目录
         val outSingle = engine.executeStrings("mkdir dirA", ctx)
-        assertEquals(listOf("mkdir: created directory 'dirA'"), outSingle)
+        assertEquals(listOf("mkdir: 已成功创建目录 'dirA'"), outSingle)
 
         // 批量新建多个目录
         val outMulti = engine.executeStrings("mkdir dirB dirC", ctx)
-        assertEquals(listOf("mkdir: created directory 'dirB'", "mkdir: created directory 'dirC'"), outMulti)
+        assertEquals(listOf("mkdir: 已成功创建目录 'dirB'", "mkdir: 已成功创建目录 'dirC'"), outMulti)
 
         // -p 选项递归创建深层目录
         val outRec = engine.executeStrings("mkdir -p a/b/c", ctx)
-        assertEquals(listOf("mkdir: created directory 'a/b/c'"), outRec)
+        assertEquals(listOf("mkdir: 已成功创建目录 'a/b/c'"), outRec)
 
         // 重复 -p 选项容错处理
         val outDupFlag = engine.executeStrings("mkdir -p -p dirE", ctx)
-        assertEquals(listOf("mkdir: created directory 'dirE'"), outDupFlag)
+        assertEquals(listOf("mkdir: 已成功创建目录 'dirE'"), outDupFlag)
     }
 
     /**
@@ -90,36 +90,36 @@ class MkdirCommandTest {
 
         // 路径包含空格未转义拆分为多个目录创建
         val outMultiSpace = engine.executeStrings("mkdir my dir", ctx)
-        assertEquals(listOf("mkdir: created directory 'my'", "mkdir: created directory 'dir'"), outMultiSpace)
+        assertEquals(listOf("mkdir: 已成功创建目录 'my'", "mkdir: 已成功创建目录 'dir'"), outMultiSpace)
 
         // 路径包含空格使用双引号包裹
         val outQuotedSpace = engine.executeStrings("mkdir \"my dir\"", ctx)
-        assertEquals(listOf("mkdir: created directory 'my dir'"), outQuotedSpace)
+        assertEquals(listOf("mkdir: 已成功创建目录 'my dir'"), outQuotedSpace)
 
         // 路径包含空格使用反斜杠转义
         val outEscapedSpace = engine.executeStrings("mkdir my\\ dir2", ctx)
-        assertEquals(listOf("mkdir: created directory 'my dir2'"), outEscapedSpace)
+        assertEquals(listOf("mkdir: 已成功创建目录 'my dir2'"), outEscapedSpace)
 
         // 路径包含单双引号、美元符号、中文及 Emoji
         val outSpecial1 = engine.executeStrings("mkdir \"it's\"", ctx)
-        assertEquals(listOf("mkdir: created directory 'it's'"), outSpecial1)
+        assertEquals(listOf("mkdir: 已成功创建目录 'it's'"), outSpecial1)
 
         val outSpecial2 = engine.executeStrings("mkdir 'price$1'", ctx)
-        assertEquals(listOf("mkdir: created directory 'price$1'"), outSpecial2)
+        assertEquals(listOf("mkdir: 已成功创建目录 'price$1'"), outSpecial2)
 
         val outChinese = engine.executeStrings("mkdir 测试目录", ctx)
-        assertEquals(listOf("mkdir: created directory '测试目录'"), outChinese)
+        assertEquals(listOf("mkdir: 已成功创建目录 '测试目录'"), outChinese)
 
         val outEmoji = engine.executeStrings("mkdir '😀目录'", ctx)
-        assertEquals(listOf("mkdir: created directory '😀目录'"), outEmoji)
+        assertEquals(listOf("mkdir: 已成功创建目录 '😀目录'"), outEmoji)
 
         // 使用绝对路径创建目录
         val outAbs = engine.executeStrings("mkdir /根目录/absdir", ctx)
-        assertEquals(listOf("mkdir: created directory '/根目录/absdir'"), outAbs)
+        assertEquals(listOf("mkdir: 已成功创建目录 '/根目录/absdir'"), outAbs)
 
         // 目标路径以 / 结尾
         val outSlash = engine.executeStrings("mkdir slashdir/", ctx)
-        assertEquals(listOf("mkdir: created directory 'slashdir/'"), outSlash)
+        assertEquals(listOf("mkdir: 已成功创建目录 'slashdir/'"), outSlash)
     }
 
     /**
@@ -159,7 +159,7 @@ class MkdirCommandTest {
 
         // mkdir 提示信息经由管道输出传输
         val outPipeHead = engine.executeStrings("mkdir pdir2 | head -n 1", ctx)
-        assertEquals(listOf("mkdir: created directory 'pdir2'"), outPipeHead)
+        assertEquals(listOf("mkdir: 已成功创建目录 'pdir2'"), outPipeHead)
 
         // 批量创建目录后通过 ls 查看验证
         engine.executeStrings("mkdir q1 q2 q3", ctx)

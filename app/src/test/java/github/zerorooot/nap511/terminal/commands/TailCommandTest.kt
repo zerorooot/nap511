@@ -93,8 +93,8 @@ class TailCommandTest {
 
         // 多文件参数但文件不存在时的标准错误输出
         val out18 = engine.executeStrings("tail -n 1 a b", ctx)
-        assertTrue(out18.any { it.contains("tail: a: No such file or directory") })
-        assertTrue(out18.any { it.contains("tail: b: No such file or directory") })
+        assertTrue(out18.any { it.contains("tail: 'a': No such file or directory") })
+        assertTrue(out18.any { it.contains("tail: 'b': No such file or directory") })
     }
 
     /**

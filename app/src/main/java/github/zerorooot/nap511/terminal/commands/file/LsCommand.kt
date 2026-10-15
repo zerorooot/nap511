@@ -2,6 +2,7 @@ package github.zerorooot.nap511.terminal.commands.file
 
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.terminal.commands.util.CommandFormatUtil
+import github.zerorooot.nap511.terminal.commands.util.CommandMessages
 import github.zerorooot.nap511.terminal.commands.util.TableAlignment
 import github.zerorooot.nap511.terminal.commands.util.TableFormatter
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
@@ -143,7 +144,7 @@ class LsCommand : EntityListingCommand<LsEntry>() {
             val singleTarget = targets.first()
             val resolved = ctx.resolveTarget(singleTarget)
             if (resolved == null) {
-                collector.emitError("ls: cannot access '$singleTarget': No such file or directory")
+                collector.emitError(CommandMessages.cannotAccess("ls", singleTarget))
                 return
             }
 
@@ -176,7 +177,7 @@ class LsCommand : EntityListingCommand<LsEntry>() {
         for (target in targets) {
             val resolved = ctx.resolveTarget(target)
             when (resolved) {
-                null -> notFoundErrors.add("ls: cannot access '$target': No such file or directory")
+                null -> notFoundErrors.add(CommandMessages.cannotAccess("ls", target))
                 is ResolvedTarget.File -> fileEntries.add(
                     LsEntry(resolved.file, isSingleTarget = true, queryPath = target)
                 )

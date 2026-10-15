@@ -190,7 +190,7 @@ class CatCommandTest {
 
         // 验证 a.txt 正常输出，non_exist.txt 输出报错，b.txt 仍继续正常输出
         assertTrue(output.contains("good1"))
-        assertTrue(output.any { it.contains("non_exist.txt: No such file or directory") })
+        assertTrue(output.any { it.contains("'non_exist.txt': No such file or directory") })
         assertTrue(output.contains("good2"))
     }
 
@@ -240,7 +240,7 @@ class CatCommandTest {
         val ctx = createTestContext()
 
         val output = engine.executeStrings("cat *.md", ctx)
-        assertTrue(output.any { it.contains("cat: *.md: No such file or directory") })
+        assertTrue(output.any { it.contains("cat: '*.md': No such file or directory") })
     }
 
     /**
@@ -259,7 +259,7 @@ class CatCommandTest {
         val engine = createTestEngine()
         val output = engine.executeStrings("cat *", ctx)
 
-        assertTrue("对子目录应报错 Is a directory", output.any { it.contains("cat: sub_folder: Is a directory") })
+        assertTrue("对子目录应报错 Is a directory", output.any { it.contains("cat: 'sub_folder': Is a directory") })
         assertTrue("对普通文本文件应继续正常读取输出", output.contains("normal text content"))
     }
 }

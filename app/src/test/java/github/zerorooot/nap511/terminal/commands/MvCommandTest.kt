@@ -1,9 +1,12 @@
 package github.zerorooot.nap511.terminal.commands
 
+import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.PathBean
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -223,5 +226,108 @@ class MvCommandTest {
         assertEquals("0", call["pid"])
         assertEquals("601", call["fid[0]"])
         assertEquals("602", call["fid[1]"])
+    }
+
+    /**
+     * 测试同一文件快速短路拦截 (mv a.txt a.txt 及 mv a.txt .)
+     */
+    @Test
+    fun testMvSameFileShortCircuit() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        val f = createMockFile("a.txt", "1")
+        ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(f), cid = "0", count = 1, order = "", path = emptyList()))
+
+        // 1. mv a.txt a.txt
+        val outSame = engine.executeStrings("mv a.txt a.txt", ctx)
+        assertEquals(listOf("mv: 'a.txt' and 'a.txt' are the same file"), outSame)
+
+        // 2. mv a.txt .
+        val outDot = engine.executeStrings("mv a.txt .", ctx)
+        assertEquals(listOf("mv: 'a.txt' and '.' are the same file"), outDot)
+
+        // 验证未发起任何移动或重命名请求
+        assertTrue(mockRepo.movedItems.isEmpty())
+        assertTrue(mockRepo.renamedItems.isEmpty())
+    }
+
+    /**
+     * 测试特殊目录（. 与 ..）及工作目录祖先移动安全拦截
+     */
+    @Test
+    fun testMvAncestorAndSpecialDirectoryProtection() = runBlocking {
+        val engine = createTestEngine()
+        val ctx = createTestContext()
+
+        val folderA = createMockFolder("folderA", "10")
+        val subFolder = createMockFolder("subFolder", "20")
+        val destFolder = createMockFolder("dest", "30")
+        ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(folderA, destFolder), cid = "0", count = 2, order = "", path = emptyList()))
+        ctx.fileCacheManager.put("10", FilesBean(fileBeanList = arrayListOf(subFolder), cid = "10", count = 1, order = "", path = emptyList()))
+        ctx.fileCacheManager.put("20", FilesBean(fileBeanList = arrayListOf(), cid = "20", count = 0, order = "", path = emptyList()))
+        ctx.fileCacheManager.put("30", FilesBean(fileBeanList = arrayListOf(), cid = "30", count = 0, order = "", path = emptyList()))
+
+        // 切换到 /folderA/subFolder
+        ctx.updateDirectory(listOf(
+            PathBean("0", "根目录", "0"),
+            PathBean("10", "folderA", "0"),
+            PathBean("20", "subFolder", "10")
+        ))
+
+        // 1. 移动 . 与 .. 保护
+        val outDot = engine.executeStrings("mv . /dest", ctx)
+        assertTrue(outDot.any { it.contains("Cannot move '.' or '..' directory") })
+
+        val outDotDot = engine.executeStrings("mv .. /dest", ctx)
+        assertTrue(outDotDot.any { it.contains("Cannot move '.' or '..' directory") })
+
+        // 2. 移动当前工作目录祖先
+        val outAncestor = engine.executeStrings("mv /folderA /dest", ctx)
+        assertTrue(outAncestor.any { it.contains("Cannot move ancestor of current working directory") })
+    }
+
+    /**
+     * 测试跨目录移动并重命名（两阶段操作）及重命名失败时的反向事务回滚
+     */
+    @Test
+    fun testMvCrossDirectoryMoveAndRenameSuccessAndRollback() = runBlocking {
+        val engine = createTestEngine()
+
+        // 1. 成功场景：跨目录移动并在目标目录下重命名
+        val mockRepoSuccess = createTestMockRepository()
+        val ctxSuccess = createTestContext(fileRepository = mockRepoSuccess)
+
+        val fileSrc = createMockFile("old.txt", "101")
+        val destDir = createMockFolder("target_dir", "200")
+        ctxSuccess.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(fileSrc, destDir), cid = "0", count = 2, order = "", path = emptyList()))
+        ctxSuccess.fileCacheManager.put("200", FilesBean(fileBeanList = arrayListOf(), cid = "200", count = 0, order = "", path = emptyList()))
+
+        val outSuccess = engine.executeStrings("mv old.txt target_dir/new.txt", ctxSuccess)
+        assertEquals(listOf("mv: 'old.txt' -> 'target_dir/new.txt'"), outSuccess)
+        assertEquals(1, mockRepoSuccess.movedItems.size)
+        assertEquals("200", mockRepoSuccess.movedItems[0]["pid"])
+        assertEquals("101", mockRepoSuccess.movedItems[0]["fid[0]"])
+        assertEquals(1, mockRepoSuccess.renamedItems.size)
+        assertTrue(mockRepoSuccess.renamedItems[0].contains("new.txt"))
+
+        // 2. 失败回滚场景：移动成功但重命名失败，触发事务回滚移回源目录
+        val mockRepoRollback = object : TestMockFileRepository() {
+            override suspend fun rename(renameBean: okhttp3.RequestBody): BaseReturnMessage {
+                return BaseReturnMessage(state = false, error = "目标重名或文件已锁定")
+            }
+        }
+        val ctxRollback = createTestContext(fileRepository = mockRepoRollback)
+        ctxRollback.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(fileSrc, destDir), cid = "0", count = 2, order = "", path = emptyList()))
+        ctxRollback.fileCacheManager.put("200", FilesBean(fileBeanList = arrayListOf(), cid = "200", count = 0, order = "", path = emptyList()))
+
+        val outRollback = engine.executeStrings("mv old.txt target_dir/new.txt", ctxRollback)
+        assertTrue(outRollback.any { it.contains("目标重名或文件已锁定") })
+        // 验证执行了 2 次移动操作：第 1 次前向移动到目标目录(200)，第 2 次逆向回滚到源目录(0)
+        assertEquals(2, mockRepoRollback.movedItems.size)
+        assertEquals("200", mockRepoRollback.movedItems[0]["pid"])
+        assertEquals("0", mockRepoRollback.movedItems[1]["pid"])
+        assertEquals("101", mockRepoRollback.movedItems[1]["fid[0]"])
     }
 }

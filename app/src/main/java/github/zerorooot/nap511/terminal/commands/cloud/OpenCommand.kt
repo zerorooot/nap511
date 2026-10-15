@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.terminal.commands.cloud
 
+import github.zerorooot.nap511.terminal.commands.util.CommandMessages
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
@@ -32,11 +33,11 @@ class OpenCommand : TerminalCommand {
     ): Flow<TerminalOutput> = flow {
         val targets = ast.rawPositionalValues
         if (targets.isEmpty()) {
-            emitError("open: missing file operand")
+            emitError(CommandMessages.missingFileOperand("open"))
             return@flow
         }
         if (targets.size > 1) {
-            emitError("open: too many arguments")
+            emitError(CommandMessages.tooManyArguments("open"))
             return@flow
         }
         val fileName = targets.first()

@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.terminal.commands.file
 
+import github.zerorooot.nap511.terminal.commands.util.CommandMessages
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
@@ -83,25 +84,25 @@ class CatCommand : TerminalCommand {
         for (filePath in files) {
             val resolved = ctx.resolveTarget(filePath)
             if (resolved == null) {
-                emitError("cat: $filePath: No such file or directory")
+                emitError(CommandMessages.noSuchFile("cat", filePath))
                 continue
             }
 
             when (resolved) {
                 is ResolvedTarget.Directory -> {
-                    emitError("cat: $filePath: Is a directory")
+                    emitError(CommandMessages.isADirectory("cat", filePath))
                 }
 
                 is ResolvedTarget.File -> {
                     val fileBean = resolved.file
                     when (val validRes = TextFileHelper.validate(fileBean, maxKb)) {
                         is TextValidationResult.NotTextFile -> {
-                            emitError("cat: ${fileBean.name}: Not a text file")
+                            emitError(CommandMessages.notATextFile("cat", fileBean.name))
                         }
 
                         is TextValidationResult.ExceedsSizeLimit -> {
                             val sizeStr = fileBean.sizeString.ifEmpty { "${fileBean.size}B" }
-                            emitError("cat: ${fileBean.name}: File exceeds size limit ($sizeStr >= ${validRes.limitKb}KB)")
+                            emitError(CommandMessages.fileExceedsLimit("cat", fileBean.name, sizeStr, validRes.limitKb))
                         }
 
                         is TextValidationResult.Valid -> {
@@ -115,7 +116,7 @@ class CatCommand : TerminalCommand {
                                     formatter.formatAndEmit(line, this)
                                 }
                             }.onFailure { err ->
-                                emitError("cat: ${fileBean.name}: Failed to read file (${err.message ?: "unknown error"})")
+                                emitError(CommandMessages.failedToReadFile("cat", fileBean.name, err.message ?: "unknown error"))
                             }
                         }
                     }

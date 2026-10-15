@@ -2,19 +2,20 @@ package github.zerorooot.nap511.terminal.commands.file
 
 import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.terminal.commands.util.TerminalExceptionHandler
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.util.FileCacheManager
 
 /**
  * 待批量操作（删除/移动）目标实体统一元数据模型
  *
- * @property parentCid 待操作项原本所在的父目录 ID
+ * @property parentCid 待操作项原本所在的父目录 ID，根目录或未知时显式为 null
  * @property fid 待操作项的唯一文件/目录标识符（fileId 或 categoryId）
  * @property displayName 显示名称（用于输出日志与错误信息）
  * @property isFolder 是否为文件夹
  */
 data class BatchTargetItem(
-    val parentCid: String,
+    val parentCid: String?,
     val fid: String,
     val displayName: String,
     val isFolder: Boolean
@@ -125,12 +126,12 @@ object TerminalBatchFileOps {
                     // 本地缓存多源同步：按源目录 parentCid 分组清理条目
                     val groupedBySourceParent = chunk.groupBy { it.parentCid }
                     for ((srcParentCid, srcItems) in groupedBySourceParent) {
-                        if (srcParentCid.isNotEmpty()) {
+                        if (!srcParentCid.isNullOrEmpty()) {
                             FileCacheManager.removeItems(srcParentCid, srcItems.map { it.fid })
                         }
                     }
                 } else {
-                    firstError = res.error.ifEmpty { res.message.ifEmpty { "未知错误" } }
+                    firstError = TerminalExceptionHandler.extractErrorMessage(res, "未知错误")
                     break // 熔断后续切片
                 }
             }
@@ -153,25 +154,27 @@ object TerminalBatchFileOps {
      * 对同一父目录 [parentCid] 下的一组待删除项执行删除并同步本地缓存
      *
      * @param ctx 终端执行上下文
-     * @param parentCid 待删除项所在的父目录 ID
+     * @param parentCid 待删除项所在的父目录 ID，根目录或未知时可为 null
      * @param items 归属于该父目录的待删除目标列表
      * @return 删除操作结果
      */
     suspend fun deleteGroup(
         ctx: TerminalContext,
-        parentCid: String,
+        parentCid: String?,
         items: List<BatchTargetItem>
     ): BaseReturnMessage {
         if (items.isEmpty()) {
             return BaseReturnMessage(state = true, message = "无需删除")
         }
 
+        val effectivePid = parentCid.orEmpty()
+
         // 1. 降级分支：单项目或 parentCid 为空时走单项删除
-        if (items.size == 1 || parentCid.isEmpty()) {
+        if (items.size == 1 || effectivePid.isEmpty()) {
             val single = items.first()
-            val res = ctx.fileRepository.delete(pid = parentCid, fid = single.fid)
+            val res = ctx.fileRepository.delete(pid = effectivePid, fid = single.fid)
             if (res.state) {
-                syncCacheAfterDelete(parentCid, listOf(single))
+                syncCacheAfterDelete(effectivePid, listOf(single))
             }
             return res
         }
@@ -183,7 +186,7 @@ object TerminalBatchFileOps {
         for (chunk in chunks) {
             val data = HashMap<String, String>().apply {
                 put("ignore_warn", "1")
-                put("pid", parentCid)
+                put("pid", effectivePid)
                 chunk.forEachIndexed { index, item ->
                     put("fid[$index]", item.fid)
                 }
@@ -191,7 +194,7 @@ object TerminalBatchFileOps {
 
             val res = ctx.fileRepository.deleteMultiple(data)
             if (res.state) {
-                syncCacheAfterDelete(parentCid, chunk)
+                syncCacheAfterDelete(effectivePid, chunk)
                 lastSuccessResult = res
             } else {
                 return res
@@ -210,13 +213,13 @@ object TerminalBatchFileOps {
      * @param items 已成功从云端删除的项目列表
      */
     suspend fun syncCacheAfterDelete(
-        parentCid: String,
+        parentCid: String?,
         items: List<BatchTargetItem>
     ) {
         if (items.isEmpty()) return
 
         // 1. 就地从父目录缓存中批量剔除条目
-        if (parentCid.isNotEmpty()) {
+        if (!parentCid.isNullOrEmpty()) {
             val fids = items.map { it.fid }
             FileCacheManager.removeItems(parentCid, fids)
         }

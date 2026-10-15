@@ -200,7 +200,7 @@ class BatchMoveTest {
 
         // 原地移动至当前目录 .
         val outDot = engine.executeStrings("mv same.txt .", ctx)
-        assertEquals(listOf("mv: 'same.txt' 与目标目录相同，已跳过"), outDot)
+        assertEquals(listOf("mv: 'same.txt' and '.' are the same file"), outDot)
 
         // 验证未发起任何网络请求
         assertEquals(0, mockRepo.movedItems.size)

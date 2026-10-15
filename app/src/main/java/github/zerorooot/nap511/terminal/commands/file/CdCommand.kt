@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.terminal.commands.file
 
+import github.zerorooot.nap511.terminal.commands.util.CommandMessages
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.TerminalCommand
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
@@ -32,7 +33,7 @@ class CdCommand : TerminalCommand {
     ): Flow<TerminalOutput> = flow {
         val targets = ast.rawPositionalValues
         if (targets.size > 1) {
-            emitError("cd: too many arguments")
+            emitError(CommandMessages.tooManyArguments("cd"))
             return@flow
         }
         // 若缺省目标路径，默认切换至根目录 "/"

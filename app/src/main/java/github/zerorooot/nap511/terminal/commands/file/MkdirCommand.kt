@@ -1,6 +1,8 @@
 package github.zerorooot.nap511.terminal.commands.file
 
 import github.zerorooot.nap511.bean.PathBean
+import github.zerorooot.nap511.terminal.commands.util.CommandMessages
+import github.zerorooot.nap511.terminal.commands.util.TerminalExceptionHandler
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.context.TerminalPath
 import github.zerorooot.nap511.terminal.context.TerminalPathConstants
@@ -11,6 +13,7 @@ import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
 import github.zerorooot.nap511.terminal.viewmodel.emitText
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 
@@ -49,7 +52,7 @@ class MkdirCommand : MutationCommand<MkdirPlan>() {
     ): Result<MkdirPlan> {
         val folderNames = ast.rawPositionalValues
         if (folderNames.isEmpty()) {
-            return Result.failure(Exception("missing operand"))
+            return Result.failure(Exception(CommandMessages.missingOperand("mkdir").removePrefix("mkdir: ")))
         }
         val isParents = ast.hasFlag("-p")
         return Result.success(MkdirPlan(isParents = isParents, folderNames = folderNames))
@@ -65,7 +68,7 @@ class MkdirCommand : MutationCommand<MkdirPlan>() {
             val parsed = TerminalPath.parse(rawName)
             if (parsed.isRoot || parsed.targetName.isEmpty()) {
                 if (!isParents) {
-                    collector.emitError("mkdir: cannot create directory '$rawName': File exists")
+                    collector.emitError(CommandMessages.fileExists("mkdir", rawName))
                 }
                 continue
             }
@@ -95,7 +98,7 @@ class MkdirCommand : MutationCommand<MkdirPlan>() {
                     } else {
                         val existingFile = existingFiles.firstOrNull { !it.isFolder && it.name == seg }
                         if (existingFile != null) {
-                            collector.emitError("mkdir: cannot create directory '$rawName': File exists")
+                            collector.emitError(CommandMessages.fileExists("mkdir", rawName))
                             createSuccess = false
                             break
                         }
@@ -113,20 +116,22 @@ class MkdirCommand : MutationCommand<MkdirPlan>() {
                                     break
                                 }
                             } else {
-                                val err = res.error.ifEmpty { "创建失败" }
+                                val err = TerminalExceptionHandler.extractErrorMessage(res, "创建失败")
                                 collector.emitError("mkdir: cannot create directory '$rawName': $err")
                                 createSuccess = false
                                 break
                             }
                         } catch (e: Exception) {
-                            collector.emitError("mkdir: cannot create directory '$rawName': ${e.message}")
+                            if (e is CancellationException) throw e
+                            val errStr = TerminalExceptionHandler.extractErrorMessage(e)
+                            collector.emitError("mkdir: cannot create directory '$rawName': $errStr")
                             createSuccess = false
                             break
                         }
                     }
                 }
                 if (createSuccess) {
-                    collector.emitText("mkdir: created directory '$rawName'")
+                    collector.emitText(CommandMessages.createdDirectory("mkdir", rawName))
                 }
             } else {
                 // 非 -p 模式：若带路径则必须在其已存在的父目录下创建
@@ -148,7 +153,7 @@ class MkdirCommand : MutationCommand<MkdirPlan>() {
                 // 校验父目录下是否已存在同名文件夹或文件
                 val existing = ctx.listDirectory(parentCid).firstOrNull { it.name == folderName }
                 if (existing != null) {
-                    collector.emitError("mkdir: cannot create directory '$rawName': File exists")
+                    collector.emitError(CommandMessages.fileExists("mkdir", rawName))
                     continue
                 }
 
@@ -160,13 +165,15 @@ class MkdirCommand : MutationCommand<MkdirPlan>() {
                     if (res.state) {
                         // 更新缓存
                         ctx.listDirectory(parentCid, forceRefresh = true)
-                        collector.emitText("mkdir: created directory '$rawName'")
+                        collector.emitText(CommandMessages.createdDirectory("mkdir", rawName))
                     } else {
-                        val err = res.error.ifEmpty { "创建失败" }
+                        val err = TerminalExceptionHandler.extractErrorMessage(res, "创建失败")
                         collector.emitError("mkdir: cannot create directory '$rawName': $err")
                     }
                 } catch (e: Exception) {
-                    collector.emitError("mkdir: cannot create directory '$rawName': ${e.message}")
+                    if (e is CancellationException) throw e
+                    val errStr = TerminalExceptionHandler.extractErrorMessage(e)
+                    collector.emitError("mkdir: cannot create directory '$rawName': $errStr")
                 }
             }
         }

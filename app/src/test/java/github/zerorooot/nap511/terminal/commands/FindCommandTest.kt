@@ -546,5 +546,41 @@ class FindCommandTest {
             outPiped
         )
     }
+
+    /**
+     * 测试 find -delete 拓扑剪枝优化：
+     * 当祖先文件夹与子孙文件/子目录同时命中删除条件时，
+     * 拓扑剪枝算法自动剔除冗余子孙项，仅保留最顶层父目录发起删除调用，
+     * 避免因上层已删除导致子孙项 404 或网络请求浪费。
+     */
+    @Test
+    fun testFindDeleteTopologicalPruning() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        // 构造目录层次：
+        // 根目录(0) -> parentDir(10) -> subDir(20) -> deepFile.txt(201)
+        //                            -> subFile.txt(101)
+        val parentDir = createMockFolder("parentDir", "10")
+        val subDir = createMockFolder("subDir", "20")
+        val subFile = createMockFile("subFile.txt", "101")
+        val deepFile = createMockFile("deepFile.txt", "201")
+
+        ctx.putMockFiles("0", listOf(parentDir))
+        ctx.putMockFiles("10", listOf(subDir, subFile))
+        ctx.putMockFiles("20", listOf(deepFile))
+
+        // 执行无过滤条件的 find -delete -f（所有文件夹和文件均匹配）
+        val out = engine.executeStrings("find -delete -f", ctx)
+
+        // 验证提示信息显示剪枝后的实际删除数量为 1（仅顶层 parentDir）
+        assertTrue(out.any { it.contains("已成功删除 1 / 1 个项目") })
+
+        // 验证网络请求只发起了 1 个项目（parentDir ID: 10），子孙项 20, 101, 201 已被拓扑剔除
+        assertEquals(1, mockRepo.deletedItems.size)
+        assertEquals("10", mockRepo.deletedItems[0].second)
+    }
 }
+
 

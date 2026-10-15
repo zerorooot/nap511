@@ -2,8 +2,10 @@ package github.zerorooot.nap511.terminal.commands.cloud
 
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.repository.SettingsRepository
+import github.zerorooot.nap511.terminal.commands.util.CommandMessages
 import github.zerorooot.nap511.terminal.commands.util.TableAlignment
 import github.zerorooot.nap511.terminal.commands.util.TableFormatter
+import github.zerorooot.nap511.terminal.commands.util.TerminalExceptionHandler
 import github.zerorooot.nap511.terminal.context.ResolvedTarget
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
@@ -18,6 +20,7 @@ import github.zerorooot.nap511.terminal.viewmodel.emitText
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.worker.UnzipQueueManager
 import github.zerorooot.nap511.worker.UnzipTaskItem
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 
@@ -90,7 +93,7 @@ class UnzipCommand : ActionDispatchCommand<UnzipAction>() {
         targetPaths.addAll(stdinFiles)
 
         if (targetPaths.isEmpty()) {
-            collector.emitError("unzip: missing file operand")
+            collector.emitError(CommandMessages.missingFileOperand("unzip"))
             return
         }
 
@@ -152,7 +155,8 @@ class UnzipCommand : ActionDispatchCommand<UnzipAction>() {
                             collector.emitText("unzip: 压缩包内无可显示文件或暂未完成分析")
                         }
                     } catch (e: Exception) {
-                        collector.emitError("unzip: 预览 '${file.name}' 失败: ${e.message}")
+                        if (e is CancellationException) throw e
+                        collector.emitError("unzip: 预览 '${file.name}' 失败: ${TerminalExceptionHandler.extractErrorMessage(e)}")
                     }
                 }
             }
@@ -186,7 +190,8 @@ class UnzipCommand : ActionDispatchCommand<UnzipAction>() {
                         "unzip: 已成功提交 ${distinctFileBeans.size} 个解压任务到后台 UnzipAllFileWorker 处理 (${distinctFileBeans.joinToString { it.name }})"
                     )
                 } catch (e: Exception) {
-                    collector.emitError("unzip: 提交解压任务失败: ${e.message}")
+                    if (e is CancellationException) throw e
+                    collector.emitError("unzip: 提交解压任务失败: ${TerminalExceptionHandler.extractErrorMessage(e)}")
                 }
             }
         }

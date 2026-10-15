@@ -1,7 +1,10 @@
 package github.zerorooot.nap511.terminal.commands.file
 
 import github.zerorooot.nap511.bean.RenameBean
-import github.zerorooot.nap511.terminal.context.ResolvedTarget
+import github.zerorooot.nap511.terminal.commands.util.CommandMessages
+import github.zerorooot.nap511.terminal.commands.util.MoveValidationResult
+import github.zerorooot.nap511.terminal.commands.util.TargetItemResolver
+import github.zerorooot.nap511.terminal.commands.util.TerminalExceptionHandler
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.context.TerminalPath
 import github.zerorooot.nap511.terminal.engine.CommandFlag
@@ -11,6 +14,7 @@ import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
 import github.zerorooot.nap511.terminal.viewmodel.emitText
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 
@@ -36,7 +40,10 @@ data class MvPlan(
  *    - 委托 [TerminalBatchFileOps.moveGroup] 批量执行，避免 N 次串行 HTTP 往返；
  *    - 内置前置安全防御：拦截原地移动、拦截将目录移入自身或其下属子目录；
  *    - 细粒度回显：单项移动展示源与目标明细，批量移动展示汇总摘要。
- * 2. 重命名模式：当仅有一个源文件且目标非目录时，执行文件/文件夹就地重命名操作。
+ * 2. 重命名与跨目录移动重命名模式：当仅有一个源文件且目标非目录时：
+ *    - 若目标路径包含父级路径（如 `mv a.txt exist_dir/b.txt`），执行「移动 -> 重命名 -> 失败仅逆向回滚」事务机制；
+ *    - 若目标无父级路径（如 `mv a.txt b.txt`），执行同目录就地重命名并同步本地缓存；
+ *    - 原地自移动防御：严格拦截 `mv a.txt a.txt`，输出 POSIX 标准 same file 错误。
  */
 class MvCommand : MutationCommand<MvPlan>() {
 
@@ -96,52 +103,7 @@ class MvCommand : MutationCommand<MvPlan>() {
     ) {
         val destination = plan.destination
         val sources = plan.sources
-        val currentFiles = ctx.listDirectory(ctx.currentCid)
         val destParsed = TerminalPath.parse(destination)
-
-        /**
-         * 解析源文件/目录，将其统一转换为 [BatchTargetItem] 元数据实体
-         */
-        suspend fun resolveSourceItem(rawSrc: String): BatchTargetItem? {
-            val srcParsed = TerminalPath.parse(rawSrc)
-            val localFile = currentFiles.firstOrNull { it.name == srcParsed.targetName || it.name == rawSrc.trim() }
-            if (localFile != null && !srcParsed.isMultiSegment && !srcParsed.isAbsolute) {
-                val fid = if (localFile.isFolder) localFile.categoryId else localFile.fileId
-                return BatchTargetItem(
-                    parentCid = ctx.currentCid,
-                    fid = fid,
-                    displayName = localFile.name,
-                    isFolder = localFile.isFolder
-                )
-            }
-
-            // 尝试路径解析（支持绝对路径与相对路径）
-            return when (val resolved = ctx.resolveTarget(rawSrc)) {
-                is ResolvedTarget.Directory -> {
-                    val effectiveParentCid = resolved.parentCid
-                        ?: resolved.pathList.dropLast(1).lastOrNull()?.cid
-                        ?: ctx.currentCid
-                    BatchTargetItem(
-                        parentCid = effectiveParentCid,
-                        fid = resolved.cid,
-                        displayName = resolved.name.ifEmpty { srcParsed.targetName.ifEmpty { "/" } },
-                        isFolder = true
-                    )
-                }
-
-                is ResolvedTarget.File -> {
-                    val effectiveParentCid = resolved.parentCid.ifEmpty { resolved.file.categoryId }
-                    BatchTargetItem(
-                        parentCid = effectiveParentCid,
-                        fid = resolved.file.fileId,
-                        displayName = resolved.file.name,
-                        isFolder = false
-                    )
-                }
-
-                null -> null
-            }
-        }
 
         // 解析目标目录（通过强类型 Directory 返回完整路径面包屑 pathList）
         val resolvedDestDir = ctx.resolveDirectory(destination)
@@ -161,26 +123,22 @@ class MvCommand : MutationCommand<MvPlan>() {
 
             // 阶段一：前置多源安全校验与合法条目收集
             for (src in sources) {
-                val resolvedSrc = resolveSourceItem(src)
+                val resolvedSrc = TargetItemResolver.resolveToBatchItem(ctx, src)
                 if (resolvedSrc == null) {
-                    collector.emitError("mv: cannot stat '$src': No such file or directory")
+                    collector.emitError(CommandMessages.cannotStat("mv", src))
                     continue
                 }
 
-                // 前置安全校验 1：原地移动防护（源条目已位于目标目录中）
-                if (resolvedSrc.parentCid == targetDestCid) {
-                    collector.emitText("mv: '$src' 与目标目录相同，已跳过")
-                    continue
+                when (val validation = TargetItemResolver.validateMove(resolvedSrc, targetDestCid, resolvedDestDir, ctx, src, destination)) {
+                    is MoveValidationResult.Error -> {
+                        collector.emitError(validation.message)
+                        continue
+                    }
+                    is MoveValidationResult.Valid -> {
+                        validItems.add(resolvedSrc)
+                        validRawSources.add(src)
+                    }
                 }
-
-                // 前置安全校验 2：自嵌套与移入子目录防护（目标目录自身包含在源目录的层级链条中）
-                if (resolvedSrc.isFolder && resolvedDestDir.pathList.any { it.cid == resolvedSrc.fid }) {
-                    collector.emitError("mv: 无法将目录 '$src' 移动至其自身或子目录下")
-                    continue
-                }
-
-                validItems.add(resolvedSrc)
-                validRawSources.add(src)
             }
 
             if (validItems.isEmpty()) return
@@ -191,7 +149,7 @@ class MvCommand : MutationCommand<MvPlan>() {
                 val singleRaw = validRawSources.first()
                 val result = TerminalBatchFileOps.moveGroup(ctx, targetDestCid, listOf(single))
                 if (result.isAllSuccess) {
-                    collector.emitText("mv: '$singleRaw' -> '$formattedDest'")
+                    collector.emitText(CommandMessages.singleMoveSuccess("mv", singleRaw, formattedDest))
                 } else {
                     collector.emitError("mv: 移动 '$singleRaw' 失败: ${result.error}")
                 }
@@ -199,49 +157,158 @@ class MvCommand : MutationCommand<MvPlan>() {
                 val result = TerminalBatchFileOps.moveGroup(ctx, targetDestCid, validItems)
                 when {
                     result.isAllSuccess -> {
-                        collector.emitText("mv: 已成功移动 ${result.successCount} 个文件/文件夹至 '$formattedDest'")
+                        collector.emitText(CommandMessages.batchMoveSuccess("mv", result.successCount, formattedDest))
                     }
                     result.isPartialSuccess -> {
-                        collector.emitText("mv: 部分移动成功 (${result.successCount}/${result.totalCount}) 至 '$formattedDest'")
-                        collector.emitError("mv: 其余 ${result.failureCount} 个项目移动失败: ${result.error}")
+                        collector.emitText(CommandMessages.batchMovePartial("mv", result.successCount, result.totalCount, formattedDest))
+                        collector.emitError(CommandMessages.batchMoveFailed("mv", result.failureCount, result.error))
                     }
                     else -> {
-                        collector.emitError("mv: 批量移动失败 (${validItems.size} 个项目): ${result.error}")
+                        collector.emitError(CommandMessages.batchMoveFailed("mv", validItems.size, result.error))
                     }
                 }
             }
         } else if (sources.size == 1) {
-            // === 模式 2：重命名模式（单源且目标不是现有目录） ===
+            // === 模式 2：重命名或跨目录移动重命名模式（单源且目标不是现有目录） ===
             if (destParsed.hasTrailingSlash) {
-                collector.emitError("mv: target '$destination' is not a directory")
+                collector.emitError(CommandMessages.notADirectory("mv", destination))
                 return
             }
+
             val src = sources[0]
-            val resolvedSrc = resolveSourceItem(src)
+            val resolvedSrc = TargetItemResolver.resolveToBatchItem(ctx, src)
             if (resolvedSrc == null) {
-                collector.emitError("mv: cannot stat '$src': No such file or directory")
+                collector.emitError(CommandMessages.cannotStat("mv", src))
                 return
             }
-            // 截取纯文件名，防止将路径名误作为文件名传入 rename API
+
+            // 高危目录前置拦截
+            if (TargetItemResolver.isDotOrDotDot(src)) {
+                collector.emitError(CommandMessages.cannotMoveDotOrDotDot("mv", src))
+                return
+            }
+            if (TargetItemResolver.isRoot(resolvedSrc)) {
+                collector.emitError(CommandMessages.cannotMoveRoot("mv", src))
+                return
+            }
+            if (TargetItemResolver.isCurrentDirectory(ctx, resolvedSrc)) {
+                collector.emitError(CommandMessages.cannotMoveCwd("mv", src))
+                return
+            }
+            if (TargetItemResolver.isAncestorOfCurrent(ctx, resolvedSrc)) {
+                collector.emitError(CommandMessages.cannotMoveAncestor("mv", src))
+                return
+            }
+
             val newName = destParsed.targetName
-            try {
-                val renameBean = RenameBean(resolvedSrc.fid, newName)
-                val res = ctx.fileRepository.rename(renameBean.toRequestBody())
-                if (res.state) {
-                    val parentCid = resolvedSrc.parentCid.ifEmpty { ctx.currentCid }
-                    // 就地在父目录缓存中重命名该文件/文件夹（对齐 FileViewModel 的 rename 逻辑）
-                    ctx.fileCacheManager.renameItem(parentCid = parentCid, fid = resolvedSrc.fid, newName = newName)
-                    collector.emitText("mv: '$src' renamed to '$newName'")
-                } else {
-                    val err = res.error.ifEmpty { res.errorMsg.ifEmpty { res.message } }
-                    collector.emitError("mv: 重命名失败: $err")
+
+            // 判断目标是否指定了跨目录路径（带父级路径）
+            val parentPath = destParsed.parentPathString
+            if (parentPath.isNotEmpty()) {
+                // 子分支 2A：跨目录移动并重命名（mv a.txt exist_dir/b.txt）
+                val resolvedDestParent = ctx.resolveDirectory(parentPath)
+                if (resolvedDestParent == null) {
+                    collector.emitError(CommandMessages.cannotAccess("mv", parentPath))
+                    return
                 }
-            } catch (e: Exception) {
-                collector.emitError("mv: 重命名失败: ${e.message}")
+
+                // 检查原地同名短路拦截
+                if (resolvedSrc.parentCid == resolvedDestParent.cid && resolvedSrc.displayName == newName) {
+                    collector.emitError(CommandMessages.sameFile("mv", src, destination))
+                    return
+                }
+
+                // 若源文件已在目标父目录下，直接执行同目录就地重命名
+                if (resolvedSrc.parentCid == resolvedDestParent.cid) {
+                    executeInPlaceRename(ctx, resolvedSrc, src, newName, collector)
+                    return
+                }
+
+                // 校验将源移入目标父目录的合法性（防自嵌套等）
+                if (resolvedSrc.isFolder && (resolvedSrc.fid == resolvedDestParent.cid || resolvedDestParent.pathList.any { it.cid == resolvedSrc.fid })) {
+                    collector.emitError(CommandMessages.selfNestingError("mv", src))
+                    return
+                }
+
+                // 步骤 1：先移动文件至目标目录（遵循 115 同名自动追加后缀容忍机制）
+                val moveResult = TerminalBatchFileOps.moveGroup(ctx, resolvedDestParent.cid, listOf(resolvedSrc))
+                if (!moveResult.isAllSuccess) {
+                    collector.emitError("mv: 移动 '$src' 失败: ${moveResult.error}")
+                    return
+                }
+
+                // 步骤 2：在目标目录下执行重命名为指定名称
+                try {
+                    val renameBean = RenameBean(resolvedSrc.fid, newName)
+                    val renameRes = ctx.fileRepository.rename(renameBean.toRequestBody())
+                    if (renameRes.state) {
+                        ctx.fileCacheManager.renameItem(
+                            parentCid = resolvedDestParent.cid,
+                            fid = resolvedSrc.fid,
+                            newName = newName
+                        )
+                        collector.emitText(CommandMessages.singleMoveSuccess("mv", src, destination))
+                    } else {
+                        val renameErr = TerminalExceptionHandler.extractErrorMessage(renameRes, "重命名失败")
+                        // 步骤 3：失败逆向回滚：将文件移回原目录（不强求恢复原文件名）
+                        val originalParentCid = resolvedSrc.parentCid
+                        if (!originalParentCid.isNullOrEmpty()) {
+                            val rollbackItem = resolvedSrc.copy(parentCid = resolvedDestParent.cid)
+                            val rollbackResult = TerminalBatchFileOps.moveGroup(ctx, originalParentCid, listOf(rollbackItem))
+                            if (rollbackResult.isAllSuccess) {
+                                collector.emitText(CommandMessages.moveRollbackSuccess("mv", src, originalParentCid))
+                                collector.emitError("mv: 重命名失败: $renameErr")
+                            } else {
+                                collector.emitError(CommandMessages.moveRollbackFailed("mv", src, resolvedDestParent.path, rollbackResult.error))
+                            }
+                        } else {
+                            collector.emitError("mv: 重命名失败: $renameErr")
+                        }
+                    }
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    val errStr = TerminalExceptionHandler.extractErrorMessage(e)
+                    collector.emitError("mv: 重命名失败: $errStr")
+                }
+            } else {
+                // 子分支 2B：同目录就地重命名（如 mv a.txt b.txt）
+                if (src == destination || resolvedSrc.displayName == newName) {
+                    collector.emitError(CommandMessages.sameFile("mv", src, destination))
+                    return
+                }
+                executeInPlaceRename(ctx, resolvedSrc, src, newName, collector)
             }
         } else {
             // 多源但目标非目录，无法执行移动
-            collector.emitError("mv: target '$destination' is not a directory")
+            collector.emitError(CommandMessages.notADirectory("mv", destination))
+        }
+    }
+
+    /**
+     * 执行同目录文件就地重命名并同步本地缓存
+     */
+    private suspend fun executeInPlaceRename(
+        ctx: TerminalContext,
+        resolvedSrc: BatchTargetItem,
+        srcDisplay: String,
+        newName: String,
+        collector: FlowCollector<TerminalOutput>
+    ) {
+        try {
+            val renameBean = RenameBean(resolvedSrc.fid, newName)
+            val res = ctx.fileRepository.rename(renameBean.toRequestBody())
+            if (res.state) {
+                val parentCid = resolvedSrc.parentCid.orEmpty().ifEmpty { ctx.currentCid }
+                // 就地在父目录缓存中重命名该文件/文件夹（对齐 FileViewModel 的 rename 逻辑）
+                ctx.fileCacheManager.renameItem(parentCid = parentCid, fid = resolvedSrc.fid, newName = newName)
+                collector.emitText(CommandMessages.renamed("mv", srcDisplay, newName))
+            } else {
+                val err = TerminalExceptionHandler.extractErrorMessage(res, "重命名失败")
+                collector.emitError("mv: 重命名失败: $err")
+            }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            collector.emitError("mv: 重命名失败: ${TerminalExceptionHandler.extractErrorMessage(e)}")
         }
     }
 }
