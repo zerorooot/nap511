@@ -14,8 +14,8 @@ android {
         applicationId = "github.zerorooot.nap511"
         minSdk = 26
         targetSdk = 37
-        versionCode = 12
-        versionName = "1.6"
+        versionCode = 13
+        versionName = "1.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -77,8 +77,8 @@ dependencies {
 
     implementation(libs.androidx.concurrent.futures.ktx)
     implementation(libs.xlog)
-    implementation(files("libs/lazycolumnscrollbar-2.2.0.aar"))
-    //implementation(libs.lazycolumnscrollbar)
+//    implementation(files("libs/lazycolumnscrollbar-2.2.0.aar"))
+    implementation(libs.lazycolumnscrollbar)
     implementation(libs.process.phoenix)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.android.request.inspector.webview)

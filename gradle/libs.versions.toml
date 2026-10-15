@@ -13,10 +13,10 @@ androidxNavigation3="1.2.0"
 kotlinxCoroutinesAndroid = "1.11.0"
 kotlinxCoroutinesCore = "1.11.0"
 kotlinxSerializationJson = "1.11.0"
-lazycolumnscrollbar = "2.2.0"
+lazycolumnscrollbar = "3.0.0"
 lifecycleRuntimeKtx = "2.11.0"
 activityCompose = "1.13.0"
-kotlin = "2.4.20"
+kotlin = "2.4.21"
 composeBom = "2026.09.00"
 appcompat = "1.8.0"
 cardview = "1.0.0"
@@ -67,7 +67,7 @@ kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutine
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutinesCore" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
-lazycolumnscrollbar = { module = "com.github.nanihadesuka:LazyColumnScrollbar", version.ref = "lazycolumnscrollbar" }
+lazycolumnscrollbar = { module = "com.github.nanihadesuka.LazyColumnScrollbar:lazycolumnscrollbar", version.ref = "lazycolumnscrollbar" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 process-phoenix = { module = "com.jakewharton:process-phoenix", version.ref = "processPhoenix" }
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
