@@ -81,6 +81,7 @@ import github.zerorooot.nap511.viewmodel.removeFile
 import github.zerorooot.nap511.viewmodel.startSendAria2Service
 import github.zerorooot.nap511.viewmodel.unzipFile
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 
 @OptIn(
     ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalCoilApi::class
@@ -210,16 +211,29 @@ fun FileScreen(
         onBottomBarShowChange = { isBottomBarShow = it })
 
 
+    val currentScrollState by rememberUpdatedState(
+        when {
+            isPreviewActive -> staggeredGrid.asScrollState
+            isGridScreen -> gridState.asScrollState
+            else -> listState.asScrollState
+        }
+    )
+
     LaunchedEffect(fileViewModel) {
         fileViewModel.videoResultEvent.collect { index ->
-            val state = when {
-                isPreviewActive -> staggeredGrid.asScrollState
-                isGridScreen -> gridState.asScrollState
-                else -> listState.asScrollState
+            if (index !in fileViewModel.fileBeanList.indices) return@collect
+
+            // 让步一帧，确保前台恢复与基础测量完成
+            yield()
+            // 根据当前页面视图模式滚动，使位置接近中央
+            val state = currentScrollState
+            val visibleCount = state.visibleItemsCount
+            val halfCount = if (visibleCount > 0) visibleCount / 2 else 4
+            val targetTopIndex = (index - halfCount).coerceAtLeast(0)
+
+            runCatching {
+                state.scrollToItem(targetTopIndex, 0)
             }
-            // 根据当前页面视图模式滚动，将当前行提前 x 行显示，使位置接近中央
-            val scrollIndex = (index - 4).coerceAtLeast(0)
-            state.animateScrollToItem(scrollIndex, 0)
         }
     }
 
@@ -282,11 +296,15 @@ fun FileScreen(
 
     fun myItemOnClick(i: Int) = clickHandler.myItemOnClick(i)
 
-    suspend fun scrollToTop() {
-        when {
-            isPreviewActive -> staggeredGrid.scrollToItem(0, 0)
-            isGridScreen -> gridState.scrollToItem(0, 0)
-            else -> listState.scrollToItem(0, 0)
+    fun requestScrollToTop() {
+        currentScrollState.requestScrollToItem(0, 0)
+    }
+
+    suspend fun scrollToTop(animate: Boolean = false) {
+        if (animate) {
+            currentScrollState.animateScrollToItem(0, 0)
+        } else {
+            currentScrollState.scrollToItem(0, 0)
         }
     }
 
@@ -306,13 +324,7 @@ fun FileScreen(
             return
         }
         if (contentState.currentCid != "0" && !contentState.isLongClickState) {
-            val currentCid = contentState.currentCid
-            val state = when {
-                isPreviewActive -> staggeredGrid.asScrollState
-                isGridScreen -> gridState.asScrollState
-                else -> listState.asScrollState
-            }
-            fileViewModel.setListLocation(currentCid, state)
+            fileViewModel.setListLocation(contentState.currentCid, currentScrollState)
         }
         isBottomBarShow = true
         isTopBarShow = true
@@ -359,9 +371,7 @@ fun FileScreen(
 
             MenuItemAction.VIDEO_SCHEDULE -> {
                 fileViewModel.sortByVideoTime()
-                scope.launch {
-                    scrollToTop()
-                }
+                requestScrollToTop()
             }
 
             MenuItemAction.FILE_SORT -> fileViewModel.openFileOrderDialog()
@@ -412,7 +422,7 @@ fun FileScreen(
             },
             onPathDoubleClick = {
                 scope.launch {
-                    scrollToTop()
+                    scrollToTop(animate = true)
                 }
             },
             onPathLongClick = { name, cid ->
