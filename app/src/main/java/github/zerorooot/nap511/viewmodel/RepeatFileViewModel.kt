@@ -95,6 +95,7 @@ class RepeatFileViewModel : ViewModel() {
     fun refreshList() {
         if (!_uiState.value.hasStartedDedup) {
             _uiState.update { it.copy(isRefreshing = false) }
+            App.instance.toast("请查重后再刷新页面")
             return
         }
         viewModelScope.launch {

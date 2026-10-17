@@ -38,6 +38,8 @@ import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
 import androidx.compose.runtime.Composable
+import github.zerorooot.nap511.dialog.sync.LanSyncReceiverDialog
+import github.zerorooot.nap511.dialog.sync.LanSyncSenderDialog
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -173,6 +175,25 @@ fun SettingScreen(
 
     // 重置配置对话框状态
     var showResetDialog by remember { mutableStateOf(false) }
+    // 局域网同步发送与接收弹窗状态
+    var showSenderDialog by remember { mutableStateOf(false) }
+    var showReceiverDialog by remember { mutableStateOf(false) }
+
+    if (showSenderDialog) {
+        LanSyncSenderDialog(
+            currentState = uiState,
+            onDismissRequest = { showSenderDialog = false }
+        )
+    }
+
+    if (showReceiverDialog) {
+        LanSyncReceiverDialog(
+            onDismissRequest = { showReceiverDialog = false },
+            onPayloadReceived = { payload ->
+                viewModel.handleSettingSyncPayload(payload)
+            }
+        )
+    }
 
     if (showResetDialog) {
         AlertDialog(
@@ -208,7 +229,13 @@ fun SettingScreen(
         SettingActions(
             onSaveConfig = { key, value -> viewModel.saveData(key, value) },
             onDrawerClick = onDrawerClick,
-            onActionClick = onActionClick,
+            onActionClick = { action ->
+                when (action) {
+                    "GenerateSyncQr" -> showSenderDialog = true
+                    "ScanSyncQr" -> showReceiverDialog = true
+                    else -> onActionClick(action)
+                }
+            },
             onExportConfig = {
                 exportLauncher.launch(
                     "nap511_${System.currentTimeMillis().toString().takeLast(13)}.json"

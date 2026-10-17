@@ -28,6 +28,8 @@ workRuntimeKtx = "2.12.0"
 xlog = "1.11.1"
 media3DatasourceOkhttp = "1.11.1"
 junit = "4.13.2"
+camerax = "1.5.3"
+zxing = "3.5.3"
 
 [libraries]
 android-request-inspector-webview = { module = "com.github.acsbendi:Android-Request-Inspector-WebView", version.ref = "androidRequestInspectorWebview" }
@@ -73,6 +75,13 @@ process-phoenix = { module = "com.jakewharton:process-phoenix", version.ref = "p
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
 xlog = { module = "com.elvishew:xlog", version.ref = "xlog" }
 androidx-media3-datasource-okhttp = { group = "androidx.media3", name = "media3-datasource-okhttp", version.ref = "media3DatasourceOkhttp" }
+
+androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "camerax" }
+androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
+androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
+androidx-camera-compose = { module = "androidx.camera:camera-compose", version.ref = "camerax" }
+okhttp-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver", version.ref = "okhttp" }
+zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 

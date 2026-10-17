@@ -37,9 +37,12 @@ import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import github.zerorooot.nap511.dialog.sync.LanSyncReceiverDialog
+import github.zerorooot.nap511.util.network.SyncPayload
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -210,10 +213,28 @@ fun LoginScreen(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("配置导入 / Cookie登录")
+                    Text("配置导入 / Cookie登录 / 扫码同步")
                 }
             }
         }
+    }
+
+    var showSyncReceiverDialog by remember { mutableStateOf(false) }
+
+    // 局域网同步接收端弹窗
+    if (showSyncReceiverDialog) {
+        LanSyncReceiverDialog(
+            onDismissRequest = { showSyncReceiverDialog = false },
+            onPayloadReceived = { payload ->
+                handleLoginSyncPayload(
+                    payload = payload,
+                    onSuccessLogin = { credential ->
+                        showAdvancedSheet = false
+                        onLoginSuccess(credential)
+                    }
+                )
+            }
+        )
     }
 
     // 底部展开框：高级登录
@@ -227,8 +248,42 @@ fun LoginScreen(
                 onConfigImported = { configJson ->
                     showAdvancedSheet = false
                     onLoginSuccess(LoginCredential.ConfigFile(configJson))
+                },
+                onScanSyncClick = {
+                    showSyncReceiverDialog = true
                 }
             )
+        }
+    }
+}
+
+/**
+ * 局域网同步载荷分发到登录界面 (LoginScreen)
+ * 若接收到的是应用配置（包含凭据与全部配置），以 ConfigFile 方式导入登录；
+ * 若接收到的是纯账号凭据，以 Cookie 方式发起鉴权登录。
+ */
+fun handleLoginSyncPayload(
+    payload: SyncPayload,
+    onSuccessLogin: (LoginCredential) -> Unit
+) {
+    val cookie = payload.cookie
+    val configJson = payload.configJson
+
+    when {
+        // 模式 2（应用设置）：完整包含凭证与全部配置，以 ConfigFile 方式导入，一次性完成配置更新与登录鉴权
+        !configJson.isNullOrBlank() -> {
+            if (cookie.isNullOrBlank()) {
+                App.instance.toast("同步的配置中未包含登录凭据，请重新发起包含有效账号的同步")
+            } else {
+                onSuccessLogin(LoginCredential.ConfigFile(configJson))
+            }
+        }
+        // 模式 1（仅账号凭据）：以单 Cookie 凭据发起登录鉴权
+        !cookie.isNullOrBlank() -> {
+            onSuccessLogin(LoginCredential.Cookie(cookie))
+        }
+        else -> {
+            App.instance.toast("同步数据为空")
         }
     }
 }
@@ -547,9 +602,10 @@ fun WebLoginCardSection(onClick: () -> Unit) {
 @Composable
 private fun AdvancedLoginSheetContent(
     onCookieSubmit: (String) -> Unit,
-    onConfigImported: (String) -> Unit
+    onConfigImported: (String) -> Unit,
+    onScanSyncClick: () -> Unit
 ) {
-    var subTab by remember { mutableIntStateOf(0) } // 0: 导入文件 , 1: Cookie
+    var subTab by remember { mutableIntStateOf(0) } // 0: 导入文件 , 1: Cookie , 2: 扫码同步
     var cookieInput by remember { mutableStateOf("") }
     val clipboardManager = LocalClipboard.current
     val context = LocalContext.current
@@ -583,13 +639,16 @@ private fun AdvancedLoginSheetContent(
         Text("其他登录方式", style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 二级切换选项
+        // 二级切换选项：严格按照 1.导入配置文件, 2.手动 Cookie, 3.扫码同步登录
         PrimaryTabRow(selectedTabIndex = subTab) {
             Tab(selected = subTab == 0, onClick = { subTab = 0 }) {
-                Text("导入配置文件", modifier = Modifier.padding(vertical = 12.dp))
+                Text("导入配置", modifier = Modifier.padding(vertical = 12.dp))
             }
             Tab(selected = subTab == 1, onClick = { subTab = 1 }) {
                 Text("手动 Cookie", modifier = Modifier.padding(vertical = 12.dp))
+            }
+            Tab(selected = subTab == 2, onClick = { subTab = 2 }) {
+                Text("扫码同步", modifier = Modifier.padding(vertical = 12.dp))
             }
         }
 
@@ -660,6 +719,42 @@ private fun AdvancedLoginSheetContent(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text("使用 Cookie 登录")
+                }
+            }
+
+            2 -> {
+                // 局域网扫码同步登录区域
+                OutlinedCard(
+                    onClick = onScanSyncClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.QrCodeScanner,
+                            contentDescription = null,
+                            modifier = Modifier.size(40.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "点击启动扫码同步",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            "扫描另一台已登录 nap511 客户端展示的同步码",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
                 }
             }
         }

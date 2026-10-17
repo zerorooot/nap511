@@ -58,6 +58,20 @@ fun LazyListScope.accountSecurityPreferenceItems(
             onClick = { onActionClick("Web") }
         )
     }
+    item {
+        PreferenceItem(
+            title = "生成同步口令",
+            summary = "生成局域网同步二维码与口令",
+            onClick = { onActionClick("GenerateSyncQr") }
+        )
+    }
+    item {
+        PreferenceItem(
+            title = "扫码同步导入",
+            summary = "扫描另一台 nap511 客户端的同步码",
+            onClick = { onActionClick("ScanSyncQr") }
+        )
+    }
 }
 
 /**

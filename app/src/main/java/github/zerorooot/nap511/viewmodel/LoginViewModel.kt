@@ -33,31 +33,35 @@ class LoginViewModel : ViewModel() {
                         val gson = GsonBuilder().setPrettyPrinting().create()
                         val jsonString = credential.rawJson
                         val jsonObject = gson.fromJson(jsonString, JsonObject::class.java)
-
-                        jsonObject.entrySet().forEach { (key, element) ->
-                            if (element.isJsonPrimitive) {
-                                val primitive = element.asJsonPrimitive
-                                when {
-                                    primitive.isBoolean -> SettingsRepository.saveData(
-                                        key,
-                                        primitive.asBoolean
-                                    )
-
-                                    primitive.isString -> SettingsRepository.saveData(
-                                        key,
-                                        primitive.asString
-                                    )
-
-                                    primitive.isNumber -> SettingsRepository.saveData(
-                                        key,
-                                        primitive.asNumber
-                                    )
-                                }
-                            }
-                        }
                         val cookie = jsonObject.get(ConfigKeyUtil.COOKIE).asString
                         AuthRepository.checkLogin(cookie)
-                            .onSuccess { App.instance.toast("登录成功～") }
+                            .onSuccess {
+                                //因为checkLogin里已经设置了
+                                jsonObject.remove(ConfigKeyUtil.AVATAR_BEAN)
+                                jsonObject.entrySet().forEach { (key, element) ->
+                                    if (element.isJsonPrimitive) {
+                                        val primitive = element.asJsonPrimitive
+                                        when {
+                                            primitive.isBoolean -> SettingsRepository.saveData(
+                                                key,
+                                                primitive.asBoolean
+                                            )
+
+                                            primitive.isString -> SettingsRepository.saveData(
+                                                key,
+                                                primitive.asString
+                                            )
+
+                                            primitive.isNumber -> SettingsRepository.saveData(
+                                                key,
+                                                primitive.asNumber
+                                            )
+                                        }
+                                    }
+                                }
+
+                                App.instance.toast("登录成功～")
+                            }
                             .onFailure { App.instance.toast("验证失败: ${it.localizedMessage}") }
                             .isSuccess
                     } catch (e: Exception) {
