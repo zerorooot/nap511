@@ -126,7 +126,7 @@ class RmCommandTest {
         )
 
         val out = engine.executeStrings("rm -f *.log", ctx)
-        assertEquals(listOf("rm: 已成功批量删除目录下的 2 个项目至回收站"), out)
+        assertEquals(listOf("rm: 已成功删除 2 个项目至回收站"), out)
         assertEquals(1, mockRepo.deletedMultipleCalls.size)
         val call = mockRepo.deletedMultipleCalls[0]
         assertEquals("0", call["pid"])
@@ -158,7 +158,7 @@ class RmCommandTest {
         )
 
         val out = engine.executeStrings("rm -f build/*.tmp", ctx)
-        assertEquals(listOf("rm: 已成功批量删除目录下的 2 个项目至回收站"), out)
+        assertEquals(listOf("rm: 已成功删除 2 个项目至回收站"), out)
         assertEquals(1, mockRepo.deletedMultipleCalls.size)
         val call = mockRepo.deletedMultipleCalls[0]
         assertEquals("50", call["pid"])
@@ -311,4 +311,159 @@ class RmCommandTest {
         // 验证 -f 模式下网络异常仍然向终端输出错误，避免静默失败造成误删假象
         assertTrue(out.any { it.contains("Connection timed out") || it.contains("cannot access") })
     }
+
+    /**
+     * 测试通配符混合普通目录时的容错批量删除（POSIX 惯例：即时报错目录，正常批量删除其余普通文件）
+     */
+    @Test
+    fun testRmWildcardTolerantWithSubdirectory() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        val f1 = createMockFile("data1.log", "101")
+        val f2 = createMockFile("data2.log", "102")
+        val folder = createMockFolder("logs_dir", "201")
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(fileBeanList = arrayListOf<FileBean>(f1, f2, folder), cid = "0", count = 3, order = "", path = emptyList())
+        )
+
+        // 未携带 -r 参数执行 rm -f *（模拟 * 展开包含普通文件与普通目录）
+        val out = engine.executeStrings("rm -f data1.log data2.log logs_dir", ctx)
+
+        // 验证：文件夹诊断错误正常输出，其余文件正常批量删除，绝不发生恶性全量零删除
+        assertTrue(out.contains("rm: 'logs_dir': Is a directory"))
+        assertTrue(out.contains("rm: 已成功删除 2 个项目至回收站"))
+
+        // 验证发起 1 次 deleteMultiple 批量删除请求，仅包含两个文件
+        assertEquals(1, mockRepo.deletedMultipleCalls.size)
+        val call = mockRepo.deletedMultipleCalls[0]
+        assertEquals("0", call["pid"])
+        assertTrue(call.values.contains("101"))
+        assertTrue(call.values.contains("102"))
+        assertFalse(call.values.contains("201"))
+    }
+
+    /**
+     * 测试深层嵌套路径内存拓扑剪枝防护（父目录与深层子孙同时指定时自动剪除深层子孙）
+     */
+    @Test
+    fun testRmDeepPathTopologicalPruning() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        // 目录结构：/dirA/subDir/deepFile.txt
+        val dirA = createMockFolder("dirA", "10")
+        val subDir = createMockFolder("subDir", "20").copy(parentId = "10")
+        val deepFile = createMockFile("deepFile.txt", "30", categoryId = "20")
+
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(fileBeanList = arrayListOf(dirA), cid = "0", count = 1, order = "", path = emptyList())
+        )
+        ctx.fileCacheManager.put(
+            "10",
+            FilesBean(fileBeanList = arrayListOf(subDir), cid = "10", count = 1, order = "", path = listOf(PathBean("0", "根目录", "0"), PathBean("10", "dirA", "0")))
+        )
+        ctx.fileCacheManager.put(
+            "20",
+            FilesBean(fileBeanList = arrayListOf(deepFile), cid = "20", count = 1, order = "", path = listOf(PathBean("0", "根目录", "0"), PathBean("10", "dirA", "0"), PathBean("20", "subDir", "10")))
+        )
+
+        // 同时删除顶层 dirA 与深层子孙 dirA/subDir/deepFile.txt
+        val out = engine.executeStrings("rm -rf dirA dirA/subDir/deepFile.txt", ctx)
+
+        // 拓扑剪枝后仅剩 1 个顶层项 dirA，输出单项删除成功
+        assertEquals(listOf("rm: 已移入回收站 'dirA'"), out)
+
+        // 验证仅删除了 dirA（单项 delete 形式），深层 deepFile.txt 未被重复提交
+        assertEquals(1, mockRepo.deletedItems.size)
+        assertEquals("0" to "10", mockRepo.deletedItems[0])
+    }
+
+    /**
+     * 测试目录末尾带斜杠时的自剪枝免疫验证（rm -rf dirA/ 不应被误判为自身子孙而丢失）
+     */
+    @Test
+    fun testRmTrailingSlashDirectorySelfPruningImmunity() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        val dirA = createMockFolder("dirA", "10")
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(fileBeanList = arrayListOf(dirA), cid = "0", count = 1, order = "", path = emptyList())
+        )
+
+        val out = engine.executeStrings("rm -rf dirA/", ctx)
+        assertEquals(listOf("rm: 已移入回收站 'dirA'"), out)
+        assertEquals(1, mockRepo.deletedItems.size)
+        assertEquals("0" to "10", mockRepo.deletedItems[0])
+    }
+
+    /**
+     * 测试重复操作数与重复通配符命中的 FID 幂等去重防护（rm -f a.txt a.txt）
+     */
+    @Test
+    fun testRmDuplicateTargetFidDeduplication() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        val f = createMockFile("a.txt", "101")
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(fileBeanList = arrayListOf(f), cid = "0", count = 1, order = "", path = emptyList())
+        )
+
+        // 重复传入相同的目标操作数
+        val out = engine.executeStrings("rm -f a.txt a.txt", ctx)
+
+        // 去重后仅统计 1 项成功，且底层仅发起 1 次有效删除
+        assertEquals(listOf("rm: 已移入回收站 'a.txt'"), out)
+        assertEquals(1, mockRepo.deletedItems.size)
+        assertEquals("0" to "101", mockRepo.deletedItems[0])
+    }
+
+    /**
+     * 测试用例 11：单项删除失败与批量删除失败回显精确度验证（决策 9）
+     * 验证单文件删除失败时输出精确保留文件名的报错；多项批量删除失败时输出汇总报错。
+     */
+    @Test
+    fun testRmSingleItemAndBatchDeleteFailureFeedback() = runBlocking {
+        val mockRepo = object : TestMockFileRepository() {
+            override suspend fun delete(pid: String, fid: String): github.zerorooot.nap511.bean.BaseReturnMessage {
+                return github.zerorooot.nap511.bean.BaseReturnMessage(state = false, error = "服务端拒绝删除")
+            }
+
+            override suspend fun deleteMultiple(data: Map<String, String>): github.zerorooot.nap511.bean.BaseReturnMessage {
+                return github.zerorooot.nap511.bean.BaseReturnMessage(state = false, error = "批量操作权限不足")
+            }
+        }
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        // 1. 验证单项删除失败：精确保留文件名
+        val single = createMockFile("single.txt", "101")
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(fileBeanList = arrayListOf(single), cid = "0", count = 1, order = "", path = emptyList())
+        )
+        val singleOut = engine.executeStrings("rm -f single.txt", ctx)
+        assertEquals(listOf("rm: 删除失败 'single.txt': 服务端拒绝删除"), singleOut)
+
+        // 2. 验证多项批量删除失败：准确输出批量汇总报错
+        val f1 = createMockFile("b1.txt", "201")
+        val f2 = createMockFile("b2.txt", "202")
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(fileBeanList = arrayListOf(f1, f2), cid = "0", count = 2, order = "", path = emptyList())
+        )
+        val batchOut = engine.executeStrings("rm -f b1.txt b2.txt", ctx)
+        assertEquals(listOf("rm: 批量删除失败 (2 个项目): 批量操作权限不足"), batchOut)
+    }
 }
+

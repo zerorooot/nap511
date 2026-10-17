@@ -182,7 +182,8 @@ class PipelineBatchOpsTest {
         // 直连管道：find -name '*.tmp' -print0 | rm -f
         val out = engine.executeStrings("find -type f -name '*.tmp' -print0 | rm -f", ctx)
 
-        assertEquals(listOf("rm: 已成功批量删除目录下的 2 个项目至回收站"), out)
+        // 全局统一汇总回显：已成功删除 2 个项目至回收站
+        assertEquals(listOf("rm: 已成功删除 2 个项目至回收站"), out)
 
         // 验证发起 1 次 deleteMultiple 批量删除请求
         assertEquals(1, mockRepo.deletedMultipleCalls.size)

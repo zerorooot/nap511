@@ -411,10 +411,10 @@ class FindCommand : TerminalCommand {
             isFolder = false
         )
         val res = TerminalBatchFileOps.deleteGroup(ctx, effectivePid, listOf(item))
-        if (res.state) {
+        if (res.isAllSuccess) {
             emitSystem("find: 已成功删除 '${resolved.file.name}' 至回收站")
         } else {
-            val err = TerminalExceptionHandler.extractErrorMessage(res, "未知错误")
+            val err = res.error.ifEmpty { "未知错误" }
             emitError("find: 删除失败: $err")
         }
     }
@@ -584,44 +584,6 @@ class FindCommand : TerminalCommand {
     }
 
     /**
-     * 待删除项内存拓扑剪枝 (Topological Pruning)
-     *
-     * 针对搜索条件同时命中父目录及其内部子孙项的场景：
-     * 剔除所有“父级或祖先目录已在待删除队列中”的子孙条目（例如同时命中 /dir 与 /dir/file.txt 时，剪枝后仅保留顶层 /dir）。
-     * 避免云端网盘级联删除父目录后子项产生冗余网络请求或虚假报错。
-     */
-    internal fun pruneDeletableTargets(targets: List<DeletableTarget>): List<DeletableTarget> {
-        if (targets.size <= 1) return targets
-
-        // 收集所有作为待删除项的文件夹路径（统一附带末尾斜杠作为前缀匹配）
-        val folderPathPrefixes = targets
-            .filter { it.isFolder && it.path.isNotEmpty() }
-            .map { if (it.path.endsWith("/")) it.path else "${it.path}/" }
-
-        val folderFids = targets
-            .filter { it.isFolder }
-            .map { it.fid }
-            .toSet()
-
-        return targets.filter { item ->
-            // 1. 若当前项的完整路径落在某个待删除文件夹的前缀路径下，则判定为子孙项予以剪枝
-            if (item.path.isNotEmpty()) {
-                val isDescendantByPath = folderPathPrefixes.any { prefix ->
-                    item.path != prefix.trimEnd('/') && item.path.startsWith(prefix)
-                }
-                if (isDescendantByPath) return@filter false
-            }
-
-            // 2. 若当前项的直接父目录 ID 处于待删除文件夹集合中，判定为子项予以剪枝
-            if (!item.parentCid.isNullOrEmpty() && item.parentCid in folderFids) {
-                return@filter false
-            }
-
-            true
-        }
-    }
-
-    /**
      * 批量安全移入回收站（按父目录聚合批量删除，并级联清理父目录及文件夹子孙缓存）
      */
     private suspend fun FlowCollector<TerminalOutput>.performBatchDelete(
@@ -634,38 +596,39 @@ class FindCommand : TerminalCommand {
             return
         }
 
-        // 内存拓扑剪枝：剔除待删除队列中所有祖先目录已在队列中的子孙项
-        val prunedTargets = pruneDeletableTargets(targets)
+        // 将目标转换为包含完整路径的 BatchTargetItem，统一交由底层公共组件进行双保险拓扑剪枝
+        val convertedItems = targets.map {
+            BatchTargetItem(
+                parentCid = it.parentCid,
+                fid = it.fid,
+                displayName = it.name,
+                isFolder = it.isFolder,
+                path = it.path
+            )
+        }
+
+        // 内存拓扑剪枝：直接复用公共拓扑剪枝组件剔除已被父级包含的深层子孙项
+        val prunedItems = TerminalBatchFileOps.pruneBatchItems(convertedItems)
 
         // 若为交互式删除策略，执行前提示用户二次确认（展示剪枝后的真实待删顶层项数量）
         if (policy is FindDeletePolicy.Interactive) {
-            val confirmed = ctx.confirm("find: 是否确认将匹配到的 ${prunedTargets.size} 个项目移入回收站? (yes/no): ")
+            val confirmed = ctx.confirm("find: 是否确认将匹配到的 ${prunedItems.size} 个项目移入回收站? (yes/no): ")
             if (!confirmed) {
                 emitSystem(CommandMessages.cancelOperation("find"))
                 return
             }
         }
 
-        val convertedItems = prunedTargets.map {
-            BatchTargetItem(
-                parentCid = it.parentCid,
-                fid = it.fid,
-                displayName = it.name,
-                isFolder = it.isFolder
-            )
-        }
-
-        val grouped = convertedItems.groupBy { it.parentCid }
+        val grouped = prunedItems.groupBy { it.parentCid }
         var successCount = 0
 
         for ((parentCid, items) in grouped) {
             try {
                 val res = TerminalBatchFileOps.deleteGroup(ctx, parentCid, items)
-                if (res.state) {
-                    successCount += items.size
-                } else {
-                    val err = TerminalExceptionHandler.extractErrorMessage(res, "未知错误")
-                    emitError("find: 目录 [ID:${parentCid ?: "0"}] 下的 ${items.size} 个项目删除失败: $err")
+                successCount += res.successCount
+                if (res.failureCount > 0) {
+                    val err = res.error.ifEmpty { "未知错误" }
+                    emitError("find: 目录 [ID:${parentCid ?: "0"}] 下的 ${res.failureCount} 个项目删除失败: $err")
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
@@ -673,6 +636,6 @@ class FindCommand : TerminalCommand {
             }
         }
 
-        emitSystem("find: 已成功删除 $successCount / ${prunedTargets.size} 个项目至回收站")
+        emitSystem("find: 已成功删除 $successCount / ${prunedItems.size} 个项目至回收站")
     }
 }

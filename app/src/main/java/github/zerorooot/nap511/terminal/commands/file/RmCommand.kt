@@ -7,7 +7,6 @@ import github.zerorooot.nap511.terminal.commands.util.TerminalExceptionHandler
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.CommandFlag
 import github.zerorooot.nap511.terminal.engine.StreamTargetCollector
-import github.zerorooot.nap511.terminal.engine.archetype.ConfirmPolicy
 import github.zerorooot.nap511.terminal.engine.archetype.MutationCommand
 import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
@@ -18,14 +17,26 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 
 /**
+ * rm 命令确认策略
+ */
+enum class RmConfirmPolicy {
+    /** 显式 -f：强制免确认 */
+    FORCE,
+    /** 默认无选项：单次汇总确认（避免多文件弹窗轰炸） */
+    SUMMARY,
+    /** 显式 -i：逐项交互确认（保留用户精细挑选保留项的控制权） */
+    STEP_BY_STEP
+}
+
+/**
  * 删除操作执行计划
  *
- * @property confirmPolicy 确认策略（FORCE 免确认或 INTERACTIVE 交互确认）
+ * @property confirmPolicy 确认策略（FORCE 免确认、SUMMARY 默认汇总确认、STEP_BY_STEP 逐项确认）
  * @property recursive 是否递归删除目录（对应 -r / -R 开关）
  * @property targets 待删除的目标路径列表
  */
 data class RmPlan(
-    val confirmPolicy: ConfirmPolicy,
+    val confirmPolicy: RmConfirmPolicy,
     val recursive: Boolean = false,
     val targets: List<String>
 )
@@ -78,22 +89,23 @@ class RmCommand : MutationCommand<RmPlan>() {
     /**
      * 遵循 POSIX Guideline 11 解析确认策略：
      * 命令行中后出现的选项覆盖先出现的选项（以 ast.rawArgs 中的最终选项为准）；
-     * 默认策略为 INTERACTIVE 交互确认，保护云端网盘数据。
+     * 默认无选项时采用 SUMMARY 单次汇总确认，避免通配符多文件展开弹窗轰炸；
+     * 显式指定 -i 时采用 STEP_BY_STEP 逐项精细挑选确认。
      */
-    private fun resolveConfirmPolicy(ast: CommandInvocationAst): ConfirmPolicy {
-        var lastPolicy: ConfirmPolicy? = null
+    private fun resolveConfirmPolicy(ast: CommandInvocationAst): RmConfirmPolicy {
+        var lastPolicy: RmConfirmPolicy? = null
         for (arg in ast.rawArgs) {
             if (arg == "--") break
             if (arg.startsWith("-") && arg.length > 1 && !arg.startsWith("--")) {
                 for (ch in arg.substring(1)) {
                     when (ch) {
-                        'f', 'y' -> lastPolicy = ConfirmPolicy.FORCE
-                        'i' -> lastPolicy = ConfirmPolicy.INTERACTIVE
+                        'f', 'y' -> lastPolicy = RmConfirmPolicy.FORCE
+                        'i' -> lastPolicy = RmConfirmPolicy.STEP_BY_STEP
                     }
                 }
             }
         }
-        return lastPolicy ?: ConfirmPolicy.INTERACTIVE
+        return lastPolicy ?: RmConfirmPolicy.SUMMARY
     }
 
     override suspend fun executePlan(
@@ -101,12 +113,13 @@ class RmCommand : MutationCommand<RmPlan>() {
         plan: RmPlan,
         collector: FlowCollector<TerminalOutput>
     ) {
-        val isForce = plan.confirmPolicy == ConfirmPolicy.FORCE
-        val confirmedItems = mutableListOf<BatchTargetItem>()
+        val isForce = plan.confirmPolicy == RmConfirmPolicy.FORCE
+        val validItems = mutableListOf<BatchTargetItem>()
 
-        // 阶段一：目标解析、前置安全校验及交互确认（收集确认删除项）
+        // 阶段一：前置解析与 POSIX 容错式校验（即时报告错误，收集有效合法目标）
         for (target in plan.targets) {
             val resolvedItem: BatchTargetItem? = try {
+                // TargetItemResolver 已在源头注入完整路径 (fullPath / path)，无需任何外部补丁
                 TargetItemResolver.resolveToBatchItem(ctx, target)
             } catch (e: Throwable) {
                 // 协程取消或中断（Ctrl+C）必须重抛，保证终端即时响应
@@ -135,53 +148,91 @@ class RmCommand : MutationCommand<RmPlan>() {
                     continue
                 }
                 is RemoveValidationResult.Valid -> {
-                    // 校验通过
+                    validItems.add(resolvedItem)
                 }
             }
-
-            // 若未开启免确认，向终端触发交互确认
-            if (plan.confirmPolicy == ConfirmPolicy.INTERACTIVE) {
-                val confirmed = ctx.confirm("rm: 是否确认删除 '${resolvedItem.displayName}'? (yes/no): ")
-                if (!confirmed) {
-                    collector.emitText(CommandMessages.cancelDelete("rm", resolvedItem.displayName))
-                    continue
-                }
-            }
-
-            confirmedItems.add(resolvedItem)
         }
 
-        if (confirmedItems.isEmpty()) return
+        if (validItems.isEmpty()) return
 
-        // 阶段二：按有效父目录 parentCid 分组聚合
+        // 内存拓扑剪枝：基于 path 前缀及 parentCid 剔除已被包含的深层子孙条目（内置 FID 去重与自身排除）
+        val prunedItems = TerminalBatchFileOps.pruneBatchItems(validItems)
+        val confirmedItems = mutableListOf<BatchTargetItem>()
+
+        // 阶段二：分层交互确认
+        when (plan.confirmPolicy) {
+            RmConfirmPolicy.FORCE -> {
+                confirmedItems.addAll(prunedItems)
+            }
+            RmConfirmPolicy.SUMMARY -> {
+                val prompt = if (prunedItems.size == 1) {
+                    "rm: 是否确认删除 '${prunedItems.first().displayName}'? (yes/no): "
+                } else {
+                    "rm: 是否确认删除匹配到的 ${prunedItems.size} 个项目至回收站? (yes/no): "
+                }
+                val confirmed = ctx.confirm(prompt)
+                if (!confirmed) {
+                    // 精细化取消提示：单项时输出 cancelDelete，多项汇总时输出 cancelOperation
+                    if (prunedItems.size == 1) {
+                        collector.emitText(CommandMessages.cancelDelete("rm", prunedItems.first().displayName))
+                    } else {
+                        collector.emitText(CommandMessages.cancelOperation("rm"))
+                    }
+                    return
+                }
+                confirmedItems.addAll(prunedItems)
+            }
+            RmConfirmPolicy.STEP_BY_STEP -> {
+                // 显式 -i：逐项询问确认，赋予用户精细挑选保留项的控制权
+                for (item in prunedItems) {
+                    val confirmed = ctx.confirm("rm: 是否确认删除 '${item.displayName}'? (yes/no): ")
+                    if (confirmed) {
+                        confirmedItems.add(item)
+                    } else {
+                        collector.emitText(CommandMessages.cancelDelete("rm", item.displayName))
+                    }
+                }
+                if (confirmedItems.isEmpty()) return
+            }
+        }
+
+        // 阶段三：按父目录分组执行批量删除流水线
         val groupedByParent = confirmedItems.groupBy { it.parentCid }
+        var totalSuccessCount = 0
+        var hasAnyFailure = false
 
-        // 阶段三：分目录执行批量删除或降级单项删除
         for ((parentCid, items) in groupedByParent) {
             try {
-                if (items.size > 1 && !parentCid.isNullOrEmpty()) {
-                    // 同目录多项：组装 deleteMultiple 批量删除
-                    val res = TerminalBatchFileOps.deleteGroup(ctx, parentCid, items)
-                    if (res.state) {
-                        collector.emitText(CommandMessages.batchMovedToTrash("rm", items.size))
-                    } else {
-                        val err = TerminalExceptionHandler.extractErrorMessage(res, "未知错误")
-                        collector.emitError("rm: 批量删除失败 (${items.size} 个项目): $err")
-                    }
-                } else {
-                    // 单项处理：保持传统单项提示
-                    val single = items.first()
-                    val res = TerminalBatchFileOps.deleteGroup(ctx, parentCid, listOf(single))
-                    if (res.state) {
-                        collector.emitText(CommandMessages.movedToTrash("rm", single.displayName))
-                    } else {
-                        val err = TerminalExceptionHandler.extractErrorMessage(res, "未知错误")
+                val result = TerminalBatchFileOps.deleteGroup(ctx, parentCid, items)
+                totalSuccessCount += result.successCount
+                if (result.failureCount > 0) {
+                    hasAnyFailure = true
+                    // 精细化错误回显：单项失败精确显示单文件名，批量失败输出批量汇总
+                    if (items.size == 1) {
+                        val single = items.first()
+                        val err = result.error.ifEmpty { "未知错误" }
                         collector.emitError("rm: 删除失败 '${single.displayName}': $err")
+                    } else {
+                        collector.emitError(CommandMessages.batchDeleteFailed("rm", result.failureCount, result.error))
                     }
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
+                hasAnyFailure = true
                 collector.emitError("rm: 删除失败: ${TerminalExceptionHandler.extractErrorMessage(e)}")
+            }
+        }
+
+        // 阶段四：全局统一汇总回显（无论单目录还是跨目录批量删除，均统一输出单次原子汇总）
+        if (!hasAnyFailure) {
+            if (confirmedItems.size == 1) {
+                collector.emitText(CommandMessages.movedToTrash("rm", confirmedItems.first().displayName))
+            } else {
+                collector.emitText(CommandMessages.batchDeleteSuccess("rm", totalSuccessCount))
+            }
+        } else {
+            if (totalSuccessCount > 0) {
+                collector.emitText(CommandMessages.batchDeletePartial("rm", totalSuccessCount, confirmedItems.size))
             }
         }
     }

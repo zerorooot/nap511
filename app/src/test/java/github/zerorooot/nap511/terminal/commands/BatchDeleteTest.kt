@@ -178,8 +178,8 @@ class BatchDeleteTest {
 
         val out = engine.executeStrings("rm -f file1.txt file2.txt file3.txt", ctx)
 
-        // 验证终端输出汇总信息
-        assertEquals(listOf("rm: 已成功批量删除目录下的 3 个项目至回收站"), out)
+        // 验证终端输出全局统一汇总信息
+        assertEquals(listOf("rm: 已成功删除 3 个项目至回收站"), out)
 
         // 验证只发起了 1 次 deleteMultiple 网络请求
         assertEquals(1, mockRepo.deletedMultipleCalls.size)
@@ -191,7 +191,7 @@ class BatchDeleteTest {
     }
 
     /**
-     * 6. 测试 RmCommand 跨目录删除时的自动目录分组处理
+     * 6. 测试 RmCommand 跨目录删除时的自动目录分组处理与全局统一单行汇总回显（决策 5 & 15）
      */
     @Test
     fun testRmCommandMultiDirectoryGrouping() = runBlocking {
@@ -226,17 +226,17 @@ class BatchDeleteTest {
         // 执行跨目录删除
         val out = engine.executeStrings("rm -f dirA/a1.txt dirA/a2.txt dirB/b1.txt", ctx)
 
-        // dirA 的 2 个项目批量删除，dirB 的 1 个项目单项删除
-        assertTrue(out.contains("rm: 已成功批量删除目录下的 2 个项目至回收站"))
-        assertTrue(out.contains("rm: 已移入回收站 'b1.txt'"))
+        // 全局统一汇总回显：单行原子反馈已成功删除 3 个项目
+        assertEquals(listOf("rm: 已成功删除 3 个项目至回收站"), out)
 
-        // 验证网络请求：dirA 走 deleteMultiple，dirB 走单项 delete
+        // 验证网络请求：dirA 走 deleteMultiple（2个项目），dirB 走单项 delete（1个项目）
         assertEquals(1, mockRepo.deletedMultipleCalls.size)
         assertEquals("10", mockRepo.deletedMultipleCalls[0]["pid"])
+        assertTrue(mockRepo.deletedItems.contains("20" to "201"))
     }
 
     /**
-     * 7. 测试 RmCommand 交互确认（未带 -f）中用户部分确认、部分取消的批处理行为
+     * 7. 测试 RmCommand 显式 -i 交互确认中用户部分确认、部分取消的批处理行为（决策 2 & 7）
      */
     @Test
     fun testRmCommandInteractivePartialConfirm() = runBlocking {
@@ -259,11 +259,11 @@ class BatchDeleteTest {
             FilesBean(fileBeanList = arrayListOf(f1, f2, f3), cid = "0", count = 3, order = "", path = emptyList())
         )
 
-        val out = engine.executeStrings("rm f1.txt f2.txt f3.txt", ctx)
+        val out = engine.executeStrings("rm -i f1.txt f2.txt f3.txt", ctx)
 
         // 验证输出包含取消 f2 以及批量成功 2 个项目
         assertTrue(out.contains("rm: 已取消删除 'f2.txt'"))
-        assertTrue(out.contains("rm: 已成功批量删除目录下的 2 个项目至回收站"))
+        assertTrue(out.contains("rm: 已成功删除 2 个项目至回收站"))
 
         // 验证批量删除只提交了 1 和 3
         assertEquals(1, mockRepo.deletedMultipleCalls.size)
@@ -337,5 +337,115 @@ class BatchDeleteTest {
         assertEquals("50", call["pid"])
         assertEquals("501", call["fid[0]"])
         assertEquals("502", call["fid[1]"])
+    }
+
+    /**
+     * 10. 测试 RmCommand 默认策略下的单次汇总确认与取消文案（决策 2）
+     */
+    @Test
+    fun testRmCommandDefaultSummaryConfirm() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+
+        var promptSeen = ""
+        var confirmResult = true
+
+        val ctx = createTestContext(
+            fileRepository = mockRepo,
+            onConfirmRequest = { prompt ->
+                promptSeen = prompt
+                confirmResult
+            }
+        )
+
+        val f1 = createMockFile("item1.txt", "1")
+        val f2 = createMockFile("item2.txt", "2")
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(fileBeanList = arrayListOf(f1, f2), cid = "0", count = 2, order = "", path = emptyList())
+        )
+
+        // 1. 用户取消汇总删除：提示词为匹配到的 2 个项目，回显 cancelOperation
+        confirmResult = false
+        val cancelOut = engine.executeStrings("rm item1.txt item2.txt", ctx)
+        assertEquals("rm: 是否确认删除匹配到的 2 个项目至回收站? (yes/no): ", promptSeen)
+        assertEquals(listOf("rm: 已取消操作"), cancelOut)
+        assertEquals(0, mockRepo.deletedMultipleCalls.size)
+
+        // 2. 用户同意汇总删除：单次确认通过，执行 1 次批量删除
+        confirmResult = true
+        val confirmOut = engine.executeStrings("rm item1.txt item2.txt", ctx)
+        assertEquals("rm: 是否确认删除匹配到的 2 个项目至回收站? (yes/no): ", promptSeen)
+        assertEquals(listOf("rm: 已成功删除 2 个项目至回收站"), confirmOut)
+        assertEquals(1, mockRepo.deletedMultipleCalls.size)
+    }
+
+    /**
+     * 11. 测试缺失 path 路径元数据时的 folderFids 拓扑剪枝防护（决策 11）
+     */
+    @Test
+    fun testPruneBatchItemsWithEmptyPathFolder() {
+        val folderWithoutPath = BatchTargetItem("0", "100", "my_folder", isFolder = true, path = "")
+        val childFile = BatchTargetItem("100", "201", "file.txt", isFolder = false, path = "")
+        val otherFile = BatchTargetItem("0", "202", "other.txt", isFolder = false, path = "")
+
+        val pruned = TerminalBatchFileOps.pruneBatchItems(listOf(folderWithoutPath, childFile, otherFile))
+
+        // 验证：即使 folderWithoutPath.path 为空，childFile 依然因 parentCid in folderFids 被剪枝
+        assertEquals(2, pruned.size)
+        assertTrue(pruned.any { it.fid == "100" })
+        assertTrue(pruned.any { it.fid == "202" })
+        assertFalse(pruned.any { it.fid == "201" })
+    }
+
+    /**
+     * 12. 验证 BatchOpResult.state 与 isAllSuccess 契约向后兼容性（决策 13）
+     */
+    @Test
+    fun testBatchOpResultStateContract() {
+        val successResult = github.zerorooot.nap511.terminal.commands.file.BatchOpResult(totalCount = 3, successCount = 3, failureCount = 0)
+        assertTrue(successResult.state)
+        assertTrue(successResult.isAllSuccess)
+
+        val partialResult = github.zerorooot.nap511.terminal.commands.file.BatchOpResult(totalCount = 3, successCount = 2, failureCount = 1)
+        assertFalse(partialResult.state)
+        assertFalse(partialResult.isAllSuccess)
+        assertTrue(partialResult.isPartialSuccess)
+    }
+
+    /**
+     * 13. 验证分片批量删除中途抛出网络异常时的统计保全与部分成功回显（决策 12）
+     */
+    @Test
+    fun testDeleteGroupChunkNetworkExceptionPartialSuccess() = runBlocking {
+        var callCount = 0
+        val mockRepo = object : TestMockFileRepository() {
+            override suspend fun deleteMultiple(data: Map<String, String>): github.zerorooot.nap511.bean.BaseReturnMessage {
+                callCount++
+                if (callCount == 1) {
+                    // 第 1 批成功
+                    return github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
+                } else {
+                    // 第 2 批网络异常超时
+                    throw java.io.IOException("Socket timeout")
+                }
+            }
+        }
+
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        // 构造 150 个条目（超出 100 阈值，分为 2 批：第 1 批 100 项，第 2 批 50 项）
+        val items = (1..150).map { i ->
+            BatchTargetItem("100", "fid_$i", "file_$i.txt", isFolder = false)
+        }
+
+        val result = TerminalBatchFileOps.deleteGroup(ctx, "100", items)
+
+        // 验证：即使第 2 批发生网络异常，第 1 批的 100 项成功计数依然被精准保全
+        assertEquals(150, result.totalCount)
+        assertEquals(100, result.successCount)
+        assertEquals(50, result.failureCount)
+        assertTrue(result.isPartialSuccess)
+        assertTrue(result.error.contains("Socket timeout"))
     }
 }
