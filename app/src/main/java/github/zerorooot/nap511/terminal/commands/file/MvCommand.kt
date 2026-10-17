@@ -143,9 +143,12 @@ class MvCommand : MutationCommand<MvPlan>() {
 
             if (validItems.isEmpty()) return
 
+            // 预先按 fid 去重，防止重复操作数引起数量虚高
+            val uniqueItems = validItems.distinctBy { it.fid }
+
             // 阶段二：委托 TerminalBatchFileOps 执行批量移动与缓存维护
-            if (validItems.size == 1) {
-                val single = validItems.first()
+            if (uniqueItems.size == 1) {
+                val single = uniqueItems.first()
                 val singleRaw = validRawSources.first()
                 val result = TerminalBatchFileOps.moveGroup(ctx, targetDestCid, listOf(single))
                 if (result.isAllSuccess) {
@@ -154,7 +157,7 @@ class MvCommand : MutationCommand<MvPlan>() {
                     collector.emitError("mv: 移动 '$singleRaw' 失败: ${result.error}")
                 }
             } else {
-                val result = TerminalBatchFileOps.moveGroup(ctx, targetDestCid, validItems)
+                val result = TerminalBatchFileOps.moveGroup(ctx, targetDestCid, uniqueItems)
                 when {
                     result.isAllSuccess -> {
                         collector.emitText(CommandMessages.batchMoveSuccess("mv", result.successCount, formattedDest))
@@ -164,7 +167,7 @@ class MvCommand : MutationCommand<MvPlan>() {
                         collector.emitError(CommandMessages.batchMoveFailed("mv", result.failureCount, result.error))
                     }
                     else -> {
-                        collector.emitError(CommandMessages.batchMoveFailed("mv", validItems.size, result.error))
+                        collector.emitError(CommandMessages.batchMoveFailed("mv", uniqueItems.size, result.error))
                     }
                 }
             }

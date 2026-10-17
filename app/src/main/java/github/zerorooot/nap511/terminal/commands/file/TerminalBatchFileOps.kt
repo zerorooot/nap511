@@ -105,7 +105,9 @@ object TerminalBatchFileOps {
         targetDestCid: String,
         items: List<BatchTargetItem>
     ): BatchOpResult {
-        if (items.isEmpty()) {
+        // 1. 预先按 fid 去重，防止重复操作数引起数量虚高与多余网络请求
+        val uniqueItems = items.distinctBy { it.fid }
+        if (uniqueItems.isEmpty()) {
             return BatchOpResult(totalCount = 0, successCount = 0, failureCount = 0)
         }
 
@@ -114,7 +116,7 @@ object TerminalBatchFileOps {
         var anyChunkSucceeded = false
 
         try {
-            val chunks = items.chunked(BATCH_CHUNK_SIZE)
+            val chunks = uniqueItems.chunked(BATCH_CHUNK_SIZE)
             for (chunk in chunks) {
                 // 组装 115 files/move 协议表单: pid + fid[0]..fid[N]
                 val data = HashMap<String, String>().apply {
@@ -124,21 +126,28 @@ object TerminalBatchFileOps {
                     }
                 }
 
-                val res = ctx.fileRepository.move(data)
-                if (res.state) {
-                    anyChunkSucceeded = true
-                    successCount += chunk.size
+                try {
+                    val res = ctx.fileRepository.move(data)
+                    if (res.state) {
+                        anyChunkSucceeded = true
+                        successCount += chunk.size
 
-                    // 本地缓存多源同步：按源目录 parentCid 分组清理条目
-                    val groupedBySourceParent = chunk.groupBy { it.parentCid }
-                    for ((srcParentCid, srcItems) in groupedBySourceParent) {
-                        if (!srcParentCid.isNullOrEmpty()) {
-                            FileCacheManager.removeItems(srcParentCid, srcItems.map { it.fid })
+                        // 本地缓存多源同步：按源目录 parentCid 分组清理条目
+                        val groupedBySourceParent = chunk.groupBy { it.parentCid }
+                        for ((srcParentCid, srcItems) in groupedBySourceParent) {
+                            if (!srcParentCid.isNullOrEmpty()) {
+                                FileCacheManager.removeItems(srcParentCid, srcItems.map { it.fid })
+                            }
                         }
+                    } else {
+                        firstError = TerminalExceptionHandler.extractErrorMessage(res, "未知错误")
+                        break // 业务失败熔断后续切片
                     }
-                } else {
-                    firstError = TerminalExceptionHandler.extractErrorMessage(res, "未知错误")
-                    break // 熔断后续切片
+                } catch (e: Throwable) {
+                    if (e is CancellationException) throw e
+                    // 隔离网络非致命异常（如超时），保全已成功切片统计，防击穿打穿外层
+                    firstError = TerminalExceptionHandler.extractErrorMessage(e)
+                    break // 网络异常熔断后续切片
                 }
             }
         } finally {
@@ -149,9 +158,9 @@ object TerminalBatchFileOps {
         }
 
         return BatchOpResult(
-            totalCount = items.size,
+            totalCount = uniqueItems.size,
             successCount = successCount,
-            failureCount = items.size - successCount,
+            failureCount = uniqueItems.size - successCount,
             error = firstError
         )
     }

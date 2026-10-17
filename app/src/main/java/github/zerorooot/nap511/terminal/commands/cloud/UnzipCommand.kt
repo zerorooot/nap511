@@ -97,15 +97,17 @@ class UnzipCommand : ActionDispatchCommand<UnzipAction>() {
             return
         }
 
-        // 解析并收集所有 FileBean
-        val fileBeansList = mutableListOf<FileBean>()
-        var targetCid = ctx.currentCid
+        // 收集待解压文件与其各自的所属父目录 CID
+        data class ResolvedArchive(val file: FileBean, val targetCid: String)
+        val archivesList = mutableListOf<ResolvedArchive>()
 
         for (path in targetPaths) {
             when (val resolved = ctx.resolveTarget(path)) {
                 is ResolvedTarget.File -> {
-                    targetCid = resolved.parentCid
-                    fileBeansList.add(resolved.file)
+                    val fileTargetCid = resolved.parentCid.ifEmpty {
+                        resolved.file.categoryId.ifEmpty { ctx.currentCid }
+                    }
+                    archivesList.add(ResolvedArchive(resolved.file, fileTargetCid))
                 }
 
                 is ResolvedTarget.Directory -> {
@@ -119,18 +121,19 @@ class UnzipCommand : ActionDispatchCommand<UnzipAction>() {
         }
 
         // 去重 (根据 fileId 或 pickCode)
-        val distinctFileBeans = fileBeansList.distinctBy { file ->
-            file.fileId.ifEmpty { file.pickCode }
+        val distinctArchives = archivesList.distinctBy { archive ->
+            archive.file.fileId.ifEmpty { archive.file.pickCode }
         }
 
-        if (distinctFileBeans.isEmpty()) {
+        if (distinctArchives.isEmpty()) {
             collector.emitError("unzip: 未找到可解压的文件")
             return
         }
 
         when (action) {
             is UnzipAction.ListEntries -> {
-                for (file in distinctFileBeans) {
+                for (archive in distinctArchives) {
+                    val file = archive.file
                     val pickCode = file.pickCode
                     if (pickCode.isEmpty()) {
                         collector.emitError("unzip: 文件 '${file.name}' 缺失 pickCode，无法预览")
@@ -163,31 +166,36 @@ class UnzipCommand : ActionDispatchCommand<UnzipAction>() {
 
             is UnzipAction.SubmitExtract -> {
                 try {
-                    collector.emitText("正在提交 ${distinctFileBeans.size} 个解压任务至后台...")
+                    collector.emitText("正在提交 ${distinctArchives.size} 个解压任务至后台...")
 
-                    // 查找失败移动目录 CID
-                    val moveFailFile = SettingsRepository.getDataSuspend(ConfigKeyUtil.MOVE_FAIL_FILE, "")
-                    val errorCid = if (moveFailFile.isNotEmpty()) {
-                        val currentFiles = ctx.listDirectory(targetCid)
-                        currentFiles.firstOrNull { it.isFolder && it.name == moveFailFile }?.categoryId
-                    } else null
+                    // 查找失败移动目录 CID（按 targetCid 缓存，避免重复网络请求，捕获测试环境无 Android Context 异常）
+                    val moveFailFile = runCatching {
+                        SettingsRepository.getDataSuspend(ConfigKeyUtil.MOVE_FAIL_FILE, "")
+                    }.getOrDefault("")
+                    val errorCidCache = mutableMapOf<String, String?>()
 
-                    // 1. 构造独立任务项
-                    val taskItems = distinctFileBeans.map { file ->
+                    // 1. 构造独立任务项，每个任务项绑定自身准确的 targetCid
+                    val taskItems = distinctArchives.map { archive ->
+                        val errCid = if (moveFailFile.isNotEmpty()) {
+                            errorCidCache.getOrPut(archive.targetCid) {
+                                val currentFiles = ctx.listDirectory(archive.targetCid)
+                                currentFiles.firstOrNull { it.isFolder && it.name == moveFailFile }?.categoryId
+                            }
+                        } else null
+
                         UnzipTaskItem(
-                            fileBean = file,
-                            targetCid = targetCid,
+                            fileBean = archive.file,
+                            targetCid = archive.targetCid,
                             password = action.password.takeIf { it.isNotEmpty() },
-                            errorCid = errorCid
+                            errorCid = errCid
                         )
                     }
 
                     // 2. 追加至全局解压队列并触发 Worker (KEEP 策略)
                     UnzipQueueManager.enqueueAndStartWorker(taskItems)
-                    //不用失效缓存，所有的缓存会在UnzipAllFileWorker中统一更新
-                   // ctx.invalidateCache(targetCid)
+                    val fileNames = distinctArchives.joinToString { it.file.name }
                     collector.emitText(
-                        "unzip: 已成功提交 ${distinctFileBeans.size} 个解压任务到后台 UnzipAllFileWorker 处理 (${distinctFileBeans.joinToString { it.name }})"
+                        "unzip: 已成功提交 ${distinctArchives.size} 个解压任务到后台 UnzipAllFileWorker 处理 ($fileNames)"
                     )
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e

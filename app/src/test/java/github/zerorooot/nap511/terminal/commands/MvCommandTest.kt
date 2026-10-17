@@ -330,4 +330,57 @@ class MvCommandTest {
         assertEquals("0", mockRepoRollback.movedItems[1]["pid"])
         assertEquals("101", mockRepoRollback.movedItems[1]["fid[0]"])
     }
+
+    /**
+     * 测试批量移动时重复源操作数按 FID 幂等去重（mv -t target_dir a.txt a.txt）
+     */
+    @Test
+    fun testMvDuplicateSourceDeduplication() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        val file1 = createMockFile("a.txt", "101")
+        val destDir = createMockFolder("target_dir", "200")
+        ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(file1, destDir), cid = "0", count = 2, order = "", path = emptyList()))
+        ctx.fileCacheManager.put("200", FilesBean(fileBeanList = arrayListOf(), cid = "200", count = 0, order = "", path = emptyList()))
+
+        val out = engine.executeStrings("mv -t target_dir a.txt a.txt", ctx)
+        assertEquals(listOf("mv: 'a.txt' -> 'target_dir/'"), out)
+        assertEquals(1, mockRepo.movedItems.size)
+        assertEquals("200", mockRepo.movedItems[0]["pid"])
+        assertEquals("101", mockRepo.movedItems[0]["fid[0]"])
+        assertEquals(null, mockRepo.movedItems[0]["fid[1]"])
+    }
+
+    /**
+     * 测试批量移动切片中途发生网络异常时的统计保全与部分成功回显
+     */
+    @Test
+    fun testMvChunkNetworkExceptionPartialSuccess() = runBlocking {
+        var callCount = 0
+        val mockRepo = object : TestMockFileRepository() {
+            override suspend fun move(data: Map<String, String>): BaseReturnMessage {
+                callCount++
+                if (callCount == 1) {
+                    return BaseReturnMessage(state = true)
+                } else {
+                    throw java.io.IOException("Move timed out")
+                }
+            }
+        }
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        val items = (1..150).map { i ->
+            github.zerorooot.nap511.terminal.commands.file.BatchTargetItem("0", "fid_$i", "file_$i.txt", isFolder = false)
+        }
+
+        val result = github.zerorooot.nap511.terminal.commands.file.TerminalBatchFileOps.moveGroup(ctx, "200", items)
+        assertEquals(150, result.totalCount)
+        assertEquals(100, result.successCount)
+        assertEquals(50, result.failureCount)
+        assertTrue(result.isPartialSuccess)
+        assertTrue(result.error.contains("Move timed out"))
+    }
 }
+

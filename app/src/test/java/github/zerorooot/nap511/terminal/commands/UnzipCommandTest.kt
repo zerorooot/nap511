@@ -1,10 +1,13 @@
 package github.zerorooot.nap511.terminal.commands
 
+import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.FilesBean
+import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -12,7 +15,13 @@ import org.junit.Test
  * 覆盖：解压校验与密码参数、转义与特殊字符路径、异常处理与管道组合场景
  */
 class UnzipCommandTest {
-
+    @Before
+    fun setUp() {
+        try {
+            XLog.init()
+        } catch (_: Throwable) {}
+        UnzipQueueManager.clear()
+    }
     /**
      * 测试文件类型与存在性校验
      */
@@ -312,4 +321,40 @@ class UnzipCommandTest {
         val out = engine.executeStrings("unzip *.zip", ctx)
         assertTrue(out.any { it.contains("正在提交 2 个解压任务至后台...") })
     }
+
+    /**
+     * 测试跨目录解压多个压缩包时，各个任务项分别绑定各自正确的归属父目录 targetCid
+     */
+    @Test
+    fun testUnzipCrossDirectoryTargetCidBinding() = runBlocking {
+        UnzipQueueManager.clear()
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        val folderA = createMockFolder("dirA", "10")
+        val folderB = createMockFolder("dirB", "20")
+        ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(folderA, folderB), cid = "0", count = 2, order = "", path = emptyList()))
+
+        val zipA = createMockFile("a.zip", "101", categoryId = "10").copy(pickCode = "PK_A")
+        ctx.fileCacheManager.put("10", FilesBean(fileBeanList = arrayListOf(zipA), cid = "10", count = 1, order = "", path = listOf(github.zerorooot.nap511.bean.PathBean("0", "根目录", "0"), github.zerorooot.nap511.bean.PathBean("10", "dirA", "0"))))
+
+        val zipB = createMockFile("b.zip", "201", categoryId = "20").copy(pickCode = "PK_B")
+        ctx.fileCacheManager.put("20", FilesBean(fileBeanList = arrayListOf(zipB), cid = "20", count = 1, order = "", path = listOf(github.zerorooot.nap511.bean.PathBean("0", "根目录", "0"), github.zerorooot.nap511.bean.PathBean("20", "dirB", "0"))))
+
+        val out = engine.executeStrings("unzip dirA/a.zip dirB/b.zip", ctx)
+        if (!out.any { it.contains("已成功提交 2 个解压任务到后台") }) {
+            throw AssertionError("Actual out: $out")
+        }
+
+        // 验证队列中提取的两个任务项，其 targetCid 分别对应各自的所属目录（10 与 20），绝不发生覆盖
+        val task1 = github.zerorooot.nap511.worker.UnzipQueueManager.pollNext()
+        val task2 = github.zerorooot.nap511.worker.UnzipQueueManager.pollNext()
+        assertNotNull(task1)
+        assertNotNull(task2)
+        assertEquals("10", task1?.targetCid)
+        assertEquals("20", task2?.targetCid)
+        github.zerorooot.nap511.worker.UnzipQueueManager.clear()
+    }
 }
+

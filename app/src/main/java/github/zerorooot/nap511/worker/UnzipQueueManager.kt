@@ -54,10 +54,12 @@ object UnzipQueueManager {
      */
     fun enqueueAndStartWorker(
         items: List<UnzipTaskItem>,
-        context: Context = App.instance.applicationContext
+        context: Context? = runCatching { App.instance.applicationContext }.getOrNull()
     ) {
         if (items.isEmpty()) return
         enqueue(items)
+
+        if (context == null) return
 
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -169,9 +171,6 @@ object UnzipQueueManager {
         }
     }
 
-    fun reset() {
-        clear()
-    }
 
     /**
      * 获取当前处理进度 (已处理数, 总数)
