@@ -5,6 +5,7 @@ import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.terminal.commands.util.TerminalExceptionHandler
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.util.FileCacheManager
+import kotlinx.coroutines.CancellationException
 
 /**
  * 待批量操作（删除/移动）目标实体统一元数据模型
@@ -13,12 +14,14 @@ import github.zerorooot.nap511.util.FileCacheManager
  * @property fid 待操作项的唯一文件/目录标识符（fileId 或 categoryId）
  * @property displayName 显示名称（用于输出日志与错误信息）
  * @property isFolder 是否为文件夹
+ * @property path 文件或目录的完整路径（用于内存拓扑剪枝，默认为空）
  */
 data class BatchTargetItem(
     val parentCid: String?,
     val fid: String,
     val displayName: String,
-    val isFolder: Boolean
+    val isFolder: Boolean,
+    val path: String = ""
 )
 
 /**
@@ -45,6 +48,9 @@ data class BatchOpResult(
 
     /** 是否部分成功（存在成功切片，但后续切片熔断失败） */
     val isPartialSuccess: Boolean get() = successCount > 0 && failureCount > 0
+
+    /** 向后兼容 BaseReturnMessage.state 契约（等价于 isAllSuccess） */
+    val state: Boolean get() = isAllSuccess
 }
 
 /**
@@ -151,37 +157,123 @@ object TerminalBatchFileOps {
     }
 
     /**
+     * 待删除项通用内存拓扑剪枝 (Topological Pruning)
+     *
+     * 针对通配符展开或搜索递归中同时包含父目录及其内部任意层级子孙项的场景：
+     * 1. 预先按 FID 去重：杜绝用户重复参数输入或通配符多次命中造成的数量虚高与多余网络请求；
+     * 2. 绑定 FID 排除自身：将待删除目录的 FID 与前缀路径配对，使用 item.fid != folderFid 排除自身，
+     *    彻底根除目录路径末尾带斜杠时的“自剪枝”Bug；
+     * 3. 路径前缀判定：若某条目的完整 path 落在某个非自身的待删除文件夹前缀下，判定为深层子孙项予以剪枝；
+     * 4. 父级 ID 判定：若某条目的直接 parentCid 落在待删除文件夹 ID 集合中，予以剪枝（独立全量提取 folderFids 防漏剪）。
+     * 避免云端网盘级联删除父目录后子孙项产生冗余网络请求或二次删除 404 虚假报错。
+     */
+    fun pruneBatchItems(items: List<BatchTargetItem>): List<BatchTargetItem> {
+        // 1. 预先按 fid 去重，防止重复操作数引起数量虚高与多余网络请求
+        val uniqueItems = items.distinctBy { it.fid }
+        if (uniqueItems.size <= 1) return uniqueItems
+
+        // 2. 收集所有作为待删除项的文件夹 (fid to pathPrefix) 对，明确排除自身
+        val folderEntries = uniqueItems
+            .filter { it.isFolder && it.path.isNotEmpty() }
+            .map { it.fid to (if (it.path.endsWith("/")) it.path else "${it.path}/") }
+
+        // 独立于 path 是否为空进行全量提取，确保在缺失路径元数据时 ID 剪枝依然 100% 生效
+        val folderFids = uniqueItems.filter { it.isFolder }.map { it.fid }.toSet()
+
+        return uniqueItems.filter { item ->
+            // 1. 路径前缀判定：若某条目的完整 path 落在某个非自身的待删除文件夹前缀下，判定为深层子孙项予以剪枝
+            if (item.path.isNotEmpty()) {
+                val isDescendant = folderEntries.any { (fFid, prefix) ->
+                    item.fid != fFid && item.path.startsWith(prefix)
+                }
+                if (isDescendant) return@filter false
+            }
+
+            // 2. 直接父级 ID 判定
+            if (!item.parentCid.isNullOrEmpty() && item.parentCid in folderFids) {
+                return@filter false
+            }
+
+            true
+        }
+    }
+
+    /**
      * 对同一父目录 [parentCid] 下的一组待删除项执行删除并同步本地缓存
      *
      * @param ctx 终端执行上下文
      * @param parentCid 待删除项所在的父目录 ID，根目录或未知时可为 null
      * @param items 归属于该父目录的待删除目标列表
-     * @return 删除操作结果
+     * @return 细粒度批量删除执行结果 [BatchOpResult]
      */
     suspend fun deleteGroup(
         ctx: TerminalContext,
         parentCid: String?,
         items: List<BatchTargetItem>
-    ): BaseReturnMessage {
+    ): BatchOpResult {
         if (items.isEmpty()) {
-            return BaseReturnMessage(state = true, message = "无需删除")
+            return BatchOpResult(totalCount = 0, successCount = 0, failureCount = 0)
         }
 
         val effectivePid = parentCid.orEmpty()
 
-        // 1. 降级分支：单项目或 parentCid 为空时走单项删除
-        if (items.size == 1 || effectivePid.isEmpty()) {
-            val single = items.first()
-            val res = ctx.fileRepository.delete(pid = effectivePid, fid = single.fid)
-            if (res.state) {
-                syncCacheAfterDelete(effectivePid, listOf(single))
+        // 1. parentCid 为空时的降级遍历分支（修复原代码只删首项、空PID传参与缓存遗漏的多重缺陷）
+        if (effectivePid.isEmpty()) {
+            var successCount = 0
+            var firstError = ""
+            for (item in items) {
+                val itemPid = item.parentCid.orEmpty()
+                try {
+                    // 优先使用 item 自身记录的 parentCid 作为有效 pid 发起云端删除，避免空串引发服务端异常
+                    val res = ctx.fileRepository.delete(pid = itemPid, fid = item.fid)
+                    if (res.state) {
+                        successCount++
+                        // 优先使用 item 自身的 parentCid 进行精准缓存剔除，避免空串导致缓存失效
+                        syncCacheAfterDelete(itemPid, listOf(item))
+                    } else {
+                        if (firstError.isEmpty()) {
+                            firstError = TerminalExceptionHandler.extractErrorMessage(res, "未知错误")
+                        }
+                    }
+                } catch (e: Throwable) {
+                    if (e is CancellationException) throw e
+                    if (firstError.isEmpty()) {
+                        firstError = TerminalExceptionHandler.extractErrorMessage(e)
+                    }
+                    break // 熔断后续条目，返回已成功的数量
+                }
             }
-            return res
+            return BatchOpResult(
+                totalCount = items.size,
+                successCount = successCount,
+                failureCount = items.size - successCount,
+                error = firstError
+            )
         }
 
-        // 2. 批量分支：按安全阈值切片并调用 deleteMultiple
+        // 2. 单项删除分支（有有效 parentCid）
+        if (items.size == 1) {
+            val single = items.first()
+            return try {
+                val res = ctx.fileRepository.delete(pid = effectivePid, fid = single.fid)
+                if (res.state) {
+                    syncCacheAfterDelete(effectivePid, listOf(single))
+                    BatchOpResult(totalCount = 1, successCount = 1, failureCount = 0)
+                } else {
+                    val err = TerminalExceptionHandler.extractErrorMessage(res, "未知错误")
+                    BatchOpResult(totalCount = 1, successCount = 0, failureCount = 1, error = err)
+                }
+            } catch (e: Throwable) {
+                if (e is CancellationException) throw e
+                val err = TerminalExceptionHandler.extractErrorMessage(e)
+                BatchOpResult(totalCount = 1, successCount = 0, failureCount = 1, error = err)
+            }
+        }
+
+        // 3. 批量删除分支：按安全阈值 100 条切片分批调用 deleteMultiple
         val chunks = items.chunked(BATCH_CHUNK_SIZE)
-        var lastSuccessResult = BaseReturnMessage(state = true)
+        var successCount = 0
+        var firstError = ""
 
         for (chunk in chunks) {
             val data = HashMap<String, String>().apply {
@@ -192,16 +284,29 @@ object TerminalBatchFileOps {
                 }
             }
 
-            val res = ctx.fileRepository.deleteMultiple(data)
-            if (res.state) {
-                syncCacheAfterDelete(effectivePid, chunk)
-                lastSuccessResult = res
-            } else {
-                return res
+            try {
+                val res = ctx.fileRepository.deleteMultiple(data)
+                if (res.state) {
+                    successCount += chunk.size
+                    syncCacheAfterDelete(effectivePid, chunk)
+                } else {
+                    firstError = TerminalExceptionHandler.extractErrorMessage(res, "未知错误")
+                    break // 业务失败熔断后续切片，返回已成功的数量
+                }
+            } catch (e: Throwable) {
+                if (e is CancellationException) throw e
+                // 隔离网络非致命异常（如超时），保全已成功切片统计，防击穿打穿外层
+                firstError = TerminalExceptionHandler.extractErrorMessage(e)
+                break // 网络异常熔断后续切片，返回已成功的数量
             }
         }
 
-        return lastSuccessResult
+        return BatchOpResult(
+            totalCount = items.size,
+            successCount = successCount,
+            failureCount = items.size - successCount,
+            error = firstError
+        )
     }
 
     /**

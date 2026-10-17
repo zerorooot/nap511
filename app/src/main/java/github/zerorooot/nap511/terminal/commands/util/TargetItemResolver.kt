@@ -65,7 +65,8 @@ object TargetItemResolver {
                     parentCid = effectiveParentCid.takeIf { it.isNotEmpty() },
                     fid = resolved.file.fileId,
                     displayName = resolved.file.name,
-                    isFolder = false
+                    isFolder = false,
+                    path = resolved.fullPath // 源头直接赋能完整路径，支持跨目录拓扑剪枝
                 )
             }
             is ResolvedTarget.Directory -> {
@@ -82,7 +83,8 @@ object TargetItemResolver {
                     parentCid = effectiveParentCid,
                     fid = resolved.cid,
                     displayName = resolved.name.ifEmpty { parsed.targetName.ifEmpty { TerminalPathConstants.ROOT_NAME } },
-                    isFolder = true
+                    isFolder = true,
+                    path = resolved.path // 源头直接赋能完整路径，支持跨目录拓扑剪枝
                 )
             }
         }

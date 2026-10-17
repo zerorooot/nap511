@@ -101,7 +101,22 @@ object CommandMessages {
     /** 单文件移入回收站成功回显 */
     fun movedToTrash(cmd: String, name: String): String = "$cmd: 已移入回收站 '$name'"
 
-    /** 批量移入回收站成功回显 */
+    /** 批量移入回收站全部成功回显（全新全局统一标准） */
+    fun batchDeleteSuccess(cmd: String, count: Int): String = "$cmd: 已成功删除 $count 个项目至回收站"
+
+    /** 批量移入回收站部分成功回显 */
+    fun batchDeletePartial(cmd: String, success: Int, total: Int): String = "$cmd: 部分删除成功 ($success/$total) 至回收站"
+
+    /** 批量移入回收站失败提示 */
+    fun batchDeleteFailed(cmd: String, count: Int, error: String): String = "$cmd: 批量删除失败 ($count 个项目): $error"
+
+    /**
+     * 批量移入回收站历史成功回显（保留作为向后兼容别名，防止下游未适配调用方编译中断）
+     */
+    @Deprecated(
+        message = "建议迁移至 batchDeleteSuccess 以支持跨目录原子汇总语义",
+        replaceWith = ReplaceWith("batchDeleteSuccess(cmd, count)")
+    )
     fun batchMovedToTrash(cmd: String, count: Int): String = "$cmd: 已成功批量删除目录下的 $count 个项目至回收站"
 
     /** 取消单项删除操作 */
