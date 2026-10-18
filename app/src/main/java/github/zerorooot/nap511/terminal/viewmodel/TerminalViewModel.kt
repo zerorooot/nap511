@@ -134,8 +134,10 @@ class TerminalViewModel(
         get() = when {
             commandExecutor.isWaitingConfirmation ->
                 TerminalSessionState.Confirming(commandExecutor.currentConfirmationPrompt)
+
             commandExecutor.isExecuting ->
                 TerminalSessionState.Executing(commandExecutor.currentRunningCommand)
+
             else ->
                 TerminalSessionState.Idle
         }
@@ -149,7 +151,8 @@ class TerminalViewModel(
     val isWaitingConfirmation: Boolean get() = commandExecutor.isWaitingConfirmation
 
     // 自动补全候选条状态
-    val completionCandidates: SnapshotStateList<CompletionCandidate> = completionCoordinator.candidates
+    val completionCandidates: SnapshotStateList<CompletionCandidate> =
+        completionCoordinator.candidates
     val isCompletionBarVisible: Boolean get() = completionCoordinator.isVisible
     val activeCandidateIndex: Int get() = completionCoordinator.activeIndex
 
@@ -226,25 +229,21 @@ class TerminalViewModel(
     }
 
     private fun printWelcomeBanner() {
-        appendTerminalLine(TerminalLine("=== 115 Cloud Terminal (nap511) ===", TerminalLineType.System.INFO))
-        appendTerminalLine(
-            TerminalLine(
-                "欢迎使用网盘终端！输入 '?' 'help' 或 'man' 可查看命令列表与快捷键指南。终端尚不稳定，目前还在测试中。",
-                TerminalLineType.System.INFO
-            )
+        val info = arrayOf(
+            "=== 115 Cloud Terminal (nap511) ===",
+            "终端功能尚不稳定，目前还在测试中。",
+            "输入 '?' 'help' 或 'man' 可查看支持的命令列表与快捷键指南。",
+            "支持管道 '|' 与通配符；悬浮栏已内置 CTRL / ALT 粘滞键与常用 Readline 快捷键。",
+            "当前工作目录: $currentPath (cid: $currentCid)\n"
         )
-        appendTerminalLine(
-            TerminalLine(
-                "提示：支持管道 '|' 与通配符；悬浮栏已内置 CTRL / ALT 粘滞键与常用 Readline 快捷键。",
-                TerminalLineType.System.INFO
+        info.forEach {
+            appendTerminalLine(
+                TerminalLine(
+                    it,
+                    TerminalLineType.System.INFO
+                )
             )
-        )
-        appendTerminalLine(
-            TerminalLine(
-                "当前工作目录: $currentPath (cid: $currentCid)\n",
-                TerminalLineType.System.INFO
-            )
-        )
+        }
     }
 
     /**
@@ -518,7 +517,11 @@ class TerminalViewModel(
                 }
 
                 // B. 单击 Tab 直接展开候选栏（Chips Bar）供点选或继续 Tab 轮询
-                completionCoordinator.show(result.candidates, inputState.text, inputState.selection.end)
+                completionCoordinator.show(
+                    result.candidates,
+                    inputState.text,
+                    inputState.selection.end
+                )
             }
         }
     }
@@ -602,7 +605,12 @@ class TerminalViewModel(
         }
 
         // 统一双行格式入屏：第 1 行完整路径上下文，第 2 行提示符与用户命令
-        appendTerminalLine(TerminalLine("${contextPromptText()}\n$ $raw", TerminalLineType.System.COMMAND))
+        appendTerminalLine(
+            TerminalLine(
+                "${contextPromptText()}\n$ $raw",
+                TerminalLineType.System.COMMAND
+            )
+        )
 
         commandExecutor.execute(
             scope = viewModelScope,
@@ -634,7 +642,12 @@ class TerminalViewModel(
             appendTerminalLine(TerminalLine("^C", TerminalLineType.Output.TEXT))
         } else {
             val raw = inputState.text
-            appendTerminalLine(TerminalLine("${contextPromptText()}\n$ $raw^C", TerminalLineType.System.COMMAND))
+            appendTerminalLine(
+                TerminalLine(
+                    "${contextPromptText()}\n$ $raw^C",
+                    TerminalLineType.System.COMMAND
+                )
+            )
             inputState = TextFieldValue("")
             ghostText = ""
         }

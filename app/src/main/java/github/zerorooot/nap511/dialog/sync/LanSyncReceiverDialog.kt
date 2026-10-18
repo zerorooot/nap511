@@ -4,7 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -54,26 +54,26 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.nativeClipboardManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import github.zerorooot.nap511.bean.sync.SyncPayload
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.network.LanSyncClient
 import github.zerorooot.nap511.util.network.LanSyncCrypto
-import github.zerorooot.nap511.bean.sync.SyncPayload
 import github.zerorooot.nap511.util.qr.QrCodeAnalyzer
 import github.zerorooot.nap511.util.qr.QrCodeUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * 局域网同步接收端弹窗 (LanSyncReceiverDialog)
@@ -115,19 +115,48 @@ fun LanSyncReceiverDialog(
     var surfaceRequest by remember { mutableStateOf<SurfaceRequest?>(null) }
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
 
-    // 处理扫描或粘贴得到的 URI 字符串
-    fun handleRawUri(rawUri: String) {
+    // 相机连续扫码防抖状态（避免镜头停留在同一错误码上时高频重复弹窗导致看不清提示）
+    val lastInvalidQr = remember { AtomicReference<String?>(null) }
+    val lastDetectedTimestamp = remember { AtomicLong(0L) }
+
+    /**
+     * 处理扫描、相册选择或剪贴板导入得到的 URI 字符串
+     *
+     * @param rawUri 原始扫描或导入的 URI 文本
+     * @param isFromCamera 是否来自相机连续帧识别（若为 true 则应用移开视野前只弹一次的防抖策略）
+     */
+    fun handleRawUri(rawUri: String, isFromCamera: Boolean = false) {
         if (hasProcessed || isLoading) return
 
         val trimmed = rawUri.trim()
         val uriInfo = LanSyncCrypto.parseSyncUri(trimmed)
 
         if (uriInfo == null) {
+            val now = System.currentTimeMillis()
+            if (isFromCamera) {
+                // 若连续 0.5 秒未检测到该码，视为已移开视野并重新对准，重置防抖缓存
+                if (now - lastDetectedTimestamp.get() > 500L) {
+                    lastInvalidQr.set(null)
+                }
+
+                // 镜头持续停留在同一个非官方二维码上时，仅更新活跃时间戳，静默忽略避免重复弹 Toast
+                if (lastInvalidQr.get() == trimmed) {
+                    lastDetectedTimestamp.set(now)
+                    return
+                }
+
+                // 首次对准该错误码或切换到了新的错误码，记录并更新活跃时间
+                lastInvalidQr.set(trimmed)
+                lastDetectedTimestamp.set(now)
+            }
+
             // 误扫 115 官方登录码或其他非 nap511 码时的明确拦截引导
             App.instance.toast("检测到非 nap511 同步码。如需官方扫码登录，请使用 115 官方 App 扫码，或在登录页选择【网页登录】")
             return
         }
 
+        // 识别到合法的 nap511 同步码，清除错误码防抖缓存
+        lastInvalidQr.set(null)
         hasProcessed = true
         isLoading = true
         loadingMessage = "正在通过局域网拉取加密载荷..."
@@ -177,7 +206,7 @@ fun LanSyncReceiverDialog(
                     .build()
                     .also { analysis ->
                         analysis.setAnalyzer(cameraExecutor, QrCodeAnalyzer { text ->
-                            handleRawUri(text)
+                            handleRawUri(text, isFromCamera = true)
                         })
                     }
                 val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
