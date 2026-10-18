@@ -67,7 +67,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.network.LanSyncClient
 import github.zerorooot.nap511.util.network.LanSyncCrypto
-import github.zerorooot.nap511.util.network.SyncPayload
+import github.zerorooot.nap511.bean.sync.SyncPayload
 import github.zerorooot.nap511.util.qr.QrCodeAnalyzer
 import github.zerorooot.nap511.util.qr.QrCodeUtil
 import kotlinx.coroutines.Dispatchers

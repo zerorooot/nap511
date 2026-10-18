@@ -1,6 +1,9 @@
 package github.zerorooot.nap511.util.network
 
 import com.google.gson.Gson
+import github.zerorooot.nap511.bean.sync.EncryptedResponse
+import github.zerorooot.nap511.bean.sync.LanSyncUriInfo
+import github.zerorooot.nap511.bean.sync.SyncPayload
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient

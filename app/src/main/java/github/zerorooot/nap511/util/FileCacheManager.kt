@@ -19,11 +19,7 @@ import java.io.File
 import java.util.StringJoiner
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
-
-data class CacheWrapper(
-    val data: FilesBean,
-    val timestamp: Long = System.currentTimeMillis()
-)
+import github.zerorooot.nap511.bean.cache.CacheWrapper
 
 /**
  * 缓存数据变更通知事件

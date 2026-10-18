@@ -26,11 +26,19 @@
 # Application Data Beans & Serialization (Gson / Kotlinx Serialization)
 # -------------------------------------------------------------------------
 # Keep model bean class names, fields, and constructors for reflection-based deserialization
+# (涵盖 bean.sync 局域网同步实体、bean.cache 磁盘缓存实体等全部业务 Bean)
+#noinspection ProguardRuleBroadKeep
 -keep class github.zerorooot.nap511.bean.** {
     <fields>;
     public <init>(...);
 }
 -keepclassmembers enum github.zerorooot.nap511.bean.** { *; }
+
+# Keep worker tasks reflection / serialization models (后台解压缩任务持久化)
+-keep class github.zerorooot.nap511.worker.UnzipTaskItem {
+    <fields>;
+    public <init>(...);
+}
 
 # Standard Gson annotations and rules
 -keepattributes AnnotationDefault,RuntimeVisibleAnnotations,RuntimeVisibleParameterAnnotations
@@ -41,18 +49,65 @@
 -dontwarn com.google.gson.**
 -dontwarn sun.misc.**
 
+# Kotlinx Serialization（适配 Jetpack Compose Navigation 3 类型安全路由序列化）
+-dontwarn kotlinx.serialization.**
+-keepclassmembers class * {
+    *** Companion;
+}
+-keepclasseswithmembers class * {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keepclassmembers class * implements kotlinx.serialization.KSerializer {
+    public static ** INSTANCE;
+}
+
 # -------------------------------------------------------------------------
-# Network: Retrofit & OkHttp
+# Network: Retrofit & OkHttp (含 OkHttp 5.x 及嵌入式 MockWebServer)
 # -------------------------------------------------------------------------
-# Retrofit and OkHttp include consumer rules in their AARs (retrofit2.pro / okhttp-android).
-# Suppress optional runtime dependency warnings.
+# 1) Retrofit 业务接口定义与方法签名保护
+-keep interface github.zerorooot.nap511.service.** { *; }
+-keepclassmembers,allowshrinking,allowobfuscation interface * {
+    @retrofit2.http.* <methods>;
+}
+
+# 2) Retrofit and OkHttp include consumer rules in their AARs (retrofit2.pro / okhttp-android).
+# Suppress optional runtime dependency warnings (增加对 OkHttp 5.x 核心包 mockwebserver3 的防御性告警抑制).
 -dontwarn okhttp3.**
+-dontwarn okhttp3.mockwebserver.**
+-dontwarn mockwebserver3.**
 -dontwarn okio.**
 -dontwarn retrofit2.**
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
 -dontwarn javax.annotation.**
+
+# -------------------------------------------------------------------------
+# WebView Request Inspector (acsbendi)
+# -------------------------------------------------------------------------
+# 该库 AAR 未自带 Consumer 规则，完整保留其公开 API 与 @JavascriptInterface 交互方法
+-keep class com.acsbendi.requestinspectorwebview.** { *; }
+-dontwarn com.acsbendi.requestinspectorwebview.**
+
+# -------------------------------------------------------------------------
+# CameraX & QR Code (ZXing)
+# -------------------------------------------------------------------------
+# 抑制相机拓展与二维码分析核心算法库的可选依赖告警
+-dontwarn com.google.zxing.**
+-dontwarn androidx.camera.**
+-dontwarn androidx.camera.viewfinder.**
+
+# -------------------------------------------------------------------------
+# Image Loading: Coil
+# -------------------------------------------------------------------------
+# 抑制图片加载库可能触发的可选解码器告警
+-dontwarn coil.**
+
+# -------------------------------------------------------------------------
+# Process Phoenix (Application Process Rebirth)
+# -------------------------------------------------------------------------
+# 保护应用进程冷重启组件
+-keep class com.jakewharton.processphoenix.** { *; }
 
 # -------------------------------------------------------------------------
 # Media & Video Player: GSYVideoPlayer, ijkplayer & Media3 / ExoPlayer
@@ -94,7 +149,5 @@
 # -------------------------------------------------------------------------
 # AndroidX WorkManager
 # -------------------------------------------------------------------------
-# Keep Worker reflection constructors (automatically covers CoroutineWorker subclasses)
--keep class * extends androidx.work.ListenableWorker {
-    public <init>(android.content.Context, androidx.work.WorkerParameters);
-}
+# 完整保留 Worker 类名与构造器，防止因类名混淆导致持久化在 SQLite 中的任务在跨版本升级后抛出 ClassNotFoundException
+-keep class * extends androidx.work.ListenableWorker { *; }

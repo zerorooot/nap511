@@ -3,8 +3,8 @@ package github.zerorooot.nap511.util
 import com.google.gson.Gson
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.util.network.LanSyncCrypto
-import github.zerorooot.nap511.util.network.LanSyncType
-import github.zerorooot.nap511.util.network.SyncPayload
+import github.zerorooot.nap511.bean.sync.LanSyncType
+import github.zerorooot.nap511.bean.sync.SyncPayload
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull

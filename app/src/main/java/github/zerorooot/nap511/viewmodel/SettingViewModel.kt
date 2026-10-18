@@ -14,7 +14,7 @@ import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.repository.AuthRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.network.SyncPayload
+import github.zerorooot.nap511.bean.sync.SyncPayload
 import github.zerorooot.nap511.util.network.UserSessionManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow

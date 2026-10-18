@@ -65,7 +65,7 @@ import github.zerorooot.nap511.util.copy
 import github.zerorooot.nap511.util.network.LanIpUtil
 import github.zerorooot.nap511.util.network.LanSyncCrypto
 import github.zerorooot.nap511.util.network.LanSyncServerSession
-import github.zerorooot.nap511.util.network.LanSyncType
+import github.zerorooot.nap511.bean.sync.LanSyncType
 import github.zerorooot.nap511.util.network.NetworkIpInfo
 import github.zerorooot.nap511.util.qr.QrCodeUtil
 import kotlinx.coroutines.Dispatchers

@@ -42,7 +42,7 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import github.zerorooot.nap511.dialog.sync.LanSyncReceiverDialog
-import github.zerorooot.nap511.util.network.SyncPayload
+import github.zerorooot.nap511.bean.sync.SyncPayload
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
