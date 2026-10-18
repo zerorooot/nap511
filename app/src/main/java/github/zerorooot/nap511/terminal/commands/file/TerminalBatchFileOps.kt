@@ -320,22 +320,26 @@ object TerminalBatchFileOps {
 
     /**
      * 成功删除后的本地缓存双重同步：
-     * 1. 父目录列表更新：就地从父目录缓存列表中批量剔除被删除条目并递减计数；
+     * 1. 父目录列表更新：按各条目自身记录的 parentCid 分组清理对应目录的本地缓存，
+     *    若项本身无 parentCid 则回退至 fallbackParentCid，确保跨目录批量删除时子目录缓存同步清除；
      * 2. 子目录级联清理：针对被删除的文件夹，显式递归清理自身及其所有子孙目录的内存与磁盘缓存。
      *
-     * @param parentCid 待同步的父目录 ID
+     * @param fallbackParentCid 待同步的兜底父目录 ID
      * @param items 已成功从云端删除的项目列表
      */
     suspend fun syncCacheAfterDelete(
-        parentCid: String?,
+        fallbackParentCid: String?,
         items: List<BatchTargetItem>
     ) {
         if (items.isEmpty()) return
 
-        // 1. 就地从父目录缓存中批量剔除条目
-        if (!parentCid.isNullOrEmpty()) {
-            val fids = items.map { it.fid }
-            FileCacheManager.removeItems(parentCid, fids)
+        // 1. 本地缓存多源同步：按条目自身记录的 parentCid 分组清理条目（对齐 moveGroup 模式）
+        val groupedByParent = items.groupBy { it.parentCid?.takeIf { p -> p.isNotEmpty() } ?: fallbackParentCid }
+        for ((targetParentCid, groupItems) in groupedByParent) {
+            if (!targetParentCid.isNullOrEmpty()) {
+                val fids = groupItems.map { it.fid }
+                FileCacheManager.removeItems(targetParentCid, fids)
+            }
         }
 
         // 2. 针对所有被删除的文件夹，深度递归清理其子孙目录缓存并向外广播 FolderDeleted 事件

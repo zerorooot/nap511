@@ -197,13 +197,20 @@ class RmCommand : MutationCommand<RmPlan>() {
         }
 
         // 阶段三：按父目录分组执行批量删除流水线
+        // 核心架构规范与设计考量：
+        // 1. 同父级目录操作（如当前目录 rm a.txt b.txt 或相对父级目录 rm ../../a.txt ../../b.txt）：
+        //    所有待删条目拥有相同的 parentCid，分组仅有 1 个组，API 请求体中的 pid 精确对应其真实的父目录 ID，单次批量网络请求完成；
+        // 2. 跨父级目录操作（如 rm dirA/a.txt dirB/b.txt）：
+        //    按各自实际所在的 parentCid 分组发起调用，杜绝将当前工作目录 ctx.currentCid 误作为远程其它目录文件的 pid；
+        // 3. 兜底保护：若解析出来的 parentCid 为空，回退使用当前工作目录 ctx.currentCid。
         val groupedByParent = confirmedItems.groupBy { it.parentCid }
         var totalSuccessCount = 0
         var hasAnyFailure = false
 
         for ((parentCid, items) in groupedByParent) {
             try {
-                val result = TerminalBatchFileOps.deleteGroup(ctx, parentCid, items)
+                val effectivePid = parentCid?.takeIf { it.isNotEmpty() } ?: ctx.currentCid
+                val result = TerminalBatchFileOps.deleteGroup(ctx, effectivePid, items)
                 totalSuccessCount += result.successCount
                 if (result.failureCount > 0) {
                     hasAnyFailure = true

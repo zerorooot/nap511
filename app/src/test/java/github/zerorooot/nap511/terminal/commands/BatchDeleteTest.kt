@@ -448,4 +448,168 @@ class BatchDeleteTest {
         assertTrue(result.isPartialSuccess)
         assertTrue(result.error.contains("Socket timeout"))
     }
+
+    /**
+     * 14. 测试 RmCommand 针对相对父级目录（如 ../../a.txt ../../b.txt）批量删除时，
+     * 传给 API 的 pid 必须精准为待删文件所在的真实父目录 CID，绝不能错误传为当前工作目录 ctx.currentCid。
+     */
+    @Test
+    fun testRmCommandRelativeParentPathBatchDelete() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        // 构造三层目录结构：根目录("0") -> grandparent("10") -> parent("20") -> current("30")
+        val grandparent = createMockFolder("grandparent", "10").copy(parentId = "0")
+        val parent = createMockFolder("parent", "20").copy(parentId = "10")
+        val current = createMockFolder("current", "30").copy(parentId = "20")
+
+        // 待删文件位于 grandparent("10")
+        val fileA = createMockFile("a.txt", "101", categoryId = "10")
+        val fileB = createMockFile("b.txt", "102", categoryId = "10")
+
+        ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(grandparent), cid = "0", count = 1, order = "", path = emptyList()))
+        ctx.fileCacheManager.put("10", FilesBean(fileBeanList = arrayListOf(parent, fileA, fileB), cid = "10", count = 3, order = "", path = listOf(PathBean("0", "根目录", "0"), PathBean("10", "grandparent", "0"))))
+        ctx.fileCacheManager.put("20", FilesBean(fileBeanList = arrayListOf(current), cid = "20", count = 1, order = "", path = listOf(PathBean("0", "根目录", "0"), PathBean("10", "grandparent", "0"), PathBean("20", "parent", "10"))))
+        ctx.fileCacheManager.put("30", FilesBean(fileBeanList = arrayListOf(), cid = "30", count = 0, order = "", path = listOf(PathBean("0", "根目录", "0"), PathBean("10", "grandparent", "0"), PathBean("20", "parent", "10"), PathBean("30", "current", "20"))))
+
+        // 切换当前工作目录至深层目录 current("30")
+        ctx.updateDirectory(
+            listOf(
+                PathBean("0", "根目录", "0"),
+                PathBean("10", "grandparent", "0"),
+                PathBean("20", "parent", "10"),
+                PathBean("30", "current", "20")
+            )
+        )
+        assertEquals("30", ctx.currentCid)
+
+        // 在 current("30") 下执行跨级删除位于 ../../ (即 grandparent "10") 下的多个文件
+        val out = engine.executeStrings("rm -f ../../a.txt ../../b.txt", ctx)
+
+        // 验证全局原子汇总输出
+        assertEquals(listOf("rm: 已成功删除 2 个项目至回收站"), out)
+
+        // 核心断言：
+        // 1. 发起 1 次 deleteMultiple 批量调用；
+        // 2. 传给 API 的 pid 必须是文件所在真实父目录 grandparent 的 CID ("10")，绝对不能是当前目录 ("30")；
+        // 3. 包含了所有指定的文件 FID。
+        assertEquals(1, mockRepo.deletedMultipleCalls.size)
+        val call = mockRepo.deletedMultipleCalls[0]
+        assertEquals("10", call["pid"])
+        assertTrue(listOf(call["fid[0]"], call["fid[1]"]).containsAll(listOf("101", "102")))
+
+        // 验证父目录 grandparent("10") 缓存中对应项已被精准剔除
+        val gpCache = ctx.fileCacheManager.get("10")
+        assertFalse(gpCache?.fileBeanList?.any { it.fileId in listOf("101", "102") } == true)
+    }
+
+    /**
+     * 15. 测试 FindCommand 递归树搜索批量删除时以搜索起点目录作为统一 pid 批量提交，
+     * 且底层 syncCacheAfterDelete 能多源精准清理各不同子目录的本地缓存。
+     */
+    @Test
+    fun testFindCommandSubdirectoryBatchDeleteWithSearchRootPid() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        // 构造目录树结构：
+        // 搜索起点目录 targetDir("100")
+        //  ├── sub1("201") -> a.tmp("1001")
+        //  └── sub2("202") -> b.tmp("1002")
+        val sub1 = createMockFolder("sub1", "201").copy(parentId = "100")
+        val sub2 = createMockFolder("sub2", "202").copy(parentId = "100")
+        ctx.fileCacheManager.put(
+            "100",
+            FilesBean(fileBeanList = arrayListOf(sub1, sub2), cid = "100", count = 2, order = "", path = listOf(PathBean("100", "targetDir", "0")))
+        )
+
+        val file1 = createMockFile("a.tmp", "1001", categoryId = "201")
+        ctx.fileCacheManager.put(
+            "201",
+            FilesBean(fileBeanList = arrayListOf(file1), cid = "201", count = 1, order = "", path = listOf(PathBean("100", "targetDir", "0"), PathBean("201", "sub1", "100")))
+        )
+
+        val file2 = createMockFile("b.tmp", "1002", categoryId = "202")
+        ctx.fileCacheManager.put(
+            "202",
+            FilesBean(fileBeanList = arrayListOf(file2), cid = "202", count = 1, order = "", path = listOf(PathBean("100", "targetDir", "0"), PathBean("202", "sub2", "100")))
+        )
+
+        // 根目录 "0" 包含 targetDir
+        val targetDir = createMockFolder("targetDir", "100")
+        ctx.fileCacheManager.put(
+            "0",
+            FilesBean(fileBeanList = arrayListOf(targetDir), cid = "0", count = 1, order = "", path = emptyList())
+        )
+
+        // 执行 find targetDir -name '*.tmp' -delete -f
+        val out = engine.executeStrings("find targetDir -name '*.tmp' -delete -f", ctx)
+
+        // 验证全局统一输出
+        assertEquals(listOf("find: 已成功删除 2 / 2 个项目至回收站"), out)
+
+        // 核心断言：
+        // 1. 尽管 2 个文件分散在不同的子目录 (sub1, sub2)，但以搜索起点 targetDir("100") 作为 pid 合并为单次 deleteMultiple 请求；
+        // 2. 避免了按子目录拆分成 2 次串行 HTTP 请求。
+        assertEquals(1, mockRepo.deletedMultipleCalls.size)
+        val call = mockRepo.deletedMultipleCalls[0]
+        assertEquals("100", call["pid"])
+        assertTrue(listOf(call["fid[0]"], call["fid[1]"]).containsAll(listOf("1001", "1002")))
+
+        // 验证本地多源缓存精准同步：sub1("201") 和 sub2("202") 目录下的本地缓存均已各自正确剔除被删文件
+        assertEquals(0, ctx.fileCacheManager.get("201")?.fileBeanList?.size)
+        assertEquals(0, ctx.fileCacheManager.get("202")?.fileBeanList?.size)
+    }
+
+    /**
+     * 16. 测试 FindCommand 相对路径搜索起点（如 find ../../../ -delete）下，
+     * 传给 API 的 pid 为相对路径解析出的目标目录 CID，绝非当前工作目录。
+     */
+    @Test
+    fun testFindCommandRelativeParentPathBatchDelete() = runBlocking {
+        val mockRepo = createTestMockRepository()
+        val engine = createTestEngine()
+        val ctx = createTestContext(fileRepository = mockRepo)
+
+        // 目录结构：根目录("0") -> baseDir("10") -> subDir("20") -> leafDir("30")
+        val baseDir = createMockFolder("baseDir", "10").copy(parentId = "0")
+        val subDir = createMockFolder("subDir", "20").copy(parentId = "10")
+        val leafDir = createMockFolder("leafDir", "30").copy(parentId = "20")
+
+        val targetFile1 = createMockFile("t1.log", "101", categoryId = "10")
+        val targetFile2 = createMockFile("t2.log", "102", categoryId = "10")
+
+        ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(baseDir), cid = "0", count = 1, order = "", path = emptyList()))
+        ctx.fileCacheManager.put("10", FilesBean(fileBeanList = arrayListOf(subDir, targetFile1, targetFile2), cid = "10", count = 3, order = "", path = listOf(PathBean("0", "根目录", "0"), PathBean("10", "baseDir", "0"))))
+        ctx.fileCacheManager.put("20", FilesBean(fileBeanList = arrayListOf(leafDir), cid = "20", count = 1, order = "", path = listOf(PathBean("0", "根目录", "0"), PathBean("10", "baseDir", "0"), PathBean("20", "subDir", "10"))))
+        ctx.fileCacheManager.put("30", FilesBean(fileBeanList = arrayListOf(), cid = "30", count = 0, order = "", path = listOf(PathBean("0", "根目录", "0"), PathBean("10", "baseDir", "0"), PathBean("20", "subDir", "10"), PathBean("30", "leafDir", "20"))))
+
+        // 当前工作目录切换至 leafDir("30")
+        ctx.updateDirectory(
+            listOf(
+                PathBean("0", "根目录", "0"),
+                PathBean("10", "baseDir", "0"),
+                PathBean("20", "subDir", "10"),
+                PathBean("30", "leafDir", "20")
+            )
+        )
+        assertEquals("30", ctx.currentCid)
+
+        // 在 leafDir("30") 下执行 find ../../ -name '*.log' -delete -f (搜索起点为 baseDir "10")
+        val out = engine.executeStrings("find ../../ -name '*.log' -delete -f", ctx)
+
+        assertEquals(listOf("find: 已成功删除 2 / 2 个项目至回收站"), out)
+
+        // 验证请求体中的 pid 为搜索起点 baseDir 的 CID "10"，绝非当前工作目录 "30"
+        assertEquals(1, mockRepo.deletedMultipleCalls.size)
+        val call = mockRepo.deletedMultipleCalls[0]
+        assertEquals("10", call["pid"])
+        assertTrue(listOf(call["fid[0]"], call["fid[1]"]).containsAll(listOf("101", "102")))
+
+        // 验证 baseDir("10") 本地缓存中的文件已被正确移除
+        val baseCache = ctx.fileCacheManager.get("10")
+        assertFalse(baseCache?.fileBeanList?.any { it.fileId in listOf("101", "102") } == true)
+    }
 }

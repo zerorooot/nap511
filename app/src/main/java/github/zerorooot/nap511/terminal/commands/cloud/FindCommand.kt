@@ -239,7 +239,8 @@ class FindCommand : TerminalCommand {
 
         // 5. 若配置了删除策略，统一执行批量安全删除流水线
         if (plan.deletePolicy != FindDeletePolicy.None) {
-            performBatchDelete(ctx, deletableTargets, plan.deletePolicy)
+            val searchRootCid = if (plan.strategy is FindSearchStrategy.Tree) dirResolution.targetCid else null
+            performBatchDelete(ctx, deletableTargets, plan.deletePolicy, searchRootCid)
         }
     }
 
@@ -584,12 +585,19 @@ class FindCommand : TerminalCommand {
     }
 
     /**
-     * 批量安全移入回收站（按父目录聚合批量删除，并级联清理父目录及文件夹子孙缓存）
+     * 批量安全移入回收站
+     *
+     * 架构考量（高内聚、高复用、高性能）：
+     * 1. 递归树搜索 (Tree)：拥有明确的搜索起点目录 [searchRootCid]（例如 find ../../../ 或 find .）。
+     *    传给 API 的 pid 统一为搜索起点目录 CID，由底层切片（每批 100 项）批量执行删除，
+     *    避免不同深层子目录产生多次串行 HTTP 往返；同时底层结合各条目原本的 parentCid 自动进行多目录本地缓存清理；
+     * 2. 全盘云端搜索 (Global)：匹配条目散落全盘无单一目标根目录，继续按各自所在目录的 parentCid 分组提交。
      */
     private suspend fun FlowCollector<TerminalOutput>.performBatchDelete(
         ctx: TerminalContext,
         targets: List<DeletableTarget>,
-        policy: FindDeletePolicy
+        policy: FindDeletePolicy,
+        searchRootCid: String? = null
     ) {
         if (targets.isEmpty()) {
             emitSystem("find: 未找到匹配的删除目标")
@@ -619,20 +627,36 @@ class FindCommand : TerminalCommand {
             }
         }
 
-        val grouped = prunedItems.groupBy { it.parentCid }
         var successCount = 0
 
-        for ((parentCid, items) in grouped) {
+        if (!searchRootCid.isNullOrEmpty()) {
+            // 分支 1：递归树搜索模式，以搜索起点目录 searchRootCid 作为统一 pid 进行单批/切片聚合删除
             try {
-                val res = TerminalBatchFileOps.deleteGroup(ctx, parentCid, items)
-                successCount += res.successCount
+                val res = TerminalBatchFileOps.deleteGroup(ctx, searchRootCid, prunedItems)
+                successCount = res.successCount
                 if (res.failureCount > 0) {
                     val err = res.error.ifEmpty { "未知错误" }
-                    emitError("find: 目录 [ID:${parentCid ?: "0"}] 下的 ${res.failureCount} 个项目删除失败: $err")
+                    emitError("find: 目录 [ID:$searchRootCid] 下的 ${res.failureCount} 个项目删除失败: $err")
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                emitError("find: 删除异常 [ID:${parentCid ?: "0"}]: ${TerminalExceptionHandler.extractErrorMessage(e)}")
+                emitError("find: 删除异常 [ID:$searchRootCid]: ${TerminalExceptionHandler.extractErrorMessage(e)}")
+            }
+        } else {
+            // 分支 2：全盘云端搜索模式，按各条目所在 parentCid 分组批量删除
+            val grouped = prunedItems.groupBy { it.parentCid }
+            for ((parentCid, items) in grouped) {
+                try {
+                    val res = TerminalBatchFileOps.deleteGroup(ctx, parentCid, items)
+                    successCount += res.successCount
+                    if (res.failureCount > 0) {
+                        val err = res.error.ifEmpty { "未知错误" }
+                        emitError("find: 目录 [ID:${parentCid ?: "0"}] 下的 ${res.failureCount} 个项目删除失败: $err")
+                    }
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    emitError("find: 删除异常 [ID:${parentCid ?: "0"}]: ${TerminalExceptionHandler.extractErrorMessage(e)}")
+                }
             }
         }
 

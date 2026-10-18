@@ -3,12 +3,7 @@ package github.zerorooot.nap511.viewmodel
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Intent
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.concurrent.futures.await
 import androidx.lifecycle.AndroidViewModel
@@ -28,21 +23,17 @@ import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileContentUiState
-import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.FileDialogUiState
-import github.zerorooot.nap511.bean.FileInfo
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.ImageBean
 import github.zerorooot.nap511.bean.LocationBean
 import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.OrderBean
-import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.RemainingSpaceBean
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.bean.TorrentFileBean
-import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
@@ -67,7 +58,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import retrofit2.HttpException
 import java.util.concurrent.ConcurrentHashMap
 
 @SuppressLint("MutableCollectionMutableState")
@@ -84,7 +74,8 @@ class FileViewModel(
     // ==================== 核心状态流 (分域双 Flow 规范) ====================
 
     /** 1. 文件列表核心浏览与模式状态流 */
-    private val _contentState = MutableStateFlow(FileContentUiState(appBarTitle = context.getString(R.string.app_name)))
+    private val _contentState =
+        MutableStateFlow(FileContentUiState(appBarTitle = context.getString(R.string.app_name)))
     val contentState: StateFlow<FileContentUiState> = _contentState.asStateFlow()
 
     /** 2. 弹窗交互独立状态流（与列表展示彻底物理隔离） */
@@ -97,7 +88,8 @@ class FileViewModel(
 
     /** 4. 电池优化状态流（初始化与手动刷新时发射） */
     private val _isIgnoringBatteryOptimizations = MutableStateFlow(false)
-    val isIgnoringBatteryOptimizations: StateFlow<Boolean> = _isIgnoringBatteryOptimizations.asStateFlow()
+    val isIgnoringBatteryOptimizations: StateFlow<Boolean> =
+        _isIgnoringBatteryOptimizations.asStateFlow()
 
     // 便捷只读属性访问器（供内部方法与平滑过渡）
     val fileBeanList: List<FileBean>
@@ -120,6 +112,7 @@ class FileViewModel(
 
     // ==================== 内部线程安全与细粒度响应式缓存（解耦，不触发 UI 整体重组） ====================
     val clickMap = ConcurrentHashMap<String, Int>()
+
     // 二级 Compose SnapshotStateMap：外层按目录 cid 隔离，内层按文件 pickCode 触发列表单条目精准重组
     val imageBeanCache = mutableStateMapOf<String, SnapshotStateMap<String, ImageBean>>()
     internal val imageLoadingSet = hashSetOf<String>()
@@ -161,6 +154,7 @@ class FileViewModel(
     internal fun updateDialogState(reducer: FileDialogUiState.() -> FileDialogUiState) {
         _dialogState.update(reducer)
     }
+
     internal val fileRepository: FileRepository by lazy {
         FileRepository.getInstance()
     }
@@ -315,7 +309,8 @@ class FileViewModel(
                 val gson = fileRepository.remainingSpace()
                 if (gson.get("state").asBoolean) {
                     val spaceInfoJson = gson.getAsJsonObject("data").get("space_info")
-                    _remainingSpace.value = Gson().fromJson(spaceInfoJson, RemainingSpaceBean::class.java)
+                    _remainingSpace.value =
+                        Gson().fromJson(spaceInfoJson, RemainingSpaceBean::class.java)
                 }
             }.onFailureToastAndLog()
         }
@@ -350,10 +345,10 @@ class FileViewModel(
             }.onFailure {
                 val expiredTip = when (it) {
                     is NullPointerException -> "获取文件列表失败，建议更新您的Cookie"
-                    is HttpException if it.code() == 405 -> "HttpException 405，建议更新您的Cookie"
+                    //  is HttpException if it.code() == 405 -> "HttpException 405，建议更新您的Cookie"
                     else -> null
                 }
-                val message=if (expiredTip != null) {
+                val message = if (expiredTip != null) {
                     FileCacheManager.clearAll()
                     UserSessionManager.clearSession()
                     _navigationEvent.send(NavEvent.NavigateToScreen(Route.Login))
@@ -496,7 +491,8 @@ class FileViewModel(
                     val updatedCache = FileCacheManager.getDate(event.cid)
                     if (updatedCache != null) {
                         updateContentState {
-                            val unselectedList = updatedCache.fileBeanList.map { it.copy(isSelect = false) }
+                            val unselectedList =
+                                updatedCache.fileBeanList.map { it.copy(isSelect = false) }
                             copy(
                                 fileBeanList = unselectedList,
                                 pathList = updatedCache.path,
@@ -515,7 +511,7 @@ class FileViewModel(
                 // 【远程 API 刷新逻辑】：
                 // 针对新增文件、解压完成、离线下载完成、字幕上传、回收站还原等场景，云端生成了新文件或变动：
                 /**不需要删除缓存，因为在 [FileCacheManager.notifyRemoteRefresh] 里已经删除了**/
-                refresh(event.cid,true)
+                refresh(event.cid, true)
             }
 
             is CacheEvent.FolderDeleted -> {
@@ -549,11 +545,13 @@ class FileViewModel(
             }
         }
     }
-    private  fun resolveDirName(cid: String): String {
+
+    private fun resolveDirName(cid: String): String {
         if (cid == currentCid) return pathList.lastOrNull()?.name ?: "当前目录($cid)"
         // 尝试从内存缓存中获取其面包屑末级名称
         return FileCacheManager.getDate(cid)?.path?.lastOrNull()?.name ?: "cid=$cid"
     }
+
     /**
      * 在 IO 调度器下彻底清理指定文件列表对应的 Coil 内存与磁盘缓存
      * （对应原 FileScreen 在主线程执行的缓存操作，现统一收口至 ViewModel 异步执行）
