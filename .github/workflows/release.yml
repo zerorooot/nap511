@@ -1,4 +1,3 @@
- 
 name: Release
 on:
   push:
@@ -10,18 +9,30 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-java@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          distribution: temurin
-          java-version: 17
-      - uses: gradle/gradle-build-action@v2
+          fetch-depth: 0
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
         with:
-          gradle-version: current
-          arguments: assembleRelease
-          
-      - uses: ilharp/sign-android-release@v1
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew assembleRelease
+
+      - name: Sign Android APK
+        uses: ilharp/sign-android-release@v1
         id: sign_app
         with:
           releaseDir: app/build/outputs/apk/release
@@ -31,12 +42,83 @@ jobs:
           keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
           buildToolsVersion: 35.0.0
 
-      - run: mv ${{steps.sign_app.outputs.signedFile}} nap511_$GITHUB_REF_NAME.apk
-      - uses: ncipollo/release-action@v1
-        with:
-          artifacts: "*.apk"
-          token: ${{ github.token }}
-          generateReleaseNotes: true
-          allowUpdates: true
-          replacesArtifacts: true
+      - name: Rename Signed APK
+        run: |
+          mv "${{ steps.sign_app.outputs.signedFile }}" "nap511_${GITHUB_REF_NAME}.apk"
 
+      - name: Generate Grouped Changelog
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CURR_TAG="${GITHUB_REF_NAME}"
+          REPO_URL="https://github.com/${{ github.repository }}"
+          OUTPUT_FILE="changelog.md"
+
+          # 确保拉取远端所有 Tag 以便精准对比
+          git fetch --tags --force 2>/dev/null || true
+
+          # 1. 三级安全定位基线 Tag
+          PREV_TAG=$(git describe --tags --abbrev=0 --match 'v*' "${CURR_TAG}^" 2>/dev/null || true)
+          if [ -z "$PREV_TAG" ]; then
+            PREV_TAG=$(git tag -l 'v*' | grep -v "^${CURR_TAG}$" | sort -V | tail -n 1 || true)
+          fi
+          if [ -z "$PREV_TAG" ]; then
+            PREV_TAG=$(gh release list --exclude-pre-releases --exclude-drafts --limit 5 --json tagName \
+              -q '[.[] | select(.tagName != "'"${CURR_TAG}"'")][0].tagName' 2>/dev/null || true)
+          fi
+
+          # 2. 确定日志区间与对比信息
+          if [ -n "$PREV_TAG" ]; then
+            LOG_RANGE="${PREV_TAG}..HEAD"
+            COMPARE_URL="${REPO_URL}/compare/${PREV_TAG}...${CURR_TAG}"
+            echo -e "## 本次更新内容\n自正式版本 **\`${PREV_TAG}\`** 以来的主要变动：\n" > "$OUTPUT_FILE"
+          else
+            # 初次发布防御：仅追溯最近 50 条提交，避免全量历史过长
+            LOG_RANGE="HEAD"
+            echo -e "## 初始版本发布\n" > "$OUTPUT_FILE"
+          fi
+
+          # 3. 提取过滤 Merge 后的提交并附带短哈希链接
+          RAW_LOGS=$(git log $LOG_RANGE --max-count=200 --pretty=format:"- %s ([%h](${REPO_URL}/commit/%H))" | grep -v '^\s*-\s*[Mm]erge' || true)
+
+          if [ -z "$RAW_LOGS" ]; then
+            echo -e "_本次发布包含常规维护与内部构建优化，无公开提交记录。_\n" >> "$OUTPUT_FILE"
+          else
+            # 4. 结构化分类解析
+            # 4.1 破坏性变更（提权置顶）
+            BREAKING=$(echo "$RAW_LOGS" | grep -iE '^-\s*[a-z0-9_-]+(\([^\)]+\))?!:|BREAKING CHANGE' || true)
+            # 4.2 移除已标记为破坏性变更的条目，避免下方重复分类
+            NON_BREAKING=$(echo "$RAW_LOGS" | grep -ivE '^-\s*[a-z0-9_-]+(\([^\)]+\))?!:|BREAKING CHANGE' || true)
+
+            FEAT=$(echo "$NON_BREAKING" | grep -iE '^-\s*(feat|feature|ui)(\([^\)]+\))?:' || true)
+            FIX=$(echo "$NON_BREAKING" | grep -iE '^-\s*fix(\([^\)]+\))?:' || true)
+            PERF=$(echo "$NON_BREAKING" | grep -iE '^-\s*(perf|refactor)(\([^\)]+\))?:' || true)
+            BUILD=$(echo "$NON_BREAKING" | grep -iE '^-\s*(build|chore|ci|deps)(\([^\)]+\))?:' || true)
+            OTHER=$(echo "$NON_BREAKING" | grep -ivE '^-\s*(feat|feature|ui|fix|perf|refactor|build|chore|ci|deps)(\([^\)]+\))?:' || true)
+
+            # 4.3 写入分组内容
+            [ -n "$BREAKING" ] && echo -e "### ⚠️ 破坏性变更 (Breaking Changes)\n${BREAKING}\n" >> "$OUTPUT_FILE"
+            [ -n "$FEAT" ]     && echo -e "### 🚀 新功能与界面优化 (Features & UI)\n${FEAT}\n" >> "$OUTPUT_FILE"
+            [ -n "$FIX" ]      && echo -e "### 🐛 缺陷修复 (Bug Fixes)\n${FIX}\n" >> "$OUTPUT_FILE"
+            [ -n "$PERF" ]     && echo -e "### ⚡ 性能提升与重构 (Performance & Refactor)\n${PERF}\n" >> "$OUTPUT_FILE"
+            [ -n "$BUILD" ]    && echo -e "### 📦 构建与工程维护 (Build & Dependencies)\n${BUILD}\n" >> "$OUTPUT_FILE"
+            [ -n "$OTHER" ]    && echo -e "### 🔧 其他变更 (Improvements)\n${OTHER}\n" >> "$OUTPUT_FILE"
+          fi
+
+          # 5. 写入底部全量对比超链接
+          if [ -n "$PREV_TAG" ]; then
+            echo -e "\n**完整更新对比:** [\`${PREV_TAG}...${CURR_TAG}\`](${COMPARE_URL})" >> "$OUTPUT_FILE"
+          fi
+
+          echo "--- 生成的更新日志预览 ---"
+          cat "$OUTPUT_FILE"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Release ${{ github.ref_name }}"
+          tag_name: ${{ github.ref_name }}
+          body_path: changelog.md
+          files: "nap511_${{ github.ref_name }}.apk"
+          draft: false
+          prerelease: false
