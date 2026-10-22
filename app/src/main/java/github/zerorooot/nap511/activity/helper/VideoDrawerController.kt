@@ -136,4 +136,19 @@ class VideoDrawerController(
                 ?.scrollToPosition((fileBeanIndex - 3).coerceAtLeast(0))
         }
     }
+
+    /**
+     * 动态刷新选集抽屉的数据源（当发生移除或撤回导致列表变动时）
+     */
+    fun refreshEpisodeDrawer() {
+        val episodeTitles = viewModel.videoList.mapIndexed { index, item ->
+            val displayIndex = index + 1
+            if (item.name.isNotEmpty()) {
+                "P$displayIndex ${item.time} ${item.name}"
+            } else {
+                "第 $displayIndex 集"
+            }
+        }
+        episodeAdapter.updateData(episodeTitles, viewModel.uiState.value.fileBeanIndex)
+    }
 }

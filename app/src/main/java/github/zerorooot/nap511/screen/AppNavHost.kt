@@ -59,6 +59,7 @@ import github.zerorooot.nap511.viewmodel.getImage
 import github.zerorooot.nap511.viewmodel.getTorrentTask
 import github.zerorooot.nap511.viewmodel.getZipListFile
 import github.zerorooot.nap511.viewmodel.onVideoActivityResult
+import github.zerorooot.nap511.viewmodel.openDiscardVideosDialog
 import java.lang.reflect.Type
 
 /**
@@ -134,6 +135,15 @@ fun AppNavHost(
             val cid = data?.getStringExtra("cid") ?: fileViewModel.currentCid
             // 统一交给 fileViewModel 处理（更新进度 + 触发滚动事件）
             fileViewModel.onVideoActivityResult(pickCode, cid, videoHistoryMap)
+
+            // 处理移除批量确认弹窗
+            val discardJson = data?.getStringExtra("discard") ?: "[]"
+            val discardType: Type = object : TypeToken<List<VideoBean>>() {}.type
+            val discardList: List<VideoBean> =
+                Gson().fromJson(discardJson, discardType) ?: emptyList()
+            if (discardList.isNotEmpty()) {
+                fileViewModel.openDiscardVideosDialog(discardList, cid)
+            }
         }
 
         if (result.resultCode == Activity.RESULT_CANCELED) {

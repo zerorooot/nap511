@@ -30,6 +30,7 @@ media3DatasourceOkhttp = "1.11.1"
 junit = "4.13.2"
 camerax = "1.5.3"
 zxing = "3.5.3"
+material = "1.12.0"
 
 [libraries]
 android-request-inspector-webview = { module = "com.github.acsbendi:Android-Request-Inspector-WebView", version.ref = "androidRequestInspectorWebview" }
@@ -82,6 +83,7 @@ androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", versi
 androidx-camera-compose = { module = "androidx.camera:camera-compose", version.ref = "camerax" }
 okhttp-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver", version.ref = "okhttp" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
+google-material = { module = "com.google.android.material:material", version.ref = "material" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 

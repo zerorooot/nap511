@@ -37,6 +37,7 @@ import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.elvishew.xlog.XLog
+import com.google.android.material.snackbar.Snackbar
 import com.google.gson.Gson
 import com.shuyu.gsyvideoplayer.GSYVideoManager
 import com.shuyu.gsyvideoplayer.listener.GSYSampleCallBack
@@ -91,6 +92,9 @@ class VideoActivity : AppCompatActivity() {
 
     /** 标记视频是否正在加载中（用于上一集/下一集按钮防止重复点击） */
     private var isEpisodeLoading = false
+
+    /** 移除 Snackbar 引用（用于复用原生生命周期与及时清理） */
+    private var activeSnackbar: Snackbar? = null
 
     /**
      * 更新"上/下一集"按钮的启用状态与透明度
@@ -212,6 +216,15 @@ class VideoActivity : AppCompatActivity() {
             backButton.setOnClickListener {
                 performBack()
             }
+            // 移除按钮 (胶囊按钮)
+            findViewById<View>(R.id.btn_discard)?.setOnClickListener {
+                val isPort =
+                    resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+                isEpisodeLoading = true
+                updatePrevNextButtons()
+                viewModel.discardCurrentVideo(isPort)
+                showDiscardSnackbar()
+            }
             // 上一集按钮
             findViewById<View>(R.id.prev_episode)?.setOnClickListener {
                 playNextVideo(false)
@@ -315,13 +328,29 @@ class VideoActivity : AppCompatActivity() {
                                 showCaptchaDialog()
                             }
 
+                            // 选集列表变动，刷新选集抽屉
+                            is VideoUiEvent.EpisodeListUpdated -> {
+                                videoDrawerController.refreshEpisodeDrawer()
+                            }
+
+                            // 列表全部移除，暂停并进入延时自退流程
+                            is VideoUiEvent.AllVideosDiscarded -> {
+                                isEpisodeLoading = false
+                                updatePrevNextButtons()
+                                videoPlayer.onVideoPause()
+                                showAllDiscardedSnackbar(event.autoExitDelayMs)
+                            }
+
                             // 携带播放历史及结果返回上个界面
                             is VideoUiEvent.FinishWithResult -> {
+                                activeSnackbar?.dismiss()
+                                activeSnackbar = null
                                 val returnIntent = Intent().apply {
                                     putExtra("videoHistory", event.videoHistoryJson)
                                     putExtra("toast", event.toast)
                                     putExtra("pickCode", event.pickCode)
                                     putExtra("cid", event.cid)
+                                    putExtra("discard", event.discardJson)
                                 }
                                 setResult(event.resultCode, returnIntent)
                                 videoPlayer.setVideoAllCallBack(null)
@@ -533,7 +562,60 @@ class VideoActivity : AppCompatActivity() {
         super.onResume()
     }
 
+    /**
+     * 显示已移出列表提示 Snackbar（支持点击撤回），锚定在底部控制栏上方，避免遮挡上一集/下一集与进度条
+     */
+    private fun showDiscardSnackbar() {
+        activeSnackbar?.dismiss()
+        val snackbar = Snackbar.make(videoPlayer, "已移出列表", Snackbar.LENGTH_LONG)
+            .setAction("撤回") {
+                val isPort =
+                    resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+                viewModel.undoDiscard(isPort)
+            }
+        // 锚定在底部控制栏 layout_bottom 之上，避免遮挡播放按钮与进度条
+        videoPlayer.findViewById<View>(R.id.layout_bottom)?.let { bottomView ->
+            snackbar.anchorView = bottomView
+        }
+        activeSnackbar = snackbar
+        snackbar.show()
+    }
+
+    /**
+     * 弹出全部已移出列表提示 Snackbar，通过原生 onDismissed 回调在超时或滑动消除时自动退出 Activity；
+     * 若用户点击"撤回"则忽略退出
+     *
+     * @param delayMs 延时退出时间（毫秒）
+     */
+    private fun showAllDiscardedSnackbar(delayMs: Long) {
+        activeSnackbar?.dismiss()
+        val snackbar = Snackbar.make(
+            videoPlayer,
+            "已全部已移出列表，${delayMs / 1000}秒后自动退出",
+            delayMs.toInt()
+        ).setAction("撤回") {
+            val isPort =
+                resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+            viewModel.undoDiscard(isPort)
+        }
+        // 锚定在底部控制栏 layout_bottom 之上，避免遮挡播放按钮与进度条
+        videoPlayer.findViewById<View>(R.id.layout_bottom)?.let { bottomView ->
+            snackbar.anchorView = bottomView
+        }
+        snackbar.addCallback(object : Snackbar.Callback() {
+            override fun onDismissed(transientBottomBar: Snackbar?, event: Int) {
+                if (event == DISMISS_EVENT_TIMEOUT || event == DISMISS_EVENT_SWIPE) {
+                    performBack()
+                }
+            }
+        })
+        activeSnackbar = snackbar
+        snackbar.show()
+    }
+
     override fun onDestroy() {
+        activeSnackbar?.dismiss()
+        activeSnackbar = null
         captchaDialog?.dismiss()
         captchaDialog = null
         GSYVideoManager.releaseAllVideos()

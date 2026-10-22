@@ -12,4 +12,5 @@ sealed interface FileDialogState {
     data object UnzipPassword : FileDialogState
     data object UnzipAllFile : FileDialogState
     data object CreateSelectTorrentFile : FileDialogState
+    data object DiscardVideos : FileDialogState
 }

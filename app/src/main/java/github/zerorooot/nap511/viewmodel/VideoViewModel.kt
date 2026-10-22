@@ -35,6 +35,16 @@ import okhttp3.MediaType
 import java.io.File
 
 /**
+ * 移除操作的历史记录单元（用于 LIFO 撤回栈）
+ * @param video 被标记移除的视频对象（保留原 fileId、pickCode、name 等完整元数据）
+ * @param originalIndex 被移除时在原动态播放列表中的下标索引
+ */
+data class DiscardRecord(
+    val video: VideoBean,
+    val originalIndex: Int
+)
+
+/**
  * 视频播放页面的一次性 UI 事件定义
  */
 sealed class VideoUiEvent {
@@ -57,11 +67,18 @@ sealed class VideoUiEvent {
         /**
          * 最后一个视频的pickCode，方便selectIndex定位到视频
          */
-        val pickCode: String
+        val pickCode: String,
+        val discardJson: String = "[]"
     ) : VideoUiEvent()
 
     /** 触发 115 视频账号验证码弹窗事件 */
     object ShowCaptchaDialog : VideoUiEvent()
+
+    /** 通知选集列表发生变化，刷新抽屉 */
+    data object EpisodeListUpdated : VideoUiEvent()
+
+    /** 列表中所有视频均已被移除，进入延时退出流程 */
+    data class AllVideosDiscarded(val autoExitDelayMs: Long = 5000L) : VideoUiEvent()
 }
 
 /**
@@ -87,9 +104,13 @@ class VideoViewModel : ViewModel() {
     /** 视频播放页面的 UI 状态流 */
     val uiState: StateFlow<VideoUiState> = _uiState.asStateFlow()
 
-    /** 当前播放列表中的所有视频 */
+    /** 移除撤回栈 (LIFO 结构) */
+    private val discardRecords = ArrayDeque<DiscardRecord>()
+
+    /** 当前播放列表中的所有视频（动态维护，支持移除剔除与撤回恢复） */
+    /** 当前播放列表（外部只读） */
     val videoList: List<VideoBean>
-        get() = if (::launchVideoParams.isInitialized) launchVideoParams.videoList else emptyList()
+        field = mutableListOf<VideoBean>()
 
     private val _uiEvent = MutableSharedFlow<VideoUiEvent>()
 
@@ -126,9 +147,12 @@ class VideoViewModel : ViewModel() {
      */
     fun initParams(params: LaunchVideoParams, isPortrait: Boolean) {
         launchVideoParams = params
+        videoList.clear()
+        videoList.addAll(params.videoList)
+        discardRecords.clear()
         val initialVideoInfo = params.videoInfo
         val currentIndex = initialVideoInfo.index
-        val listSize = params.videoList.size
+        val listSize = videoList.size
 
         _uiState.update { currentState ->
             currentState.copy(
@@ -180,13 +204,23 @@ class VideoViewModel : ViewModel() {
         }
 
         if (targetIndex == _uiState.value.fileBeanIndex) return
-        val fileBean = launchVideoParams.videoList.getOrNull(targetIndex)
+        loadVideoAt(targetIndex, isPortrait)
+    }
+
+    /**
+     * 核心加载并播放指定索引视频的内部实现
+     *
+     * @param targetIndex 目标视频在 currentVideoList 中的索引
+     * @param isPortrait 当前屏幕方向是否为竖屏
+     */
+    private fun loadVideoAt(targetIndex: Int, isPortrait: Boolean) {
+        val fileBean = videoList.getOrNull(targetIndex)
         if (fileBean == null) {
             App.instance.toast("找不到视频")
             return
         }
         val videoName = fileBean.name
-        val listSize = launchVideoParams.videoList.size
+        val listSize = videoList.size
         _uiState.update { currentState ->
             currentState.copy(
                 fileBeanIndex = targetIndex,
@@ -233,6 +267,75 @@ class VideoViewModel : ViewModel() {
     }
 
     /**
+     * 「移除」核心处理：
+     * 1. 记录当前视频至撤回栈；
+     * 2. 从动态播放列表中剔除该视频（选集抽屉防回切）；
+     * 3. 自动向后移播放下一集（后方元素前移，新索引即原 currentIndex）；
+     * 4. 若为最后一集，自动切至新末尾；若列表全空，触发全移除延时自退事件。
+     */
+    fun discardCurrentVideo(isPortrait: Boolean) {
+        if (videoList.isEmpty()) return
+        val currentIndex = _uiState.value.fileBeanIndex
+        if (currentIndex !in videoList.indices) return
+
+        val currentVideo = videoList[currentIndex]
+        discardRecords.addLast(DiscardRecord(currentVideo, currentIndex))
+        videoList.removeAt(currentIndex)
+        if (videoList.isEmpty()) {
+            _uiState.update { it.copy(fileBeanIndex = -1, hasPrev = false, hasNext = false) }
+            viewModelScope.launch {
+                _uiEvent.emit(VideoUiEvent.EpisodeListUpdated)
+                _uiEvent.emit(VideoUiEvent.AllVideosDiscarded(autoExitDelayMs = 5000L))
+            }
+        } else {
+            // 注意：移除当前元素后，后方的原本“下一集”自动前移填补到 currentIndex
+            val nextIndex = if (currentIndex < videoList.size) currentIndex else videoList.size - 1
+            loadVideoAt(nextIndex, isPortrait)
+            viewModelScope.launch {
+                _uiEvent.emit(VideoUiEvent.EpisodeListUpdated)
+            }
+        }
+    }
+
+    /**
+     * 「撤回移除」处理：
+     * 1. 弹出最近一次移除记录并插回原位（支持多级撤回与边界保护）；
+     * 2. 保持当前画面正常播放不中断；
+     * 3. 若之前全部被弃导致暂停，撤回后自动恢复播放。
+     */
+    fun undoDiscard(isPortrait: Boolean) {
+        val lastRecord = discardRecords.removeLastOrNull() ?: return
+        val (restoredVideo, originalIndex) = lastRecord
+
+        val insertIndex = originalIndex.coerceIn(0, videoList.size)
+        videoList.add(insertIndex, restoredVideo)
+
+        // 查找当前正在播放视频在新列表中的最新索引
+        val currentPlayingPickCode = _uiState.value.videoInfo?.pickCode
+        val newPlayingIndex = videoList.indexOfFirst { it.pickCode == currentPlayingPickCode }
+        val listSize = videoList.size
+
+        if (newPlayingIndex >= 0) {
+            // 当前仍在播放某视频，保持播放不中断，仅更新索引与上下集状态
+            _uiState.update {
+                it.copy(
+                    fileBeanIndex = newPlayingIndex,
+                    hasPrev = newPlayingIndex - 1 in 0 until listSize,
+                    hasNext = newPlayingIndex + 1 in 0 until listSize
+                )
+            }
+        } else {
+            // 之前所有视频全被移除（停播），撤回后自动恢复播放刚插回的视频
+            loadVideoAt(insertIndex, isPortrait)
+        }
+
+        viewModelScope.launch {
+            _uiEvent.emit(VideoUiEvent.EpisodeListUpdated)
+        }
+        App.instance.toast("已撤回：${restoredVideo.name}")
+    }
+
+    /**
      * 当视频地址错误或失效时，重新从服务器获取新链接并重新播放
      */
     fun rePlayNewVideo() {
@@ -243,7 +346,6 @@ class VideoViewModel : ViewModel() {
             try {
                 val currentInfo = _uiState.value.videoInfo ?: return@launch
                 val video = fileRepository.video(currentInfo.pickCode)
-                XLog.i("playNewVideo $video")
                 _uiEvent.emit(
                     VideoUiEvent.PlayNext(
                         video.downloadUrl,
@@ -299,16 +401,34 @@ class VideoViewModel : ViewModel() {
         toast: String = "",
         resultCode: Int = Activity.RESULT_OK
     ) {
+        val discardedPickCodes = discardRecords.map { it.video.pickCode }.toSet()
         val currentInfo = _uiState.value.videoInfo ?: VideoInfoBean()
         val pickCode = currentInfo.pickCode
-        val currentDuration = (currentPositionMs / 1000).toInt()
-        val bean = VideoBean(currentDuration, pickCode, name = currentInfo.fileName)
-        videoHistoryMap[pickCode] = bean
-        val videoHistoryMapJson = Gson().toJson(videoHistoryMap)
-        // 异步启动：不阻塞当前协程。内部已加 NonCancellable，销毁后依然会执行。
-        viewModelScope.launch {
-            updateVideoHistory(bean)
+
+        // 仅在当前视频未被移除且有效时记录播放进度
+        if (pickCode !in discardedPickCodes && pickCode.isNotEmpty()) {
+            val currentDuration = (currentPositionMs / 1000).toInt()
+            val bean = VideoBean(currentDuration, pickCode, name = currentInfo.fileName)
+            videoHistoryMap[pickCode] = bean
+            // 异步启动：不阻塞当前协程。内部已加 NonCancellable，销毁后依然会执行。
+            viewModelScope.launch {
+                updateVideoHistory(bean)
+            }
         }
+
+        // 过滤掉所有已移除的播放历史，避免本地缓存回写进度
+        val finalHistoryMap = videoHistoryMap.filterKeys { it !in discardedPickCodes }
+        val videoHistoryMapJson = Gson().toJson(finalHistoryMap)
+
+        // 定位 pickCode：若当前视频已被移除，则定位到动态列表中最后剩余的视频
+        val returnPickCode = if (pickCode in discardedPickCodes) {
+            videoList.lastOrNull()?.pickCode ?: ""
+        } else {
+            pickCode
+        }
+
+        val discardedVideoList = discardRecords.map { it.video }
+        val discardJson = Gson().toJson(discardedVideoList)
 
         viewModelScope.launch {
             _uiEvent.emit(
@@ -317,7 +437,8 @@ class VideoViewModel : ViewModel() {
                     videoHistoryJson = videoHistoryMapJson,
                     toast = toast,
                     cid = launchVideoParams.categoryId,
-                    pickCode = currentInfo.pickCode
+                    pickCode = returnPickCode,
+                    discardJson = discardJson
                 )
             )
         }

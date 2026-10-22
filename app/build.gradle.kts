@@ -101,6 +101,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.appcompat)
+    implementation(libs.google.material)
     implementation(libs.androidx.cardview)
     implementation(libs.androidx.transition)
     implementation(libs.androidx.constraintlayout)

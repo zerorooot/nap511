@@ -9,6 +9,7 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.RenameBean
+import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.deleteCoilCache
@@ -238,6 +239,58 @@ internal fun FileViewModel.deleteMultiple() {
             }
         }.onSuccess { message ->
             App.instance.toast(message)
+        }.onFailureToastAndLog()
+    }
+}
+
+/**
+ * 确认批量删除移除视频：
+ * 1. 组装 115 批量删除接口请求参数（原子单次请求，彻底防止频控）；
+ * 2. 清理对应文件的 Coil 缩略图磁盘/内存缓存与 imageBeanCache；
+ * 3. 乐观更新本地响应式列表与 FileCacheManager 持久化缓存；
+ * 4. 驱动 LocalUiUpdated 瞬时刷新当前界面，失败时支持回滚。
+ */
+@OptIn(ExperimentalCoilApi::class)
+fun FileViewModel.confirmDiscardVideos(discardList: List<VideoBean>, targetCid: String) {
+    closeDialog()
+    if (discardList.isEmpty()) return
+
+    val cid = targetCid.ifEmpty { currentCid }
+    val fids = discardList.map { it.fileId }.filter { it.isNotEmpty() }
+    if (fids.isEmpty()) {
+        App.instance.toast("移除文件信息不全，删除取消")
+        return
+    }
+
+
+    viewModelScope.launch {
+        val beforeList = fileBeanList
+        val beforeClickMap = clickMap.getOrDefault(cid, 0)
+
+        val rollback = FileCacheManager.removeItems(cid, fids)
+        clickMap[cid] = (clickMap.getOrDefault(cid, 0) - fids.size).coerceAtLeast(0)
+
+        // 组装 115 批量删除 map
+        val mapOf = hashMapOf<String, String>()
+        mapOf["ignore_warn"] = "1"
+        mapOf["pid"] = cid
+        fids.forEachIndexed { index, fid ->
+            mapOf["fid[$index]"] = fid
+        }
+        //  发起单次 115 网络批量删除
+        runCatching {
+            val deleteResult = fileRepository.deleteMultiple(mapOf)
+            if (deleteResult.state) {
+                "成功删除 ${fids.size} 个移除视频"
+            } else {
+                // 失败回滚
+                updateContentState { copy(fileBeanList = beforeList) }
+                rollback?.rollback()
+                clickMap[cid] = beforeClickMap
+                "删除失败：${deleteResult.errorMsg}"
+            }
+        }.onSuccess { msg ->
+            App.instance.toast(msg)
         }.onFailureToastAndLog()
     }
 }

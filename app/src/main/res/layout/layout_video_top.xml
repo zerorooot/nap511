@@ -53,6 +53,20 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
+        <!-- 移除按钮 (胶囊样式) -->
+        <TextView
+            android:id="@+id/btn_discard"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/bg_control_pill"
+            android:gravity="center"
+            android:minWidth="44dp"
+            android:paddingHorizontal="10dp"
+            android:text="移除"
+            android:textColor="@android:color/white"
+            android:textSize="12sp" />
+
         <!-- 播放倍速 (胶囊样式) -->
         <TextView
             android:id="@+id/switchSpeed"

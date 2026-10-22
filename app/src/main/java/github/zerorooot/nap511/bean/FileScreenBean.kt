@@ -38,7 +38,9 @@ data class FileDialogUiState(
     val targetFileBean: FileBean? = null,
     val fileInfo: FileInfo = FileInfo(),
     val torrentBean: TorrentFileBean = TorrentFileBean(),
-    val unzipBeanList: ZipBeanList = ZipBeanList()
+    val unzipBeanList: ZipBeanList = ZipBeanList(),
+    val discardVideoList: List<VideoBean> = emptyList(),
+    val targetCid: String = ""
 )
 
 

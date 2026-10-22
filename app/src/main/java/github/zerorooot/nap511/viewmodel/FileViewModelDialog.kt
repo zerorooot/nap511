@@ -2,8 +2,19 @@ package github.zerorooot.nap511.viewmodel
 
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileDialogState
+import github.zerorooot.nap511.bean.VideoBean
 
 // ==================== 公开方法：供外部触发对话框事件 ====================
+
+fun FileViewModel.openDiscardVideosDialog(discardList: List<VideoBean>, targetCid: String) {
+    updateDialogState {
+        copy(
+            activeDialog = FileDialogState.DiscardVideos,
+            discardVideoList = discardList,
+            targetCid = targetCid
+        )
+    }
+}
 
 internal fun FileViewModel.openCreateFolderDialog() {
     updateDialogState { copy(activeDialog = FileDialogState.CreateFolder) }
@@ -65,3 +76,5 @@ internal fun FileViewModel.closeUnzipPasswordDialog() = closeDialog()
 internal fun FileViewModel.closeUnzipAllFileDialog() = closeDialog()
 
 internal fun FileViewModel.closeCreateSelectTorrentFileDialog() = closeDialog()
+
+internal fun FileViewModel.closeDiscardVideosDialog() = closeDialog()

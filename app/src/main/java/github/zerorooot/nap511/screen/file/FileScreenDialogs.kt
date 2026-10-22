@@ -17,6 +17,7 @@ import github.zerorooot.nap511.dialog.Aria2Dialog
 import github.zerorooot.nap511.dialog.CreateFolderDialog
 import github.zerorooot.nap511.dialog.CreateSelectTorrentFileDialog
 import github.zerorooot.nap511.dialog.FileInfoDialog
+import github.zerorooot.nap511.dialog.DiscardVideosDialog
 import github.zerorooot.nap511.dialog.FileOrderDialog
 import github.zerorooot.nap511.dialog.RenameFileDialog
 import github.zerorooot.nap511.dialog.SearchDialog
@@ -36,6 +37,7 @@ import github.zerorooot.nap511.viewmodel.closeFileOrderDialog
 import github.zerorooot.nap511.viewmodel.closeRenameFileDialog
 import github.zerorooot.nap511.viewmodel.closeSearchDialog
 import github.zerorooot.nap511.viewmodel.closeUnzipPasswordDialog
+import github.zerorooot.nap511.viewmodel.confirmDiscardVideos
 import github.zerorooot.nap511.viewmodel.createFolder
 import github.zerorooot.nap511.viewmodel.decryptZip
 import github.zerorooot.nap511.viewmodel.rename
@@ -190,6 +192,24 @@ fun CreateDialogs(
 
         is FileDialogState.UnzipAllFile -> {
             UnzipAllFile(fileViewModel)
+        }
+
+        // 移除确认删除弹窗
+        is FileDialogState.DiscardVideos -> {
+            val discardList = dialogState.discardVideoList
+            if (discardList.isNotEmpty()) {
+                DiscardVideosDialog(
+                    discardList = discardList,
+                    onConfirm = {
+                        fileViewModel.confirmDiscardVideos(discardList, dialogState.targetCid)
+                    },
+                    onDismiss = {
+                        fileViewModel.closeDialog()
+                    }
+                )
+            } else {
+                fileViewModel.closeDialog()
+            }
         }
 
         else -> {
