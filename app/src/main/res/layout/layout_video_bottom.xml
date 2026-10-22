@@ -1,149 +1,182 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 播放器底部控制栏 (包含进度条与播放控制组件) -->
+<!-- 播放器底部控制栏：内嵌居中悬浮半透明微卡片 (Floating Glass Dock) 容器 -->
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/layout_bottom"
     android:layout_width="match_parent"
-    android:layout_height="72dp"
+    android:layout_height="wrap_content"
     android:layout_alignParentBottom="true"
-    android:background="@drawable/bg_bottom_gradient"
-    android:paddingHorizontal="12dp"
-    android:paddingTop="6dp"
-    android:paddingBottom="6dp"
+    android:background="@android:color/transparent"
     android:visibility="invisible"
     tools:showIn="@layout/video_layout_preview">
 
-    <!-- 第一行：播放进度指示器与时间文本 -->
-    <TextView
-        android:id="@+id/current"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="4dp"
-        android:textColor="#E6FFFFFF"
-        android:textSize="12sp"
-        android:typeface="monospace"
-        app:layout_constraintBottom_toTopOf="@+id/start"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        tools:text="00:00" />
-
-    <!-- 播放拖动进度条 (SeekBar) -->
-    <SeekBar
-        android:id="@+id/progress"
+    <!-- 居中悬浮磨砂玻璃卡片主体 (宽度自适应收拢，精致沉浸) -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/card_dock"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_vertical"
-        android:layout_marginHorizontal="6dp"
-        android:background="@null"
-        android:max="100"
-        android:maxHeight="3dp"
-        android:minHeight="3dp"
-        android:paddingVertical="10dp"
-        android:progressDrawable="@drawable/video_seek_progress"
-        android:splitTrack="false"
-        android:thumb="@drawable/video_seek_thumb"
-        app:layout_constraintBottom_toBottomOf="@+id/current"
-        app:layout_constraintEnd_toStartOf="@+id/total"
-        app:layout_constraintStart_toEndOf="@+id/current"
-        app:layout_constraintTop_toTopOf="@+id/current" />
-
-    <TextView
-        android:id="@+id/total"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginEnd="4dp"
-        android:textColor="#80FFFFFF"
-        android:textSize="12sp"
-        android:typeface="monospace"
-        app:layout_constraintBottom_toBottomOf="@+id/current"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_bottom_center_dock"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/current"
-        tools:text="00:00" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintWidth_max="560dp"
+        app:layout_constraintWidth_percent="0.65">
 
-    <!-- 第二行：播放控制与功能入口按钮 -->
-    <!-- 上一集按钮 -->
-    <ImageView
-        android:id="@+id/prev_episode"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:padding="4dp"
-        android:scaleType="centerInside"
-        android:src="@drawable/ic_skip_previous"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        <!-- =================== 第一行：播放进度指示器与时间文本 =================== -->
 
-    <!-- 播放/暂停按键开关 -->
-    <ImageView
-        android:id="@+id/start"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
-        android:layout_marginStart="4dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:padding="4dp"
-        android:scaleType="centerInside"
-        android:src="@drawable/video_click_play_selector"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/prev_episode" />
+        <!-- 播放进度拖动条 (SeekBar: 细线轨与实心滑块) -->
+        <SeekBar
+            android:id="@+id/progress"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:layout_marginEnd="10dp"
+            android:background="@null"
+            android:max="100"
+            android:maxHeight="3dp"
+            android:minHeight="3dp"
+            android:paddingVertical="8dp"
+            android:progressDrawable="@drawable/video_seek_progress"
+            android:splitTrack="false"
+            android:thumb="@drawable/video_seek_thumb"
+            app:layout_constraintBottom_toBottomOf="@+id/layout_time_group"
+            app:layout_constraintEnd_toStartOf="@+id/layout_time_group"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="@+id/layout_time_group" />
 
-    <!-- 下一集按钮 -->
-    <ImageView
-        android:id="@+id/next_episode"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
-        android:layout_marginStart="4dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:padding="4dp"
-        android:scaleType="centerInside"
-        android:src="@drawable/ic_skip_next"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/start" />
+        <!-- 进度条右侧并列时间展示：[当前时间 00:00] / [总时间 00:00] -->
+        <LinearLayout
+            android:id="@+id/layout_time_group"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
 
-    <!-- 全屏/窗口切换按钮 -->
-    <ImageView
-        android:id="@+id/fullscreen"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:padding="4dp"
-        android:scaleType="centerInside"
-        android:src="@drawable/video_enlarge"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+            <TextView
+                android:id="@+id/current"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#E6FFFFFF"
+                android:textSize="12sp"
+                android:typeface="monospace"
+                tools:text="00:00" />
 
-    <!-- 选集抽屉面板触发按钮 (胶囊样式) -->
-    <TextView
-        android:id="@+id/switchEpisode"
-        android:layout_width="wrap_content"
-        android:layout_height="28dp"
-        android:layout_marginEnd="8dp"
-        android:background="@drawable/bg_control_pill"
-        android:gravity="center"
-        android:minWidth="44dp"
-        android:paddingHorizontal="10dp"
-        android:text="选集"
-        android:textColor="@android:color/white"
-        android:textSize="12sp"
-        app:layout_constraintBottom_toBottomOf="@+id/fullscreen"
-        app:layout_constraintEnd_toStartOf="@+id/fullscreen"
-        app:layout_constraintTop_toTopOf="@+id/fullscreen" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" / "
+                android:textColor="#80FFFFFF"
+                android:textSize="12sp"
+                android:typeface="monospace" />
 
-    <!-- 字幕设置抽屉面板触发按钮 (胶囊样式) -->
-    <TextView
-        android:id="@+id/switchSubtitle"
-        android:layout_width="wrap_content"
-        android:layout_height="28dp"
-        android:layout_marginEnd="8dp"
-        android:background="@drawable/bg_control_pill"
-        android:gravity="center"
-        android:minWidth="44dp"
-        android:paddingHorizontal="10dp"
-        android:text="字幕"
-        android:textColor="@android:color/white"
-        android:textSize="12sp"
-        app:layout_constraintBottom_toBottomOf="@+id/fullscreen"
-        app:layout_constraintEnd_toStartOf="@+id/switchEpisode"
-        app:layout_constraintTop_toTopOf="@+id/fullscreen" />
+            <TextView
+                android:id="@+id/total"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#80FFFFFF"
+                android:textSize="12sp"
+                android:typeface="monospace"
+                tools:text="00:00" />
+        </LinearLayout>
+
+        <!-- =================== 第二行：播放控制与功能入口按钮 =================== -->
+
+        <!-- 核心播控基准：居中放大播放/暂停按键开关 (44dp 尺寸 + 圆形微透底座) -->
+<!--        android:background="@drawable/bg_play_center_circle"-->
+        <ImageView
+            android:id="@+id/start"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="8dp"
+            android:padding="8dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/video_click_play_selector"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/progress" />
+
+        <!-- 上一集按钮 (居中按键左侧) -->
+        <ImageView
+            android:id="@+id/prev_episode"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginEnd="18dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="4dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_skip_previous"
+            app:layout_constraintBottom_toBottomOf="@+id/start"
+            app:layout_constraintEnd_toStartOf="@+id/start"
+            app:layout_constraintTop_toTopOf="@+id/start" />
+
+        <!-- 字幕设置抽屉面板触发按钮 (胶囊样式，靠卡片左侧) -->
+        <TextView
+            android:id="@+id/switchSubtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:background="@drawable/bg_control_pill"
+            android:gravity="center"
+            android:minWidth="44dp"
+            android:paddingHorizontal="10dp"
+            android:text="字幕"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            app:layout_constraintBottom_toBottomOf="@+id/start"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="@+id/start" />
+
+        <!-- 下一集按钮 (居中按键右侧) -->
+        <ImageView
+            android:id="@+id/next_episode"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginStart="18dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="4dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_skip_next"
+            app:layout_constraintBottom_toBottomOf="@+id/start"
+            app:layout_constraintStart_toEndOf="@+id/start"
+            app:layout_constraintTop_toTopOf="@+id/start" />
+
+        <!-- 全屏/窗口切换按钮 (靠卡片右端最外侧) -->
+        <ImageView
+            android:id="@+id/fullscreen"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="4dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/video_enlarge"
+            app:layout_constraintBottom_toBottomOf="@+id/start"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@+id/start" />
+
+        <!-- 选集抽屉面板触发按钮 (胶囊样式，全屏按键左侧) -->
+        <TextView
+            android:id="@+id/switchEpisode"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/bg_control_pill"
+            android:gravity="center"
+            android:minWidth="44dp"
+            android:paddingHorizontal="10dp"
+            android:text="选集"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            app:layout_constraintBottom_toBottomOf="@+id/start"
+            app:layout_constraintEnd_toStartOf="@+id/fullscreen"
+            app:layout_constraintTop_toTopOf="@+id/start" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
