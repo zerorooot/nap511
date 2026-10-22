@@ -7,6 +7,7 @@ import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -547,8 +548,7 @@ class VideoActivity : AppCompatActivity() {
                 }
             val title = viewModel.uiState.value.videoInfo?.fileName ?: ""
             XLog.e("$title 播放失败 $errorStatus")
-            Toast.makeText(baseContext, errorStatus, Toast.LENGTH_SHORT).show()
-            finish()
+            viewModel.back(videoPlayer.currentPositionWhenPlaying,errorStatus)
         }
     }
 
@@ -560,6 +560,24 @@ class VideoActivity : AppCompatActivity() {
     override fun onResume() {
         videoPlayer.onVideoResume()
         super.onResume()
+    }
+
+    /**
+     * 将 Snackbar 样式美化为右下角轻量半透明微胶囊，避免遮挡主要画面与台词字幕
+     */
+    private fun applyCapsuleStyle(snackbar: Snackbar) {
+        val snackbarView = snackbar.view
+        snackbarView.setBackgroundResource(R.drawable.bg_discard_capsule)
+        snackbarView.elevation = 0f
+        val params = snackbarView.layoutParams as? ViewGroup.MarginLayoutParams
+        if (params != null) {
+            params.width = ViewGroup.LayoutParams.WRAP_CONTENT
+            if (params is android.widget.FrameLayout.LayoutParams) {
+                params.gravity = Gravity.BOTTOM or Gravity.END
+            }
+            params.rightMargin = (24 * resources.displayMetrics.density).toInt()
+            snackbarView.layoutParams = params
+        }
     }
 
     /**
@@ -577,6 +595,7 @@ class VideoActivity : AppCompatActivity() {
         videoPlayer.findViewById<View>(R.id.layout_bottom)?.let { bottomView ->
             snackbar.anchorView = bottomView
         }
+        applyCapsuleStyle(snackbar)
         activeSnackbar = snackbar
         snackbar.show()
     }
@@ -591,7 +610,7 @@ class VideoActivity : AppCompatActivity() {
         activeSnackbar?.dismiss()
         val snackbar = Snackbar.make(
             videoPlayer,
-            "已全部已移出列表，${delayMs / 1000}秒后自动退出",
+            "已全部移出列表，${delayMs / 1000}秒后自动退出",
             delayMs.toInt()
         ).setAction("撤回") {
             val isPort =
@@ -602,6 +621,7 @@ class VideoActivity : AppCompatActivity() {
         videoPlayer.findViewById<View>(R.id.layout_bottom)?.let { bottomView ->
             snackbar.anchorView = bottomView
         }
+        applyCapsuleStyle(snackbar)
         snackbar.addCallback(object : Snackbar.Callback() {
             override fun onDismissed(transientBottomBar: Snackbar?, event: Int) {
                 if (event == DISMISS_EVENT_TIMEOUT || event == DISMISS_EVENT_SWIPE) {

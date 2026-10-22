@@ -178,8 +178,10 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
             TransitionManager.beginDelayedTransition(mLayoutBottom);
             if (isPortrait && mBottomConstraintPort != null) {
                 mBottomConstraintPort.applyTo(mLayoutBottom);
+                mLayoutBottom.setBackgroundResource(R.drawable.bg_bottom_gradient);
             } else if (!isPortrait && mBottomConstraintLand != null) {
                 mBottomConstraintLand.applyTo(mLayoutBottom);
+                mLayoutBottom.setBackgroundResource(R.drawable.bg_bottom_glass_dock);
             }
         }
     }

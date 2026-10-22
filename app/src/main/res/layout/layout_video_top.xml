@@ -7,16 +7,16 @@
     android:layout_width="match_parent"
     android:layout_height="56dp"
     android:layout_alignParentTop="true"
-    android:background="@drawable/bg_top_gradient"
+    android:background="@drawable/bg_top_optical_vignette"
     android:paddingHorizontal="12dp"
     tools:showIn="@layout/video_layout_preview">
 
-    <!-- 返回按钮 -->
+    <!-- 圆形微磨砂返回按钮 -->
     <ImageView
         android:id="@+id/back"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:background="@drawable/bg_control_circle"
         android:padding="8dp"
         android:scaleType="centerInside"
         android:src="@drawable/video_back"
@@ -24,25 +24,29 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- 视频标题 (单行超出省略) -->
+    <!-- 视频标题 (单行超出省略，带防过曝柔和阴影与优雅 Medium 字重) -->
     <TextView
         android:id="@+id/title"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="6dp"
+        android:layout_marginStart="10dp"
         android:layout_marginEnd="12dp"
         android:ellipsize="end"
+        android:fontFamily="sans-serif-medium"
         android:maxLines="1"
+        android:shadowColor="#80000000"
+        android:shadowDx="0"
+        android:shadowDy="2"
+        android:shadowRadius="4"
         android:textColor="@android:color/white"
         android:textSize="15sp"
-        android:textStyle="bold"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toStartOf="@+id/top_right_panel"
         app:layout_constraintStart_toEndOf="@+id/back"
         app:layout_constraintTop_toTopOf="parent"
         tools:text="视频标题示例" />
 
-    <!-- 顶部右侧整合面板：[倍速胶囊] | [比例胶囊] | [电量 时间] -->
+    <!-- 顶部右侧整合面板：[移除胶囊] | [倍速胶囊] | [比例胶囊] | [电量 时间] -->
     <LinearLayout
         android:id="@+id/top_right_panel"
         android:layout_width="wrap_content"
@@ -53,13 +57,13 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <!-- 移除按钮 (胶囊样式) -->
+        <!-- 移除按钮 (胶囊样式，微红强调描边) -->
         <TextView
             android:id="@+id/btn_discard"
             android:layout_width="wrap_content"
             android:layout_height="28dp"
             android:layout_marginEnd="8dp"
-            android:background="@drawable/bg_control_pill"
+            android:background="@drawable/bg_discard_pill_accent"
             android:gravity="center"
             android:minWidth="44dp"
             android:paddingHorizontal="10dp"

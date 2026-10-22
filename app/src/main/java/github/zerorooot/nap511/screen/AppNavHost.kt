@@ -126,6 +126,10 @@ fun AppNavHost(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         val data = result.data
+        val message = data?.getStringExtra("toast") ?: ""
+        if (message.isNotEmpty()) {
+            App.instance.toast(message)
+        }
         if (result.resultCode == Activity.RESULT_OK) {
             val videoHistoryJson = data?.getStringExtra("videoHistory") ?: "{}"
             val type: Type = object : TypeToken<MutableMap<String, VideoBean>>() {}.type
@@ -143,13 +147,6 @@ fun AppNavHost(
                 Gson().fromJson(discardJson, discardType) ?: emptyList()
             if (discardList.isNotEmpty()) {
                 fileViewModel.openDiscardVideosDialog(discardList, cid)
-            }
-        }
-
-        if (result.resultCode == Activity.RESULT_CANCELED) {
-            val message = data?.getStringExtra("toast") ?: ""
-            if (message.isNotEmpty()) {
-                App.instance.toast(message)
             }
         }
     }

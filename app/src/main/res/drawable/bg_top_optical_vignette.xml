@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 播放器顶部自然光学暗角平滑渐变（从深色柔和过渡至透明，无生硬分界线） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <gradient
+        android:angle="270"
+        android:startColor="#B3000000"
+        android:centerColor="#40000000"
+        android:endColor="#00000000"
+        android:type="linear" />
+</shape>
