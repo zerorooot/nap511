@@ -20,6 +20,7 @@ import java.util.StringJoiner
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
 import github.zerorooot.nap511.bean.cache.CacheWrapper
+import github.zerorooot.nap511.viewmodel.formatFileBeanList
 
 /**
  * 缓存数据变更通知事件
@@ -224,6 +225,8 @@ object FileCacheManager {
                         diskFile.delete()
                         return@withContext null
                     }
+                    // 反序列化后纠正图标 ID，防止编译时资源 ID 偏移导致图标错乱或崩溃
+                    diskEntry.data.fileBeanList = formatFileBeanList(diskEntry.data.fileBeanList)
                     return@withContext diskEntry
                 }
             } catch (e: Exception) {

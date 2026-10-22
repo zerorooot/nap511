@@ -396,7 +396,7 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
             ext == "apk" -> R.drawable.apk
             ext == "iso" -> R.drawable.iso
             ext == "torrent" -> R.drawable.torrent
-            else -> fileBean.fileIco
+            else -> R.drawable.other
         }
 
         // 使用 copy() 拷贝并返回更新后的不可变对象
