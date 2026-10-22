@@ -77,6 +77,9 @@ sealed class VideoUiEvent {
     /** 通知选集列表发生变化，刷新抽屉 */
     data object EpisodeListUpdated : VideoUiEvent()
 
+    /** 单个视频移出列表事件，弹出撤回提示 Snackbar */
+    data object SingleVideoDiscarded : VideoUiEvent()
+
     /** 列表中所有视频均已被移除，进入延时退出流程 */
     data class AllVideosDiscarded(val autoExitDelayMs: Long = 5000L) : VideoUiEvent()
 }
@@ -285,7 +288,7 @@ class VideoViewModel : ViewModel() {
             _uiState.update { it.copy(fileBeanIndex = -1, hasPrev = false, hasNext = false) }
             viewModelScope.launch {
                 _uiEvent.emit(VideoUiEvent.EpisodeListUpdated)
-                _uiEvent.emit(VideoUiEvent.AllVideosDiscarded(autoExitDelayMs = 5000L))
+                _uiEvent.emit(VideoUiEvent.AllVideosDiscarded(autoExitDelayMs = 3000L))
             }
         } else {
             // 注意：移除当前元素后，后方的原本“下一集”自动前移填补到 currentIndex
@@ -293,6 +296,7 @@ class VideoViewModel : ViewModel() {
             loadVideoAt(nextIndex, isPortrait)
             viewModelScope.launch {
                 _uiEvent.emit(VideoUiEvent.EpisodeListUpdated)
+                _uiEvent.emit(VideoUiEvent.SingleVideoDiscarded)
             }
         }
     }

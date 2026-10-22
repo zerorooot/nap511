@@ -61,6 +61,7 @@ import github.zerorooot.nap511.viewmodel.VideoViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
+import androidx.core.view.isVisible
 
 /**
  * 视频播放界面 Activity
@@ -224,7 +225,6 @@ class VideoActivity : AppCompatActivity() {
                 isEpisodeLoading = true
                 updatePrevNextButtons()
                 viewModel.discardCurrentVideo(isPort)
-                showDiscardSnackbar()
             }
             // 上一集按钮
             findViewById<View>(R.id.prev_episode)?.setOnClickListener {
@@ -332,6 +332,11 @@ class VideoActivity : AppCompatActivity() {
                             // 选集列表变动，刷新选集抽屉
                             is VideoUiEvent.EpisodeListUpdated -> {
                                 videoDrawerController.refreshEpisodeDrawer()
+                            }
+
+                            // 单个视频被移出列表，弹出撤回提示 Snackbar
+                            is VideoUiEvent.SingleVideoDiscarded -> {
+                                showDiscardSnackbar()
                             }
 
                             // 列表全部移除，暂停并进入延时自退流程
@@ -576,6 +581,7 @@ class VideoActivity : AppCompatActivity() {
                 params.gravity = Gravity.BOTTOM or Gravity.END
             }
             params.rightMargin = (24 * resources.displayMetrics.density).toInt()
+            params.bottomMargin = (16 * resources.displayMetrics.density).toInt()
             snackbarView.layoutParams = params
         }
     }
@@ -591,9 +597,11 @@ class VideoActivity : AppCompatActivity() {
                     resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
                 viewModel.undoDiscard(isPort)
             }
-        // 锚定在底部控制栏 layout_bottom 之上，避免遮挡播放按钮与进度条
+        // 锚定在底部控制栏 layout_bottom 之上（仅在可见时），避免遮挡播放按钮与进度条
         videoPlayer.findViewById<View>(R.id.layout_bottom)?.let { bottomView ->
-            snackbar.anchorView = bottomView
+            if (bottomView.visibility == View.VISIBLE) {
+                snackbar.anchorView = bottomView
+            }
         }
         applyCapsuleStyle(snackbar)
         activeSnackbar = snackbar
