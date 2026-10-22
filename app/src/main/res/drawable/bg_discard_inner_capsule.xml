@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 顶部胶囊内「移除」子按钮背景（高度 26dp + 13dp 圆角 + 微红透光底 + 克制红描边 + 触控水波纹） -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#4DFF4D4F">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#26FF4D4F" />
+            <corners android:radius="13dp" />
+            <stroke
+                android:width="1dp"
+                android:color="#80FF4D4F" />
+        </shape>
+    </item>
+</ripple>

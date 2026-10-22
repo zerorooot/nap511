@@ -32,8 +32,11 @@ import github.zerorooot.nap511.R;
 import github.zerorooot.nap511.bean.SubtitleStyleBean;
 
 public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
-    private TextView mMoreScale;
-    private TextView switchSpeed;
+    // 顶部右侧胶囊控制区：倍速与比例控件（支持单行/双行灵活适配）
+    private View mMoreScale;
+    private View switchSpeed;
+    private TextView tvScaleVal;
+    private TextView tvSpeedVal;
 
     // 统一的合并抽屉面板组件
     private View layoutDrawer;
@@ -126,6 +129,8 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
 
         mMoreScale = findViewById(R.id.moreScale);
         switchSpeed = findViewById(R.id.switchSpeed);
+        tvScaleVal = findViewById(R.id.tv_scale_val);
+        tvSpeedVal = findViewById(R.id.tv_speed_val);
         TextView switchEpisode = findViewById(R.id.switchEpisode);
         TextView switchSubtitle = findViewById(R.id.switchSubtitle);
 
@@ -237,28 +242,37 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
             batteryTextView.setText(batteryPct + "%" + (isCharging ? " ⚡" : ""));
         }
 
-        // 规范为 HH:mm:ss
-        timeTextView.setText(new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date()));
+        // 规范为设计图样式的极简 HH:mm
+        timeTextView.setText(new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date()));
     }
 
     private void resolveTypeUI() {
         if (!mHadPlay) return;
+        String scaleText = "默认";
         if (mType == 1) {
-            mMoreScale.setText("16:9");
+            scaleText = "16:9";
             GSYVideoType.setShowType(GSYVideoType.SCREEN_TYPE_16_9);
         } else if (mType == 2) {
-            mMoreScale.setText("4:3");
+            scaleText = "4:3";
             GSYVideoType.setShowType(GSYVideoType.SCREEN_TYPE_4_3);
         } else if (mType == 3) {
-            mMoreScale.setText("全屏");
+            scaleText = "全屏";
             GSYVideoType.setShowType(GSYVideoType.SCREEN_TYPE_FULL);
         } else if (mType == 4) {
-            mMoreScale.setText("拉伸");
+            scaleText = "拉伸";
             GSYVideoType.setShowType(GSYVideoType.SCREEN_MATCH_FULL);
         } else if (mType == 0) {
-            mMoreScale.setText("默认");
+            scaleText = "默认";
             GSYVideoType.setShowType(GSYVideoType.SCREEN_TYPE_DEFAULT);
         }
+
+        // 优先更新双行胶囊中的比例数值，兼容原单行 TextView 模式
+        if (tvScaleVal != null) {
+            tvScaleVal.setText(scaleText);
+        } else if (mMoreScale instanceof TextView) {
+            ((TextView) mMoreScale).setText(scaleText);
+        }
+
         changeTextureViewShowType();
         if (mTextureView != null) mTextureView.requestLayout();
     }
@@ -374,9 +388,19 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         resolveTypeUI();
     }
 
+    /**
+     * 设置倍速按钮展示文案
+     * 针对双行胶囊布局进行智能格式化（如 1.0x / 1.5x），避免顶部数值与底部“倍速”标签重复
+     */
     public void setSpeedText(String text) {
-        if (switchSpeed != null) {
-            switchSpeed.setText(text);
+        if (tvSpeedVal != null) {
+            if ("倍速".equals(text) || "1.0X".equalsIgnoreCase(text) || "1.0".equalsIgnoreCase(text)) {
+                tvSpeedVal.setText("1.0x");
+            } else {
+                tvSpeedVal.setText(text.toLowerCase(Locale.ROOT));
+            }
+        } else if (switchSpeed instanceof TextView) {
+            ((TextView) switchSpeed).setText(text);
         }
     }
 

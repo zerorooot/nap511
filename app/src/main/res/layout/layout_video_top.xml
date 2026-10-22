@@ -46,93 +46,136 @@
         app:layout_constraintTop_toTopOf="parent"
         tools:text="视频标题示例" />
 
-    <!-- 顶部右侧整合面板：[移除胶囊] | [倍速胶囊] | [比例胶囊] | [电量 时间] -->
+    <!-- 顶部右侧整合大胶囊：[移除小胶囊] | [倍速双行] | [比例双行] | [时间 电量] -->
     <LinearLayout
         android:id="@+id/top_right_panel"
         android:layout_width="wrap_content"
-        android:layout_height="match_parent"
+        android:layout_height="36dp"
+        android:background="@drawable/bg_top_right_capsule_dock"
         android:gravity="center_vertical"
         android:orientation="horizontal"
+        android:paddingStart="5dp"
+        android:paddingEnd="12dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <!-- 移除按钮 (胶囊样式，微红强调描边) -->
+        <!-- 1. 移除按钮 (内嵌红框小胶囊，保持原有 ID 与点击事件) -->
         <TextView
             android:id="@+id/btn_discard"
             android:layout_width="wrap_content"
-            android:layout_height="28dp"
-            android:layout_marginEnd="8dp"
-            android:background="@drawable/bg_discard_pill_accent"
+            android:layout_height="26dp"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/bg_discard_inner_capsule"
+            android:fontFamily="sans-serif-medium"
             android:gravity="center"
-            android:minWidth="44dp"
             android:paddingHorizontal="10dp"
             android:text="移除"
-            android:textColor="@android:color/white"
+            android:textColor="#FF6B6B"
             android:textSize="12sp" />
 
-        <!-- 播放倍速 (胶囊样式) -->
-        <TextView
+        <!-- 2. 播放倍速 (上下双行：1.5x / 倍速) -->
+        <LinearLayout
             android:id="@+id/switchSpeed"
             android:layout_width="wrap_content"
-            android:layout_height="28dp"
-            android:layout_marginEnd="8dp"
-            android:background="@drawable/bg_control_pill"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_capsule_item_ripple"
+            android:clickable="true"
+            android:focusable="true"
             android:gravity="center"
-            android:minWidth="44dp"
-            android:paddingHorizontal="10dp"
-            android:text="倍速"
-            android:textColor="@android:color/white"
-            android:textSize="12sp" />
+            android:orientation="vertical"
+            android:paddingHorizontal="8dp">
 
-        <!-- 画面比例切换按钮 (胶囊样式) -->
-        <TextView
+            <TextView
+                android:id="@+id/tv_speed_val"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:includeFontPadding="false"
+                android:textColor="@android:color/white"
+                android:textSize="12sp"
+                android:text="1.0x" />
+
+            <TextView
+                android:id="@+id/tv_speed_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:text="倍速"
+                android:textColor="#99FFFFFF"
+                android:textSize="9sp" />
+        </LinearLayout>
+
+        <!-- 3. 画面比例 (上下双行：16:9 / 比例) -->
+        <LinearLayout
             android:id="@+id/moreScale"
             android:layout_width="wrap_content"
-            android:layout_height="28dp"
-            android:background="@drawable/bg_control_pill"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_capsule_item_ripple"
+            android:clickable="true"
+            android:focusable="true"
             android:gravity="center"
-            android:minWidth="44dp"
-            android:paddingHorizontal="10dp"
-            android:text="默认"
-            android:textColor="@android:color/white"
-            android:textSize="12sp" />
+            android:orientation="vertical"
+            android:paddingHorizontal="8dp">
 
-        <!-- 系统状态显示区 (设备电量百分比 + 充电状态标识 + 实时系统时间) -->
+            <TextView
+                android:id="@+id/tv_scale_val"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:includeFontPadding="false"
+                android:textColor="@android:color/white"
+                android:textSize="12sp"
+                android:text="默认" />
+
+            <TextView
+                android:id="@+id/tv_scale_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:text="比例"
+                android:textColor="#99FFFFFF"
+                android:textSize="9sp" />
+        </LinearLayout>
+
+        <!-- 4. 系统状态信息区 (时间在前 + 电量在后) -->
         <LinearLayout
             android:id="@+id/layout_status_info"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <!-- 竖向半透明分割线 -->
+            <!-- 竖向微弱半透明分割线 -->
             <View
                 android:layout_width="1dp"
-                android:layout_height="14dp"
-                android:layout_marginHorizontal="10dp"
-                android:background="#33FFFFFF" />
-
-            <!-- 电量显示 -->
-            <TextView
-                android:id="@+id/batteryTextView"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_height="12dp"
                 android:layout_marginEnd="8dp"
-                android:textColor="#B3FFFFFF"
-                android:textSize="12sp"
-                android:typeface="monospace"
-                tools:text="98% ⚡" />
+                android:background="#26FFFFFF" />
 
-            <!-- 系统时间显示 -->
+            <!-- 系统时间显示 (HH:mm) -->
             <TextView
                 android:id="@+id/timeTextView"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:includeFontPadding="false"
                 android:textColor="#B3FFFFFF"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:typeface="monospace"
-                tools:text="14:30" />
+                tools:text="16:48" />
+
+            <!-- 电量显示 (98% ⚡) -->
+            <TextView
+                android:id="@+id/batteryTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:includeFontPadding="false"
+                android:textColor="#B3FFFFFF"
+                android:textSize="11sp"
+                android:typeface="monospace"
+                tools:text="98% ⚡" />
         </LinearLayout>
     </LinearLayout>
 
