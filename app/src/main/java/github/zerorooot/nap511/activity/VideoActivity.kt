@@ -11,7 +11,6 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -92,25 +91,31 @@ class VideoActivity : AppCompatActivity() {
 
     private lateinit var launchVideoParams: LaunchVideoParams
 
-    /** 标记视频是否正在加载中（用于上一集/下一集按钮防止重复点击） */
-    private var isEpisodeLoading = false
-
     /** 移除 Snackbar 引用（用于复用原生生命周期与及时清理） */
     private var activeSnackbar: Snackbar? = null
 
     /**
-     * 更新"上/下一集"按钮的启用状态与透明度
+     * 统一更新控制栏按钮（上一集、下一集、移除按钮）的启用状态与视觉透明度
+     * 完全依赖响应式 state.isLoadingEpisode 与列表边界，彻底消除分散变量带来的竞态
      */
-    private fun updatePrevNextButtons(state: VideoUiState = viewModel.uiState.value) {
-        val prevEnabled = state.hasPrev && !isEpisodeLoading
+    private fun updateControlButtonsState(state: VideoUiState = viewModel.uiState.value) {
+        val prevEnabled = state.hasPrev && !state.isLoadingEpisode
         videoPlayer.findViewById<View>(R.id.prev_episode)?.apply {
             isEnabled = prevEnabled
             alpha = if (prevEnabled) 1.0f else 0.3f
         }
-        val nextEnabled = state.hasNext && !isEpisodeLoading
+
+        val nextEnabled = state.hasNext && !state.isLoadingEpisode
         videoPlayer.findViewById<View>(R.id.next_episode)?.apply {
             isEnabled = nextEnabled
             alpha = if (nextEnabled) 1.0f else 0.3f
+        }
+
+        val discardEnabled =
+            !state.isLoadingEpisode && state.fileBeanIndex in viewModel.videoList.indices
+        videoPlayer.findViewById<View>(R.id.btn_discard)?.apply {
+            isEnabled = discardEnabled
+            alpha = if (discardEnabled) 1.0f else 0.4f
         }
     }
 
@@ -222,9 +227,7 @@ class VideoActivity : AppCompatActivity() {
             findViewById<View>(R.id.btn_discard)?.setOnClickListener {
                 val isPort =
                     resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
-                isEpisodeLoading = true
-                updatePrevNextButtons()
-                viewModel.discardCurrentVideo(isPort)
+                viewModel.discardCurrentVideo(isPort, videoPlayer.currentPositionWhenPlaying)
             }
             // 上一集按钮
             findViewById<View>(R.id.prev_episode)?.setOnClickListener {
@@ -285,8 +288,8 @@ class VideoActivity : AppCompatActivity() {
                         // 更新抽屉菜单中选中的剧集索引
                         videoDrawerController.updateEpisodeSelectedIndex(state.fileBeanIndex)
 
-                        // 更新"上/下一集"按钮的启用状态与透明度
-                        updatePrevNextButtons(state)
+                        // 统一更新控制栏按钮（上一集、下一集、移除按钮）的启用状态与透明度
+                        updateControlButtonsState(state)
 
                         // 将最新的状态同步更新给字幕面板控制器
                         subtitlePanelController.bindState(state)
@@ -298,13 +301,10 @@ class VideoActivity : AppCompatActivity() {
                         when (event) {
                             // 切换播放下一集/上一集视频
                             is VideoUiEvent.PlayNext -> {
-                                isEpisodeLoading = true
-                                updatePrevNextButtons()
                                 videoPlayer.playNext(event.videoUrl, event.title)
                                 if (event.videoUrl.isEmpty()) {
                                     App.instance.toast("获取视频链接失败，视频可能被删除，请刷新重试！")
-                                    isEpisodeLoading = false
-                                    updatePrevNextButtons()
+                                    viewModel.onEpisodeLoadError()
                                 } else {
                                     // 切换集数时的字幕联动：为新集数匹配并自动加载对应字幕
                                     loadMatchingSubtitleForVideo(event.title)
@@ -313,8 +313,6 @@ class VideoActivity : AppCompatActivity() {
 
                             // 弹出 Toast 消息
                             is VideoUiEvent.Toast -> {
-                                isEpisodeLoading = false
-                                updatePrevNextButtons()
                                 App.instance.toast(event.message)
                             }
 
@@ -341,8 +339,6 @@ class VideoActivity : AppCompatActivity() {
 
                             // 列表全部移除，暂停并进入延时自退流程
                             is VideoUiEvent.AllVideosDiscarded -> {
-                                isEpisodeLoading = false
-                                updatePrevNextButtons()
                                 videoPlayer.onVideoPause()
                                 showAllDiscardedSnackbar(event.autoExitDelayMs)
                             }
@@ -501,8 +497,6 @@ class VideoActivity : AppCompatActivity() {
      * @param isNext true 表示下一集，false 表示上一集
      */
     private fun playNextVideo(isNext: Boolean) {
-        isEpisodeLoading = true
-        updatePrevNextButtons()
         val isPortrait =
             resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
         viewModel.playNextVideo(isNext, isPortrait, videoPlayer.currentPositionWhenPlaying)
@@ -521,13 +515,11 @@ class VideoActivity : AppCompatActivity() {
     private val gSYErrorCallBack = object : GSYSampleCallBack() {
         override fun onPrepared(url: String?, vararg objects: Any?) {
             super.onPrepared(url, *objects)
-            isEpisodeLoading = false
-            updatePrevNextButtons()
+            viewModel.onEpisodeLoaded()
         }
 
         override fun onPlayError(url: String?, vararg objects: Any?) {
-            isEpisodeLoading = false
-            updatePrevNextButtons()
+            viewModel.onEpisodeLoadError()
             // 如果验证码弹窗正在显示，忽略播放错误回调，避免在验证码处理过程中退出 Activity
             if (captchaDialog?.isShowing == true) {
                 return
@@ -553,7 +545,7 @@ class VideoActivity : AppCompatActivity() {
                 }
             val title = viewModel.uiState.value.videoInfo?.fileName ?: ""
             XLog.e("$title 播放失败 $errorStatus")
-            viewModel.back(videoPlayer.currentPositionWhenPlaying,errorStatus)
+            viewModel.back(videoPlayer.currentPositionWhenPlaying, errorStatus)
         }
     }
 
@@ -599,7 +591,7 @@ class VideoActivity : AppCompatActivity() {
             }
         // 锚定在底部控制栏 layout_bottom 之上（仅在可见时），避免遮挡播放按钮与进度条
         videoPlayer.findViewById<View>(R.id.layout_bottom)?.let { bottomView ->
-            if (bottomView.visibility == View.VISIBLE) {
+            if (bottomView.isVisible) {
                 snackbar.anchorView = bottomView
             }
         }

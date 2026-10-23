@@ -7,7 +7,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elvishew.xlog.XLog
 import com.google.gson.JsonParser
-import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
@@ -16,8 +15,8 @@ import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.dialog.Aria2Dialog
 import github.zerorooot.nap511.dialog.CreateFolderDialog
 import github.zerorooot.nap511.dialog.CreateSelectTorrentFileDialog
-import github.zerorooot.nap511.dialog.FileInfoDialog
 import github.zerorooot.nap511.dialog.DiscardVideosDialog
+import github.zerorooot.nap511.dialog.FileInfoDialog
 import github.zerorooot.nap511.dialog.FileOrderDialog
 import github.zerorooot.nap511.dialog.RenameFileDialog
 import github.zerorooot.nap511.dialog.SearchDialog
@@ -29,6 +28,7 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.addTorrentTask
+import github.zerorooot.nap511.viewmodel.cancelDiscardVideos
 import github.zerorooot.nap511.viewmodel.closeAria2Dialog
 import github.zerorooot.nap511.viewmodel.closeCreateFolderDialog
 import github.zerorooot.nap511.viewmodel.closeCreateSelectTorrentFileDialog
@@ -204,7 +204,8 @@ fun CreateDialogs(
                         fileViewModel.confirmDiscardVideos(discardList, dialogState.targetCid)
                     },
                     onDismiss = {
-                        fileViewModel.closeDialog()
+                        // 用户点击“取消”或点击遮罩外部：更新本地进度缓存并同步 115 云端历史
+                        fileViewModel.cancelDiscardVideos(discardList, dialogState.targetCid)
                     }
                 )
             } else {

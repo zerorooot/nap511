@@ -8,6 +8,7 @@ data class VideoUiState(
     val fileBeanIndex: Int = -1,
     val hasPrev: Boolean = false,
     val hasNext: Boolean = false,
+    val isLoadingEpisode: Boolean = false,
     val subtitle: SubtitleUiState = SubtitleUiState()
 ) {
     // 兼容快捷属性访问，映射至字幕独立 UI 状态

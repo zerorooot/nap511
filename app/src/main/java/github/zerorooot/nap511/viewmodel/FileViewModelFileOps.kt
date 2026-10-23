@@ -295,6 +295,43 @@ fun FileViewModel.confirmDiscardVideos(discardList: List<VideoBean>, targetCid: 
     }
 }
 
+/**
+ * 取消批量删除移除视频（用户点击“取消”或点击遮罩关闭对话框，保留文件）：
+ * 1. 关闭对话框；
+ * 2. 提取 discardList 中包含有效 pickCode 且 currentDuration > 0 的播放进度映射；
+ *    （若播放时长 <= 0，则严格过滤，保留原有历史进度，避免误将既有进度冲刷清零）；
+ * 3. 乐观瞬时刷新：批量调用 FileCacheManager.updateVideoProgress 更新本地缓存与持久化磁盘，并自动触发 LocalUiUpdated 刷新 UI；
+ * 4. 异步并发调用 fileRepository.updateVideoHistory 同步 115 云端播放历史。
+ */
+fun FileViewModel.cancelDiscardVideos(discardList: List<VideoBean>, targetCid: String) {
+    closeDialog()
+    if (discardList.isEmpty()) return
+
+    val cid = targetCid.ifEmpty { currentCid }
+    // 上层严格保护：仅同步真实播放时长 > 0 的记录，防止误冲刷原有历史进度
+    val videoHistoryMap = discardList
+        .filter { it.pickCode.isNotEmpty() && it.currentDuration > 0 }
+        .associateBy { it.pickCode }
+
+    if (videoHistoryMap.isNotEmpty()) {
+        viewModelScope.launch {
+            // 1. 瞬时刷新本地缓存与 UI（零延迟响应）
+            FileCacheManager.updateVideoProgress(cid, videoHistoryMap)
+
+            // 2. 异步并发同步 115 云端播放历史（仅在确定保留不删除且有时长时提交）
+            videoHistoryMap.values.forEach { bean ->
+                launch {
+                    fileRepository.updateVideoHistory(
+                        pickCode = bean.pickCode,
+                        currentDuration = bean.currentDuration,
+                        name = bean.name
+                    )
+                }
+            }
+        }
+    }
+}
+
 // 1. 静态提取扩展名集合，避免每次遍历重复构造数组
 internal val ZIP_EXTS = setOf("rar", "tar", "gz", "7z", "zip", "part", "jar")
 internal val IMG_EXTS =

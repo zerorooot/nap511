@@ -35,6 +35,7 @@ import github.zerorooot.nap511.util.network.NetworkClient
 import github.zerorooot.nap511.util.network.UserSessionManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
@@ -211,13 +212,49 @@ open class FileRepository {
     }
 
 
-    suspend fun videoHistory(body: Map<String, String>): BaseReturnMessage {
-        return fileService.videoHistory(body)
+    /**
+     * 更新并提交视频播放进度至 115 云端历史记录
+     *
+     * 具备以下特性：
+     * 1. 线程切换至 Dispatchers.IO；
+     * 2. 包裹在 NonCancellable 中，确保即使外部协程取消，网络请求依然坚持完成；
+     * 3. 基础参数与 0 秒过滤保护；
+     * 4. 统一日志打印与异常捕获。
+     *
+     * @param pickCode 视频文件的唯一提取码
+     * @param currentDuration 播放进度（秒）
+     * @param name 视频文件名（用于调试日志）
+     * @return 是否同步成功
+     */
+    suspend fun updateVideoHistory(
+        pickCode: String,
+        currentDuration: Int,
+        name: String = ""
+    ): Boolean = withContext(Dispatchers.IO + NonCancellable) {
+        if (pickCode.isEmpty() || currentDuration <= 5) return@withContext false
+        val map = mapOf(
+            "op" to "update",
+            "pick_code" to pickCode,
+            "time" to currentDuration.toString(),
+            "category" to "1",
+            "format" to "json"
+        )
+        runCatching {
+            val videoHistory = fileService.videoHistory(map)
+            if (!videoHistory.state) {
+                XLog.e("更新视频时间失败！ name: $name, time: $currentDuration, pickCode: $pickCode, result: $videoHistory")
+                false
+            } else {
+                XLog.d("更新视频时间成功 name: $name, time: $currentDuration, pickCode: $pickCode, result: $videoHistory")
+                true
+            }
+        }.onFailure { e ->
+            XLog.e("更新视频时间异常 name: $name, time: $currentDuration, pickCode: $pickCode", e)
+        }.getOrDefault(false)
     }
 
     suspend fun video(pickCode: String): VideoInfoBean {
         return fileService.video(pickCode)
-
     }
 
     suspend fun getFileInfo(cid: String): FileInfo {
