@@ -25,12 +25,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.ForceOpenType
+import github.zerorooot.nap511.bean.OrderBean
+import github.zerorooot.nap511.bean.OrderType
 import github.zerorooot.nap511.bean.VideoBean
 import kotlin.math.max
 
@@ -99,9 +99,13 @@ fun RenameFileDialog(name: String, position: Boolean, enter: (String?) -> Unit) 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FileOrderDialog(orderBean: String, enter: (String) -> Unit) {
-    val fileOrderList = stringArrayResource(id = R.array.fileOrder).toList()
-    RadioButtonDialog(fileOrderList, orderBean, enter)
+fun FileOrderDialog(selectOrderBean: OrderBean, enter: (OrderBean) -> Unit) {
+    val fileOrderList = mutableListOf<OrderBean>()
+    OrderType.entries.forEach {
+        fileOrderList.add(OrderBean(type = it.rawValue, asc = 1))
+        fileOrderList.add(OrderBean(type = it.rawValue, asc = 0))
+    }
+    RadioButtonDialog(fileOrderList, selectOrderBean, enter)
 }
 
 /**

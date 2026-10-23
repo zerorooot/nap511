@@ -337,6 +337,7 @@ class FileViewModel(
                     App.instance.toast("当前文件夹被删除！")
                 }
                 files.fileBeanList = formatFileBeanList(files.fileBeanList)
+
                 // 网络请求返回最新文件列表后，同步清空该目录旧的高清图缓存，
                 // 避免在等待网络期间提前清空导致屏幕上的旧列表条目闪烁或抢跑发起重复请求
                 clearImageCache(cid)
@@ -725,6 +726,7 @@ class FileViewModel(
             copy(
                 fileBeanList = files.fileBeanList.toList(),// 使用 .toList() 生成不可变浅拷贝，切断引用共享
                 currentCid = files.cid,
+                orderBean = OrderBean.from(files),
                 pathList = files.path,
                 isRefreshing = false,
                 isLongClickState = false,

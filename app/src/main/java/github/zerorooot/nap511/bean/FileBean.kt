@@ -37,27 +37,60 @@ data class FilesBean(
     var cid: String,
     var count: Int,
     var order: String,
-    var path: List<PathBean>
+    var path: List<PathBean>,
+    /**
+     * is_asc = 1：升序（正序，从小到大 / A-Z / 从旧到新）。
+     *
+     * is_asc = 0：降序（倒序，从大到小 / Z-A / 从新到旧）。
+     */
+    @SerializedName("is_asc") val isAsc: Int,
 )
 
 object OrderEnum {
-    const val change = "user_ptime"
+    const val create = "user_ptime"
     const val type = "file_type"
     const val name = "file_name"
     const val size = "file_size"
+    const val update = "user_utime"
+    const val open = "user_otime"
 }
 
-data class OrderBean(var type: String = OrderEnum.name, var asc: Int = 1) {
+enum class OrderType(val rawValue: String, val label: String) {
+    NAME(OrderEnum.name, "文件名称"),
+    SIZE(OrderEnum.size, "文件大小"),
+    TYPE(OrderEnum.type, "文件种类"),
+    CREATE(OrderEnum.create, "创建时间"),
+    UPDATE(OrderEnum.update, "修改时间"),
+    OPEN(OrderEnum.open, "打开时间");
+
+    companion object {
+        fun fromRaw(raw: String): OrderType = entries.find { it.rawValue == raw } ?: NAME
+        fun fromLabel(label: String): OrderType = entries.find { it.label == label } ?: NAME
+    }
+}
+
+data class OrderBean(
+    var type: String = OrderEnum.name,
+    var asc: Int = 1
+) {
+    val isAscending: Boolean get() = asc == 1
+    val orderType: OrderType get() = OrderType.fromRaw(type)
+
     override fun toString(): String {
-        val order = if (asc == 1) "⬆️" else "⬇️"
-        val name = when (type) {
-            OrderEnum.name -> "文件名称"
-            OrderEnum.change -> "更改时间"
-            OrderEnum.type -> "文件种类"
-            OrderEnum.size -> "文件大小"
-            else -> "文件名称"
+        val arrow = if (isAscending) "⬆️" else "⬇️"
+        return "${orderType.label}$arrow"
+    }
+
+    companion object {
+        // 从 FilesBean 快捷创建
+        fun from(files: FilesBean) = OrderBean(type = files.order, asc = files.isAsc)
+
+        // 从弹窗选中的 UI 文本（如 "文件名称⬆️"）安全解析成 OrderBean
+        fun parseFromUiString(uiText: String): OrderBean {
+            val isAsc = if (uiText.endsWith("⬆️")) 1 else 0
+            val label = uiText.removeSuffix("⬆️").removeSuffix("⬇️")
+            return OrderBean(type = OrderType.fromLabel(label).rawValue, asc = isAsc)
         }
-        return "$name$order"
     }
 }
 

@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.dialog
 
+import github.zerorooot.nap511.bean.OrderBean
 import android.os.Process
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -185,24 +186,26 @@ fun InfoDialog(
 
 @Composable
 fun RadioButtonDialog(
-    items: List<String>, selectValue: String = "", enter: (String) -> Unit
+    fileOrderList: List<OrderBean>,
+    selectOrderBean: OrderBean,
+    enter: (OrderBean) -> Unit
 ) {
-    val selectedValue = remember { mutableStateOf(selectValue) }
+    val selectedValue = remember { mutableStateOf(selectOrderBean) }
 
-    val isSelectedItem: (String) -> Boolean = { selectedValue.value == it }
-    val onChangeState: (String) -> Unit = { selectedValue.value = it }
+    val isSelectedItem: (OrderBean) -> Boolean = { selectedValue.value == it }
+    val onChangeState: (OrderBean) -> Unit = { selectedValue.value = it }
 
-    AlertDialog(onDismissRequest = { enter.invoke("") }, confirmButton = {
+    AlertDialog(onDismissRequest = { enter.invoke(selectOrderBean) }, confirmButton = {
         TextButton(
             onClick = {
-                enter.invoke("")
+                enter.invoke(selectOrderBean)
             },
         ) {
             Text(text = "取消")
         }
     }, title = { Text(text = "选择排序模式") }, text = {
         Column(Modifier.padding(8.dp)) {
-            items.forEach { item ->
+            fileOrderList.forEach { item ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically, modifier = Modifier
                         .selectable(
@@ -224,7 +227,7 @@ fun RadioButtonDialog(
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = item, modifier = Modifier.fillMaxWidth()
+                        text = item.toString(), modifier = Modifier.fillMaxWidth()
                     )
                 }
             }

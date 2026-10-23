@@ -95,19 +95,11 @@ fun CreateDialogs(
 
         is FileDialogState.FileOrder -> {
             // 文件排序
-            val orderBean = fileViewModel.orderBean.toString()
-            FileOrderDialog(orderBean) {
+            val orderBean = fileViewModel.orderBean
+            FileOrderDialog(orderBean) { newOrder ->
                 fileViewModel.closeFileOrderDialog()
-                if (it.isNotEmpty()) {
-                    val asc = if (it.subSequence(it.length - 2, it.length) == "⬆️") 1 else 0
-                    val type = when (it.subSequence(0, it.length - 2)) {
-                        "文件名称" -> OrderEnum.name
-                        "更改时间" -> OrderEnum.change
-                        "文件种类" -> OrderEnum.type
-                        "文件大小" -> OrderEnum.size
-                        else -> OrderEnum.name
-                    }
-                    fileViewModel.updateOrder(OrderBean(type, asc))
+                if (newOrder != orderBean) {
+                    fileViewModel.updateOrder(newOrder)
                 }
             }
         }
