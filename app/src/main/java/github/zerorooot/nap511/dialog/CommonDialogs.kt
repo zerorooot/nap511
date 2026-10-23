@@ -1,6 +1,5 @@
 package github.zerorooot.nap511.dialog
 
-import github.zerorooot.nap511.bean.OrderBean
 import android.os.Process
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -180,57 +179,6 @@ fun InfoDialog(
             onDismissRequest()
         }) {
             Text("取消")
-        }
-    })
-}
-
-@Composable
-fun RadioButtonDialog(
-    fileOrderList: List<OrderBean>,
-    selectOrderBean: OrderBean,
-    enter: (OrderBean) -> Unit
-) {
-    val selectedValue = remember { mutableStateOf(selectOrderBean) }
-
-    val isSelectedItem: (OrderBean) -> Boolean = { selectedValue.value == it }
-    val onChangeState: (OrderBean) -> Unit = { selectedValue.value = it }
-
-    AlertDialog(onDismissRequest = { enter.invoke(selectOrderBean) }, confirmButton = {
-        TextButton(
-            onClick = {
-                enter.invoke(selectOrderBean)
-            },
-        ) {
-            Text(text = "取消")
-        }
-    }, title = { Text(text = "选择排序模式") }, text = {
-        Column(Modifier.padding(8.dp)) {
-            fileOrderList.forEach { item ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically, modifier = Modifier
-                        .selectable(
-                            selected = isSelectedItem(item), onClick = {
-                                onChangeState(item)
-                                enter.invoke(item)
-                            }, role = Role.RadioButton
-                        )
-                        .padding(8.dp)
-                ) {
-                    Icon(
-                        modifier = Modifier.padding(end = 16.dp),
-                        imageVector = if (isSelectedItem(item)) {
-                            Icons.Outlined.CheckCircle
-                        } else {
-                            Icons.Outlined.RadioButtonUnchecked
-                        },
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = item.toString(), modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
         }
     })
 }
