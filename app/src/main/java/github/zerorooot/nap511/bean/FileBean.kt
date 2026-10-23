@@ -18,6 +18,13 @@ import kotlinx.parcelize.Parcelize
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.PlayCircleOutline
+import androidx.compose.material.icons.filled.SortByAlpha
+import androidx.compose.material.icons.filled.Storage
 
 enum class ForceOpenType(
     val label: String,
@@ -64,6 +71,17 @@ enum class OrderType(val rawValue: String, val label: String, val isLocalOnly: B
     CREATE(OrderEnum.create, "创建时间"),
     OPEN(OrderEnum.open, "打开时间"),
     VIDEO_DURATION(OrderEnum.videoDuration, "视频时长", isLocalOnly = true);
+
+    val icon: ImageVector
+        get() = when (this) {
+            NAME           -> Icons.Default.SortByAlpha
+            SIZE           -> Icons.Default.Storage
+            TYPE           -> Icons.Default.Category
+            UPDATE         -> Icons.Default.AccessTime
+            CREATE         -> Icons.Default.CalendarToday
+            OPEN           -> Icons.Default.History
+            VIDEO_DURATION -> Icons.Default.PlayCircleOutline
+        }
 
     companion object {
         fun fromRaw(raw: String): OrderType = entries.find { it.rawValue == raw } ?: NAME
