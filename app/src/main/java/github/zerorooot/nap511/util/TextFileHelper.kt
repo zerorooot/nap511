@@ -9,6 +9,7 @@ import github.zerorooot.nap511.viewmodel.TXT_EXTS
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * 文本文件规范校验结果
@@ -108,7 +109,7 @@ object TextFileHelper {
      * @return 字节数组包装的 [Result]
      */
     /** 全局共享的小文本内容内存缓存（按 fileId/pickCode 索引），避免同一文件在终端与界面间重复发起网络 I/O */
-    private val memoryTextCache = java.util.concurrent.ConcurrentHashMap<String, ByteArray>()
+    private val memoryTextCache = ConcurrentHashMap<String, ByteArray>()
 
     /** 清空内存文本缓存（供单元测试重置及清理时调用） */
     fun clearMemoryCache() {

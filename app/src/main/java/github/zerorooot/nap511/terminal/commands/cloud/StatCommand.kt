@@ -68,8 +68,8 @@ class StatCommand : TerminalCommand {
             if (file.sha1.isNotEmpty()) {
                 emitText("  SHA-1:    ${file.sha1}")
             }
-            if (file.modifiedTime.isNotEmpty()) {
-                emitText("  Modify:   ${file.modifiedTimeString}")
+            if (file.time.isNotEmpty()) {
+                emitText("  Modify:   ${file.timeString}")
             }
             if (file.createTime.isNotEmpty()) {
                 emitText("  Created:  ${file.createTimeString}")

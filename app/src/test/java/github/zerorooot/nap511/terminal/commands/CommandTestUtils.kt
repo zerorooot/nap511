@@ -109,7 +109,7 @@ internal fun createMockFolder(
     name = name,
     categoryId = categoryId,
     isFolder = true,
-    modifiedTime = modifiedTime
+    time = modifiedTime
 )
 
 /**
@@ -132,7 +132,7 @@ internal fun createMockFile(
     categoryId = categoryId,
     size = size,
     isFolder = false,
-    modifiedTime = modifiedTime,
+    time = modifiedTime,
     pickCode = pickCode,
     sha1 = sha1,
     icoString = icoString,

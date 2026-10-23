@@ -19,7 +19,6 @@ import github.zerorooot.nap511.terminal.viewmodel.emitPath
 import github.zerorooot.nap511.terminal.viewmodel.emitText
 import github.zerorooot.nap511.util.formatFileSize
 import kotlinx.coroutines.flow.FlowCollector
-import java.util.Locale
 
 /**
  * 列表项封装实体，携带目标路径与单文件标记
@@ -85,13 +84,13 @@ class LsCommand : EntityListingCommand<LsEntry>() {
         // 2. 编译期比较器合成
         val baseComparator: Comparator<LsEntry> = when {
             sortByMtime -> Comparator { a, b ->
-                val timeA = a.file.modifiedTime.toLongOrNull() ?: 0L
-                val timeB = b.file.modifiedTime.toLongOrNull() ?: 0L
+                val timeA = a.file.time.toLongOrNull() ?: 0L
+                val timeB = b.file.time.toLongOrNull() ?: 0L
                 timeB.compareTo(timeA) // 降序
             }
             sortByAtime -> Comparator { a, b ->
-                val timeA = a.file.updateTime.toLongOrNull() ?: 0L
-                val timeB = b.file.updateTime.toLongOrNull() ?: 0L
+                val timeA = a.file.modifiedTime.toLongOrNull() ?: 0L
+                val timeB = b.file.modifiedTime.toLongOrNull() ?: 0L
                 timeB.compareTo(timeA) // 降序
             }
             sortBySize -> Comparator { a, b ->
@@ -291,7 +290,7 @@ class LsCommand : EntityListingCommand<LsEntry>() {
         val typeChar = if (file.isFolder) "d" else "-"
         val perm = "${typeChar}rwxr-xr-x"
         val sizeStr = if (file.isFolder) "-" else (file.size.toLongOrNull() ?: 0L).formatFileSize()
-        val timeStr = CommandFormatUtil.formatTimestamp(file.modifiedTime)
+        val timeStr = CommandFormatUtil.formatTimestamp(file.time)
         val nameStr = formatDisplayName(entry)
 
         val paddedPerm = TableFormatter.padCell(perm, 11, TableAlignment.LEFT)

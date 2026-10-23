@@ -29,14 +29,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileInfo
 import github.zerorooot.nap511.bean.InfoItem
 import github.zerorooot.nap511.bean.InfoSection
-import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.PathsBean
-import github.zerorooot.nap511.screen.file.TaskDetailPane
 
 @Composable
 fun FileInfoDialog(

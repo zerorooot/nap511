@@ -367,7 +367,7 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
 
     return fileBeanList.map { fileBean ->
         // 解析时间戳
-        val updateTimeString = fileBean.updateTime.toLongOrNull()?.let {
+        val modifiedTimeString = fileBean.modifiedTime.toLongOrNull()?.let {
             dateFormat.format(it * 1000)
         } ?: ""
 
@@ -378,28 +378,28 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
 
 
         // 判断是否为文件夹
-        val isFolder = fileBean.fileId.isEmpty() || fileBean.isFolder
+        val isFolder = fileBean.fileId.isEmpty()
         val finalFileId = if (isFolder) fileBean.categoryId else fileBean.fileId
         val finalParentId = if (isFolder) fileBean.parentId else fileBean.categoryId
 
         var sizeString = fileBean.sizeString
-        var modifiedTimeString: String
-        var rawModifiedTime = fileBean.modifiedTime
+        var timeString: String
+        var rawTime = fileBean.time
 
         if (isFolder) {
-            modifiedTimeString = fileBean.modifiedTime.toLongOrNull()?.let {
+            timeString = fileBean.time.toLongOrNull()?.let {
                 dateFormat.format(it * 1000)
             } ?: ""
         } else {
             sizeString = (fileBean.size.toLongOrNull() ?: 0L).formatFileSize() + " "
-            modifiedTimeString = fileBean.modifiedTime
+            timeString = fileBean.time
 
-            if (fileBean.modifiedTime.isNotEmpty() && fileBean.modifiedTime.all { it.isDigit() }) {
+            if (fileBean.time.isNotEmpty() && fileBean.time.all { it.isDigit() }) {
                 val parsedTime = runCatching {
-                    dateFormat.parse(fileBean.modifiedTime)?.time?.div(1000)
+                    dateFormat.parse(fileBean.time)?.time?.div(1000)
                 }.getOrNull()
                 if (parsedTime != null) {
-                    rawModifiedTime = parsedTime.toString()
+                    rawTime = parsedTime.toString()
                 }
             }
 
@@ -442,10 +442,10 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
             parentId = finalParentId,
             isFolder = isFolder,
             fileIco = icoRes,
-            updateTimeString = updateTimeString,
-            createTimeString = createTimeString,
             modifiedTimeString = modifiedTimeString,
-            modifiedTime = rawModifiedTime,
+            createTimeString = createTimeString,
+            timeString = timeString,
+            time = rawTime,
             sizeString = sizeString,
             playLongRatio = playLongRatio,
             playLongString = playLongString
