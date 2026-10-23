@@ -309,6 +309,14 @@ fun LazyListScope.fileCachePreferenceItems(
     }
     item {
         SwitchPreferenceItem(
+            title = "文件夹置顶开关项",
+            summary = "开启时文件夹始终显示在文件上方；关闭时文件夹与文件按当前排序规则混合排列",
+            checked = uiState.keepFoldersOnTop,
+            onCheckedChange = { onSaveConfig(ConfigKeyUtil.KEEP_FOLDERS_ON_TOP, it) }
+        )
+    }
+    item {
+        SwitchPreferenceItem(
             title = "开启请求磁盘缓存",
             summary = "将请求的文件列表缓存至本地存储，提升再次加载速度",
             checked = uiState.saveRequestCache,

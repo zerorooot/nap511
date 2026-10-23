@@ -93,6 +93,9 @@ data class SettingUiState(
     /** 是否启用多列网格模式（在平板或大屏设备上列表多行排列） */
     @SerializedName(ConfigKeyUtil.GRID_SCREEN) val gridScreenEnabled: Boolean = true,
 
+    /** 文件夹优先置顶（开启时文件夹始终显示在文件最上方） */
+    @SerializedName(ConfigKeyUtil.KEEP_FOLDERS_ON_TOP) val keepFoldersOnTop: Boolean = true,
+
 
     /** 网格布局单列最小宽度（单位：dp） */
     @SerializedName(ConfigKeyUtil.GRID_CELL_MIN_SIZE) val gridCellMinSize: String = "340",

@@ -225,8 +225,6 @@ object FileCacheManager {
                         diskFile.delete()
                         return@withContext null
                     }
-                    // 反序列化后纠正图标 ID，防止编译时资源 ID 偏移导致图标错乱或崩溃
-                    diskEntry.data.fileBeanList = formatFileBeanList(diskEntry.data.fileBeanList)
                     return@withContext diskEntry
                 }
             } catch (e: Exception) {

@@ -43,7 +43,7 @@ data class FilesBean(
      *
      * is_asc = 0：降序（倒序，从大到小 / Z-A / 从新到旧）。
      */
-    @SerializedName("is_asc") val isAsc: Int,
+    @SerializedName("is_asc") val isAsc: Int = 1,
 )
 
 object OrderEnum {
@@ -53,15 +53,17 @@ object OrderEnum {
     const val size = "file_size"
     const val update = "user_utime"
     const val open = "user_otime"
+    const val videoDuration = "play_long"
 }
 
-enum class OrderType(val rawValue: String, val label: String) {
+enum class OrderType(val rawValue: String, val label: String, val isLocalOnly: Boolean = false) {
     NAME(OrderEnum.name, "文件名称"),
     SIZE(OrderEnum.size, "文件大小"),
     TYPE(OrderEnum.type, "文件种类"),
-    CREATE(OrderEnum.create, "创建时间"),
     UPDATE(OrderEnum.update, "修改时间"),
-    OPEN(OrderEnum.open, "打开时间");
+    CREATE(OrderEnum.create, "创建时间"),
+    OPEN(OrderEnum.open, "打开时间"),
+    VIDEO_DURATION(OrderEnum.videoDuration, "视频时长", isLocalOnly = true);
 
     companion object {
         fun fromRaw(raw: String): OrderType = entries.find { it.rawValue == raw } ?: NAME
@@ -155,7 +157,8 @@ data class FileBean(
     val playLongRatio: String = "",
     val sizeString: String = "",
     val isSelect: Boolean = false,
-    val fileIco: Int = R.drawable.other
+    // 标记为 @Transient，避免 Gson 保存到磁盘 json 中
+    @Transient val fileIco: Int = R.drawable.other
 ) : Parcelable
 
 data class FileInfo(

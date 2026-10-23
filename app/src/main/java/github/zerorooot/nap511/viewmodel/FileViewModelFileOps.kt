@@ -164,7 +164,10 @@ internal fun FileViewModel.delete(fileBean: FileBean) {
     }
 }
 
-internal fun FileViewModel.rename(fileBean: FileBean? = dialogState.value.targetFileBean, name: String) {
+internal fun FileViewModel.rename(
+    fileBean: FileBean? = dialogState.value.targetFileBean,
+    name: String
+) {
     val targetBean = fileBean ?: dialogState.value.targetFileBean ?: return
     viewModelScope.launch {
         val cid = currentCid
@@ -377,8 +380,8 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
         var playLongRatio = ""
 
 
-        // 判断是否为文件夹
-        val isFolder = fileBean.fileId.isEmpty()
+        // 判断是否为文件夹。此函数可能被FileCacheManager调用，缓存时已经判断好了isFolder，直接调用就行
+        val isFolder = fileBean.isFolder || fileBean.fileId.isEmpty()
         val finalFileId = if (isFolder) fileBean.categoryId else fileBean.fileId
         val finalParentId = if (isFolder) fileBean.parentId else fileBean.categoryId
 

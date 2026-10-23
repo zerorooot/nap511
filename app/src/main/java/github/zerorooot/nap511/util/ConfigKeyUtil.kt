@@ -159,6 +159,11 @@ class ConfigKeyUtil {
         const val FLOATING_ACTION_BUTTON_POSITION = "floatingActionButtonPosition"
 
         /**
+         * 文件夹优先置顶（开启时文件夹始终显示在文件最上方）
+         */
+        const val KEEP_FOLDERS_ON_TOP = "KeepFoldersOnTop"
+
+        /**
          * 动态配色
          */
         const val DYNAMIC_COLOR = "dynamicColor"
