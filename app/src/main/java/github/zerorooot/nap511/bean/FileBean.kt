@@ -3,11 +3,18 @@ package github.zerorooot.nap511.bean
 import android.os.Parcelable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.AudioFile
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FolderZip
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.PlayCircleOutline
+import androidx.compose.material.icons.filled.SortByAlpha
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -18,13 +25,6 @@ import kotlinx.parcelize.Parcelize
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.PlayCircleOutline
-import androidx.compose.material.icons.filled.SortByAlpha
-import androidx.compose.material.icons.filled.Storage
 
 enum class ForceOpenType(
     val label: String,
@@ -74,12 +74,12 @@ enum class OrderType(val rawValue: String, val label: String, val isLocalOnly: B
 
     val icon: ImageVector
         get() = when (this) {
-            NAME           -> Icons.Default.SortByAlpha
-            SIZE           -> Icons.Default.Storage
-            TYPE           -> Icons.Default.Category
-            UPDATE         -> Icons.Default.AccessTime
-            CREATE         -> Icons.Default.CalendarToday
-            OPEN           -> Icons.Default.History
+            NAME -> Icons.Default.SortByAlpha
+            SIZE -> Icons.Default.Storage
+            TYPE -> Icons.Default.Category
+            UPDATE -> Icons.Default.AccessTime
+            CREATE -> Icons.Default.CalendarToday
+            OPEN -> Icons.Default.History
             VIDEO_DURATION -> Icons.Default.PlayCircleOutline
         }
 

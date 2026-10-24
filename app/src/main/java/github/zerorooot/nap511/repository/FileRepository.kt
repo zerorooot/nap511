@@ -197,12 +197,12 @@ open class FileRepository {
     }
 
     open suspend fun search(
-        cid: String, searchValue: String, aid: Int = 1, asc: Int = 0, limit: Int = 999
+        cid: String, searchValue: String, aid: Int = 1, asc: Int = 0, limit: Int = 1150
     ): FilesBean {
         return fileService.search(cid, searchValue, aid, asc, limit)
     }
 
-    open suspend fun filterFile(cid: String, type: Int, limit: Int = 999): FilesBean {
+    open suspend fun filterFile(cid: String, type: Int, limit: Int = 1150): FilesBean {
         return fileService.filterFile(cid = cid, type = type, limit = limit)
     }
 

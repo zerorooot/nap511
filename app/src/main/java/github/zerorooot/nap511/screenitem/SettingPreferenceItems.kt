@@ -1,6 +1,8 @@
 package github.zerorooot.nap511.screenitem
 
 import androidx.compose.foundation.lazy.LazyListScope
+import github.zerorooot.nap511.bean.OrderBean
+import github.zerorooot.nap511.bean.OrderType
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.screen.setting.SettingActions
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -310,7 +312,7 @@ fun LazyListScope.fileCachePreferenceItems(
     item {
         SwitchPreferenceItem(
             title = "文件夹置顶开关项",
-            summary = "开启时文件夹始终显示在文件上方；关闭时文件夹与文件按当前排序规则混合排列",
+            summary = "开启时文件夹始终显示在文件上方；关闭时文件夹与文件按当前排序规则混合排列\n注：此设置对按${OrderType.SIZE.label}、${OrderType.TYPE.label}排序模式不生效",
             checked = uiState.keepFoldersOnTop,
             onCheckedChange = { onSaveConfig(ConfigKeyUtil.KEEP_FOLDERS_ON_TOP, it) }
         )

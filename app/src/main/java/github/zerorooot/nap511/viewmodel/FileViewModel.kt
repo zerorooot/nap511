@@ -62,18 +62,35 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 /**
  * 单例管理 ICU Collator，避免在列表排序过程中反复创建对象
  */
 object NaturalOrderComparator {
-    val instance: Collator by lazy {
-        Collator.getInstance(ULocale.forLocale(Locale.getDefault())).apply {
-            (this as? RuleBasedCollator)?.numericCollation = true // 开启数字数值大小自然排序 ("2" < "10")
+    private val icuCollator: Collator by lazy {
+        Collator.getInstance(ULocale.CHINA).apply {
+            (this as? RuleBasedCollator)?.numericCollation = true // 开启数字自然排序 ("2" < "10")
             strength = Collator.TERTIARY // 区分大小写与音调
-            freeze() // 设为不可变以保证线程安全与极致性能
+            freeze()  // 设为不可变以保证线程安全与极致性能
+        }
+    }
+
+    val instance: Comparator<String> by lazy {
+        Comparator { s1, s2 ->
+            // 判断首字符：普通字符(字母/数字/中文)权重为 0，特殊符号/标点权重为 1(沉底)
+            val w1 = if (s1.firstOrNull()
+                    ?.let { it.isLetterOrDigit() || it.code in 0x4e00..0x9fa5 } == true
+            ) 0 else 1
+            val w2 = if (s2.firstOrNull()
+                    ?.let { it.isLetterOrDigit() || it.code in 0x4e00..0x9fa5 } == true
+            ) 0 else 1
+
+            if (w1 != w2) {
+                w1.compareTo(w2) // 符号开头的一律排在汉字/字母后面
+            } else {
+                icuCollator.compare(s1, s2) // 其余继续走原生 ICU 自然排序
+            }
         }
     }
 }
@@ -436,14 +453,11 @@ class FileViewModel(
         orderBean: OrderBean,
         keepFoldersOnTop: Boolean
     ): List<FileBean> {
-        if (list.isEmpty()) return list
-
-        // 对于 SIZE (文件大小) 排序：115 官方 API 服务端已排好序，且客户端接收到的文件夹 size 恒为 0。
+        //keepFoldersOnTop为true时，默认也排序，因为重命名后也需要手动排序，保持和官方顺序一致
+        // 对于 SIZE (文件大小) 排序：客户端接收到的文件夹 size 恒为 0。
         // 对于 TYPE (文件类型) 排序：不知道官方是怎么排的序，本地无法复现
         // 直接复用官方拉取的顺序，避免客户端本地使用不准确的字段二次排序导致顺序与官方不一致。
-        if (orderBean.orderType == OrderType.SIZE || orderBean.orderType == OrderType.TYPE) {
-            return list
-        }
+        if (list.isEmpty() || orderBean.orderType == OrderType.SIZE || orderBean.orderType == OrderType.TYPE) return list
 
         val comparator = Comparator<FileBean> { a, b ->
             // 1. 文件夹置顶规则 (keepFoldersOnTop)
@@ -585,8 +599,13 @@ class FileViewModel(
                         updateContentState {
                             val unselectedList =
                                 updatedCache.fileBeanList.map { it.copy(isSelect = false) }
+                            val sortedList = processFileOrder(
+                                list = unselectedList,
+                                orderBean = orderBean,
+                                keepFoldersOnTop = settingUiState.keepFoldersOnTop
+                            )
                             copy(
-                                fileBeanList = unselectedList,
+                                fileBeanList = sortedList,
                                 pathList = updatedCache.path,
                                 isLongClickState = false,
                                 appBarTitle = if (isSearchState) "搜索" else context.getString(R.string.app_name)

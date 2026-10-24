@@ -255,7 +255,6 @@ internal fun FileViewModel.deleteMultiple() {
  */
 @OptIn(ExperimentalCoilApi::class)
 fun FileViewModel.confirmDiscardVideos(discardList: List<VideoBean>, targetCid: String) {
-    closeDialog()
     if (discardList.isEmpty()) return
 
     val cid = targetCid.ifEmpty { currentCid }
@@ -307,7 +306,6 @@ fun FileViewModel.confirmDiscardVideos(discardList: List<VideoBean>, targetCid: 
  * 4. 异步并发调用 fileRepository.updateVideoHistory 同步 115 云端播放历史。
  */
 fun FileViewModel.cancelDiscardVideos(discardList: List<VideoBean>, targetCid: String) {
-    closeDialog()
     if (discardList.isEmpty()) return
 
     val cid = targetCid.ifEmpty { currentCid }
@@ -370,13 +368,18 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
 
     return fileBeanList.map { fileBean ->
         // 解析时间戳
-        val modifiedTimeString = fileBean.modifiedTime.toLongOrNull()?.let {
-            dateFormat.format(it * 1000)
-        } ?: ""
+        //可能被FileCacheManager解析，所以判断一下ifBlank
+        val modifiedTimeString = fileBean.modifiedTimeString.ifBlank {
+            fileBean.modifiedTime.toLongOrNull()?.let {
+                dateFormat.format(it * 1000)
+            } ?: ""
+        }
 
-        val createTimeString = fileBean.createTime.toLongOrNull()?.let {
-            dateFormat.format(it * 1000)
-        } ?: ""
+        val createTimeString = fileBean.createTimeString.ifBlank {
+            fileBean.createTime.toLongOrNull()?.let {
+                dateFormat.format(it * 1000)
+            } ?: ""
+        }
         var playLongRatio = ""
 
 
@@ -390,11 +393,15 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
         var rawTime = fileBean.time
 
         if (isFolder) {
-            timeString = fileBean.time.toLongOrNull()?.let {
-                dateFormat.format(it * 1000)
-            } ?: ""
+            timeString = fileBean.timeString.ifBlank {
+                fileBean.time.toLongOrNull()?.let {
+                    dateFormat.format(it * 1000)
+                } ?: ""
+            }
         } else {
-            sizeString = (fileBean.size.toLongOrNull() ?: 0L).formatFileSize() + " "
+            sizeString = fileBean.sizeString.ifBlank {
+                (fileBean.size.toLongOrNull() ?: 0L).formatFileSize() + " "
+            }
             timeString = fileBean.time
 
             if (fileBean.time.isNotEmpty() && fileBean.time.all { it.isDigit() }) {
@@ -420,7 +427,8 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
         val icoRes = when {
             isFolder -> R.drawable.folder
             fileBean.isVideo == 1 || ext in VIDEO_EXTS -> {
-                playLongString = generateTime(fileBean.playLong.toLong()) + " "
+                playLongString =
+                    playLongString.ifBlank { generateTime(fileBean.playLong.toLong()) + " " }
                 R.drawable.mp4
             }
 
@@ -429,7 +437,8 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
             ext in IMG_EXTS -> R.drawable.png
             ext in TXT_EXTS -> R.drawable.txt
             ext in AUDIO_EXTS -> {
-                playLongString = generateTime(fileBean.playLong.toLong()) + " "
+                playLongString =
+                    playLongString.ifBlank { generateTime(fileBean.playLong.toLong()) + " " }
                 R.drawable.mp3
             }
 

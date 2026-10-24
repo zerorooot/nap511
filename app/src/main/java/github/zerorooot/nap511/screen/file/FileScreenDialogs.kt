@@ -32,6 +32,7 @@ import github.zerorooot.nap511.viewmodel.cancelDiscardVideos
 import github.zerorooot.nap511.viewmodel.closeAria2Dialog
 import github.zerorooot.nap511.viewmodel.closeCreateFolderDialog
 import github.zerorooot.nap511.viewmodel.closeCreateSelectTorrentFileDialog
+import github.zerorooot.nap511.viewmodel.closeDiscardVideosDialog
 import github.zerorooot.nap511.viewmodel.closeFileInfoDialog
 import github.zerorooot.nap511.viewmodel.closeFileOrderDialog
 import github.zerorooot.nap511.viewmodel.closeRenameFileDialog
@@ -193,15 +194,17 @@ fun CreateDialogs(
                 DiscardVideosDialog(
                     discardList = discardList,
                     onConfirm = {
+                        fileViewModel.closeDiscardVideosDialog()
                         fileViewModel.confirmDiscardVideos(discardList, dialogState.targetCid)
                     },
                     onDismiss = {
+                        fileViewModel.closeDiscardVideosDialog()
                         // 用户点击“取消”或点击遮罩外部：更新本地进度缓存并同步 115 云端历史
                         fileViewModel.cancelDiscardVideos(discardList, dialogState.targetCid)
                     }
                 )
             } else {
-                fileViewModel.closeDialog()
+                fileViewModel.closeDiscardVideosDialog()
             }
         }
 
