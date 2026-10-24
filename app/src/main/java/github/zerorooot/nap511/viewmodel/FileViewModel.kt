@@ -153,6 +153,14 @@ class FileViewModel(
     internal val imageLoadingSet = hashSetOf<String>()
     val torrentBeanCache = ConcurrentHashMap<String, TorrentFileBean>()
     private val currentLocation = ConcurrentHashMap<String, LocationBean>()
+    // 记录各目录触底分页加载是否已完全加载完毕，避免重复触发无效请求与 Toast
+    private val isLoadedCompleteMap = ConcurrentHashMap<String, Boolean>()
+    // 记录正在执行触底拉取更多任务的 cid，按目录级提供原子互斥保障，防止高频触底引发并发重入
+    private val fetchingMoreCids = ConcurrentHashMap.newKeySet<String>()
+
+    /** 当前是否正处于触底加载更多状态 */
+    val isFetchingMore: Boolean
+        get() = fetchingMoreCids.isNotEmpty()
 
     internal var saveRequestCache: Boolean = true
     internal var lastKeepFoldersOnTop: Boolean? = null
@@ -405,6 +413,100 @@ class FileViewModel(
         }
     }
 
+    /**
+     * 滑动触底自动加载下一页文件（分页加载更多）
+     */
+    fun loadMoreFiles() {
+        val state = _contentState.value
+        val cid = state.currentCid
+        // 搜索模式、多选模式、当前目录正在加载或正处于下拉刷新中，均不触发
+        if (state.isSearchState || state.isLongClickState || state.isRefreshing || fetchingMoreCids.contains(cid)) {
+            return
+        }
+
+        // 检查是否此前已被标记为加载完成
+        if (isLoadedCompleteMap.getOrDefault(cid, false)) {
+            return
+        }
+
+        val currentList = state.fileBeanList
+        if (currentList.isEmpty()) {
+            return
+        }
+
+        val cachedData = FileCacheManager.getDate(cid)
+        val totalCount = cachedData?.count ?: 0
+        val limit = UserSessionManager.requestLimitCount
+
+        // 【第一级：前置拦截】如果本地已知条目已达服务端总量，直接完成并拦截无意义网络请求
+        // 保护：仅当总数量大于单页容量（确实存在多页分页）时才提示“加载完毕”，避免只有几十项的小目录一滑到底就误弹 Toast
+        if (totalCount > 0 && currentList.size >= totalCount) {
+            isLoadedCompleteMap[cid] = true
+            if (totalCount > limit) {
+                App.instance.toast("加载完毕")
+            }
+            return
+        }
+
+        if (!fetchingMoreCids.add(cid)) {
+            return
+        }
+        setRefreshingStatus(true)
+
+        viewModelScope.launch {
+            try {
+                val offset = currentList.size
+                val res = fileRepository.getFiles(
+                    cid = cid,
+                    order = orderBean.type,
+                    asc = orderBean.asc,
+                    offset = offset
+                )
+
+                val rawNewItems = res.fileBeanList
+                val formattedNewItems = formatFileBeanList(rawNewItems)
+                // 直接追加在末尾（Append Only），杜绝全局重排序带来的视口跳动；
+                // 使用 distinctBy 保障条目唯一性，彻底防止服务端漂移造成的重复 key 导致 Compose 崩溃
+                val combinedList = (currentList + formattedNewItems).distinctBy { item ->
+                    item.fileId.ifEmpty { item.categoryId.ifEmpty { item.pickCode } }
+                }
+
+                // 同步持久化写入 FileCacheManager
+                val updatedFilesBean = (cachedData ?: res).copy(
+                    fileBeanList = ArrayList(combinedList),
+                    count = if (res.count > 0) res.count else totalCount
+                )
+                FileCacheManager[cid] = updatedFilesBean
+
+                // 【Cid 竞争保护】：仅在当前屏幕仍停留在发起请求的目录时，才更新 UI 状态，防止覆盖快速切换的新目录
+                if (_contentState.value.currentCid == cid) {
+                    updateContentState { copy(fileBeanList = combinedList) }
+                }
+
+                // 【第二级：响应双重校验】
+                // 条件 A: 本次返回数据量少于请求单页上限（说明已经是最后一批）
+                val isEndByBatchSize = rawNewItems.size < limit
+                // 条件 B: 累积展示数量已经达到或超过服务端统计的总条目数
+                val isEndByCount = (updatedFilesBean.count > 0 && combinedList.size >= updatedFilesBean.count)
+
+                if (isEndByBatchSize || isEndByCount) {
+                    isLoadedCompleteMap[cid] = true
+                    if (combinedList.size > limit) {
+                        App.instance.toast("加载完毕")
+                    }
+                }
+            } catch (e: Exception) {
+                XLog.e("loadMoreFiles Exception", e)
+                App.instance.toast("加载更多失败")
+            } finally {
+                fetchingMoreCids.remove(cid)
+                if (_contentState.value.currentCid == cid) {
+                    setRefreshingStatus(false)
+                }
+            }
+        }
+    }
+
     fun order() {
         val map = mapOf(
             "user_order" to orderBean.type,
@@ -534,6 +636,7 @@ class FileViewModel(
     @OptIn(ExperimentalCoilApi::class)
     internal fun refresh(cid: String, forceCache: Boolean = false) {
         clearSelection()
+        isLoadedCompleteMap[cid] = false
         updateContentState { copy(isSearchState = false) }
         val refreshCurrent = (cid == currentCid)
         XLog.d("refresh refreshCurrent:$refreshCurrent, settingUiState.forceLoadCache:${settingUiState.forceLoadCache}, forceCache:$forceCache")
@@ -843,6 +946,13 @@ class FileViewModel(
                 isLongClickState = false,
                 appBarTitle = if (isSearchState) "搜索" else context.getString(R.string.app_name)
             )
+        }
+        // 若初始加载/缓存读取的条目已达服务端总量，或单页数量少于单页上限，说明该目录全部条目已加载完毕，标记为完成，避免触底无效触发
+        val limit = UserSessionManager.requestLimitCount
+        if (files.fileBeanList.size < limit || (files.count > 0 && files.fileBeanList.size >= files.count)) {
+            isLoadedCompleteMap[files.cid] = true
+        } else {
+            isLoadedCompleteMap[files.cid] = false
         }
         viewModelScope.launch {
             FileCacheManager[files.cid] = files.copy(fileBeanList = ArrayList(processedList))

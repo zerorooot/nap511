@@ -110,7 +110,8 @@ class MvCommandTest {
                 naturalSort: Int,
                 order: String,
                 limit: Int,
-                format: String
+                format: String,
+                offset: Int,
             ): FilesBean {
                 if (cid == "200") {
                     return FilesBean(
@@ -124,7 +125,7 @@ class MvCommandTest {
                         )
                     )
                 }
-                return super.getFiles(cid, showDir, aid, asc, naturalSort, order, limit, format)
+                return super.getFiles(cid, showDir, aid, asc, naturalSort, order, limit, format, offset)
             }
         }
 

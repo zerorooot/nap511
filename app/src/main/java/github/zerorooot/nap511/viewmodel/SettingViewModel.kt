@@ -15,6 +15,7 @@ import github.zerorooot.nap511.repository.AuthRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.bean.sync.SyncPayload
+import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.network.UserSessionManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -123,6 +124,24 @@ class SettingViewModel(
                 withContext(Dispatchers.Main) { onSuccess() }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { onError(e.localizedMessage ?: "恢复默认设置失败") }
+            }
+        }
+    }
+
+    /**
+     * 清空全部文件缓存（包含内存缓存与磁盘缓存数据）
+     * 内部通过 FileCacheManager.clearAll() 执行，并在协程完成后回调 UI 主线程
+     */
+    fun clearFileCache(
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                FileCacheManager.clearAll()
+                withContext(Dispatchers.Main) { onSuccess() }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { onError(e.localizedMessage ?: "清空文件缓存失败") }
             }
         }
     }

@@ -186,7 +186,8 @@ internal open class TestMockFileRepository(
         naturalSort: Int,
         order: String,
         limit: Int,
-        format: String
+        format: String,
+        offset: Int,
     ): FilesBean {
         val existing = FileCacheManager.getDate(cid)?.fileBeanList ?: emptyList()
         val created = directoryFilesMap[cid] ?: emptyList()

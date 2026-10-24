@@ -257,7 +257,8 @@ fun LazyListScope.expandedScreenPreferenceItems(
  */
 fun LazyListScope.fileCachePreferenceItems(
     uiState: SettingUiState,
-    onSaveConfig: (String, Any) -> Unit
+    onSaveConfig: (String, Any) -> Unit,
+    onClearFileCache: () -> Unit = {}
 ) {
     item { PreferenceCategoryHeader("缓存与检索") }
     item {
@@ -331,6 +332,13 @@ fun LazyListScope.fileCachePreferenceItems(
             summary = "进入子目录时，自动预加载前后相邻文件夹的文件数据",
             checked = uiState.earlyLoading,
             onCheckedChange = { onSaveConfig(ConfigKeyUtil.EARLY_LOADING, it) }
+        )
+    }
+    item {
+        PreferenceItem(
+            title = "立即清空所有缓存",
+            summary = "清空内存与磁盘中的全部目录缓存文件",
+            onClick = onClearFileCache
         )
     }
 }
@@ -497,7 +505,8 @@ fun LazyListScope.fileCachePreferenceItems(
     actions: SettingActions
 ) = fileCachePreferenceItems(
     uiState = uiState,
-    onSaveConfig = actions.onSaveConfig
+    onSaveConfig = actions.onSaveConfig,
+    onClearFileCache = actions.onClearFileCache
 )
 
 fun LazyListScope.uiExperiencePreferenceItems(

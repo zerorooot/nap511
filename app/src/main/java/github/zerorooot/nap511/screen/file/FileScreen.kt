@@ -24,6 +24,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -80,6 +81,7 @@ import github.zerorooot.nap511.viewmodel.openUnzipAllFileDialog
 import github.zerorooot.nap511.viewmodel.removeFile
 import github.zerorooot.nap511.viewmodel.startSendAria2Service
 import github.zerorooot.nap511.viewmodel.unzipFile
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 
@@ -124,11 +126,10 @@ fun FileScreen(
     LaunchedEffect(
         contentState.pathList,
         refreshing,
-        fileBeanList,
         settingUiState.autoImagePreviewCount
     ) {
         val threshold = settingUiState.autoImagePreviewCount.toIntOrNull() ?: 0
-        if (threshold > 0 && !refreshing) {
+        if (threshold > 0 && !refreshing && !fileViewModel.isFetchingMore) {
             val imageCount = fileBeanList.count { it.photoThumb.isNotEmpty() }
             isAutoImagePreview = (imageCount > threshold)
         }
@@ -211,13 +212,25 @@ fun FileScreen(
         onBottomBarShowChange = { isBottomBarShow = it })
 
 
-    val currentScrollState by rememberUpdatedState(
-        when {
-            isPreviewActive -> staggeredGrid.asScrollState
-            isGridScreen -> gridState.asScrollState
-            else -> listState.asScrollState
+    val currentScrollState =
+        remember(isPreviewActive, isGridScreen, staggeredGrid, gridState, listState) {
+            when {
+                isPreviewActive -> staggeredGrid.asScrollState
+                isGridScreen -> gridState.asScrollState
+                else -> listState.asScrollState
+            }
         }
-    )
+
+    // 采用标准 Compose snapshotFlow 惯用法监听当前视图滚动触底状态并触发加载更多
+    LaunchedEffect(currentScrollState) {
+        snapshotFlow { currentScrollState.isNearBottom }
+            .distinctUntilChanged()
+            .collect { isNearBottom ->
+                if (isNearBottom && !contentState.isSearchState && !contentState.isLongClickState) {
+                    fileViewModel.loadMoreFiles()
+                }
+            }
+    }
 
     LaunchedEffect(fileViewModel) {
         fileViewModel.videoResultEvent.collect { index ->
@@ -386,6 +399,9 @@ fun FileScreen(
     fun itemOnLongClick(i: Int) {
         if (!contentState.isLongClickState) {
             fileViewModel.startMultiSelect(i)
+            if (!isTopBarShow) {
+                isTopBarShow = true
+            }
         } else {
             fileViewModel.clearSelection()
         }

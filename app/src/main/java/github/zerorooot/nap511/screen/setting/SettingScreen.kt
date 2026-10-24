@@ -87,7 +87,8 @@ data class SettingActions(
     val onExportConfig: () -> Unit,
     val onImportConfig: () -> Unit,
     val onResetConfig: () -> Unit,
-    val onRestartApp: () -> Unit
+    val onRestartApp: () -> Unit,
+    val onClearFileCache: () -> Unit = {}
 )
 
 data class SettingCategoryData(
@@ -175,6 +176,8 @@ fun SettingScreen(
 
     // 重置配置对话框状态
     var showResetDialog by remember { mutableStateOf(false) }
+    // 清空文件缓存对话框状态
+    var showClearCacheDialog by remember { mutableStateOf(false) }
     // 局域网同步发送与接收弹窗状态
     var showSenderDialog by remember { mutableStateOf(false) }
     var showReceiverDialog by remember { mutableStateOf(false) }
@@ -217,6 +220,28 @@ fun SettingScreen(
         )
     }
 
+    if (showClearCacheDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearCacheDialog = false },
+            title = { Text("清空文件缓存") },
+            text = { Text("确定要清空所有文件缓存吗？清空后将重新从网络获取目录数据") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearCacheDialog = false
+                        viewModel.clearFileCache(
+                            onSuccess = { App.instance.toast("已清空所有文件缓存") },
+                            onError = { err -> App.instance.toast("清空失败: $err") }
+                        )
+                    }
+                ) { Text("确认清空") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearCacheDialog = false }) { Text("取消") }
+            }
+        )
+    }
+
     // 缓存所有通用的交互操作，避免层层透传大量 lambda
     val actions = remember(
         viewModel,
@@ -245,6 +270,7 @@ fun SettingScreen(
                 importLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
             },
             onResetConfig = { showResetDialog = true },
+            onClearFileCache = { showClearCacheDialog = true },
             onRestartApp = {
                 if (!lastClick) {
                     lastClick = true

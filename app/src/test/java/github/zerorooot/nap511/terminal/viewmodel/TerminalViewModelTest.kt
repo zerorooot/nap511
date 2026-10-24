@@ -431,7 +431,8 @@ class TerminalViewModelTest {
                 naturalSort: Int,
                 order: String,
                 limit: Int,
-                format: String
+                format: String,
+                offset: Int,
             ): FilesBean {
                 return FilesBean(
                     fileBeanList = arrayListOf(
@@ -484,7 +485,8 @@ class TerminalViewModelTest {
                 naturalSort: Int,
                 order: String,
                 limit: Int,
-                format: String
+                format: String,
+                offset: Int,
             ): FilesBean {
                 return FilesBean(
                     fileBeanList = arrayListOf(
@@ -562,7 +564,8 @@ class TerminalViewModelTest {
                 naturalSort: Int,
                 order: String,
                 limit: Int,
-                format: String
+                format: String,
+                offset: Int,
             ): FilesBean {
                 return FilesBean(
                     fileBeanList = arrayListOf(f1, f2),

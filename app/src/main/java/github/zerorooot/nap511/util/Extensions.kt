@@ -288,47 +288,82 @@ interface LazyScrollState {
     val firstVisibleItemIndex: Int
     val firstVisibleItemScrollOffset: Int
     val visibleItemsCount: Int get() = 0
+    val totalItemsCount: Int get() = 0
+
+    /** 最后一个可见 item 的 index + 1；无可见项时为 0。 */
+    val lastVisibleItemIndex: Int get() = 0
+
+    val isNearBottom: Boolean
+        get() = totalItemsCount > 0 &&
+                visibleItemsCount > 0 &&
+                lastVisibleItemIndex >= totalItemsCount - NEAR_BOTTOM_THRESHOLD
+
     suspend fun animateScrollToItem(index: Int, scrollOffset: Int = 0)
     suspend fun scrollToItem(index: Int, scrollOffset: Int = 0)
     fun requestScrollToItem(index: Int, scrollOffset: Int = 0)
+
+    companion object {
+        const val NEAR_BOTTOM_THRESHOLD = 5
+    }
 }
 
-// 三个扩展属性/函数桥接
+/** 统一实现，三种 Lazy 状态共用，避免三份重复代码。 */
+private class DefaultLazyScrollState(
+    private val firstIndex: () -> Int,
+    private val firstOffset: () -> Int,
+    private val visibleCount: () -> Int,
+    private val totalCount: () -> Int,
+    private val lastIndex: () -> Int,
+    private val animateTo: suspend (Int, Int) -> Unit,
+    private val scrollTo: suspend (Int, Int) -> Unit,
+    private val requestScrollTo: (Int, Int) -> Unit,
+) : LazyScrollState {
+    override val firstVisibleItemIndex get() = firstIndex()
+    override val firstVisibleItemScrollOffset get() = firstOffset()
+    override val visibleItemsCount get() = visibleCount()
+    override val totalItemsCount get() = totalCount()
+    override val lastVisibleItemIndex get() = lastIndex()
+
+    override suspend fun animateScrollToItem(index: Int, scrollOffset: Int) =
+        animateTo(index, scrollOffset)
+    override suspend fun scrollToItem(index: Int, scrollOffset: Int) =
+        scrollTo(index, scrollOffset)
+    override fun requestScrollToItem(index: Int, scrollOffset: Int) =
+        requestScrollTo(index, scrollOffset)
+}
+
 val LazyListState.asScrollState: LazyScrollState
-    get() = object : LazyScrollState {
-        override val firstVisibleItemIndex get() = this@asScrollState.firstVisibleItemIndex
-        override val firstVisibleItemScrollOffset get() = this@asScrollState.firstVisibleItemScrollOffset
-        override val visibleItemsCount get() = this@asScrollState.layoutInfo.visibleItemsInfo.size
-        override suspend fun animateScrollToItem(index: Int, scrollOffset: Int) =
-            this@asScrollState.animateScrollToItem(index, scrollOffset)
-        override suspend fun scrollToItem(index: Int, scrollOffset: Int) =
-            this@asScrollState.scrollToItem(index, scrollOffset)
-        override fun requestScrollToItem(index: Int, scrollOffset: Int) =
-            this@asScrollState.requestScrollToItem(index, scrollOffset)
-    }
+    get() = DefaultLazyScrollState(
+        firstIndex = { firstVisibleItemIndex },
+        firstOffset = { firstVisibleItemScrollOffset },
+        visibleCount = { layoutInfo.visibleItemsInfo.size },
+        totalCount = { layoutInfo.totalItemsCount },
+        lastIndex = { layoutInfo.visibleItemsInfo.maxOfOrNull { it.index }?.plus(1) ?: 0 },
+        animateTo = { i, o -> animateScrollToItem(i, o) },
+        scrollTo = { i, o -> scrollToItem(i, o) },
+        requestScrollTo = { i, o -> requestScrollToItem(i, o) },
+    )
 
 val LazyGridState.asScrollState: LazyScrollState
-    get() = object : LazyScrollState {
-        override val firstVisibleItemIndex get() = this@asScrollState.firstVisibleItemIndex
-        override val firstVisibleItemScrollOffset get() = this@asScrollState.firstVisibleItemScrollOffset
-        override val visibleItemsCount get() = this@asScrollState.layoutInfo.visibleItemsInfo.size
-        override suspend fun animateScrollToItem(index: Int, scrollOffset: Int) =
-            this@asScrollState.animateScrollToItem(index, scrollOffset)
-        override suspend fun scrollToItem(index: Int, scrollOffset: Int) =
-            this@asScrollState.scrollToItem(index, scrollOffset)
-        override fun requestScrollToItem(index: Int, scrollOffset: Int) =
-            this@asScrollState.requestScrollToItem(index, scrollOffset)
-    }
+    get() = DefaultLazyScrollState(
+        firstIndex = { firstVisibleItemIndex },
+        firstOffset = { firstVisibleItemScrollOffset },
+        visibleCount = { layoutInfo.visibleItemsInfo.size },
+        totalCount = { layoutInfo.totalItemsCount },
+        lastIndex = { layoutInfo.visibleItemsInfo.maxOfOrNull { it.index }?.plus(1) ?: 0 },
+        animateTo = { i, o -> animateScrollToItem(i, o) },
+        scrollTo = { i, o -> scrollToItem(i, o) },
+        requestScrollTo = { i, o -> requestScrollToItem(i, o) },
+    )
 
 val LazyStaggeredGridState.asScrollState: LazyScrollState
-    get() = object : LazyScrollState {
-        override val firstVisibleItemIndex get() = this@asScrollState.firstVisibleItemIndex
-        override val firstVisibleItemScrollOffset get() = this@asScrollState.firstVisibleItemScrollOffset
-        override val visibleItemsCount get() = this@asScrollState.layoutInfo.visibleItemsInfo.size
-        override suspend fun animateScrollToItem(index: Int, scrollOffset: Int) =
-            this@asScrollState.animateScrollToItem(index, scrollOffset)
-        override suspend fun scrollToItem(index: Int, scrollOffset: Int) =
-            this@asScrollState.scrollToItem(index, scrollOffset)
-        override fun requestScrollToItem(index: Int, scrollOffset: Int) =
-            this@asScrollState.requestScrollToItem(index, scrollOffset)
-    }
+    get() = DefaultLazyScrollState(
+        firstIndex = { firstVisibleItemIndex },
+        firstOffset = { firstVisibleItemScrollOffset },
+        visibleCount = { layoutInfo.visibleItemsInfo.size },
+        totalCount = { layoutInfo.totalItemsCount },
+        lastIndex = { layoutInfo.visibleItemsInfo.maxOfOrNull { it.index }?.plus(1) ?: 0 },
+        animateTo = { i, o -> animateScrollToItem(i, o) },
+        scrollTo = { i, o -> scrollToItem(i, o) },
+        requestScrollTo = { i, o -> requestScrollToItem(i, o) },
+    )
