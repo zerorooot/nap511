@@ -15,6 +15,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -123,19 +124,19 @@ fun FileScreen(
      * false: 手动强制关闭
      */
     var isImagePreviewMode by rememberSaveable { mutableStateOf<Boolean?>(null) }
-    var isAutoImagePreview by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(
+
+    // 用 derivedStateOf 解决翻页闪烁问题
+    // 在翻页追加数据（Load More）的过程中，fileBeanList 包含的是“第一页 + 新加载页”的总列表，其中的图片数量是单调递增的（例如 15 张 -> 30 张）。
+    // 只要初始第一页满足阈值（> threshold），在下滑翻页期间 isAutoImagePreview 的计算结果就会持续保持为 true，绝不会中途临时变为 false，
+    // 从而彻底杜绝了退出重入的问题。
+    val isAutoImagePreview by remember(
         contentState.source,
         fileBeanList,
-        refreshing,
         settingUiState.autoImagePreviewCount
     ) {
-        val threshold = settingUiState.autoImagePreviewCount.toIntOrNull() ?: 0
-        if (threshold > 0 && !refreshing && !fileViewModel.isFetchingMore) {
-            val imageCount = fileBeanList.count { it.photoThumb.isNotEmpty() }
-            isAutoImagePreview = (imageCount > threshold)
-        } else {
-            isAutoImagePreview = false
+        derivedStateOf {
+            val threshold = settingUiState.autoImagePreviewCount.toIntOrNull() ?: 0
+            threshold > 0 && fileBeanList.count { it.photoThumb.isNotEmpty() } > threshold
         }
     }
 
@@ -399,6 +400,7 @@ fun FileScreen(
                     fileViewModel.openFileOrderDialog()
                 }
             }
+
             MenuItemAction.REFRESH_FILES -> {
                 refresh(true)
             }
