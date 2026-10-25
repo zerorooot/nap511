@@ -35,7 +35,7 @@ internal fun FileViewModel.cut(index: Int = -1) {
             cutFileList = itemsToCut,
             isLongClickState = false,
             fileBeanList = fileBeanList.map { it.copy(isSelect = false) },
-            appBarTitle = if (isSearchState) "搜索" else context.getString(R.string.app_name)
+            appBarTitle = getDefaultAppBarTitle(context)
         )
     }
 }
@@ -220,11 +220,13 @@ internal fun FileViewModel.deleteMultiple() {
         }
         // 提前删除并获取批量回滚闭包
         val selectedIds = selectedFiles.map { it.fileId }.toSet()
+        val beforeTotalCount = totalCount
         updateContentState {
             copy(
                 fileBeanList = fileBeanList.filterNot { it.fileId in selectedIds },
+                totalCount = (totalCount - selectedFiles.size).coerceAtLeast(0),
                 isLongClickState = false,
-                appBarTitle = if (isSearchState) "搜索" else context.getString(R.string.app_name)
+                appBarTitle = getDefaultAppBarTitle(context)
             )
         }
         val rollback = FileCacheManager.removeItems(cid, selectedFiles.map { it.fileId })
@@ -235,7 +237,7 @@ internal fun FileViewModel.deleteMultiple() {
             if (deleteMultiple.state) {
                 "成功删除 ${selectedFiles.size} 个文件"
             } else {
-                updateContentState { copy(fileBeanList = beforeList) }
+                updateContentState { copy(fileBeanList = beforeList, totalCount = beforeTotalCount) }
                 rollback?.rollback()
                 clickMap[cid] = beforeClickMap
                 "删除 ${selectedFiles.size} 个文件失败~"

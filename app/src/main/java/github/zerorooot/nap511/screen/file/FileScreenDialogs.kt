@@ -8,8 +8,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elvishew.xlog.XLog
 import com.google.gson.JsonParser
 import github.zerorooot.nap511.bean.FileDialogState
-import github.zerorooot.nap511.bean.OrderBean
-import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.dialog.Aria2Dialog
@@ -96,10 +94,10 @@ fun CreateDialogs(
 
         is FileDialogState.FileOrder -> {
             // 文件排序
-            val orderBean = fileViewModel.orderBean
+            val orderBean = fileViewModel.currentOrderBean
             FileOrderDialog(orderBean) { newOrder ->
                 fileViewModel.closeFileOrderDialog()
-                if (newOrder != orderBean) {
+                if (newOrder != null) {
                     fileViewModel.updateOrder(newOrder)
                 }
             }

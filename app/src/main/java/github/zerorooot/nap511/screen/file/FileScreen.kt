@@ -47,6 +47,7 @@ import github.zerorooot.nap511.bean.FileDisplayConfig
 import github.zerorooot.nap511.bean.FileItemActions
 import github.zerorooot.nap511.bean.FileListDataState
 import github.zerorooot.nap511.bean.FileListScrollState
+import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.bean.FilePathActions
 import github.zerorooot.nap511.bean.FileScaffoldActions
 import github.zerorooot.nap511.bean.FileScaffoldState
@@ -124,7 +125,8 @@ fun FileScreen(
     var isImagePreviewMode by rememberSaveable { mutableStateOf<Boolean?>(null) }
     var isAutoImagePreview by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(
-        contentState.pathList,
+        contentState.source,
+        fileBeanList,
         refreshing,
         settingUiState.autoImagePreviewCount
     ) {
@@ -132,10 +134,12 @@ fun FileScreen(
         if (threshold > 0 && !refreshing && !fileViewModel.isFetchingMore) {
             val imageCount = fileBeanList.count { it.photoThumb.isNotEmpty() }
             isAutoImagePreview = (imageCount > threshold)
+        } else {
+            isAutoImagePreview = false
         }
     }
 
-    LaunchedEffect(contentState.pathList) {
+    LaunchedEffect(contentState.source) {
         isImagePreviewMode = null
     }
 
@@ -161,18 +165,18 @@ fun FileScreen(
         fileViewModel.refreshBatteryOptimizations()
     }
 
-    val listLocation = fileViewModel.getListLocation(contentState.currentCid)
-    val listState = key(contentState.currentCid) {
+    val listLocation = fileViewModel.getListLocation(contentState.source.paginationKey)
+    val listState = key(contentState.source.paginationKey) {
         rememberLazyListState(
             listLocation.firstVisibleItemIndex, listLocation.firstVisibleItemScrollOffset
         )
     }
-    val gridState = key(contentState.currentCid) {
+    val gridState = key(contentState.source.paginationKey) {
         rememberLazyGridState(
             listLocation.firstVisibleItemIndex, listLocation.firstVisibleItemScrollOffset
         )
     }
-    val staggeredGrid = key(contentState.currentCid) {
+    val staggeredGrid = key(contentState.source.paginationKey) {
         rememberLazyStaggeredGridState(
             listLocation.firstVisibleItemIndex, listLocation.firstVisibleItemScrollOffset
         )
@@ -226,7 +230,7 @@ fun FileScreen(
         snapshotFlow { currentScrollState.isNearBottom }
             .distinctUntilChanged()
             .collect { isNearBottom ->
-                if (isNearBottom && !contentState.isSearchState && !contentState.isLongClickState) {
+                if (isNearBottom && !contentState.isLongClickState) {
                     fileViewModel.loadMoreFiles()
                 }
             }
@@ -336,8 +340,9 @@ fun FileScreen(
         if (drawerState.invoke()) {
             return
         }
-        if (contentState.currentCid != "0" && !contentState.isLongClickState) {
-            fileViewModel.setListLocation(contentState.currentCid, currentScrollState)
+        // 仅当处于普通目录浏览时才保存滚动偏移。若当前为搜索或过滤模式，严禁将搜索结果视口覆盖写入当前父目录的 listLocation！
+        if (contentState.currentCid != "0" && !contentState.isLongClickState && !contentState.isSearchState) {
+            fileViewModel.setListLocation(contentState.source.paginationKey, currentScrollState)
         }
         isBottomBarShow = true
         isTopBarShow = true
@@ -358,7 +363,7 @@ fun FileScreen(
     fun myAppBarOnClick(action: AppBarAction) {
         when (action) {
             TopBarAction.BACK -> {
-                if (contentState.currentCid == "0" && !contentState.isLongClickState) {
+                if (contentState.currentCid == "0" && !contentState.isLongClickState && !contentState.isSearchState) {
                     openDrawer()
                     return
                 }
@@ -387,7 +392,13 @@ fun FileScreen(
                 requestScrollToTop()
             }
 
-            MenuItemAction.FILE_SORT -> fileViewModel.openFileOrderDialog()
+            MenuItemAction.FILE_SORT -> {
+                if (contentState.source is FileListSource.Search) {
+                    App.instance.toast("搜索模式暂不支持排序")
+                } else {
+                    fileViewModel.openFileOrderDialog()
+                }
+            }
             MenuItemAction.REFRESH_FILES -> {
                 refresh(true)
             }
@@ -533,7 +544,8 @@ fun FileScreen(
         isCutState = contentState.isCutState,
         fabPosition = fabPosition,
         nestedScrollConnection = nestedScrollConnection,
-        currentCid = contentState.currentCid
+        currentCid = contentState.currentCid,
+        isSearchState = contentState.isSearchState
     )
 
     val currentAppBarOnClick by rememberUpdatedState(::myAppBarOnClick)
@@ -552,7 +564,8 @@ fun FileScreen(
         fileBeanList = fileBeanList,
         refreshing = refreshing,
         clickIndex = fileViewModel.clickMap.getOrDefault(contentState.currentCid, -1),
-        imageCache = fileViewModel.imageBeanCache[contentState.currentCid]
+        imageCache = fileViewModel.imageBeanCache[contentState.currentCid],
+        contentState.source.paginationKey
     )
 
     val bannerState = FileBannerState(

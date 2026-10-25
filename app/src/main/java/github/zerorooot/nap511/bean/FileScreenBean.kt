@@ -1,14 +1,56 @@
 package github.zerorooot.nap511.bean
 
+import android.content.Context
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.material3.FabPosition
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.unit.Dp
-import androidx.compose.runtime.Immutable
+import github.zerorooot.nap511.R
 import github.zerorooot.nap511.screen.components.AppBarAction
-import github.zerorooot.nap511.viewmodel.AudioViewModel
+
+/**
+ * 列表数据源模型：定义当前文件列表展示的数据来源及上下文
+ */
+sealed interface FileListSource {
+    /** 当前关联的目录 CID */
+    val cid: String
+
+    /** 用于分页状态、锁隔离及 Compose 滚动状态 Key 的唯一复合键 */
+    val paginationKey: String
+
+    /** 普通目录浏览 */
+    data class Folder(override val cid: String) : FileListSource {
+        override val paginationKey: String get() = "folder:$cid"
+    }
+
+    /** 关键词搜索 */
+    data class Search(override val cid: String, val keyword: String) : FileListSource {
+        override val paginationKey: String get() = "search:$cid:$keyword"
+    }
+
+    /**
+     * 分类文件过滤
+     *
+     * @param cid 当前过滤所属的目录 ID
+     * @param filterType 分类过滤类型（1文档、2图片、3音频、4视频、5压缩、6软件）
+     * @param name 分类显示名称
+     * @param order 过滤模式专用的排序规则（独立内聚，不污染普通目录配置）
+     */
+    data class Filter(
+        override val cid: String,
+        val filterType: Int,
+        val name: String,
+        val order: OrderBean,
+        val fcMix:Int,
+    ) : FileListSource {
+        // 关键：将排序规则融入 paginationKey。切换排序时自动重置滚动条与触底完结标记
+        override val paginationKey: String
+            get() = "filter:$cid:$filterType:${order.type}:${order.asc}:$fcMix"
+    }
+}
 
 /**
  * 文件列表核心浏览与模式状态（低频大对象变更，严格遵循不可变 UDF）
@@ -19,15 +61,29 @@ data class FileContentUiState(
     val pathList: List<PathBean> = emptyList(),
     val fileBeanList: List<FileBean> = emptyList(),
     val isRefreshing: Boolean = false,
-    val appBarTitle: String = "nap511",
+    val appBarTitle: String,
     val orderBean: OrderBean = OrderBean(OrderEnum.name, 1),
 
     // 交互模式状态
     val isLongClickState: Boolean = false,
     val isCutState: Boolean = false,
-    val isSearchState: Boolean = false,
-    val cutFileList: List<FileBean> = emptyList()
-)
+    val cutFileList: List<FileBean> = emptyList(),
+
+    // 核心数据源与分页总数
+    val source: FileListSource = FileListSource.Folder("0"),
+    val totalCount: Int = 0,
+) {
+    // 兼容现有引用点
+    val isSearchState: Boolean
+        get() = source !is FileListSource.Folder
+
+    /** 根据当前模式获取语义化默认标题 */
+    fun getDefaultAppBarTitle(context: Context): String = when (val s = source) {
+        is FileListSource.Folder -> context.getString(R.string.app_name)
+        is FileListSource.Search -> "搜索 - ${s.keyword}"
+        is FileListSource.Filter -> "过滤 - ${s.name}"
+    }
+}
 
 /**
  * 弹窗交互独立状态（高频局部交互，彻底与列表数据流物理隔离）
@@ -44,7 +100,6 @@ data class FileDialogUiState(
 )
 
 
-
 /**
  * Scaffold 页面状态封装
  */
@@ -59,7 +114,8 @@ data class FileScaffoldState(
     val isCutState: Boolean,
     val fabPosition: FabPosition,
     val currentCid: String,
-    val nestedScrollConnection: NestedScrollConnection
+    val nestedScrollConnection: NestedScrollConnection,
+    val isSearchState: Boolean = false
 )
 
 /**
@@ -82,7 +138,13 @@ data class FileListDataState(
     val fileBeanList: List<FileBean>,
     val refreshing: Boolean,
     val clickIndex: Int,
-    val imageCache: Map<String, ImageBean>? = null
+    val imageCache: Map<String, ImageBean>? = null,
+    /**
+     * 当前列表对应的数据源唯一分页键（如 folder:0, search:0:keyword, filter:0:1）
+     * 明确由上层 contentState.source 提供，不设默认值以杜绝传参疏漏，
+     * 用于驱动视图树感知模式切换，安全重置快速滚动条与列表容器
+     */
+    val paginationKey: String,
 )
 
 /**

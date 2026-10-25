@@ -52,6 +52,7 @@ fun FileScaffold(
 ) {
     val topBarMode = when {
         state.isLongClickState -> TopBarMode.Multiple
+        state.isSearchState -> TopBarMode.Back
         state.currentCid == "0" -> TopBarMode.Root
         else -> TopBarMode.Back
     }

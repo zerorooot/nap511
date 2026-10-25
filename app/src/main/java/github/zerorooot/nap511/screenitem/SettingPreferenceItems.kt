@@ -313,7 +313,7 @@ fun LazyListScope.fileCachePreferenceItems(
     item {
         SwitchPreferenceItem(
             title = "文件夹置顶开关项",
-            summary = "开启时文件夹始终显示在文件上方；关闭时文件夹与文件按当前排序规则混合排列\n注：此设置对按${OrderType.SIZE.label}、${OrderType.TYPE.label}排序模式不生效",
+            summary = "开启时文件夹始终显示在文件上方；关闭时文件夹与文件按当前排序规则混合排列\n注：切换后因为有缓存，需要手动刷新文件才生效",
             checked = uiState.keepFoldersOnTop,
             onCheckedChange = { onSaveConfig(ConfigKeyUtil.KEEP_FOLDERS_ON_TOP, it) }
         )

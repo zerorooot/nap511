@@ -188,7 +188,9 @@ fun FileListContent(
         if (dataState.fileBeanList.isEmpty()) {
             FileEmptyContent()
         } else {
-            key(dataState.currentCid, displayConfig.isPreviewActive) {
+            // 当从普通目录切换至搜索/过滤（或退出恢复）时，强制重新初始化 LazyColumnScrollbar，
+            // 确保其内部的 LazyListStateController 紧密绑定当前活跃的 LazyListState 实例。
+            key(dataState.paginationKey, displayConfig.isPreviewActive) {
                 if (displayConfig.isPreviewActive) {
                     FileStaggeredGridList(
                         dataState = dataState,

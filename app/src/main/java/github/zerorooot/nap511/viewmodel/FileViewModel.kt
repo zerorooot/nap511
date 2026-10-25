@@ -3,9 +3,6 @@ package github.zerorooot.nap511.viewmodel
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Intent
-import android.icu.text.Collator
-import android.icu.text.RuleBasedCollator
-import android.icu.util.ULocale
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.concurrent.futures.await
@@ -27,6 +24,7 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileContentUiState
 import github.zerorooot.nap511.bean.FileDialogUiState
+import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.ImageBean
 import github.zerorooot.nap511.bean.LocationBean
@@ -62,37 +60,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
-
-/**
- * 单例管理 ICU Collator，避免在列表排序过程中反复创建对象
- */
-object NaturalOrderComparator {
-    private val icuCollator: Collator by lazy {
-        Collator.getInstance(ULocale.CHINA).apply {
-            (this as? RuleBasedCollator)?.numericCollation = true // 开启数字自然排序 ("2" < "10")
-            strength = Collator.TERTIARY // 区分大小写与音调
-            freeze()  // 设为不可变以保证线程安全与极致性能
-        }
-    }
-
-    val instance: Comparator<String> by lazy {
-        Comparator { s1, s2 ->
-            // 判断首字符：普通字符(字母/数字/中文)权重为 0，特殊符号/标点权重为 1(沉底)
-            val w1 = if (s1.firstOrNull()
-                    ?.let { it.isLetterOrDigit() || it.code in 0x4e00..0x9fa5 } == true
-            ) 0 else 1
-            val w2 = if (s2.firstOrNull()
-                    ?.let { it.isLetterOrDigit() || it.code in 0x4e00..0x9fa5 } == true
-            ) 0 else 1
-
-            if (w1 != w2) {
-                w1.compareTo(w2) // 符号开头的一律排在汉字/字母后面
-            } else {
-                icuCollator.compare(s1, s2) // 其余继续走原生 ICU 自然排序
-            }
-        }
-    }
-}
 
 @SuppressLint("MutableCollectionMutableState")
 class FileViewModel(
@@ -142,7 +109,8 @@ class FileViewModel(
         get() = MutableStateFlow(_contentState.value.isRefreshing).asStateFlow()
     val orderBean: OrderBean
         get() = _contentState.value.orderBean
-
+    val totalCount: Int
+        get() = _contentState.value.totalCount
 
     // ==================== 内部线程安全与细粒度响应式缓存（解耦，不触发 UI 整体重组） ====================
     val clickMap = ConcurrentHashMap<String, Int>()
@@ -153,18 +121,31 @@ class FileViewModel(
     val torrentBeanCache = ConcurrentHashMap<String, TorrentFileBean>()
     private val currentLocation = ConcurrentHashMap<String, LocationBean>()
 
-    // 记录各目录触底分页加载是否已完全加载完毕，避免重复触发无效请求与 Toast
+    // 记录各目录及数据源模式触底分页加载是否已完全加载完毕，避免重复触发无效请求与 Toast
     private val isLoadedCompleteMap = ConcurrentHashMap<String, Boolean>()
 
-    // 记录正在执行触底拉取更多任务的 cid，按目录级提供原子互斥保障，防止高频触底引发并发重入
-    private val fetchingMoreCids = ConcurrentHashMap.newKeySet<String>()
+    // 记录正在执行触底拉取更多任务的 paginationKey，按模式及目录级提供原子互斥保障，防止高频触底引发并发重入
+    private val fetchingMoreKeys = ConcurrentHashMap.newKeySet<String>()
 
     /** 当前是否正处于触底加载更多状态 */
     val isFetchingMore: Boolean
-        get() = fetchingMoreCids.isNotEmpty()
+        get() = fetchingMoreKeys.isNotEmpty()
 
     internal var saveRequestCache: Boolean = true
     internal var lastKeepFoldersOnTop: Boolean? = null
+
+
+    /**
+     * 获取当前活跃模式的排序规则：
+     * - 过滤模式：获取当前过滤专用的排序规则
+     * - 目录/其他模式：获取当前目录的排序规则
+     * 供排序弹窗回显及外部组件统一消费
+     */
+    val currentOrderBean: OrderBean
+        get() = when (val s = _contentState.value.source) {
+            is FileListSource.Filter -> s.order
+            else -> orderBean
+        }
 
     /**
      * 115 文件夹/文件混排参数：
@@ -189,10 +170,9 @@ class FileViewModel(
         viewModelScope.launch {
             settingUiStateFlow.collect { settings ->
                 saveRequestCache = settings.saveRequestCache
+                //不一致，说明用户切换了排序设置，需要手动再order一次，否则如何只要不点击排序，当前顺序永远无法改变
                 if (lastKeepFoldersOnTop != null && lastKeepFoldersOnTop != settings.keepFoldersOnTop) {
-                    val cid = _contentState.value.currentCid
-                    FileCacheManager.remove(cid)
-                    order()
+                    order(false)
                 }
                 lastKeepFoldersOnTop = settings.keepFoldersOnTop
             }
@@ -300,13 +280,9 @@ class FileViewModel(
                 return@launch
             }
             runCatching {
-                val files =
-                    fileRepository.getFiles(
-                        cid = cid,
-                        order = orderBean.type,
-                        asc = orderBean.asc,
-                        fcMix = currentFcMix
-                    )
+                val files = fileRepository.getFiles(
+                    cid = cid, order = orderBean.type, asc = orderBean.asc, fcMix = currentFcMix
+                )
                 files.fileBeanList = formatFileBeanList(files.fileBeanList)
                 FileCacheManager[cid] = files
             }.onFailureToastAndLog()
@@ -323,10 +299,12 @@ class FileViewModel(
             val cache = FileCacheManager.getDate(currentCid)
             if (cache != null) {
                 setFiles(cache)
+            } else {
+                getFiles(currentCid)
             }
             updateContentState {
                 copy(
-                    isSearchState = false,
+                    source = FileListSource.Folder(currentCid),
                     appBarTitle = context.getString(R.string.app_name)
                 )
             }
@@ -344,20 +322,19 @@ class FileViewModel(
         }
     }
 
-    fun setListLocation(cid: String, scrollState: LazyScrollState) {
-        currentLocation[cid] = LocationBean(
-            scrollState.firstVisibleItemIndex,
-            scrollState.firstVisibleItemScrollOffset
+    fun setListLocation(key: String, scrollState: LazyScrollState) {
+        currentLocation[key] = LocationBean(
+            scrollState.firstVisibleItemIndex, scrollState.firstVisibleItemScrollOffset
         )
     }
 
     fun setListLocationAndClickCache(index: Int, state: LazyScrollState) {
-        setListLocation(currentCid, state)
+        setListLocation(_contentState.value.source.paginationKey, state)
         clickMap[currentCid] = index
     }
 
-    fun getListLocation(currentCid: String): LocationBean {
-        return currentLocation[currentCid] ?: LocationBean(0, 0)
+    fun getListLocation(key: String): LocationBean {
+        return currentLocation[key] ?: LocationBean(0, 0)
     }
 
     fun setRefreshingStatus(status: Boolean) {
@@ -396,13 +373,9 @@ class FileViewModel(
             }
 
             runCatching {
-                val files =
-                    fileRepository.getFiles(
-                        cid = cid,
-                        order = orderBean.type,
-                        asc = orderBean.asc,
-                        fcMix = currentFcMix
-                    )
+                val files = fileRepository.getFiles(
+                    cid = cid, order = orderBean.type, asc = orderBean.asc, fcMix = currentFcMix
+                )
                 //请求的cid不是0,但返回的cid是0。证明请求的cid不存在
                 if (cid != "0" && files.cid == "0") {
                     App.instance.toast("当前文件夹被删除！")
@@ -440,17 +413,16 @@ class FileViewModel(
      */
     fun loadMoreFiles() {
         val state = _contentState.value
-        val cid = state.currentCid
-        // 搜索模式、多选模式、当前目录正在加载或正处于下拉刷新中，均不触发
-        if (state.isSearchState || state.isLongClickState || state.isRefreshing || fetchingMoreCids.contains(
-                cid
-            )
-        ) {
+        val source = state.source
+        val paginationKey = source.paginationKey
+
+        // 多选模式、当前数据源正在加载或正处于下拉刷新中，均不触发
+        if (state.isLongClickState || state.isRefreshing || fetchingMoreKeys.contains(paginationKey)) {
             return
         }
 
         // 检查是否此前已被标记为加载完成
-        if (isLoadedCompleteMap.getOrDefault(cid, false)) {
+        if (isLoadedCompleteMap.getOrDefault(paginationKey, false)) {
             return
         }
 
@@ -459,40 +431,68 @@ class FileViewModel(
             return
         }
 
-        val cachedData = FileCacheManager.getDate(cid)
-        val totalCount = cachedData?.count ?: 0
+        val cachedData =
+            if (source is FileListSource.Folder) FileCacheManager.getDate(source.cid) else null
+        val totalCount = if (source is FileListSource.Folder) {
+            state.totalCount.takeIf { it > 0 } ?: (cachedData?.count ?: 0)
+        } else {
+            state.totalCount
+        }
         val limit = UserSessionManager.requestLimitCount
 
         // 【第一级：前置拦截】如果本地已知条目已达服务端总量，直接完成并拦截无意义网络请求
         // 保护：仅当总数量大于单页容量（确实存在多页分页）时才提示“加载完毕”，避免只有几十项的小目录一滑到底就误弹 Toast
         if (totalCount > 0 && currentList.size >= totalCount) {
-            isLoadedCompleteMap[cid] = true
+            isLoadedCompleteMap[paginationKey] = true
             if (totalCount > limit) {
                 App.instance.toast("加载完毕")
             }
             return
         }
 
-        if (!fetchingMoreCids.add(cid)) {
+        if (!fetchingMoreKeys.add(paginationKey)) {
             return
         }
         setRefreshingStatus(true)
 
         // 记录请求发起时的上下文版本，用于并发校验防串位
-        val currentRequestOrder = state.orderBean
+        val currentRequestSource = source
+        //需要区分过滤时的order,防止过滤的order对Folder的排序产生干扰
+        val currentRequestOrder = currentOrderBean
         val currentRequestKeepFolders = settingUiState.keepFoldersOnTop
         val currentFcMix = this.currentFcMix
 
         viewModelScope.launch {
             try {
                 val offset = currentList.size
-                val res = fileRepository.getFiles(
-                    cid = cid,
-                    order = currentRequestOrder.type,
-                    asc = currentRequestOrder.asc,
-                    offset = offset,
-                    fcMix = currentFcMix
-                )
+                XLog.d("loadMoreFiles currentRequestSource=$currentRequestSource, order=$currentRequestOrder ,offset=$offset, fcMix=$currentFcMix, limit=$limit")
+                val res = when (currentRequestSource) {
+                    is FileListSource.Folder -> fileRepository.getFiles(
+                        cid = currentRequestSource.cid,
+                        order = currentRequestOrder.type,
+                        asc = currentRequestOrder.asc,
+                        offset = offset,
+                        fcMix = currentFcMix,
+                        limit = limit
+                    )
+
+                    is FileListSource.Search -> fileRepository.search(
+                        cid = currentRequestSource.cid,
+                        searchValue = currentRequestSource.keyword,
+                        offset = offset,
+                        limit = limit
+                    )
+
+                    is FileListSource.Filter -> fileRepository.filterFile(
+                        cid = currentRequestSource.cid,
+                        type = currentRequestSource.filterType,
+                        order = currentRequestOrder.type,
+                        asc = currentRequestOrder.asc,
+                        offset = offset,
+                        limit = limit,
+                        fcMix = currentFcMix
+                    )
+                }
 
                 val rawNewItems = res.fileBeanList
                 val formattedNewItems = formatFileBeanList(rawNewItems)
@@ -502,30 +502,43 @@ class FileViewModel(
                     item.fileId.ifEmpty { item.categoryId.ifEmpty { item.pickCode } }
                 }
 
-                // 同步持久化写入 FileCacheManager
-                val updatedFilesBean = (cachedData ?: res).copy(
-                    fileBeanList = ArrayList(combinedList),
-                    count = if (res.count > 0) res.count else totalCount
-                )
-                FileCacheManager[cid] = updatedFilesBean
+                val latestTotalCount = if (res.count > 0) res.count else totalCount
 
-                // 【Cid 与排序并发竞争保护】：仅在当前屏幕仍停留在发起请求的目录，且排序与置顶状态未发生变化时才更新 UI
-                if (_contentState.value.currentCid == cid &&
-                    _contentState.value.orderBean == currentRequestOrder &&
-                    settingUiState.keepFoldersOnTop == currentRequestKeepFolders
+                // 仅 Folder 模式同步持久化写入 FileCacheManager
+                if (currentRequestSource is FileListSource.Folder) {
+                    val updatedFilesBean = (cachedData ?: res).copy(
+                        fileBeanList = ArrayList(combinedList), count = latestTotalCount
+                    )
+                    FileCacheManager[currentRequestSource.cid] = updatedFilesBean
+                }
+
+                // 【并发竞争保护】：仅在当前屏幕仍停留在发起请求的模式与上下文时才更新 UI
+                if (
+                    // 1. 校验当前页面展示的数据源（CID/搜索词/筛选类型）是否与请求发起时一致
+                    _contentState.value.source == currentRequestSource &&
+
+                    // 2. 校验当前的排序规则（按时间/名称、升降序）是否与请求发起时一致
+                    currentOrderBean == currentRequestOrder &&
+
+                    // 3. 如果是搜索页面（不受文件夹置顶影响）或者“文件夹置顶”设置未发生改变
+                    (currentRequestSource is FileListSource.Search || settingUiState.keepFoldersOnTop == currentRequestKeepFolders)
                 ) {
-                    updateContentState { copy(fileBeanList = combinedList) }
+                    // 只有当上下文环境完全没变时，才真正把追加的数据更新到 UI 状态中
+                    updateContentState {
+                        copy(
+                            fileBeanList = combinedList, totalCount = latestTotalCount
+                        )
+                    }
                 }
 
                 // 【第二级：响应双重校验】
                 // 条件 A: 本次返回数据量少于请求单页上限（说明已经是最后一批）
                 val isEndByBatchSize = rawNewItems.size < limit
                 // 条件 B: 累积展示数量已经达到或超过服务端统计的总条目数
-                val isEndByCount =
-                    (updatedFilesBean.count > 0 && combinedList.size >= updatedFilesBean.count)
+                val isEndByCount = latestTotalCount > 0 && combinedList.size >= latestTotalCount
 
                 if (isEndByBatchSize || isEndByCount) {
-                    isLoadedCompleteMap[cid] = true
+                    isLoadedCompleteMap[paginationKey] = true
                     if (combinedList.size > limit) {
                         App.instance.toast("加载完毕")
                     }
@@ -534,26 +547,30 @@ class FileViewModel(
                 XLog.e("loadMoreFiles Exception", e)
                 App.instance.toast("加载更多失败")
             } finally {
-                fetchingMoreCids.remove(cid)
-                if (_contentState.value.currentCid == cid) {
+                fetchingMoreKeys.remove(paginationKey)
+                if (_contentState.value.source.paginationKey == paginationKey) {
                     setRefreshingStatus(false)
                 }
             }
         }
     }
 
-    fun order() {
+    fun order(isRefresh: Boolean = true, order: OrderBean? = null) {
+        val b = order ?: orderBean
         val map = mapOf(
-            "user_order" to orderBean.type,
-            "user_asc" to orderBean.asc.toString(),
+            "user_order" to b.type,
+            "user_asc" to b.asc.toString(),
             "file_id" to currentCid,
             "fc_mix" to currentFcMix.toString()
         )
+
         viewModelScope.launch {
             runCatching {
                 val order = fileRepository.order(map)
                 if (order.state) {
-                    refresh(currentCid)
+                    if (isRefresh) {
+                        refresh(currentCid)
+                    }
                 } else {
                     App.instance.toast("排序失败")
                 }
@@ -562,8 +579,21 @@ class FileViewModel(
     }
 
     fun updateOrder(order: OrderBean) {
-        updateContentState { copy(orderBean = order) }
-        this.order()
+        when (val s = _contentState.value.source) {
+            is FileListSource.Search -> {
+                App.instance.toast("暂不支持搜索模式排序")
+            }
+
+            is FileListSource.Filter -> {
+                this.order(false, order)
+                filterFile(type = s.filterType, name = s.name, order = order)
+            }
+
+            is FileListSource.Folder -> {
+                updateContentState { copy(orderBean = order) }
+                this.order()
+            }
+        }
     }
 
 
@@ -576,8 +606,7 @@ class FileViewModel(
                 if (idx <= firstSelectedIndex) item.copy(isSelect = true) else item
             }
             copy(
-                fileBeanList = list,
-                appBarTitle = list.count { it.isSelect }.toString()
+                fileBeanList = list, appBarTitle = list.count { it.isSelect }.toString()
             )
         }
     }
@@ -591,8 +620,7 @@ class FileViewModel(
                 if (idx >= firstSelectedIndex) item.copy(isSelect = true) else item
             }
             copy(
-                fileBeanList = list,
-                appBarTitle = list.count { it.isSelect }.toString()
+                fileBeanList = list, appBarTitle = list.count { it.isSelect }.toString()
             )
         }
     }
@@ -602,16 +630,33 @@ class FileViewModel(
     }
 
     fun refresh(forceCache: Boolean = false) {
-        refresh(currentCid, forceCache)
+        when (val s = _contentState.value.source) {
+            is FileListSource.Folder -> refresh(currentCid, forceCache)
+
+            is FileListSource.Search -> {
+                clearSelection()
+                isLoadedCompleteMap[s.paginationKey] = false
+                search(s.keyword)
+            }
+
+            is FileListSource.Filter -> {
+                clearSelection()
+                isLoadedCompleteMap[s.paginationKey] = false
+                // 携带 s.order 刷新，确保用户调整后的过滤排序在下拉刷新时不丢失
+                filterFile(type = s.filterType, name = s.name, order = s.order)
+            }
+        }
     }
 
     @OptIn(ExperimentalCoilApi::class)
     internal fun refresh(cid: String, forceCache: Boolean = false) {
         clearSelection()
-        isLoadedCompleteMap[cid] = false
-        updateContentState { copy(isSearchState = false) }
+        isLoadedCompleteMap["folder:$cid"] = false
+        updateContentState { copy(source = FileListSource.Folder(cid)) }
         val refreshCurrent = (cid == currentCid)
-        XLog.d("refresh refreshCurrent:$refreshCurrent, settingUiState.forceLoadCache:${settingUiState.forceLoadCache}, forceCache:$forceCache")
+        XLog.d(
+            "refresh refreshCurrent:$refreshCurrent, settingUiState.forceLoadCache:${settingUiState.forceLoadCache}, forceCache:$forceCache," + "order = ${orderBean.type}, asc = ${orderBean.asc}, fcMix = $currentFcMix"
+        )
         viewModelScope.launch {
             if (settingUiState.forceLoadCache || forceCache) {
                 if (cid == "0") {
@@ -668,7 +713,7 @@ class FileViewModel(
                 //    - 场景 D（后台视频播放进度同步）：视频在后台播放更新进度时，若用户已切出该目录，进度通知的 cid 亦非当前目录。
                 //    处理策略：FileCacheManager 已经在后台内存和磁盘中维护好了 event.cid 对应的最新数据；由于用户当前并没有在看 event.cid，
                 //    因此当前屏幕展示的 fileBeanList 绝对不需要变动，无需做任何处理。待用户未来切入该目录时即可天然读到已更新好的最新缓存。
-                if (event.cid == currentCid) {
+                if (event.cid == currentCid && _contentState.value.source is FileListSource.Folder) {
                     val updatedCache = FileCacheManager.getDate(event.cid)
                     if (updatedCache != null) {
                         updateContentState {
@@ -678,7 +723,7 @@ class FileViewModel(
                                 fileBeanList = unselectedList,
                                 pathList = updatedCache.path,
                                 isLongClickState = false,
-                                appBarTitle = if (isSearchState) "搜索" else context.getString(R.string.app_name)
+                                appBarTitle = getDefaultAppBarTitle(context)
                             )
                         }
                     } else {
@@ -692,7 +737,9 @@ class FileViewModel(
                 // 【远程 API 刷新逻辑】：
                 // 针对新增文件、解压完成、离线下载完成、字幕上传、回收站还原等场景，云端生成了新文件或变动：
                 /**不需要删除缓存，因为在 [FileCacheManager.notifyRemoteRefresh] 里已经删除了**/
-                refresh(event.cid, true)
+                if (_contentState.value.source is FileListSource.Folder) {
+                    refresh(event.cid, true)
+                }
             }
 
             is CacheEvent.FolderDeleted -> {
@@ -709,9 +756,8 @@ class FileViewModel(
                 if (isCurrentDeleted || isAncestorDeleted) {
                     App.instance.toast("当前所在目录已被删除")
                     // 回退至最近仍存在的祖先目录，兜底为根目录 "0"
-                    val survivingAncestorCid = pathList
-                        .takeWhile { it.cid != event.folderCid }
-                        .lastOrNull()?.cid ?: "0"
+                    val survivingAncestorCid =
+                        pathList.takeWhile { it.cid != event.folderCid }.lastOrNull()?.cid ?: "0"
                     getFiles(survivingAncestorCid)
                 }
             }
@@ -790,16 +836,23 @@ class FileViewModel(
     }
 
     fun search(searchKey: String) {
+        val targetSource = FileListSource.Search(currentCid, searchKey)
+        val limit = UserSessionManager.requestLimitCount
         setRefreshingStatus(true)
         viewModelScope.launch {
             runCatching {
-                val files = fileRepository.search(currentCid, searchKey)
+                val files = fileRepository.search(
+                    cid = currentCid, searchValue = searchKey, offset = 0, limit = limit
+                )
                 val formattedList = formatFileBeanList(files.fileBeanList)
+                isLoadedCompleteMap[targetSource.paginationKey] =
+                    formattedList.size < limit || (files.count > 0 && formattedList.size >= files.count)
                 updateContentState {
                     copy(
-                        isSearchState = true,
+                        source = targetSource,
                         isLongClickState = false,
                         fileBeanList = formattedList,
+                        totalCount = files.count,
                         appBarTitle = "搜索 - $searchKey"
                     )
                 }
@@ -808,17 +861,34 @@ class FileViewModel(
         }
     }
 
-    fun filterFile(type: Int, name: String) {
+    fun filterFile(type: Int, name: String, order: OrderBean = orderBean) {
+        val fcMix = currentFcMix
+        val limit = UserSessionManager.requestLimitCount
         setRefreshingStatus(true)
         viewModelScope.launch {
             runCatching {
-                val files = fileRepository.filterFile(currentCid, type)
+                val files = fileRepository.filterFile(
+                    cid = currentCid,
+                    type = type,
+                    order = order.type,
+                    asc = order.asc,
+                    offset = 0,
+                    limit = limit,
+                    fcMix = fcMix
+                )
                 val formattedList = formatFileBeanList(files.fileBeanList)
+
+                val targetSource =
+                    FileListSource.Filter(currentCid, type, name, OrderBean.from(files), fcMix)
+
+                isLoadedCompleteMap[targetSource.paginationKey] =
+                    formattedList.size < limit || (files.count > 0 && formattedList.size >= files.count)
                 updateContentState {
                     copy(
-                        isSearchState = true,
+                        source = targetSource,
                         isLongClickState = false,
                         fileBeanList = formattedList,
+                        totalCount = files.count,
                         appBarTitle = "过滤 - $name"
                     )
                 }
@@ -856,8 +926,7 @@ class FileViewModel(
                 list[index] = item.copy(isSelect = !item.isSelect)
                 val count = list.count { it.isSelect }
                 copy(
-                    fileBeanList = list,
-                    appBarTitle = if (count > 0) count.toString() else "nap511"
+                    fileBeanList = list, appBarTitle = if (count > 0) count.toString() else "nap511"
                 )
             } else {
                 this
@@ -872,9 +941,7 @@ class FileViewModel(
                 list[index] = list[index].copy(isSelect = true)
             }
             copy(
-                isLongClickState = true,
-                fileBeanList = list,
-                appBarTitle = "1"
+                isLongClickState = true, fileBeanList = list, appBarTitle = "1"
             )
         }
     }
@@ -885,27 +952,30 @@ class FileViewModel(
             copy(
                 fileBeanList = updatedList,
                 isLongClickState = false,
-                appBarTitle = if (isSearchState) "搜索" else context.getString(R.string.app_name)
+                appBarTitle = getDefaultAppBarTitle(context)
             )
         }
     }
 
     private fun setFiles(files: FilesBean) {
         val currentOrder = OrderBean.from(files)
+        val folderSource = FileListSource.Folder(files.cid)
         updateContentState {
             copy(
+                source = folderSource,
                 fileBeanList = files.fileBeanList.toList(),
                 currentCid = files.cid,
+                totalCount = files.count,
                 orderBean = currentOrder,
                 pathList = files.path,
                 isRefreshing = false,
                 isLongClickState = false,
-                appBarTitle = if (isSearchState) "搜索" else context.getString(R.string.app_name)
+                appBarTitle = context.getString(R.string.app_name)
             )
         }
         // 若初始加载/缓存读取的条目已达服务端总量，或单页数量少于单页上限，说明该目录全部条目已加载完毕，标记为完成，避免触底无效触发
         val limit = UserSessionManager.requestLimitCount
-        isLoadedCompleteMap[files.cid] =
+        isLoadedCompleteMap[folderSource.paginationKey] =
             files.fileBeanList.size < limit || (files.count > 0 && files.fileBeanList.size >= files.count)
 
         viewModelScope.launch { FileCacheManager[files.cid] = files }
@@ -938,11 +1008,9 @@ class FileViewModel(
             }
 
             // 获取并过滤本地缓存任务
-            val currentOfflineTask = settingUiState.currentOfflineTask
-                .split("\n")
+            val currentOfflineTask = settingUiState.currentOfflineTask.split("\n")
                 .filter { i -> i.isNotBlank() } // 简化过滤逻辑
-                .toSet()
-                .toMutableList()
+                .toSet().toMutableList()
 
             if (currentOfflineTask.isEmpty()) {
                 // 如果是主动添加模式且列表为空，弹 Toast 提示
@@ -959,18 +1027,14 @@ class FileViewModel(
             // 序列化并提交新任务
             val listType = object : TypeToken<List<String?>?>() {}.type
             val list = Gson().toJson(currentOfflineTask, listType)
-            val data = Data.Builder().putString("list", list)
-                .build()
+            val data = Data.Builder().putString("list", list).build()
 
-            val constraints = Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build()
+            val constraints =
+                Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
             val request = OneTimeWorkRequest.Builder(OfflineTaskWorker::class.java)
-                .addTag(ConfigKeyUtil.OFFLINE_TASK_WORKER)
-                .setInputData(data)
-                .setConstraints(constraints)
-                .build()
+                .addTag(ConfigKeyUtil.OFFLINE_TASK_WORKER).setInputData(data)
+                .setConstraints(constraints).build()
 
             workManager.enqueue(request)
         }

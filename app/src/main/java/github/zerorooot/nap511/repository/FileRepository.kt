@@ -181,7 +181,7 @@ open class FileRepository {
         limit: Int = UserSessionManager.requestLimitCount,
         format: String = "json",
         offset: Int = 0,
-        fcMix: Int = 0,
+        fcMix: Int,
     ): FilesBean {
         return fileService.getFiles(cid, showDir, aid, asc, order, limit, naturalSort, format, offset, fcMix)
     }
@@ -199,13 +199,39 @@ open class FileRepository {
     }
 
     open suspend fun search(
-        cid: String, searchValue: String, aid: Int = 1, asc: Int = 0, limit: Int = 1150
+        cid: String,
+        searchValue: String,
+        aid: Int = 1,
+        offset: Int = 0,
+        limit: Int = UserSessionManager.requestLimitCount
     ): FilesBean {
-        return fileService.search(cid, searchValue, aid, asc, limit)
+        return fileService.search(
+            cid = cid,
+            searchValue = searchValue,
+            aid = aid,
+            offset = offset,
+            limit = limit
+        )
     }
 
-    open suspend fun filterFile(cid: String, type: Int, limit: Int = 1150): FilesBean {
-        return fileService.filterFile(cid = cid, type = type, limit = limit)
+    open suspend fun filterFile(
+        cid: String,
+        type: Int,
+        order: String,
+        asc: Int = 1,
+        offset: Int = 0,
+        limit: Int = UserSessionManager.requestLimitCount,
+        fcMix: Int = 0
+    ): FilesBean {
+        return fileService.filterFile(
+            cid = cid,
+            type = type,
+            order = order,
+            asc = asc,
+            offset = offset,
+            limit = limit,
+            fcMix = fcMix
+        )
     }
 
 

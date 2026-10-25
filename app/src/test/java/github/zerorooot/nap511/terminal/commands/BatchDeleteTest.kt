@@ -313,7 +313,7 @@ class BatchDeleteTest {
                 cid: String,
                 searchValue: String,
                 aid: Int,
-                asc: Int,
+                offset: Int,
                 limit: Int
             ): FilesBean {
                 // 模拟全局搜索返回 2 个普通文件：其 parentId 为空，categoryId 为 "50"

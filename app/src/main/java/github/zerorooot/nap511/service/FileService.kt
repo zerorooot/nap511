@@ -114,7 +114,7 @@ interface FileService {
         @Query("cid") cid: String,
         @Query("search_value") searchValue: String,
         @Query("aid") aid: Int,
-        @Query("offset") asc: Int,
+        @Query("offset") offset: Int,
         @Query("limit") limit: Int
     ): FilesBean
 
@@ -122,11 +122,11 @@ interface FileService {
     suspend fun filterFile(
         @Query("aid") aid: Int = 1,
         @Query("cid") cid: String,
-        @Query("o") order: String = "user_ptime",
-        @Query("asc") asc: Int = 0,
-        @Query("offset") offset: Int = 0,
+        @Query("o") order: String,
+        @Query("asc") asc: Int,
+        @Query("offset") offset: Int,
         @Query("show_dir") showDir: Int = 1,
-        @Query("limit") limit: Int = 40,
+        @Query("limit") limit: Int,
         @Query("code") code: String? = null,
         @Query("scid") scid: String? = null,
         @Query("snap") snap: Int = 0,
@@ -140,7 +140,7 @@ interface FileService {
         @Query("suffix") suffix: String? = null,
         @Query("is_share") isShare: String? = null,
         @Query("custom_order") customOrder: String? = null,
-        @Query("fc_mix") fcMix: String? = null
+        @Query("fc_mix") fcMix: Int
     ): FilesBean
 
     /**

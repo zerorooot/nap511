@@ -122,14 +122,14 @@ fun RenameFileDialog(name: String, position: Boolean, enter: (String?) -> Unit) 
 @Composable
 fun FileOrderDialog(
     selectOrderBean: OrderBean,
-    enter: (OrderBean) -> Unit
+    enter: (OrderBean?) -> Unit
 ) {
     var selectedType by remember { mutableStateOf(selectOrderBean.orderType) }
     var selectedAsc by remember { mutableIntStateOf(selectOrderBean.asc) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
-        onDismissRequest = { enter(selectOrderBean) },
+        onDismissRequest = { enter(null) },
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 6.dp,
@@ -156,7 +156,6 @@ fun FileOrderDialog(
                     selected = selectedAsc == 1,
                     onClick = {
                         selectedAsc = 1
-                        enter(OrderBean(type = selectedType.rawValue, asc = 1))
                     },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                     icon = { Icon(Icons.Default.ArrowUpward, null, Modifier.size(16.dp)) }
@@ -167,7 +166,6 @@ fun FileOrderDialog(
                     selected = selectedAsc == 0,
                     onClick = {
                         selectedAsc = 0
-                        enter(OrderBean(type = selectedType.rawValue, asc = 0))
                     },
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                     icon = { Icon(Icons.Default.ArrowDownward, null, Modifier.size(16.dp)) }
@@ -184,8 +182,7 @@ fun FileOrderDialog(
                     val isSelected = selectedType == type
                     Surface(
                         onClick = {
-                            val nextAsc = if (isSelected) (1 - selectedAsc) else selectedAsc
-                            enter(OrderBean(type = type.rawValue, asc = nextAsc))
+                            selectedType = type
                         },
                         shape = RoundedCornerShape(12.dp),
                         color = if (isSelected) MaterialTheme.colorScheme.primaryContainer
@@ -223,6 +220,16 @@ fun FileOrderDialog(
                         }
                     }
                 }
+            }
+
+            // 确认按钮
+            Button(
+                onClick = {
+                    enter(OrderBean(type = selectedType.rawValue, asc = selectedAsc))
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("确定")
             }
         }
     }
