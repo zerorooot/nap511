@@ -527,7 +527,7 @@ object FileCacheManager {
         mutex.withLock {
             memoryCache.clear()
             if (::cacheDir.isInitialized) {
-                cacheDir.delete()
+                cacheDir.listFiles()?.forEach { it.delete() }
                 cacheDir.mkdirs()
             }
             _cacheEvents.tryEmit(CacheEvent.AllCleared)
