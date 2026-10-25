@@ -3,17 +3,15 @@
    See https://developer.android.com/about/versions/12/backup-restore#xml-changes
    for details.
 -->
+<!--  适用于 Android 12 及以上 / API ≥ 31-->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <!-- 仅备份 DataStore 配置 (files/datastore) 和 SharedPref，自动排除 cache 目录及所有其他文件 -->
+        <include domain="file" path="datastore" />
+        <include domain="sharedpref" path="." />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <include domain="file" path="datastore" />
+        <include domain="sharedpref" path="." />
     </device-transfer>
-    -->
 </data-extraction-rules>

@@ -4,6 +4,7 @@ import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.VideoBean
+import github.zerorooot.nap511.bean.cache.CacheWrapper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -16,11 +17,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.Collections
 import java.util.StringJoiner
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
-import github.zerorooot.nap511.bean.cache.CacheWrapper
-import github.zerorooot.nap511.viewmodel.formatFileBeanList
 
 /**
  * 缓存数据变更通知事件
@@ -61,8 +60,33 @@ object FileCacheManager {
     // 独立后台协程作用域，用于不阻塞启动流程的后台加载任务
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    // 内存 LRU 缓存：只要 App 运行，始终存在且有效
-    private val memoryCache = ConcurrentHashMap<String, CacheWrapper>(30)
+    // 最大内存目录缓存容量，超过时基于 LRU 淘汰旧目录，保障深度扫描时的内存安全与防 OOM
+    private const val MAX_MEMORY_DIRS = 50
+
+    private class LruCacheMap(private val capacity: Int) :
+        LinkedHashMap<String, CacheWrapper>(capacity, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CacheWrapper>?): Boolean {
+            if (size <= capacity) return false
+            // 若最老元素是根目录 "0"，不能直接淘汰 "0"，应在超过容量时保留 "0" 并移除次老元素
+            if (eldest?.key == "0") {
+                // 找到第一个非 "0" 的键进行淘汰
+                val iterator = iterator()
+                while (iterator.hasNext()) {
+                    val entry = iterator.next()
+                    if (entry.key != "0") {
+                        iterator.remove()
+                        break
+                    }
+                }
+                return false
+            }
+            return true
+        }
+    }
+
+    // 内存 LRU 缓存：只要 App 运行，始终存在且有效（使用 synchronizedMap 保证高并发读写安全）
+    private val memoryCache: MutableMap<String, CacheWrapper> =
+        Collections.synchronizedMap(LruCacheMap(MAX_MEMORY_DIRS))
 
     // 全局缓存变更事件流（带缓冲，避免高频变更时产生阻塞挂起）
     private val _cacheEvents = MutableSharedFlow<CacheEvent>(

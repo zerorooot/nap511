@@ -3,8 +3,13 @@ package github.zerorooot.nap511.terminal.context
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.PathBean
+import github.zerorooot.nap511.bean.OrderBean
+import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
+import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinator
+import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinatorImpl
+import github.zerorooot.nap511.repository.paging.PagingOptions
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.FileOpener
 import github.zerorooot.nap511.viewmodel.formatFileBeanList
@@ -52,19 +57,26 @@ sealed class ResolvedTarget {
 
 /**
  * 终端执行会话上下文
- * 维护当前终端的工作目录、115网盘仓库层接口、缓存管理器、路径解析及交互回调
+ * 维护当前终端的工作目录、统一分页协同器、115网盘仓库层接口、缓存管理器、路径解析及交互回调
  */
 class TerminalContext(
     initialPathList: List<PathBean> = emptyList(),
-    val fileRepository: FileRepository = FileRepository.getInstance(),
+    fileRepository: FileRepository = FileRepository.getInstance(),
     val fileCacheManager: FileCacheManager = FileCacheManager,
+    pagingCoordinator: DirectoryPagingCoordinator? = null,
     val onConfirmRequest: (suspend (prompt: String) -> Boolean)? = null,
     val onDirectoryChanged: ((cid: String, path: String) -> Unit)? = null,
     var fileOpener: FileOpener? = null,
     val getKeepFoldersOnTop: () -> Boolean = {
         runCatching { SettingsRepository.getInstance().settingUiStateFlow.value.keepFoldersOnTop }.getOrDefault(true)
+    },
+    val getCurrentOrder: () -> OrderBean = {
+        OrderBean(type = OrderEnum.create, asc = 0)
     }
 ) {
+    val fileRepository: FileRepository = fileRepository
+    val pagingCoordinator: DirectoryPagingCoordinator =
+        pagingCoordinator ?: DirectoryPagingCoordinatorImpl(fileRepository, fileCacheManager)
     val pathList: MutableList<PathBean> = initialPathList.toMutableList()
 
     @Volatile
@@ -104,38 +116,36 @@ class TerminalContext(
     }
 
     /**
-     * Cache-First 获取指定目录下的文件列表
-     * 1. 优先从 FileCacheManager 读取
-     * 2. 缓存未命中或 forceRefresh == true 时，请求 FileRepository.getFiles 并存入缓存
+     * 获取指定目录下的文件列表（遵循 统一分页规范）
+     * 1. 自动执行三位一体缓存门禁（完整性 + 排序 + 混排匹配）
+     * 2. 缓存未命中时委托 DirectoryPagingCoordinator 执行全量分页拉取与消峰
+     *
+     * @param cid 目标目录 ID
+     * @param forceRefresh 是否强制跳过缓存从网络全量刷新
+     * @param fetchAllPages 是否全量拉取所有分页（默认为 true；路径解析与补全可传 false 仅拉第 1 页快速短路）
+     * @param onProgress 分页拉取进度回调函数
      */
     suspend fun listDirectory(
         cid: String = currentCid,
-        forceRefresh: Boolean = false
-    ): List<FileBean> =
-        withContext(Dispatchers.IO) {
-            if (!forceRefresh) {
-                val cached = fileCacheManager[cid]
-                if (cached != null) {
-                    return@withContext cached.fileBeanList
-                }
-            }
+        forceRefresh: Boolean = false,
+        fetchAllPages: Boolean = true,
+        onProgress: ((loaded: Int, total: Int) -> Unit)? = null
+    ): List<FileBean> = withContext(Dispatchers.IO) {
+        val keepFoldersOnTop = getKeepFoldersOnTop()
+        val fcMix = if (keepFoldersOnTop) 0 else 1
+        val order = getCurrentOrder()
+        val maxPages = if (fetchAllPages) PagingOptions.MAX_PAGES_LIMIT else PagingOptions.FAST_MODE_PAGES
 
-            // 请求网络
-            return@withContext try {
-                // 读取当前设置项中的文件夹置顶配置，保持终端网络拉取与 UI 混排策略一致
-                val keepFoldersOnTop = getKeepFoldersOnTop()
-                val fcMix = if (keepFoldersOnTop) 0 else 1
-                val filesBean = fileRepository.getFiles(cid = cid, fcMix = fcMix)
-                // 规范化 isFolder
-                val normalizedList = formatFileBeanList(filesBean.fileBeanList)
-                filesBean.fileBeanList = normalizedList
-                fileCacheManager.putAndNotify(cid, filesBean)
-                normalizedList
-            } catch (e: Exception) {
-                // 如果网络请求失败且之前有旧缓存，尽量兜底返回
-                fileCacheManager[cid]?.fileBeanList ?: emptyList()
-            }
-        }
+        val options = PagingOptions(
+            cid = cid,
+            order = order,
+            fcMix = fcMix,
+            forceRefresh = forceRefresh,
+            maxPages = maxPages,
+            onProgress = onProgress
+        )
+        pagingCoordinator.fetchDirectory(options)
+    }
 
     /**
      * 智能解析目标路径（支持识别普通文件与目录）
@@ -222,7 +232,8 @@ class TerminalContext(
                 }
             } else {
                 val curCid = workingPathList.currentCid()
-                val files = listDirectory(curCid)
+                // 路径解析短路机制：仅拉取第 1 页快速寻址，杜绝多级父目录全部触发全量扫描
+                val files = listDirectory(curCid, fetchAllPages = false)
                 if (isLast && !parsedPath.hasTrailingSlash) {
                     // 最后一级且未以 '/' 结尾：先匹配同名目录，若无则匹配同名文件
                     val folder = files.firstOrNull { it.isFolder && it.name == segment }

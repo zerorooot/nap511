@@ -6,8 +6,8 @@
    See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+<!--    适用于 Android 11 及以下 / API ≤ 30-->
+    <!-- 仅备份 DataStore 配置 (files/datastore) 和 SharedPref，自动排除 cache 目录及所有其他文件 -->
+    <include domain="file" path="datastore" />
+    <include domain="sharedpref" path="." />
 </full-backup-content>

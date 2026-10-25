@@ -55,7 +55,24 @@ data class FilesBean(
      * fc_mix = 1：文件与文件夹混排。
      */
     @SerializedName("fc_mix") val fcMix: Int = 0,
-)
+) {
+    /** 当前缓存是否已完整拉取全部条目 */
+    val isComplete: Boolean
+        get() = count <= 0 || fileBeanList.size >= count
+
+    /**
+     * 三位一体缓存匹配门禁：
+     * 1. 完备性：必须是全量拉取完成的缓存
+     * 2. 排序一致性：排序字段与升降序必须与预期一致
+     * 3. 混排模式一致性：fcMix 必须与当前设置一致
+     */
+    fun isFullyValid(expectedOrder: OrderBean, expectedFcMix: Int): Boolean {
+        return isComplete &&
+                order == expectedOrder.type &&
+                isAsc == expectedOrder.asc &&
+                fcMix == expectedFcMix
+    }
+}
 
 object OrderEnum {
     const val create = "user_ptime"

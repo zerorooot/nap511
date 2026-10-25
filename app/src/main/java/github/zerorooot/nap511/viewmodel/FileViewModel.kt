@@ -37,6 +37,8 @@ import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
+import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinator
+import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinatorImpl
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.CacheEvent
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -121,8 +123,14 @@ class FileViewModel(
     val torrentBeanCache = ConcurrentHashMap<String, TorrentFileBean>()
     private val currentLocation = ConcurrentHashMap<String, LocationBean>()
 
+    // 统一目录分页与缓存协同器
+    val pagingCoordinator: DirectoryPagingCoordinator = DirectoryPagingCoordinatorImpl.getInstance()
+
     // 记录各目录及数据源模式触底分页加载是否已完全加载完毕，避免重复触发无效请求与 Toast
     private val isLoadedCompleteMap = ConcurrentHashMap<String, Boolean>()
+
+    // 记录各数据源模式服务端请求的物理偏移量（严格按服务端返回 batch.size 累加，绝不等于去重后的 list.size，消灭游标漂移）
+    private val physicalOffsets = ConcurrentHashMap<String, Int>()
 
     // 记录正在执行触底拉取更多任务的 paginationKey，按模式及目录级提供原子互斥保障，防止高频触底引发并发重入
     private val fetchingMoreKeys = ConcurrentHashMap.newKeySet<String>()
@@ -410,6 +418,7 @@ class FileViewModel(
 
     /**
      * 滑动触底自动加载下一页文件（分页加载更多）
+     * UI 表现层专注状态机与人机交互门禁，数据分发、去重合并与游标递增完全委托协同器
      */
     fun loadMoreFiles() {
         val state = _contentState.value
@@ -457,64 +466,34 @@ class FileViewModel(
 
         // 记录请求发起时的上下文版本，用于并发校验防串位
         val currentRequestSource = source
-        //需要区分过滤时的order,防止过滤的order对Folder的排序产生干扰
+        // 需要区分过滤时的order, 防止过滤的order对Folder的排序产生干扰
         val currentRequestOrder = currentOrderBean
         val currentRequestKeepFolders = settingUiState.keepFoldersOnTop
         val currentFcMix = this.currentFcMix
 
+        // 获取当前物理游标起点，若未记录则默认以当前列表大小作为初始物理游标
+        val currentPhysicalOffset = physicalOffsets.getOrPut(paginationKey) { currentList.size }
+
         viewModelScope.launch {
             try {
-                val offset = currentList.size
-                XLog.d("loadMoreFiles currentRequestSource=$currentRequestSource, order=$currentRequestOrder ,offset=$offset, fcMix=$currentFcMix, limit=$limit")
-                val res = when (currentRequestSource) {
-                    is FileListSource.Folder -> fileRepository.getFiles(
-                        cid = currentRequestSource.cid,
-                        order = currentRequestOrder.type,
-                        asc = currentRequestOrder.asc,
-                        offset = offset,
-                        fcMix = currentFcMix,
-                        limit = limit
-                    )
+                XLog.d("loadMoreFiles delegating to pagingCoordinator: source=$currentRequestSource, physicalOffset=$currentPhysicalOffset, limit=$limit")
 
-                    is FileListSource.Search -> fileRepository.search(
-                        cid = currentRequestSource.cid,
-                        searchValue = currentRequestSource.keyword,
-                        offset = offset,
-                        limit = limit
-                    )
+                // 委托统一协同器执行单页步进追加（多态支持 Folder/Search/Filter）
+                val result = pagingCoordinator.fetchNextPage(
+                    source = currentRequestSource,
+                    currentList = currentList,
+                    currentPhysicalOffset = currentPhysicalOffset,
+                    currentTotalCount = totalCount,
+                    order = currentRequestOrder,
+                    fcMix = currentFcMix
+                )
 
-                    is FileListSource.Filter -> fileRepository.filterFile(
-                        cid = currentRequestSource.cid,
-                        type = currentRequestSource.filterType,
-                        order = currentRequestOrder.type,
-                        asc = currentRequestOrder.asc,
-                        offset = offset,
-                        limit = limit,
-                        fcMix = currentFcMix
-                    )
-                }
-
-                val rawNewItems = res.fileBeanList
-                val formattedNewItems = formatFileBeanList(rawNewItems)
-                // 直接追加在末尾（Append Only），杜绝全局重排序带来的视口跳动；
-                // 使用 distinctBy 保障条目唯一性，彻底防止服务端漂移造成的重复 key 导致 Compose 崩溃
-                val combinedList = (currentList + formattedNewItems).distinctBy { item ->
-                    item.fileId.ifEmpty { item.categoryId.ifEmpty { item.pickCode } }
-                }
-
-                val latestTotalCount = if (res.count > 0) res.count else totalCount
-
-                // 仅 Folder 模式同步持久化写入 FileCacheManager
-                if (currentRequestSource is FileListSource.Folder) {
-                    val updatedFilesBean = (cachedData ?: res).copy(
-                        fileBeanList = ArrayList(combinedList), count = latestTotalCount
-                    )
-                    FileCacheManager[currentRequestSource.cid] = updatedFilesBean
-                }
+                // 推进记录服务端物理窗口游标，消灭因去重产生的游标倒退漂移
+                physicalOffsets[paginationKey] = result.nextPhysicalOffset
 
                 // 【并发竞争保护】：仅在当前屏幕仍停留在发起请求的模式与上下文时才更新 UI
                 if (
-                    // 1. 校验当前页面展示的数据源（CID/搜索词/筛选类型）是否与请求发起时一致
+                // 1. 校验当前页面展示的数据源（CID/搜索词/筛选类型）是否与请求发起时一致
                     _contentState.value.source == currentRequestSource &&
 
                     // 2. 校验当前的排序规则（按时间/名称、升降序）是否与请求发起时一致
@@ -526,20 +505,16 @@ class FileViewModel(
                     // 只有当上下文环境完全没变时，才真正把追加的数据更新到 UI 状态中
                     updateContentState {
                         copy(
-                            fileBeanList = combinedList, totalCount = latestTotalCount
+                            fileBeanList = result.combinedList,
+                            totalCount = result.latestTotalCount
                         )
                     }
                 }
 
-                // 【第二级：响应双重校验】
-                // 条件 A: 本次返回数据量少于请求单页上限（说明已经是最后一批）
-                val isEndByBatchSize = rawNewItems.size < limit
-                // 条件 B: 累积展示数量已经达到或超过服务端统计的总条目数
-                val isEndByCount = latestTotalCount > 0 && combinedList.size >= latestTotalCount
-
-                if (isEndByBatchSize || isEndByCount) {
+                // 【第二级：完备性状态闭环】
+                if (result.isComplete) {
                     isLoadedCompleteMap[paginationKey] = true
-                    if (combinedList.size > limit) {
+                    if (result.combinedList.size > limit) {
                         App.instance.toast("加载完毕")
                     }
                 }
@@ -567,6 +542,7 @@ class FileViewModel(
         viewModelScope.launch {
             runCatching {
                 val order = fileRepository.order(map)
+                XLog.d("order=$order, currentCid=${currentCid}")
                 if (order.state) {
                     if (isRefresh) {
                         refresh(currentCid)
@@ -636,12 +612,14 @@ class FileViewModel(
             is FileListSource.Search -> {
                 clearSelection()
                 isLoadedCompleteMap[s.paginationKey] = false
+                physicalOffsets.remove(s.paginationKey)
                 search(s.keyword)
             }
 
             is FileListSource.Filter -> {
                 clearSelection()
                 isLoadedCompleteMap[s.paginationKey] = false
+                physicalOffsets.remove(s.paginationKey)
                 // 携带 s.order 刷新，确保用户调整后的过滤排序在下拉刷新时不丢失
                 filterFile(type = s.filterType, name = s.name, order = s.order)
             }
@@ -651,7 +629,9 @@ class FileViewModel(
     @OptIn(ExperimentalCoilApi::class)
     internal fun refresh(cid: String, forceCache: Boolean = false) {
         clearSelection()
-        isLoadedCompleteMap["folder:$cid"] = false
+        val paginationKey = "folder:$cid"
+        isLoadedCompleteMap[paginationKey] = false
+        physicalOffsets.remove(paginationKey)
         updateContentState { copy(source = FileListSource.Folder(cid)) }
         val refreshCurrent = (cid == currentCid)
         XLog.d(
@@ -722,9 +702,16 @@ class FileViewModel(
                             copy(
                                 fileBeanList = unselectedList,
                                 pathList = updatedCache.path,
+                                totalCount = updatedCache.count,
                                 isLongClickState = false,
                                 appBarTitle = getDefaultAppBarTitle(context)
                             )
+                        }
+                        // 对齐复合键分页完成状态与物理游标（以 FilesBean.isComplete 为唯一信源 SSOT）
+                        val paginationKey = "folder:${event.cid}"
+                        physicalOffsets[paginationKey] = updatedCache.fileBeanList.size
+                        if (updatedCache.isComplete) {
+                            isLoadedCompleteMap[paginationKey] = true
                         }
                     } else {
                         // 若本地内存缓存意外丢失，兜底触发网络拉取
