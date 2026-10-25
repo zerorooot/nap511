@@ -705,9 +705,10 @@ class FindCommandTest {
                 limit: Int,
                 format: String,
                 offset: Int,
+                fcMix: Int,
             ): FilesBean {
                 listDirectoryCallCount++
-                return super.getFiles(cid, showDir, aid, asc, naturalSort, order, limit, format, offset)
+                return super.getFiles(cid, showDir, aid, asc, naturalSort, order, limit, format, offset, fcMix)
             }
         }
 

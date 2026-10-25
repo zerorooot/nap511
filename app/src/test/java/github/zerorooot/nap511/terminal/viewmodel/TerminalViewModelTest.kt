@@ -433,6 +433,7 @@ class TerminalViewModelTest {
                 limit: Int,
                 format: String,
                 offset: Int,
+                fcMix: Int,
             ): FilesBean {
                 return FilesBean(
                     fileBeanList = arrayListOf(
@@ -487,6 +488,7 @@ class TerminalViewModelTest {
                 limit: Int,
                 format: String,
                 offset: Int,
+                fcMix: Int,
             ): FilesBean {
                 return FilesBean(
                     fileBeanList = arrayListOf(
@@ -566,6 +568,7 @@ class TerminalViewModelTest {
                 limit: Int,
                 format: String,
                 offset: Int,
+                fcMix: Int,
             ): FilesBean {
                 return FilesBean(
                     fileBeanList = arrayListOf(f1, f2),

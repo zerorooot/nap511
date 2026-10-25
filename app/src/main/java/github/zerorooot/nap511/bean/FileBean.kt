@@ -12,7 +12,6 @@ import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.PlayCircleOutline
 import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.VideoFile
@@ -51,6 +50,11 @@ data class FilesBean(
      * is_asc = 0：降序（倒序，从大到小 / Z-A / 从新到旧）。
      */
     @SerializedName("is_asc") val isAsc: Int = 1,
+    /**
+     * fc_mix = 0：文件夹置顶（默认行为）。
+     * fc_mix = 1：文件与文件夹混排。
+     */
+    @SerializedName("fc_mix") val fcMix: Int = 0,
 )
 
 object OrderEnum {
@@ -60,17 +64,15 @@ object OrderEnum {
     const val size = "file_size"
     const val update = "user_utime"
     const val open = "user_otime"
-    const val videoDuration = "play_long"
 }
 
-enum class OrderType(val rawValue: String, val label: String, val isLocalOnly: Boolean = false) {
+enum class OrderType(val rawValue: String, val label: String) {
     NAME(OrderEnum.name, "文件名称"),
     SIZE(OrderEnum.size, "文件大小"),
     TYPE(OrderEnum.type, "文件种类"),
     UPDATE(OrderEnum.update, "修改时间"),
     CREATE(OrderEnum.create, "创建时间"),
-    OPEN(OrderEnum.open, "打开时间"),
-    VIDEO_DURATION(OrderEnum.videoDuration, "视频时长", isLocalOnly = true);
+    OPEN(OrderEnum.open, "打开时间");
 
     val icon: ImageVector
         get() = when (this) {
@@ -80,7 +82,6 @@ enum class OrderType(val rawValue: String, val label: String, val isLocalOnly: B
             UPDATE -> Icons.Default.AccessTime
             CREATE -> Icons.Default.CalendarToday
             OPEN -> Icons.Default.History
-            VIDEO_DURATION -> Icons.Default.PlayCircleOutline
         }
 
     companion object {

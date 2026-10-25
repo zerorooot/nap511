@@ -82,6 +82,7 @@ interface FileService {
         @Query("natsort") naturalSort: Int,
         @Query("format") format: String,
         @Query("offset") offset: Int = 0,
+        @Query("fc_mix") fcMix: Int = 0,
     ): FilesBean
 
     @GET("category/get")

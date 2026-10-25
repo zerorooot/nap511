@@ -32,7 +32,6 @@ import github.zerorooot.nap511.bean.ImageBean
 import github.zerorooot.nap511.bean.LocationBean
 import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.OrderBean
-import github.zerorooot.nap511.bean.OrderType
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.RemainingSpaceBean
 import github.zerorooot.nap511.bean.Route
@@ -153,8 +152,10 @@ class FileViewModel(
     internal val imageLoadingSet = hashSetOf<String>()
     val torrentBeanCache = ConcurrentHashMap<String, TorrentFileBean>()
     private val currentLocation = ConcurrentHashMap<String, LocationBean>()
+
     // 记录各目录触底分页加载是否已完全加载完毕，避免重复触发无效请求与 Toast
     private val isLoadedCompleteMap = ConcurrentHashMap<String, Boolean>()
+
     // 记录正在执行触底拉取更多任务的 cid，按目录级提供原子互斥保障，防止高频触底引发并发重入
     private val fetchingMoreCids = ConcurrentHashMap.newKeySet<String>()
 
@@ -164,6 +165,15 @@ class FileViewModel(
 
     internal var saveRequestCache: Boolean = true
     internal var lastKeepFoldersOnTop: Boolean? = null
+
+    /**
+     * 115 文件夹/文件混排参数：
+     * - fc_mix = 0：文件夹置顶（默认）
+     * - fc_mix = 1：文件与文件夹混排
+     */
+    val currentFcMix: Int
+        get() = if (settingUiState.keepFoldersOnTop) 0 else 1
+
     fun closeDialog() {
         _dialogState.update { FileDialogUiState() }
     }
@@ -180,7 +190,9 @@ class FileViewModel(
             settingUiStateFlow.collect { settings ->
                 saveRequestCache = settings.saveRequestCache
                 if (lastKeepFoldersOnTop != null && lastKeepFoldersOnTop != settings.keepFoldersOnTop) {
-                    applyCurrentOrder()
+                    val cid = _contentState.value.currentCid
+                    FileCacheManager.remove(cid)
+                    order()
                 }
                 lastKeepFoldersOnTop = settings.keepFoldersOnTop
             }
@@ -289,7 +301,12 @@ class FileViewModel(
             }
             runCatching {
                 val files =
-                    fileRepository.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
+                    fileRepository.getFiles(
+                        cid = cid,
+                        order = orderBean.type,
+                        asc = orderBean.asc,
+                        fcMix = currentFcMix
+                    )
                 files.fileBeanList = formatFileBeanList(files.fileBeanList)
                 FileCacheManager[cid] = files
             }.onFailureToastAndLog()
@@ -380,7 +397,12 @@ class FileViewModel(
 
             runCatching {
                 val files =
-                    fileRepository.getFiles(cid = cid, order = orderBean.type, asc = orderBean.asc)
+                    fileRepository.getFiles(
+                        cid = cid,
+                        order = orderBean.type,
+                        asc = orderBean.asc,
+                        fcMix = currentFcMix
+                    )
                 //请求的cid不是0,但返回的cid是0。证明请求的cid不存在
                 if (cid != "0" && files.cid == "0") {
                     App.instance.toast("当前文件夹被删除！")
@@ -420,7 +442,10 @@ class FileViewModel(
         val state = _contentState.value
         val cid = state.currentCid
         // 搜索模式、多选模式、当前目录正在加载或正处于下拉刷新中，均不触发
-        if (state.isSearchState || state.isLongClickState || state.isRefreshing || fetchingMoreCids.contains(cid)) {
+        if (state.isSearchState || state.isLongClickState || state.isRefreshing || fetchingMoreCids.contains(
+                cid
+            )
+        ) {
             return
         }
 
@@ -453,14 +478,20 @@ class FileViewModel(
         }
         setRefreshingStatus(true)
 
+        // 记录请求发起时的上下文版本，用于并发校验防串位
+        val currentRequestOrder = state.orderBean
+        val currentRequestKeepFolders = settingUiState.keepFoldersOnTop
+        val currentFcMix = this.currentFcMix
+
         viewModelScope.launch {
             try {
                 val offset = currentList.size
                 val res = fileRepository.getFiles(
                     cid = cid,
-                    order = orderBean.type,
-                    asc = orderBean.asc,
-                    offset = offset
+                    order = currentRequestOrder.type,
+                    asc = currentRequestOrder.asc,
+                    offset = offset,
+                    fcMix = currentFcMix
                 )
 
                 val rawNewItems = res.fileBeanList
@@ -478,8 +509,11 @@ class FileViewModel(
                 )
                 FileCacheManager[cid] = updatedFilesBean
 
-                // 【Cid 竞争保护】：仅在当前屏幕仍停留在发起请求的目录时，才更新 UI 状态，防止覆盖快速切换的新目录
-                if (_contentState.value.currentCid == cid) {
+                // 【Cid 与排序并发竞争保护】：仅在当前屏幕仍停留在发起请求的目录，且排序与置顶状态未发生变化时才更新 UI
+                if (_contentState.value.currentCid == cid &&
+                    _contentState.value.orderBean == currentRequestOrder &&
+                    settingUiState.keepFoldersOnTop == currentRequestKeepFolders
+                ) {
                     updateContentState { copy(fileBeanList = combinedList) }
                 }
 
@@ -487,7 +521,8 @@ class FileViewModel(
                 // 条件 A: 本次返回数据量少于请求单页上限（说明已经是最后一批）
                 val isEndByBatchSize = rawNewItems.size < limit
                 // 条件 B: 累积展示数量已经达到或超过服务端统计的总条目数
-                val isEndByCount = (updatedFilesBean.count > 0 && combinedList.size >= updatedFilesBean.count)
+                val isEndByCount =
+                    (updatedFilesBean.count > 0 && combinedList.size >= updatedFilesBean.count)
 
                 if (isEndByBatchSize || isEndByCount) {
                     isLoadedCompleteMap[cid] = true
@@ -512,7 +547,7 @@ class FileViewModel(
             "user_order" to orderBean.type,
             "user_asc" to orderBean.asc.toString(),
             "file_id" to currentCid,
-            "fc_mix" to "0"
+            "fc_mix" to currentFcMix.toString()
         )
         viewModelScope.launch {
             runCatching {
@@ -528,72 +563,9 @@ class FileViewModel(
 
     fun updateOrder(order: OrderBean) {
         updateContentState { copy(orderBean = order) }
-        if (order.orderType.isLocalOnly) {
-            applyCurrentOrder()
-        } else {
-            this.order()
-        }
+        this.order()
     }
 
-    /**
-     * 重新按照当前 orderBean 与设置项中的 keepFoldersOnTop 应用内存排序
-     */
-    fun applyCurrentOrder() {
-        val sortedList = processFileOrder(
-            list = fileBeanList.toList(),
-            orderBean = orderBean,
-            keepFoldersOnTop = settingUiState.keepFoldersOnTop
-        )
-        updateContentState { copy(fileBeanList = sortedList) }
-    }
-
-    /**
-     * 统一文件排序管道：根据选定的 OrderBean 及“文件夹置顶”开关对文件列表重排
-     */
-    fun processFileOrder(
-        list: List<FileBean>,
-        orderBean: OrderBean,
-        keepFoldersOnTop: Boolean
-    ): List<FileBean> {
-        //keepFoldersOnTop为true时，默认也排序，因为重命名后也需要手动排序，保持和官方顺序一致
-        // 对于 SIZE (文件大小) 排序：客户端接收到的文件夹 size 恒为 0。
-        // 对于 TYPE (文件类型) 排序：不知道官方是怎么排的序，本地无法复现
-        // 直接复用官方拉取的顺序，避免客户端本地使用不准确的字段二次排序导致顺序与官方不一致。
-        if (list.isEmpty() || orderBean.orderType == OrderType.SIZE || orderBean.orderType == OrderType.TYPE) return list
-
-        val comparator = Comparator<FileBean> { a, b ->
-            // 1. 文件夹置顶规则 (keepFoldersOnTop)
-            if (keepFoldersOnTop && a.isFolder != b.isFolder) {
-                return@Comparator if (a.isFolder) -1 else 1
-            }
-
-            // 2. 根据选定的 OrderType 进行字段比较
-            val primaryComp = compareByOrderType(a, b, orderBean.orderType)
-            val directedComp = if (orderBean.isAscending) primaryComp else -primaryComp
-
-            // 3. 字段平局保底处理 (不区分大小写文件名升序)
-            if (directedComp != 0) {
-                directedComp
-            } else {
-                NaturalOrderComparator.instance.compare(a.name, b.name)
-            }
-        }
-
-        return list.sortedWith(comparator)
-    }
-
-    private fun compareByOrderType(a: FileBean, b: FileBean, type: OrderType): Int {
-        return when (type) {
-            OrderType.NAME -> NaturalOrderComparator.instance.compare(a.name, b.name)
-            OrderType.SIZE -> (a.size.toLongOrNull() ?: 0L).compareTo(b.size.toLongOrNull() ?: 0L)
-            OrderType.TYPE -> a.icoString.compareTo(b.icoString, ignoreCase = true)
-            OrderType.CREATE -> a.createTime.compareTo(b.createTime)
-            OrderType.UPDATE -> a.modifiedTime.compareTo(b.modifiedTime)
-            OrderType.OPEN -> a.openTime.compareTo(b.openTime)
-            OrderType.VIDEO_DURATION -> a.playLong.compareTo(b.playLong)
-//            OrderType.METADATA_UPDATE -> a.metadataUpdateTime.compareTo(b.metadataUpdateTime)
-        }
-    }
 
     fun selectToUp() {
         updateContentState {
@@ -702,13 +674,8 @@ class FileViewModel(
                         updateContentState {
                             val unselectedList =
                                 updatedCache.fileBeanList.map { it.copy(isSelect = false) }
-                            val sortedList = processFileOrder(
-                                list = unselectedList,
-                                orderBean = orderBean,
-                                keepFoldersOnTop = settingUiState.keepFoldersOnTop
-                            )
                             copy(
-                                fileBeanList = sortedList,
+                                fileBeanList = unselectedList,
                                 pathList = updatedCache.path,
                                 isLongClickState = false,
                                 appBarTitle = if (isSearchState) "搜索" else context.getString(R.string.app_name)
@@ -861,7 +828,6 @@ class FileViewModel(
     }
 
     fun sortByVideoTime() {
-//        updateOrder(OrderBean(type = OrderType.VIDEO_DURATION.rawValue, asc = 0))
         updateContentState {
             copy(fileBeanList = fileBeanList.sortedByDescending { it.playLong })
         }
@@ -926,21 +892,11 @@ class FileViewModel(
 
     private fun setFiles(files: FilesBean) {
         val currentOrder = OrderBean.from(files)
-        val finalOrder = if (_contentState.value.orderBean.orderType.isLocalOnly) {
-            _contentState.value.orderBean
-        } else {
-            currentOrder
-        }
-        val processedList = processFileOrder(
-            list = files.fileBeanList.toList(),// 使用 .toList() 生成不可变浅拷贝，切断引用共享,
-            orderBean = finalOrder,
-            keepFoldersOnTop = settingUiState.keepFoldersOnTop
-        )
         updateContentState {
             copy(
-                fileBeanList = processedList,
+                fileBeanList = files.fileBeanList.toList(),
                 currentCid = files.cid,
-                orderBean = finalOrder,
+                orderBean = currentOrder,
                 pathList = files.path,
                 isRefreshing = false,
                 isLongClickState = false,
@@ -949,14 +905,10 @@ class FileViewModel(
         }
         // 若初始加载/缓存读取的条目已达服务端总量，或单页数量少于单页上限，说明该目录全部条目已加载完毕，标记为完成，避免触底无效触发
         val limit = UserSessionManager.requestLimitCount
-        if (files.fileBeanList.size < limit || (files.count > 0 && files.fileBeanList.size >= files.count)) {
-            isLoadedCompleteMap[files.cid] = true
-        } else {
-            isLoadedCompleteMap[files.cid] = false
-        }
-        viewModelScope.launch {
-            FileCacheManager[files.cid] = files.copy(fileBeanList = ArrayList(processedList))
-        }
+        isLoadedCompleteMap[files.cid] =
+            files.fileBeanList.size < limit || (files.count > 0 && files.fileBeanList.size >= files.count)
+
+        viewModelScope.launch { FileCacheManager[files.cid] = files }
     }
 
 

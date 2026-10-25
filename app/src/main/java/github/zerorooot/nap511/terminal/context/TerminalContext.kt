@@ -4,6 +4,7 @@ import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.repository.FileRepository
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.FileOpener
 import github.zerorooot.nap511.viewmodel.formatFileBeanList
@@ -59,7 +60,10 @@ class TerminalContext(
     val fileCacheManager: FileCacheManager = FileCacheManager,
     val onConfirmRequest: (suspend (prompt: String) -> Boolean)? = null,
     val onDirectoryChanged: ((cid: String, path: String) -> Unit)? = null,
-    var fileOpener: FileOpener? = null
+    var fileOpener: FileOpener? = null,
+    val getKeepFoldersOnTop: () -> Boolean = {
+        runCatching { SettingsRepository.getInstance().settingUiStateFlow.value.keepFoldersOnTop }.getOrDefault(true)
+    }
 ) {
     val pathList: MutableList<PathBean> = initialPathList.toMutableList()
 
@@ -118,7 +122,10 @@ class TerminalContext(
 
             // 请求网络
             return@withContext try {
-                val filesBean = fileRepository.getFiles(cid = cid)
+                // 读取当前设置项中的文件夹置顶配置，保持终端网络拉取与 UI 混排策略一致
+                val keepFoldersOnTop = getKeepFoldersOnTop()
+                val fcMix = if (keepFoldersOnTop) 0 else 1
+                val filesBean = fileRepository.getFiles(cid = cid, fcMix = fcMix)
                 // 规范化 isFolder
                 val normalizedList = formatFileBeanList(filesBean.fileBeanList)
                 filesBean.fileBeanList = normalizedList
