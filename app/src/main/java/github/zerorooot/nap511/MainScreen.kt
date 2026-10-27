@@ -34,14 +34,9 @@ import github.zerorooot.nap511.screenitem.AppDrawer
 import github.zerorooot.nap511.screenitem.DrawerMenuItems
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.terminal.viewmodel.TerminalViewModel
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
-import github.zerorooot.nap511.viewmodel.LoginViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
-import github.zerorooot.nap511.viewmodel.RecycleViewModel
-import github.zerorooot.nap511.viewmodel.RepeatFileViewModel
-import github.zerorooot.nap511.viewmodel.SettingViewModel
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,13 +47,8 @@ fun MainScreen(
     onMoveTaskToBack: (Boolean) -> Unit
 ) {
     val fileViewModel: FileViewModel = viewModel()
-    val offlineFileViewModel: OfflineFileViewModel = viewModel()
-    val recycleViewModel: RecycleViewModel = viewModel()
     val audioViewModel: AudioViewModel = viewModel()
-    val repeatViewModel: RepeatFileViewModel = viewModel()
-    val settingViewModel: SettingViewModel = viewModel()
-    val loginViewModel: LoginViewModel = viewModel()
-    val terminalViewModel: TerminalViewModel = viewModel()
+    val offlineFileViewModel: OfflineFileViewModel = viewModel()
 
     val context = LocalContext.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -223,12 +213,7 @@ fun MainScreen(
             avatarBean = avatarBean,
             fileViewModel = fileViewModel,
             offlineFileViewModel = offlineFileViewModel,
-            recycleViewModel = recycleViewModel,
             audioViewModel = audioViewModel,
-            repeatViewModel = repeatViewModel,
-            settingViewModel = settingViewModel,
-            loginViewModel = loginViewModel,
-            terminalViewModel = terminalViewModel,
             uiState = settingUiState,
             isDrawerOpen = { drawerState.isOpen },
             onOpenDrawer = { scope.launch { drawerState.open() } },

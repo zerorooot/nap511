@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -77,13 +78,8 @@ fun AppNavHost(
     onPopBack: () -> Unit,
     avatarBean: AvatarBean,
     fileViewModel: FileViewModel,
-    offlineFileViewModel: OfflineFileViewModel,
-    recycleViewModel: RecycleViewModel,
     audioViewModel: AudioViewModel,
-    repeatViewModel: RepeatFileViewModel,
-    settingViewModel: SettingViewModel,
-    loginViewModel: LoginViewModel,
-    terminalViewModel: TerminalViewModel,
+    offlineFileViewModel: OfflineFileViewModel,
     uiState: SettingUiState,
     isDrawerOpen: () -> Boolean,
     onOpenDrawer: () -> Unit,
@@ -180,6 +176,7 @@ fun AppNavHost(
         onBack = onPopBack,
         entryProvider = entryProvider {
             entry<Route.Login> {
+                val loginViewModel: LoginViewModel = viewModel()
                 onSetGesturesEnabled(false)
                 LoginScreen { credential ->
                     loginViewModel.performLogin(credential) {
@@ -282,6 +279,7 @@ fun AppNavHost(
             }
 
             entry<Route.AdvancedSettings> {
+                val settingViewModel: SettingViewModel = viewModel()
                 SettingScreen(
                     viewModel = settingViewModel,
                     isExpandedScreen = isExpandedScreen,
@@ -302,6 +300,7 @@ fun AppNavHost(
             }
 
             entry<Route.Terminal> {
+                val terminalViewModel: TerminalViewModel = viewModel()
                 onSetGesturesEnabled(false)
                 terminalViewModel.initDirectoryIfNeeded(fileViewModel.pathList)
                 terminalViewModel.updateFileOpener(fileOpener)
@@ -317,6 +316,7 @@ fun AppNavHost(
             }
 
             entry<Route.RecycleBin> {
+                val recycleViewModel: RecycleViewModel = viewModel()
                 RecycleScreen(recycleViewModel, isGridScreen, gridCellMinSize) {
                     onOpenDrawer()
                 }
@@ -367,6 +367,7 @@ fun AppNavHost(
             }
 
             entry<Route.RepeatFile> {
+                val repeatViewModel: RepeatFileViewModel = viewModel()
                 RepeatFileScreen(
                     viewModel = repeatViewModel,
                     isGridScreen = isGridScreen,
