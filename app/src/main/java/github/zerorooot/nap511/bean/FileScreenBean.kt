@@ -44,7 +44,7 @@ sealed interface FileListSource {
         val filterType: Int,
         val name: String,
         val order: OrderBean,
-        val fcMix:Int,
+        val fcMix: Int,
     ) : FileListSource {
         // 关键：将排序规则融入 paginationKey。切换排序时自动重置滚动条与触底完结标记
         override val paginationKey: String
@@ -72,6 +72,8 @@ data class FileContentUiState(
     // 核心数据源与分页总数
     val source: FileListSource = FileListSource.Folder("0"),
     val totalCount: Int = 0,
+    //视频排序版本，用于LaunchedEffect滚动监听
+    val videoOrderVersion: Int = 0
 ) {
     // 兼容现有引用点
     val isSearchState: Boolean

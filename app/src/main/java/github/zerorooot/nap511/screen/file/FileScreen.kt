@@ -314,8 +314,10 @@ fun FileScreen(
 
     fun myItemOnClick(i: Int) = clickHandler.myItemOnClick(i)
 
-    fun requestScrollToTop() {
-        currentScrollState.requestScrollToItem(0, 0)
+    LaunchedEffect(contentState.videoOrderVersion) {
+        if (contentState.fileBeanList.isNotEmpty()) {
+            currentScrollState.requestScrollToItem(0, 0)
+        }
     }
 
     suspend fun scrollToTop(animate: Boolean = false) {
@@ -390,7 +392,7 @@ fun FileScreen(
 
             MenuItemAction.VIDEO_SCHEDULE -> {
                 fileViewModel.sortByVideoTime()
-                requestScrollToTop()
+                //视频滚动在LaunchedEffect(contentState.videoOrder) 中
             }
 
             MenuItemAction.FILE_SORT -> {

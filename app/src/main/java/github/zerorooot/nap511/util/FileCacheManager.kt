@@ -485,7 +485,9 @@ object FileCacheManager {
                             ((duration.toFloat() / fileBean.playLong) * 100).roundToInt()
                         }
                         val playTimeRatio = "▶️ $playTime%"
-                        fileList[index] = fileBean.copy(playLongRatio = playTimeRatio)
+                        //同步更新currentPlayTime，避免从缓存中formatFileBeanList时，由于没有更新currentPlayTime，导致playTimeRatio还是原值
+                        fileList[index] =
+                            fileBean.copy(playLongRatio = playTimeRatio, currentPlayTime = duration)
                         hasChanges = true
                     }
                 }

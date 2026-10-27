@@ -237,7 +237,12 @@ internal fun FileViewModel.deleteMultiple() {
             if (deleteMultiple.state) {
                 "成功删除 ${selectedFiles.size} 个文件"
             } else {
-                updateContentState { copy(fileBeanList = beforeList, totalCount = beforeTotalCount) }
+                updateContentState {
+                    copy(
+                        fileBeanList = beforeList,
+                        totalCount = beforeTotalCount
+                    )
+                }
                 rollback?.rollback()
                 clickMap[cid] = beforeClickMap
                 "删除 ${selectedFiles.size} 个文件失败~"

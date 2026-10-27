@@ -886,7 +886,10 @@ class FileViewModel(
 
     fun sortByVideoTime() {
         updateContentState {
-            copy(fileBeanList = fileBeanList.sortedByDescending { it.playLong })
+            copy(
+                fileBeanList = fileBeanList.sortedByDescending { it.playLong },
+                videoOrderVersion = videoOrderVersion + 1
+            )
         }
     }
 
