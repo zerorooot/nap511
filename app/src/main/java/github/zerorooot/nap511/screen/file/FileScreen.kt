@@ -26,6 +26,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -110,7 +111,7 @@ fun FileScreen(
         "EndOverlay" -> FabPosition.EndOverlay
         else -> FabPosition.End
     }
-
+    var pendingVideoScrollToTop by remember { mutableStateOf(false) }
     val contentState by fileViewModel.contentState.collectAsStateWithLifecycle()
     val fileBeanList = contentState.fileBeanList
     val refreshing = contentState.isRefreshing
@@ -314,9 +315,11 @@ fun FileScreen(
 
     fun myItemOnClick(i: Int) = clickHandler.myItemOnClick(i)
 
-    LaunchedEffect(contentState.videoOrderVersion) {
-        if (contentState.fileBeanList.isNotEmpty()) {
+    LaunchedEffect(pendingVideoScrollToTop) {
+        if (pendingVideoScrollToTop) {
+            // 此时 composition 已 apply、列表已用排序后的数据 measure
             currentScrollState.requestScrollToItem(0, 0)
+            pendingVideoScrollToTop = false
         }
     }
 
@@ -392,7 +395,7 @@ fun FileScreen(
 
             MenuItemAction.VIDEO_SCHEDULE -> {
                 fileViewModel.sortByVideoTime()
-                //视频滚动在LaunchedEffect(contentState.videoOrder) 中
+                pendingVideoScrollToTop = true
             }
 
             MenuItemAction.FILE_SORT -> {

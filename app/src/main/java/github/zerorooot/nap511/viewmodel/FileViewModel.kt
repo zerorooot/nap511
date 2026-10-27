@@ -728,7 +728,7 @@ class FileViewModel(
                     refresh(event.cid, true)
                 }
             }
-
+            //todo 当使用 FileViewModel.deleteMultiple 删除当前目录的一堆文件后，FileCacheManager.removeItems 会对文件挨个检测，可能拖慢速度
             is CacheEvent.FolderDeleted -> {
                 // 根目录 "0" 永远不可被判定为删除
                 if (event.folderCid == "0") return
