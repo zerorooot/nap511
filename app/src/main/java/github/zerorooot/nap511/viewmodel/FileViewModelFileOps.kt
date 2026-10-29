@@ -197,23 +197,19 @@ internal fun FileViewModel.rename(
     }
 }
 
-@OptIn(ExperimentalCoilApi::class)
-internal fun FileViewModel.deleteMultiple() {
+internal fun FileViewModel.deleteMultiple(targetCid: String, selectedFiles: List<FileBean>) {
+    if (selectedFiles.isEmpty()) return
     viewModelScope.launch {
-        val cid = currentCid
         val beforeList = fileBeanList
-        val beforeClickMap = clickMap.getOrDefault(cid, 0)
-
+        val beforeClickMap = clickMap.getOrDefault(targetCid, 0)
         val mapOf = hashMapOf<String, String>()
         mapOf["ignore_warn"] = "1"
-        mapOf["pid"] = cid
-        val selectedFiles = fileBeanList.filter { it.isSelect }
-        if (selectedFiles.isEmpty()) return@launch
+        mapOf["pid"] = targetCid
 
         selectedFiles.forEachIndexed { index: Int, fileBean: FileBean ->
             mapOf["fid[$index]"] = fileBean.fileId
             // update image cache
-            imageBeanCache[cid]?.remove(fileBean.pickCode)
+            imageBeanCache[targetCid]?.remove(fileBean.pickCode)
             if (fileBean.photoThumb.isNotEmpty()) {
                 context.imageLoader.deleteCoilCache(fileBean.pickCode)
             }
@@ -230,9 +226,10 @@ internal fun FileViewModel.deleteMultiple() {
                 appBarTitle = getDefaultAppBarTitle(context)
             )
         }
-        clickMap[cid] = (clickMap.getOrDefault(cid, 0) - selectedFiles.size).coerceAtLeast(0)
+        clickMap[targetCid] =
+            (clickMap.getOrDefault(targetCid, 0) - selectedFiles.size).coerceAtLeast(0)
         // 先行更新内存与落盘，取得回滚句柄
-        val rollback = FileCacheManager.removeItems(cid, selectedIds)
+        val rollback = FileCacheManager.removeItems(targetCid, selectedIds)
 
         runCatching {
             val deleteMultiple = fileRepository.deleteMultiple(mapOf)
@@ -246,13 +243,18 @@ internal fun FileViewModel.deleteMultiple() {
                     )
                 }
                 rollback?.rollback()
-                clickMap[cid] = beforeClickMap
+                clickMap[targetCid] = beforeClickMap
                 "删除 ${selectedFiles.size} 个文件失败~${deleteMultiple.errorMsg}"
             }
         }.onSuccess { message ->
             App.instance.toast(message)
         }.onFailureToastAndLog()
     }
+}
+
+@OptIn(ExperimentalCoilApi::class)
+internal fun FileViewModel.deleteMultiple() {
+    deleteMultiple(currentCid, fileBeanList.filter { it.isSelect })
 }
 
 /**
@@ -272,38 +274,8 @@ fun FileViewModel.confirmDiscardVideos(discardList: List<VideoBean>, targetCid: 
         App.instance.toast("移除文件信息不全，删除取消")
         return
     }
-
-
-    viewModelScope.launch {
-        val beforeList = fileBeanList
-        val beforeClickMap = clickMap.getOrDefault(cid, 0)
-
-        val rollback = FileCacheManager.removeItems(cid, fids)
-        clickMap[cid] = (clickMap.getOrDefault(cid, 0) - fids.size).coerceAtLeast(0)
-
-        // 组装 115 批量删除 map
-        val mapOf = hashMapOf<String, String>()
-        mapOf["ignore_warn"] = "1"
-        mapOf["pid"] = cid
-        fids.forEachIndexed { index, fid ->
-            mapOf["fid[$index]"] = fid
-        }
-        //  发起单次 115 网络批量删除
-        runCatching {
-            val deleteResult = fileRepository.deleteMultiple(mapOf)
-            if (deleteResult.state) {
-                "成功删除 ${fids.size} 个移除视频"
-            } else {
-                // 失败回滚
-                updateContentState { copy(fileBeanList = beforeList) }
-                rollback?.rollback()
-                clickMap[cid] = beforeClickMap
-                "删除失败：${deleteResult.errorMsg}"
-            }
-        }.onSuccess { msg ->
-            App.instance.toast(msg)
-        }.onFailureToastAndLog()
-    }
+    val filter = fileBeanList.filter { it.fileId in fids }
+    deleteMultiple(cid, filter)
 }
 
 /**
