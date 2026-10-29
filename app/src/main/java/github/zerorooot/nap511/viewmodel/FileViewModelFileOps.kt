@@ -221,6 +221,7 @@ internal fun FileViewModel.deleteMultiple() {
         // 提前删除并获取批量回滚闭包
         val selectedIds = selectedFiles.map { it.fileId }.toSet()
         val beforeTotalCount = totalCount
+        // 瞬时乐观更新 UI 状态并重置选择状态
         updateContentState {
             copy(
                 fileBeanList = fileBeanList.filterNot { it.fileId in selectedIds },
@@ -229,8 +230,9 @@ internal fun FileViewModel.deleteMultiple() {
                 appBarTitle = getDefaultAppBarTitle(context)
             )
         }
-        val rollback = FileCacheManager.removeItems(cid, selectedFiles.map { it.fileId })
-        clickMap[cid] = clickMap.getOrDefault(cid, 0) - selectedFiles.size
+        clickMap[cid] = (clickMap.getOrDefault(cid, 0) - selectedFiles.size).coerceAtLeast(0)
+        // 先行更新内存与落盘，取得回滚句柄
+        val rollback = FileCacheManager.removeItems(cid, selectedIds)
 
         runCatching {
             val deleteMultiple = fileRepository.deleteMultiple(mapOf)
@@ -245,7 +247,7 @@ internal fun FileViewModel.deleteMultiple() {
                 }
                 rollback?.rollback()
                 clickMap[cid] = beforeClickMap
-                "删除 ${selectedFiles.size} 个文件失败~"
+                "删除 ${selectedFiles.size} 个文件失败~${deleteMultiple.errorMsg}"
             }
         }.onSuccess { message ->
             App.instance.toast(message)

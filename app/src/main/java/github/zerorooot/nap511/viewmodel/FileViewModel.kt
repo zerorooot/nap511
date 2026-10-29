@@ -54,10 +54,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -107,8 +110,10 @@ class FileViewModel(
         get() = _contentState.value.isCutState
     val isSearchState: Boolean
         get() = _contentState.value.isSearchState
-    val isRefreshing: StateFlow<Boolean>
-        get() = MutableStateFlow(_contentState.value.isRefreshing).asStateFlow()
+    val isRefreshing: StateFlow<Boolean> = _contentState
+        .map { it.isRefreshing }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     val orderBean: OrderBean
         get() = _contentState.value.orderBean
     val totalCount: Int
@@ -674,7 +679,8 @@ class FileViewModel(
             is CacheEvent.LocalUiUpdated -> resolveDirName(event.cid)
             is CacheEvent.RemoteRefreshRequired -> resolveDirName(event.cid)
             is CacheEvent.FolderDeleted -> resolveDirName(event.folderCid)
-            is CacheEvent.AllCleared -> "全部目录"
+            is CacheEvent.FoldersDeleted -> "批量目录(${event.folderCids.size}个)"
+            CacheEvent.AllCleared -> "全部缓存"
         }
         XLog.d("handleCacheEvent $event (dir: $dirName) currentCid $currentCid")
         when (event) {
@@ -696,17 +702,24 @@ class FileViewModel(
                 if (event.cid == currentCid && _contentState.value.source is FileListSource.Folder) {
                     val updatedCache = FileCacheManager.getDate(event.cid)
                     if (updatedCache != null) {
-                        updateContentState {
-                            val unselectedList =
-                                updatedCache.fileBeanList.map { it.copy(isSelect = false) }
-                            copy(
-                                fileBeanList = unselectedList,
-                                pathList = updatedCache.path,
-                                totalCount = updatedCache.count,
-                                isLongClickState = false,
-                                appBarTitle = getDefaultAppBarTitle(context)
-                            )
+                        val currentList = _contentState.value.fileBeanList
+                        // 判定当前展示的条目与缓存是否已完全一致（解决 deleteMultiple 先行乐观更新后的重复重组）
+                        val isSameList = currentList.size == updatedCache.fileBeanList.size &&
+                                currentList.map { it.fileId } == updatedCache.fileBeanList.map { it.fileId }
+                        if (isSameList) {
+                            updateContentState {
+                                val unselectedList =
+                                    updatedCache.fileBeanList.map { it.copy(isSelect = false) }
+                                copy(
+                                    fileBeanList = unselectedList,
+                                    pathList = updatedCache.path,
+                                    totalCount = updatedCache.count,
+                                    isLongClickState = false,
+                                    appBarTitle = getDefaultAppBarTitle(context)
+                                )
+                            }
                         }
+
                         // 对齐复合键分页完成状态与物理游标（以 FilesBean.isComplete 为唯一信源 SSOT）
                         val paginationKey = "folder:${event.cid}"
                         physicalOffsets[paginationKey] = updatedCache.fileBeanList.size
@@ -728,25 +741,13 @@ class FileViewModel(
                     refresh(event.cid, true)
                 }
             }
-            //todo 当使用 FileViewModel.deleteMultiple 删除当前目录的一堆文件后，FileCacheManager.removeItems 会对文件挨个检测，可能拖慢速度
+
             is CacheEvent.FolderDeleted -> {
-                // 根目录 "0" 永远不可被判定为删除
-                if (event.folderCid == "0") return
+                handleFolderDeletedCheck(setOf(event.folderCid))
+            }
 
-                imageBeanCache.remove(event.folderCid)
-
-                // 判断当前所在目录或其祖先目录是否被删除
-                val isCurrentDeleted = (currentCid == event.folderCid)
-                val isAncestorDeleted = pathList.any { it.cid == event.folderCid }
-                XLog.d("CacheEvent.FolderDeleted isCurrentDeleted=$isCurrentDeleted, isAncestorDeleted=$isAncestorDeleted")
-
-                if (isCurrentDeleted || isAncestorDeleted) {
-                    App.instance.toast("当前所在目录已被删除")
-                    // 回退至最近仍存在的祖先目录，兜底为根目录 "0"
-                    val survivingAncestorCid =
-                        pathList.takeWhile { it.cid != event.folderCid }.lastOrNull()?.cid ?: "0"
-                    getFiles(survivingAncestorCid)
-                }
+            is CacheEvent.FoldersDeleted -> {
+                handleFolderDeletedCheck(event.folderCids)
             }
 
             is CacheEvent.AllCleared -> {
@@ -757,6 +758,28 @@ class FileViewModel(
                     getFiles("0")
                 }
             }
+        }
+    }
+
+    /**
+     * 高性能检查被删目录集合是否包含当前目录或祖先目录
+     */
+    private fun handleFolderDeletedCheck(deletedCids: Set<String>) {
+        if (deletedCids.isEmpty()) return
+        val validCids = deletedCids.filter { it != "0" }.toSet()
+        if (validCids.isEmpty()) return
+
+        validCids.forEach { imageBeanCache.remove(it) }
+
+        val isCurrentDeleted = currentCid in validCids
+        val isAncestorDeleted = pathList.any { it.cid in validCids }
+        XLog.d("handleFolderDeletedCheck isCurrentDeleted=$isCurrentDeleted, isAncestorDeleted=$isAncestorDeleted, count=${validCids.size}")
+
+        if (isCurrentDeleted || isAncestorDeleted) {
+            App.instance.toast("当前所在目录已被删除")
+            val survivingAncestorCid =
+                pathList.takeWhile { it.cid !in validCids }.lastOrNull()?.cid ?: "0"
+            getFiles(survivingAncestorCid)
         }
     }
 

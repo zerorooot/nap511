@@ -8,6 +8,7 @@ import github.zerorooot.nap511.bean.cache.CacheWrapper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -19,6 +20,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Collections
 import java.util.StringJoiner
+import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 
 /**
@@ -33,6 +35,9 @@ sealed interface CacheEvent {
 
     /** 目录本身及其所有子孙目录被级联删除（rm -r / deleteMultiple） */
     data class FolderDeleted(val folderCid: String) : CacheEvent
+
+    /** 批量目录及其子孙目录被级联删除（聚合事件，防止批量删除时引发事件风暴） */
+    data class FoldersDeleted(val folderCids: Set<String>) : CacheEvent
 
     /** 全局缓存被清空 */
     data object AllCleared : CacheEvent
@@ -57,8 +62,13 @@ object FileCacheManager {
     private val mutex = Mutex()
     private val wrapperType = CacheWrapper::class.java
 
-    // 独立后台协程作用域，用于不阻塞启动流程的后台加载任务
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    // 单线程 FIFO 调度器：天然保证磁盘落盘与删除的时序绝对一致，避免多线程异步写覆盖和回滚反序竞态
+    private val diskDispatcher = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "FileCacheManager-DiskIO").apply { isDaemon = true }
+    }.asCoroutineDispatcher()
+
+    // 独立后台协程作用域，用于不阻塞关键链路的磁盘异步持久化与后台加载任务
+    private val scope = CoroutineScope(diskDispatcher + SupervisorJob())
 
     // 最大内存目录缓存容量，超过时基于 LRU 淘汰旧目录，保障深度扫描时的内存安全与防 OOM
     private const val MAX_MEMORY_DIRS = 50
@@ -110,7 +120,7 @@ object FileCacheManager {
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 memoryCache.remove(cid)
-                deleteDiskFile(cid)
+                deleteDiskFileAsync(cid)
                 _cacheEvents.tryEmit(CacheEvent.RemoteRefreshRequired(cid))
             }
         }
@@ -155,8 +165,9 @@ object FileCacheManager {
             cacheDir.listFiles()?.forEach { file ->
                 val key = file.name.substringBeforeLast(".")
                 if (key != "0") {
-                    getDiskCache(key)?.let {
-                        memoryCache[key] = it
+                    getDiskCache(key)?.let { diskWrapper ->
+                        // 使用 putIfAbsent 避免启动时后台预加载覆盖运行中刚刚产生的新缓存
+                        memoryCache.putIfAbsent(key, diskWrapper)
                     }
                 }
             }
@@ -196,7 +207,7 @@ object FileCacheManager {
             memoryCache[i]?.data?.path?.last()?.name?.let {
                 stringJoiner.add(it)
             }
-            deleteDiskFile(i)
+            deleteDiskFileAsync(i)
         }
 
         XLog.d("deleteIndividualFile 删除${length}个单一文件 $stringJoiner")
@@ -217,7 +228,7 @@ object FileCacheManager {
             if (memEntry != null) {
                 if (now - memEntry.timestamp > ttlMillis) {
                     memoryCache.remove(key)
-                    deleteDiskFile(key)
+                    deleteDiskFileAsync(key)
                     return@withContext null
                 }
                 return@withContext memEntry.data
@@ -270,7 +281,7 @@ object FileCacheManager {
             mutex.withLock {
                 val entry = CacheWrapper(data = value)
                 memoryCache[key] = entry
-                flushToDiskInternal(key)
+                flushToDiskAsync(key, entry)
             }
         }
 
@@ -296,14 +307,14 @@ object FileCacheManager {
             val oldBean = cache.fileBeanList[index]
             val oldName = oldBean.name
             cache.fileBeanList[index] = oldBean.copy(name = newName)
-            flushToDiskInternal(parentCid)
+            memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
 
             val isFolder = oldBean.isFolder
             val folderCid = oldBean.categoryId.ifEmpty { fid }
             if (isFolder) {
-                memoryCache[folderCid]?.data?.let { subCache ->
-                    subCache.path.lastOrNull()?.name = newName
-                    flushToDiskInternal(folderCid)
+                memoryCache[folderCid]?.let { subEntry ->
+                    subEntry.data.path.lastOrNull()?.name = newName
+                    flushToDiskAsync(folderCid, subEntry)
                 }
             }
 
@@ -338,12 +349,14 @@ object FileCacheManager {
 
             val removedItem = cache.fileBeanList.removeAt(targetIndex)
             cache.count = (cache.count - 1).coerceAtLeast(0)
-            flushToDiskInternal(parentCid)
+            memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
 
             val actualIsFolder = isFolder ?: removedItem.isFolder
             val targetFolderCid = removedItem.categoryId.ifEmpty { fid }
+            val removedFolderCids = mutableSetOf<String>()
             if (actualIsFolder) {
-                removeFolderRecursivelyInternal(targetFolderCid)
+                removeFolderRecursivelyInternal(targetFolderCid, removedFolderCids)
+                deleteDiskFilesAsync(removedFolderCids)
             }
 
             _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
@@ -357,7 +370,7 @@ object FileCacheManager {
                     curCache.fileBeanList.clear()
                     curCache.fileBeanList.addAll(originalList)
                     curCache.count = originalCount
-                    flushToDiskInternal(parentCid)
+                    memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
                     _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
                 }
             }
@@ -365,7 +378,11 @@ object FileCacheManager {
     }
 
     /**
-     * 就地批量从父目录缓存中移除指定条目，支持级联子目录清理与完整回滚恢复。
+     * 就地批量从父目录缓存中移除指定条目：
+     * 1. 采用 Set 快速过滤；
+     * 2. 级联递归移除子文件夹在内存中的记录，并收集全部被删子孙目录集合；
+     * 3. 单线程 FIFO 异步后台批量清理对应磁盘缓存，释放 Mutex 关键锁等待时间；
+     * 4. 采用聚合 FoldersDeleted 事件广播，彻底杜绝循环发射导致的 UI 事件风暴。
      */
     suspend fun removeItems(
         parentCid: String,
@@ -377,7 +394,7 @@ object FileCacheManager {
             val fidSet = fids.toSet()
             val originalList = ArrayList(cache.fileBeanList)
             val originalCount = cache.count
-            val deletedFolders = mutableListOf<String>()
+            val allDeletedFolderCids = mutableSetOf<String>()
 
             val iterator = cache.fileBeanList.listIterator()
             var removedCount = 0
@@ -388,18 +405,22 @@ object FileCacheManager {
                     iterator.remove()
                     if (item.isFolder) {
                         val subCid = item.categoryId.ifEmpty { item.fileId }
-                        deletedFolders.add(subCid)
-                        removeFolderRecursivelyInternal(subCid)
+                        removeFolderRecursivelyInternal(subCid, allDeletedFolderCids)
                     }
                 }
             }
             if (removedCount == 0) return@withContext null
 
             cache.count = (cache.count - removedCount).coerceAtLeast(0)
-            flushToDiskInternal(parentCid)
+            memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
+            if (allDeletedFolderCids.isNotEmpty()) {
+                deleteDiskFilesAsync(allDeletedFolderCids)
+            }
 
             _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
-            deletedFolders.forEach { _cacheEvents.tryEmit(CacheEvent.FolderDeleted(it)) }
+            if (allDeletedFolderCids.isNotEmpty()) {
+                _cacheEvents.tryEmit(CacheEvent.FoldersDeleted(allDeletedFolderCids))
+            }
 
             CacheRollback {
                 mutex.withLock {
@@ -407,7 +428,7 @@ object FileCacheManager {
                     curCache.fileBeanList.clear()
                     curCache.fileBeanList.addAll(originalList)
                     curCache.count = originalCount
-                    flushToDiskInternal(parentCid)
+                    memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
                     _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
                 }
             }
@@ -429,6 +450,7 @@ object FileCacheManager {
         val visited = HashSet<String>()
         mutex.withLock {
             removeFolderRecursivelyInternal(folderCid, visited)
+            deleteDiskFilesAsync(visited)
         }
         if (emitFolderDeleted && folderCid != "0") {
             _cacheEvents.tryEmit(CacheEvent.FolderDeleted(folderCid))
@@ -456,7 +478,6 @@ object FileCacheManager {
             }
         }
         memoryCache.remove(folderCid)
-        deleteDiskFile(folderCid)
     }
 
 
@@ -494,7 +515,7 @@ object FileCacheManager {
             }
 
             if (hasChanges) {
-                flushToDiskInternal(cid)
+                memoryCache[cid]?.let { flushToDiskAsync(cid, it) }
                 XLog.d("updateVideoProgress CacheEvent.LocalUiUpdated")
                 _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(cid))
             }
@@ -507,7 +528,7 @@ object FileCacheManager {
     suspend fun remove(key: String) = withContext(Dispatchers.IO) {
         mutex.withLock {
             memoryCache.remove(key)
-            deleteDiskFile(key)
+            deleteDiskFileAsync(key)
         }
     }
 
@@ -559,23 +580,39 @@ object FileCacheManager {
         }
     }
 
-    private fun flushToDiskInternal(key: String) {
+    /**
+     * 单线程 FIFO 异步落盘：将 JSON 序列化与文件 IO 移至后台 scope 执行，避免阻塞全局 Mutex 锁与调用方线程，且杜绝并发写乱序
+     */
+    private fun flushToDiskAsync(key: String, entry: CacheWrapper) {
         if (!saveRequestCache || !::cacheDir.isInitialized) return
-        val entry = memoryCache[key] ?: return
-        try {
-            val diskFile = getDiskFile(key)
-            val json = gson.toJson(entry, wrapperType)
-            diskFile.writeText(json)
-        } catch (e: Exception) {
-            e.printStackTrace()
+        scope.launch {
+            try {
+                val diskFile = getDiskFile(key)
+                val json = gson.toJson(entry, wrapperType)
+                diskFile.writeText(json)
+            } catch (e: Exception) {
+                XLog.e("flushToDiskAsync failed for key: $key", e)
+            }
+        }
+    }
+
+    private fun deleteDiskFileAsync(key: String) {
+        if (!::cacheDir.isInitialized) return
+        scope.launch {
+            val file = getDiskFile(key)
+            if (file.exists()) file.delete()
+        }
+    }
+
+    private fun deleteDiskFilesAsync(keys: Set<String>) {
+        if (!::cacheDir.isInitialized || keys.isEmpty()) return
+        scope.launch {
+            keys.forEach { key ->
+                val file = getDiskFile(key)
+                if (file.exists()) file.delete()
+            }
         }
     }
 
     private fun getDiskFile(key: String): File = File(cacheDir, "${key}.json")
-
-    private fun deleteDiskFile(key: String) {
-        if (!::cacheDir.isInitialized) return
-        val file = getDiskFile(key)
-        if (file.exists()) file.delete()
-    }
 }
