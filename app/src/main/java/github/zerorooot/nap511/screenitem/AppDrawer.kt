@@ -25,8 +25,8 @@ import github.zerorooot.nap511.bean.Route
 fun AppDrawer(
     drawerState: DrawerState,
     gesturesEnabled: Boolean,
-    remainingSpaceBean: RemainingSpaceBean,
-    avatarBean: AvatarBean,
+    remainingSpaceProvider: () -> RemainingSpaceBean,
+    avatarBeanProvider: () -> AvatarBean,
     menuItems: List<DrawerMenuItem>,
     currentRoute: Route?,
     onMenuItemClick: (Route) -> Unit,
@@ -42,7 +42,7 @@ fun AppDrawer(
                     .verticalScroll(rememberScrollState())
             ) {
                 Spacer(Modifier.height(6.dp))
-                Avatar(remainingSpaceBean, avatarBean)
+                Avatar(remainingSpaceProvider(), avatarBeanProvider())
                 Spacer(Modifier.height(6.dp))
 
                 menuItems.forEach { item ->

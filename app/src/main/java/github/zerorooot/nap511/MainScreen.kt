@@ -9,6 +9,7 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -57,15 +58,17 @@ fun MainScreen(
     var navGesturesEnabled by remember { mutableStateOf(true) }
     var lastBackPressTime by remember { mutableLongStateOf(0L) }
 
-    val remainingSpaceBean by fileViewModel.remainingSpace.collectAsStateWithLifecycle()
-    val fileContentState by fileViewModel.contentState.collectAsStateWithLifecycle()
-    val avatarJson by SettingsRepository.getDataFlow(ConfigKeyUtil.AVATAR_BEAN, "{}")
+    // 使用 State 结合 Provider lambda 传递，防止数据更新时倒灌导致 MainScreen 顶级全量重组
+    val remainingSpaceState = fileViewModel.remainingSpace.collectAsStateWithLifecycle()
+    val avatarJsonState = SettingsRepository.getDataFlow(ConfigKeyUtil.AVATAR_BEAN, "{}")
         .collectAsStateWithLifecycle(initialValue = "{}")
-    val avatarBean = remember(avatarJson) {
-        try {
-            Gson().fromJson(avatarJson, AvatarBean::class.java) ?: AvatarBean()
-        } catch (_: Exception) {
-            AvatarBean()
+    val avatarBeanState = remember {
+        derivedStateOf {
+            try {
+                Gson().fromJson(avatarJsonState.value, AvatarBean::class.java) ?: AvatarBean()
+            } catch (_: Exception) {
+                AvatarBean()
+            }
         }
     }
 
@@ -190,16 +193,18 @@ fun MainScreen(
     BackHandler(backStack.size == 1 && backStack[0] == Route.Login) {
         slideTwoBackHome(null)
     }
-    //MyFile页面的再滑一次返回桌面
-    BackHandler(drawerState.isClosed && backStack.size == 1 && fileContentState.pathList.size == 1) {
-        slideTwoBackHome(fileViewModel)
-    }
+    // MyFile页面的再滑一次返回桌面（隔离在单独 Composable 中，防止 contentState 变化引起 MainScreen 重组）
+    MyFileRootBackHandler(
+        enabled = drawerState.isClosed && backStack.size == 1,
+        fileViewModel = fileViewModel,
+        onBack = { slideTwoBackHome(it) }
+    )
 
     AppDrawer(
         drawerState = drawerState,
         gesturesEnabled = navGesturesEnabled,
-        remainingSpaceBean = remainingSpaceBean,
-        avatarBean = avatarBean,
+        remainingSpaceProvider = { remainingSpaceState.value },
+        avatarBeanProvider = { avatarBeanState.value },
         menuItems = menuItems,
         currentRoute = currentRoute,
         onMenuItemClick = { route ->
@@ -210,7 +215,7 @@ fun MainScreen(
             backStack = backStack,
             onNavigate = { navigateTo(it) },
             onPopBack = { popBack() },
-            avatarBean = avatarBean,
+            avatarBeanProvider = { avatarBeanState.value },
             fileViewModel = fileViewModel,
             offlineFileViewModel = offlineFileViewModel,
             audioViewModel = audioViewModel,
@@ -224,5 +229,20 @@ fun MainScreen(
 
     CreateDialogs(fileViewModel, settingUiState) {
         navigateTo(it)
+    }
+}
+
+/**
+ * 局部隔离的 MyFile 根目录返回监听器，避免 contentState 频繁发射导致全局 MainScreen 重组
+ */
+@Composable
+private fun MyFileRootBackHandler(
+    enabled: Boolean,
+    fileViewModel: FileViewModel,
+    onBack: (FileViewModel?) -> Unit
+) {
+    val fileContentState by fileViewModel.contentState.collectAsStateWithLifecycle()
+    BackHandler(enabled && fileContentState.pathList.size == 1) {
+        onBack(fileViewModel)
     }
 }

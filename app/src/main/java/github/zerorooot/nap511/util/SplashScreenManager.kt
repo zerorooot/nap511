@@ -4,9 +4,6 @@ import android.animation.ObjectAnimator
 import android.view.View
 import android.view.animation.AccelerateInterpolator
 import androidx.activity.ComponentActivity
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.core.animation.doOnEnd
 import androidx.core.splashscreen.SplashScreen
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -16,7 +13,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * 启动屏统一管理与解耦封装类 (SplashScreenManager)
@@ -29,10 +25,11 @@ import kotlinx.coroutines.withContext
  */
 object SplashScreenManager {
 
-    /** 启动屏退出时的淡出动画时长（毫秒）优化：缩短至 200ms 以加速首屏视觉感知 */
-    private const val EXIT_ANIMATION_DURATION = 200L
+    /** 启动屏退出时的淡出动画时长（毫秒）优化：缩短至 120ms 以加速首屏视觉感知 */
+    private const val EXIT_ANIMATION_DURATION = 120L
 
-    var isReady: Boolean by mutableStateOf(false)
+    @Volatile
+    var isReady: Boolean = false
         private set
 
     /**
@@ -72,10 +69,8 @@ object SplashScreenManager {
                 FileCacheManager.loadAllCache()
             }
 
-            // 3. 核心账号凭证就绪后，立即通知 UI 线程将 isReady 设为 true，触发 SplashScreen 退场
-            withContext(Dispatchers.Main) {
-                isReady = true
-            }
+            // 3. 核心账号凭证就绪后，直接在 IO 线程置 isReady = true（无需切主线程排队），使首帧 onPreDraw 即可立即通过
+            isReady = true
         }
 
         // 2. 挂起控制：在核心状态（如 DataStore 配置及预加载）加载完成前，保持动态 SplashScreen 显示

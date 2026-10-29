@@ -28,8 +28,8 @@
         <item name="windowSplashScreenBackground">?android:attr/colorBackground</item>
         <!-- 启动屏中心动态图标：云朵首尾流动轮廓 + 悬浮下载箭头 -->
         <item name="windowSplashScreenAnimatedIcon">@drawable/avd_splash_cloud</item>
-        <!-- 动效周期时长，与 AVD 循环周期对齐 -->
-        <item name="windowSplashScreenAnimationDuration">1800</item>
+        <!-- 动效周期时长，缩短至 500ms 加速冷启动淡出感知 -->
+        <item name="windowSplashScreenAnimationDuration">500</item>
         <!-- 强制设置图标背景透明，杜绝系统默认底色与圆角形状伪影 -->
         <item name="windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
         <!-- 启动图退出后，Activity 自动无缝切换至主应用样式 -->

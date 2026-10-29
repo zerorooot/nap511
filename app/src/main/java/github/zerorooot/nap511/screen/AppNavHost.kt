@@ -76,7 +76,7 @@ fun AppNavHost(
     backStack: NavBackStack<NavKey>,
     onNavigate: (Route) -> Unit,
     onPopBack: () -> Unit,
-    avatarBean: AvatarBean,
+    avatarBeanProvider: () -> AvatarBean,
     fileViewModel: FileViewModel,
     audioViewModel: AudioViewModel,
     offlineFileViewModel: OfflineFileViewModel,
@@ -304,7 +304,7 @@ fun AppNavHost(
                 onSetGesturesEnabled(false)
                 terminalViewModel.initDirectoryIfNeeded(fileViewModel.pathList)
                 terminalViewModel.updateFileOpener(fileOpener)
-                terminalViewModel.avatarBean = avatarBean
+                terminalViewModel.avatarBean = avatarBeanProvider()
                 TerminalScreen(
                     viewModel = terminalViewModel,
                     onBack = onPopBack,
