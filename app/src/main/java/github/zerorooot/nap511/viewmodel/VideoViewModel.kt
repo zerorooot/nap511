@@ -309,7 +309,15 @@ class VideoViewModel : ViewModel() {
         _uiState.update { it.copy(isLoadingEpisode = true) }
         videoList.removeAt(currentIndex)
 
-        if (videoList.isEmpty()) {
+        if (currentIndex < videoList.size) {
+            // 移除当前元素后，原本的“下一集”自动前移填补到 currentIndex 处，继续播放
+            loadVideoAt(currentIndex, isPortrait)
+            viewModelScope.launch {
+                _uiEvent.emit(VideoUiEvent.EpisodeListUpdated)
+                _uiEvent.emit(VideoUiEvent.SingleVideoDiscarded)
+            }
+        } else {
+            // 移除的是最后一个视频（列表已空，或没有后续可播放视频），停播并触发全部移除流程
             _uiState.update {
                 it.copy(
                     fileBeanIndex = -1,
@@ -321,14 +329,6 @@ class VideoViewModel : ViewModel() {
             viewModelScope.launch {
                 _uiEvent.emit(VideoUiEvent.EpisodeListUpdated)
                 _uiEvent.emit(VideoUiEvent.AllVideosDiscarded(autoExitDelayMs = 3000L))
-            }
-        } else {
-            // 注意：移除当前元素后，后方的原本“下一集”自动前移填补到 currentIndex
-            val nextIndex = if (currentIndex < videoList.size) currentIndex else videoList.size - 1
-            loadVideoAt(nextIndex, isPortrait)
-            viewModelScope.launch {
-                _uiEvent.emit(VideoUiEvent.EpisodeListUpdated)
-                _uiEvent.emit(VideoUiEvent.SingleVideoDiscarded)
             }
         }
     }
@@ -356,9 +356,9 @@ class VideoViewModel : ViewModel() {
         val insertIndex = originalIndex.coerceIn(0, videoList.size)
         videoList.add(insertIndex, restoredVideo)
 
-        // 查找当前正在播放视频在新列表中的最新索引
-        val currentPlayingPickCode = _uiState.value.videoInfo?.pickCode
-        val newPlayingIndex = videoList.indexOfFirst { it.pickCode == currentPlayingPickCode }
+        // 查找当前正在播放视频在新列表中的最新索引（若 fileBeanIndex == -1 表示出于停播状态）
+        val currentPlayingPickCode = if (_uiState.value.fileBeanIndex == -1) null else _uiState.value.videoInfo?.pickCode
+        val newPlayingIndex = if (currentPlayingPickCode == null) -1 else videoList.indexOfFirst { it.pickCode == currentPlayingPickCode }
         val listSize = videoList.size
 
         if (newPlayingIndex >= 0) {

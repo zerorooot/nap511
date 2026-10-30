@@ -80,7 +80,7 @@ class FileViewModel(
     // ==================== 核心状态流 (分域双 Flow 规范) ====================
 
     /** 1. 文件列表核心浏览与模式状态流 */
-    private val _contentState =
+    internal val _contentState =
         MutableStateFlow(FileContentUiState(appBarTitle = context.getString(R.string.app_name)))
     val contentState: StateFlow<FileContentUiState> = _contentState.asStateFlow()
 
@@ -738,7 +738,14 @@ class FileViewModel(
                 // 针对新增文件、解压完成、离线下载完成、字幕上传、回收站还原等场景，云端生成了新文件或变动：
                 /**不需要删除缓存，因为在 [FileCacheManager.notifyRemoteRefresh] 里已经删除了**/
                 if (_contentState.value.source is FileListSource.Folder) {
-                    refresh(event.cid, true)
+                    if (event.cid == currentCid) {
+                        // 当前展示目录变动，刷新当前 UI 页面
+                        refresh(currentCid, true)
+                    } else {
+                        // 非当前展示目录：FileCacheManager 在 notifyRemoteRefresh 中已清空对应 cid 的缓存
+                        // 此时无需修改 UI 的 source，后台静默拉取/更新该 cid 缓存即可（或等切入时懒加载）
+                        updateFileCache(event.cid)
+                    }
                 }
             }
 

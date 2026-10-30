@@ -8,6 +8,7 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileDialogState
+import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.bean.RenameBean
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.util.App
@@ -127,7 +128,8 @@ internal fun FileViewModel.getFileInfo(fileBean: FileBean) {
 @OptIn(ExperimentalCoilApi::class)
 internal fun FileViewModel.delete(fileBean: FileBean) {
     viewModelScope.launch {
-        val cid = currentCid
+        //可能在搜索模式删除，故使用pid而非当前cid
+        val cid = fileBean.parentId
         val beforeList = fileBeanList
         val beforeClickMap = clickMap.getOrDefault(cid, 0)
 
@@ -254,7 +256,22 @@ internal fun FileViewModel.deleteMultiple(targetCid: String, selectedFiles: List
 
 @OptIn(ExperimentalCoilApi::class)
 internal fun FileViewModel.deleteMultiple() {
-    deleteMultiple(currentCid, fileBeanList.filter { it.isSelect })
+    val filter = fileBeanList.filter { it.isSelect }
+    deleteMultiple(currentCid, filter)
+    //搜索/过滤模式中，因为被删除文件/文件夹的cid不是当前cid，所以只会删除文件，而不会删除缓存，要手动删除
+    if (_contentState.value.source !is FileListSource.Folder) {
+        val groupBy = filter.groupBy { it.parentId }
+        groupBy.forEach { (pid, beans) ->
+            /**
+             * 在[formatFileBeanList]中已经把文件、文件夹的cid、fid统一做了转换，这里直接使用fid
+             */
+            viewModelScope.launch {
+                FileCacheManager.removeItems(pid, beans.map { it.fileId })
+            }
+        }
+
+    }
+
 }
 
 /**
