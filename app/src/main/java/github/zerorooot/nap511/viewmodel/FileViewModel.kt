@@ -271,7 +271,11 @@ class FileViewModel(
 
     fun delete(fileBean: FileBean) = viewModelScope.launch { mutatorModule.delete(fileBean) }
     fun deleteMultiple() = viewModelScope.launch { mutatorModule.deleteMultiple() }
-    fun deleteIndividualFile() = mutatorModule.deleteIndividualFile()
+
+    fun deleteOrphansAndExpiredFile() = viewModelScope.launch {
+        mutatorModule.deleteOrphansAndExpiredFile()
+    }
+
     fun cut(index: Int = -1) = mutatorModule.cut(index)
     fun cancelCut() = mutatorModule.cancelCut()
     fun removeFile() = viewModelScope.launch { mutatorModule.removeFile() }

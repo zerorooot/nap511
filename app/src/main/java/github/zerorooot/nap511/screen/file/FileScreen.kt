@@ -362,6 +362,9 @@ fun FileScreen(
             }
 
             TopBarAction.SEARCH -> {
+                if (!contentState.isSearchState) {
+                    fileViewModel.setListLocation(contentState.source.paginationKey, currentScrollState)
+                }
                 fileViewModel.openSearchDialog()
             }
 

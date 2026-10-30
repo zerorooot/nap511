@@ -160,8 +160,6 @@ object FileCacheManager {
 
         // 2. 在后台异步加载其余文件及清理过期缓存，不阻塞启动流程/SplashScreen
         scope.launch {
-//            cleanExpiredDiskCache()
-
             cacheDir.listFiles()?.forEach { file ->
                 val key = file.name.substringBeforeLast(".")
                 if (key != "0") {
@@ -174,43 +172,64 @@ object FileCacheManager {
         }
     }
 
-    fun deleteIndividualFile() {
-        if (!::cacheDir.isInitialized) return
-        val diskCache = memoryCache["0"] ?: return
+    /**
+     * 清理磁盘过期、孤立文件
+     */
+    suspend fun deleteOrphansAndExpiredFile() = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            if (!::cacheDir.isInitialized) return@withContext
+            val now = System.currentTimeMillis()
 
-        val fileList =
-            cacheDir.listFiles()?.map { i -> i.name.substringBeforeLast(".") }?.toMutableList()
-                ?: return
-        fileList.remove("0")
+            // 1. 获取磁盘上所有缓存文件的 key 集合（排除根目录 "0"）
+            val allDiskKeys = cacheDir.listFiles()
+                ?.map { it.name.substringBeforeLast(".") }
+                ?.toMutableSet() ?: return@withContext
+            allDiskKeys.remove("0")
 
-        fun walk(cid: String) {
-            val walkCache = memoryCache[cid] ?: return
-            val folderList = walkCache.data.fileBeanList.filter { it.isFolder }
-            for (item in folderList) {
-                walk(item.categoryId)
+            val reachableKeys = mutableSetOf<String>()
+
+            // 2. 深度优先遍历可达树 (Supports Disk Fallback)
+            suspend fun walk(cid: String) {
+                // 优先查内存，未命中则查磁盘
+                val cacheWrapper = memoryCache[cid] ?: getDiskCache(cid, now) ?: return
+
+                // 如果该目录缓存本身已过期，不再继续向下遍历
+                if (now - cacheWrapper.timestamp > ttlMillis) return
+
+                // 标记当前目录为可达
+                if (cid != "0") {
+                    reachableKeys.add(cid)
+                }
+
+                val folderList = cacheWrapper.data.fileBeanList.filter { it.isFolder }
+                for (item in folderList) {
+                    val subCid = item.categoryId.ifEmpty { item.fileId }
+                    if (subCid.isNotEmpty() && subCid != "0" && !reachableKeys.contains(subCid)) {
+                        walk(subCid)
+                    }
+                }
             }
-            fileList.remove(cid)
-        }
 
-        diskCache.data.fileBeanList.forEach {
-            if (it.isFolder) {
-                walk(it.categoryId)
+            // 3. 从根节点 "0" 开始递归遍历
+            walk("0")
+
+            // 4. 孤立文件 = 磁盘所有文件 - 可达文件
+            val orphanKeys = allDiskKeys - reachableKeys
+            if (orphanKeys.isEmpty()) return@withContext
+
+            // 5. 同步清理内存与磁盘
+            val deletedNames = StringJoiner("；")
+            orphanKeys.forEach { key ->
+                memoryCache[key]?.data?.path?.lastOrNull()?.name?.let {
+                    deletedNames.add(it)
+                }
+                memoryCache.remove(key)
+                val file = getDiskFile(key)
+                if (file.exists()) file.delete()
             }
-        }
-        val length = fileList.size
-        if (length == 0) {
-            return
-        }
 
-        val stringJoiner = StringJoiner("；")
-        fileList.forEach { i ->
-            memoryCache[i]?.data?.path?.last()?.name?.let {
-                stringJoiner.add(it)
-            }
-            deleteDiskFileAsync(i)
+            XLog.d("deleteIndividualFile 清理了 ${orphanKeys.size} 个孤立/过期缓存文件: $deletedNames")
         }
-
-        XLog.d("deleteIndividualFile 删除${length}个单一文件 $stringJoiner")
     }
 
 
@@ -544,6 +563,15 @@ object FileCacheManager {
     }
 
     /**
+     * 仅清空内存缓存（用于模拟低内存淘汰或冷启动，保留磁盘缓存）
+     */
+    suspend fun clearMemoryOnly() = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            memoryCache.clear()
+        }
+    }
+
+    /**
      * 清空全部缓存（内存 + 磁盘）
      */
     suspend fun clearAll() = withContext(Dispatchers.IO) {
@@ -557,28 +585,6 @@ object FileCacheManager {
         }
     }
 
-    /**
-     * 清理磁盘过期的缓存文件
-     */
-    suspend fun cleanExpiredDiskCache() = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            if (!::cacheDir.isInitialized) return@withContext
-            val files = cacheDir.listFiles() ?: return@withContext
-            val now = System.currentTimeMillis()
-
-            for (file in files) {
-                try {
-                    val json = file.readText()
-                    val entry: CacheWrapper? = gson.fromJson(json, wrapperType)
-                    if (entry == null || (now - entry.timestamp > ttlMillis)) {
-                        file.delete()
-                    }
-                } catch (e: Exception) {
-                    file.delete()
-                }
-            }
-        }
-    }
 
     /**
      * 单线程 FIFO 异步落盘：将 JSON 序列化与文件 IO 移至后台 scope 执行，避免阻塞全局 Mutex 锁与调用方线程，且杜绝并发写乱序

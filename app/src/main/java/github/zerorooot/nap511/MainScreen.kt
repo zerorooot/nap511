@@ -35,6 +35,7 @@ import github.zerorooot.nap511.screenitem.AppDrawer
 import github.zerorooot.nap511.screenitem.DrawerMenuItems
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
@@ -146,7 +147,7 @@ fun MainScreen(
     fun slideTwoBackHome(fileViewModel: FileViewModel?) {
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastBackPressTime < 1500L) {
-            fileViewModel?.deleteIndividualFile()
+            fileViewModel?.deleteOrphansAndExpiredFile()
             onMoveTaskToBack(true)
         } else {
             lastBackPressTime = currentTime

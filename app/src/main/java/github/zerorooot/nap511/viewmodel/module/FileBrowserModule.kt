@@ -106,7 +106,7 @@ class FileBrowserModule(
      * 预加载指定 cid 的缓存
      */
     suspend fun updateFileCache(cid: String) {
-        if (FileCacheManager.containsKey(cid)) {
+        if (FileCacheManager[cid] != null) {
             return
         }
         runCatching {
@@ -126,10 +126,10 @@ class FileBrowserModule(
      */
     override suspend fun getFiles(cid: String) {
         stateHolder.setRefreshing(true)
-        // 1. 尝试读取缓存
-        if (FileCacheManager.containsKey(cid)) {
-            val files = FileCacheManager[cid]!!
-            files.fileBeanList = formatFileBeanList(files.fileBeanList)
+        // 1. 尝试读取缓存（内存与磁盘双级读取，支持冷启动及 LRU 淘汰后从磁盘恢复）
+        val cached = FileCacheManager[cid]
+        if (cached != null) {
+            val files = cached.copy(fileBeanList = formatFileBeanList(cached.fileBeanList))
             setFiles(files)
             stateHolder.setRefreshing(false)
             return

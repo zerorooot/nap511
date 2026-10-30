@@ -270,8 +270,8 @@ class FileMutatorModule(
         }
     }
 
-    fun deleteIndividualFile() {
-        FileCacheManager.deleteIndividualFile()
+    suspend fun deleteOrphansAndExpiredFile() {
+        FileCacheManager.deleteOrphansAndExpiredFile()
     }
 
     /**

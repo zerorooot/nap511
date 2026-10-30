@@ -333,4 +333,29 @@ class FileBrowserModuleTest {
         assertEquals(rootCid, stateHolder.currentContentState.currentCid)
         assertEquals("f_root", stateHolder.currentContentState.fileBeanList.firstOrNull()?.fileId)
     }
+
+    @Test
+    fun `test getFiles loads from disk cache when memory cache is cleared`() = runTest {
+        val cid = "folder_disk_only"
+        val diskFiles = FilesBean(
+            fileBeanList = arrayListOf(FileBean(fileId = "f_disk", name = "disk_saved_item", isFolder = false)),
+            cid = cid,
+            count = 1,
+            order = "",
+            path = listOf(PathBean(cid = cid, name = "磁盘目录", pid = "0"))
+        )
+        // 存入缓存并落盘
+        FileCacheManager.put(cid, diskFiles)
+        // 清空内存缓存，模拟冷启动或 LRU 内存淘汰
+        FileCacheManager.clearMemoryOnly()
+
+        assertFalse("内存缓存此时不应存在", FileCacheManager.containsKey(cid))
+
+        // 通过 getFiles 加载该目录，应从磁盘成功读出而非依赖内存
+        module.getFiles(cid)
+
+        assertEquals(cid, stateHolder.currentContentState.currentCid)
+        assertEquals(1, stateHolder.currentContentState.fileBeanList.size)
+        assertEquals("f_disk", stateHolder.currentContentState.fileBeanList.first().fileId)
+    }
 }
