@@ -14,7 +14,7 @@ import github.zerorooot.nap511.terminal.viewmodel.emitText
  * 输出尾部 N 行文本命令（tail）
  *
  * 遵循 POSIX.1-2017 规范：
- * 1. 支持指定操作数 `tail [-n <NUM>] [files...]`；
+ * 1. 支持指定操作数 `tail [-n <NUM>] \[files...\]`；
  * 2. 多文件时输出文件标头 `==> <filename> <==`，文件块之间空一行隔离；单文件或 stdin 输入时不显示标头；
  * 3. 维护每个数据源定长为 limit 的滑动窗口，收集末尾 N 行文本输出。
  */

@@ -17,7 +17,7 @@ import java.util.Locale
  * 文本字数统计命令（wc）
  *
  * 继承 [StreamPipelineCommand]，遵循 POSIX.1-2017 规范：
- * 1. 支持指定操作数 `wc [-l] [-w] [-c] [files...]`；
+ * 1. 支持指定操作数 `wc [-l] [-w] [-c] \[files...\]`；
  * 2. 统计维度：
  *    - `-l`：仅统计行数
  *    - `-w`：仅统计单词数

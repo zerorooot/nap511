@@ -15,7 +15,7 @@ import github.zerorooot.nap511.terminal.viewmodel.emitText
  * 文本过滤匹配命令（grep）
  *
  * 继承 [StreamPipelineCommand]，遵循 POSIX.1-2017 规范：
- * 1. 语法：`grep [-i] [-v] [-c] <pattern> [file...]`；
+ * 1. 语法：`grep [-i] [-v] [-c] <pattern> \[file...\]`；
  * 2. 位置参数划分：首个位置参数为模式 pattern，后续位置参数为待匹配文件；若未指定文件则读取标准输入 stdin；
  * 3. 多文件输出前缀：当指定 2 个及以上输入源时，每行匹配项自动附带文件名 `<file>:<content>`（若 -c 则为 `<file>:<count>`）；
  *    单文件或 stdin 输入时不附带文件名前缀。

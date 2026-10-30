@@ -56,11 +56,6 @@ import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import github.zerorooot.nap511.viewmodel.RepeatFileViewModel
 import github.zerorooot.nap511.viewmodel.SettingViewModel
-import github.zerorooot.nap511.viewmodel.getImage
-import github.zerorooot.nap511.viewmodel.getTorrentTask
-import github.zerorooot.nap511.viewmodel.getZipListFile
-import github.zerorooot.nap511.viewmodel.onVideoActivityResult
-import github.zerorooot.nap511.viewmodel.openDiscardVideosDialog
 import java.lang.reflect.Type
 
 /**

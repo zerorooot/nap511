@@ -26,6 +26,7 @@ app/src/test/java/github/zerorooot/*
 app/src/test/java/github/zerorooot/nap511/*
 !app/src/test/java/github/zerorooot/nap511/terminal/
 !app/src/test/java/github/zerorooot/nap511/util/
+!app/src/test/java/github/zerorooot/nap511/viewmodel/
 app/release/
 .artifacts
 .proxyai

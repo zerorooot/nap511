@@ -39,11 +39,7 @@ class SettingViewModel(
     }
 
     // 从 SettingsRepository 订阅统一暴露的状态 Flow
-    val uiState: StateFlow<SettingUiState> = settingsRepository.settingUiStateFlow.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000), // 当无界面订阅 5 秒后自动停止收集，节省资源
-        initialValue = SettingUiState()
-    )
+    val uiState: StateFlow<SettingUiState> = settingsRepository.settingUiStateFlow
 
     /**
      * 通用配置保存函数

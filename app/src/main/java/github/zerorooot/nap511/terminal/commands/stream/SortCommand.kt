@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.toList
  * 文本行排序命令（sort）
  *
  * 继承 [StreamPipelineCommand]，遵循 POSIX.1-2017 规范：
- * 1. 支持指定操作数 `sort [-r] [-n] [-u] [files...]`；
+ * 1. 支持指定操作数 `sort [-r] [-n] [-u] \[files...\]`；
  * 2. 汇聚所有输入数据源（stdin 或多文件）至同一个全局列表进行统一排序；
  * 3. 编译期构建比较器（数值 `-n` / 逆序 `-r` / 去重 `-u`）。
  */

@@ -151,7 +151,7 @@ fun <T> Result<T>.onFailureToastAndLog(
     val logTag = tag ?: resolveCallerTag()
     val userMsg = customMsg ?: e.toUserFriendlyMessage()
     XLog.e("[$logTag] $userMsg", e)
-    App.instance.toast(userMsg)
+    runCatching { App.instance.toast(userMsg) }
 }
 
 /**

@@ -25,21 +25,6 @@ import github.zerorooot.nap511.repository.AuthRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
-import github.zerorooot.nap511.viewmodel.addTorrentTask
-import github.zerorooot.nap511.viewmodel.cancelDiscardVideos
-import github.zerorooot.nap511.viewmodel.closeAria2Dialog
-import github.zerorooot.nap511.viewmodel.closeCreateFolderDialog
-import github.zerorooot.nap511.viewmodel.closeCreateSelectTorrentFileDialog
-import github.zerorooot.nap511.viewmodel.closeDiscardVideosDialog
-import github.zerorooot.nap511.viewmodel.closeFileInfoDialog
-import github.zerorooot.nap511.viewmodel.closeFileOrderDialog
-import github.zerorooot.nap511.viewmodel.closeRenameFileDialog
-import github.zerorooot.nap511.viewmodel.closeSearchDialog
-import github.zerorooot.nap511.viewmodel.closeUnzipPasswordDialog
-import github.zerorooot.nap511.viewmodel.confirmDiscardVideos
-import github.zerorooot.nap511.viewmodel.createFolder
-import github.zerorooot.nap511.viewmodel.decryptZip
-import github.zerorooot.nap511.viewmodel.rename
 import kotlinx.coroutines.launch
 
 @ExperimentalMaterial3Api
