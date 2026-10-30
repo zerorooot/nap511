@@ -456,6 +456,9 @@ fun FileScreen(
             },
             onPathItemClick = {
                 if (it != contentState.currentCid) {
+                    if (contentState.currentCid != "0" && !contentState.isLongClickState && !contentState.isSearchState) {
+                        fileViewModel.setListLocation(contentState.source.paginationKey, currentScrollState)
+                    }
                     fileViewModel.getFiles(it)
                 }
             }

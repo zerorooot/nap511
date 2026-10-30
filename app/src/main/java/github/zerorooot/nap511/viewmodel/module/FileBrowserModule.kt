@@ -152,6 +152,7 @@ class FileBrowserModule(
             // 避免在等待网络期间提前清空导致屏幕上的旧列表条目闪烁或抢跑发起重复请求
             imageCacheStore.clear(cid)
             // 3. 网络请求成功后写入缓存
+            FileCacheManager[cid] = files
             setFiles(files)
         }.onFailure {
             val expiredTip = when (it) {

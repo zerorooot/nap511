@@ -214,8 +214,9 @@ class FileViewModel(
         scrollPositionStore.getLocation(key)
 
     fun setListLocationAndClickCache(index: Int, state: LazyScrollState) {
+        val paginationKey = contentState.value.source.paginationKey
         scrollPositionStore.setClick(currentCid, index)
-        scrollPositionStore.setLocation(currentCid, state)
+        scrollPositionStore.setLocation(paginationKey, state)
     }
 
     // 状态与弹窗控制

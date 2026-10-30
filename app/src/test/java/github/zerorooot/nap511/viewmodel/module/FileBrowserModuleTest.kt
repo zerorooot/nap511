@@ -29,6 +29,13 @@ import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Test
 
+import github.zerorooot.nap511.bean.PathBean
+import github.zerorooot.nap511.util.FileCacheManager
+import kotlinx.coroutines.runBlocking
+import org.junit.After
+import java.io.File
+import java.nio.file.Files
+
 class FileBrowserModuleTest {
 
     companion object {
@@ -39,10 +46,39 @@ class FileBrowserModuleTest {
         }
     }
 
+    private lateinit var tempDir: File
     private lateinit var stateHolder: FileUiStateHolder
     private lateinit var pagingStateStore: PagingStateStore
     private lateinit var imageCacheStore: ImageCacheStore
     private lateinit var module: FileBrowserModule
+
+    private val fakeRepo = object : FileRepository() {
+        override suspend fun getFiles(
+            cid: String,
+            showDir: Int,
+            aid: Int,
+            asc: Int,
+            naturalSort: Int,
+            order: String,
+            limit: Int,
+            format: String,
+            offset: Int,
+            fcMix: Int
+        ): FilesBean {
+            return FilesBean(
+                fileBeanList = arrayListOf(
+                    FileBean(fileId = "f_$cid", name = "item_$cid", isFolder = false)
+                ),
+                cid = cid,
+                count = 1,
+                order = order,
+                path = listOf(
+                    PathBean(cid = "0", name = "根目录", pid = "0"),
+                    PathBean(cid = cid, name = "dir_$cid", pid = "0")
+                )
+            )
+        }
+    }
 
     private val fakeStringProvider = object : AppStringProvider {
         override val defaultAppName: String = "nap511"
@@ -75,6 +111,10 @@ class FileBrowserModuleTest {
 
     @Before
     fun setUp() {
+        tempDir = Files.createTempDirectory("fbm_test").toFile()
+        FileCacheManager.init(tempDir)
+        FileCacheManager.saveRequestCache = true
+
         stateHolder = FileUiStateHolder("nap511")
         pagingStateStore = PagingStateStore()
         imageCacheStore = ImageCacheStore()
@@ -83,12 +123,20 @@ class FileBrowserModuleTest {
             stateHolder = stateHolder,
             pagingStateStore = pagingStateStore,
             imageCacheStore = imageCacheStore,
-            fileRepository = FileRepository(),
+            fileRepository = fakeRepo,
             pagingCoordinator = fakeCoordinator,
             stringProvider = fakeStringProvider,
             coilCacheCleaner = fakeCoilCleaner,
             settingUiStateFlow =  MutableStateFlow(SettingUiState())
         )
+    }
+
+    @After
+    fun tearDown() {
+        runBlocking {
+            FileCacheManager.clearAll()
+        }
+        tempDir.deleteRecursively()
     }
 
     private fun createFileBean(id: String, name: String, isFolder: Boolean = false, isSelect: Boolean = false): FileBean {
@@ -223,5 +271,66 @@ class FileBrowserModuleTest {
             copy(source = FileListSource.Filter("0", 4, "video", filterOrder, 0))
         }
         assertEquals(filterOrder, module.currentOrderBean)
+    }
+
+    @Test
+    fun `test getFiles caches fetched files into FileCacheManager`() = runTest {
+        val cid = "folder_test_100"
+        assertFalse(FileCacheManager.containsKey(cid))
+
+        // 发起获取文件请求，触发网络拉取
+        module.getFiles(cid)
+
+        // 验证：成功获取后不仅更新 UI 状态，还必须自动写入 FileCacheManager
+        assertTrue("FileCacheManager 应包含该文件夹缓存", FileCacheManager.containsKey(cid))
+        val cached = FileCacheManager.getDate(cid)
+        assertEquals(1, cached?.fileBeanList?.size)
+        assertEquals("f_$cid", cached?.fileBeanList?.first()?.fileId)
+        assertEquals(cid, stateHolder.currentContentState.currentCid)
+    }
+
+    @Test
+    fun `test back navigates to parent folder and restores from cache`() = runTest {
+        val rootCid = "0"
+        val childCid = "child_folder_200"
+
+        // 先预填充父目录和子目录缓存
+        val rootFiles = FilesBean(
+            fileBeanList = arrayListOf(FileBean(fileId = "f_root", name = "root_item", isFolder = false)),
+            cid = rootCid,
+            count = 1,
+            order = "",
+            path = listOf(PathBean(cid = rootCid, name = "根目录", pid = rootCid))
+        )
+        val childFiles = FilesBean(
+            fileBeanList = arrayListOf(FileBean(fileId = "f_child", name = "child_item", isFolder = false)),
+            cid = childCid,
+            count = 1,
+            order = "",
+            path = listOf(
+                PathBean(cid = rootCid, name = "根目录", pid = rootCid),
+                PathBean(cid = childCid, name = "子目录", pid = rootCid)
+            )
+        )
+        FileCacheManager.put(rootCid, rootFiles)
+        FileCacheManager.put(childCid, childFiles)
+
+        // 模拟当前处于子目录
+        stateHolder.updateContentState {
+            copy(
+                source = FileListSource.Folder(childCid),
+                currentCid = childCid,
+                pathList = childFiles.path,
+                fileBeanList = childFiles.fileBeanList
+            )
+        }
+
+        // 触发返回上一级
+        val backResult = module.back()
+        assertTrue("应当成功执行返回动作", backResult)
+
+        // 验证已切回根目录
+        assertEquals(rootCid, stateHolder.currentContentState.currentCid)
+        assertEquals("f_root", stateHolder.currentContentState.fileBeanList.firstOrNull()?.fileId)
     }
 }

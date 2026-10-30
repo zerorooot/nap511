@@ -64,6 +64,36 @@ class ScrollPositionStoreTest {
     }
 
     @Test
+    fun `test bidirectional mapping between cid and paginationKey for location`() {
+        val state1 = TestScrollState(firstVisibleItemIndex = 20, firstVisibleItemScrollOffset = 80)
+        // Set with pure cid, retrieve with folder: prefix
+        store.setLocation("123", state1)
+        val retrievedWithPrefix = store.getLocation("folder:123")
+        assertEquals(20, retrievedWithPrefix.firstVisibleItemIndex)
+        assertEquals(80, retrievedWithPrefix.firstVisibleItemScrollOffset)
+
+        // Set with folder: prefix, retrieve with pure cid
+        val state2 = TestScrollState(firstVisibleItemIndex = 35, firstVisibleItemScrollOffset = 150)
+        store.setLocation("folder:456", state2)
+        val retrievedPure = store.getLocation("456")
+        assertEquals(35, retrievedPure.firstVisibleItemIndex)
+        assertEquals(150, retrievedPure.firstVisibleItemScrollOffset)
+    }
+
+    @Test
+    fun `test bidirectional mapping between cid and paginationKey for click`() {
+        store.setClick("123", 7)
+        assertEquals(7, store.getClick("folder:123"))
+
+        store.setClick("folder:456", 12)
+        assertEquals(12, store.getClick("456"))
+
+        store.adjustClick("123", -2)
+        assertEquals(5, store.getClick("folder:123"))
+        assertEquals(5, store.getClick("123"))
+    }
+
+    @Test
     fun `test clear resets all data`() {
         store.setLocation("folder_1", TestScrollState(5, 50))
         store.setClick("folder_1", 3)
