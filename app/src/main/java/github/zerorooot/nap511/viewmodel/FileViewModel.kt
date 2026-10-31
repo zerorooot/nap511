@@ -22,6 +22,8 @@ import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinator
 import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinatorImpl
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.LazyScrollState
+import github.zerorooot.nap511.util.copy
+import github.zerorooot.nap511.viewmodel.module.BackResult
 import github.zerorooot.nap511.viewmodel.module.FileBrowserModule
 import github.zerorooot.nap511.viewmodel.module.FileCacheSyncModule
 import github.zerorooot.nap511.viewmodel.module.FileIntegrationModule
@@ -31,6 +33,8 @@ import github.zerorooot.nap511.viewmodel.platform.AndroidAppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.AndroidBackgroundScheduler
 import github.zerorooot.nap511.viewmodel.platform.AndroidCoilCacheCleaner
 import github.zerorooot.nap511.viewmodel.platform.AndroidServiceBridge
+import github.zerorooot.nap511.viewmodel.platform.FileNavigator
+import github.zerorooot.nap511.viewmodel.platform.parseDeepLink
 import github.zerorooot.nap511.viewmodel.store.FileUiStateHolder
 import github.zerorooot.nap511.viewmodel.store.ImageCacheStore
 import github.zerorooot.nap511.viewmodel.store.PagingStateStore
@@ -58,7 +62,7 @@ import java.util.concurrent.ConcurrentHashMap
 @SuppressLint("MutableCollectionMutableState")
 class FileViewModel(
     application: Application,
-) : AndroidViewModel(application) {
+) : AndroidViewModel(application), FileNavigator {
     internal val context = getApplication<Application>()
 
     val settingUiStateFlow: StateFlow<SettingUiState> =
@@ -122,7 +126,7 @@ class FileViewModel(
 
     val mutatorModule = FileMutatorModule(
         stateHolder = stateHolder,
-        navigator = browserModule,
+        navigator = this, // 统一注入门面自身，掌控 Job 生命周期
         fileRepository = fileRepository,
         scrollPositionStore = scrollPositionStore,
         imageCacheStore = imageCacheStore,
@@ -138,7 +142,7 @@ class FileViewModel(
         scrollPositionStore = scrollPositionStore,
         coilCacheCleaner = coilCacheCleaner,
         serviceBridge = serviceBridge,
-        navigator = browserModule,
+        navigator = this, // 统一注入门面自身
         onEnqueueUnzip = { taskItems ->
             UnzipQueueManager.enqueueAndStartWorker(taskItems, context)
         }
@@ -146,7 +150,7 @@ class FileViewModel(
 
     val syncModule = FileCacheSyncModule(
         stateHolder = stateHolder,
-        navigator = browserModule,
+        navigator = this, // 统一注入门面自身
         imageCacheStore = imageCacheStore,
         pagingStateStore = pagingStateStore,
         coilCacheCleaner = coilCacheCleaner,
@@ -156,9 +160,10 @@ class FileViewModel(
 
     val integrationModule = FileIntegrationModule(
         stateHolder = stateHolder,
-        navigator = browserModule,
+        navigator = this, // 统一注入门面自身
         fileRepository = fileRepository,
-        backgroundScheduler = backgroundScheduler
+        backgroundScheduler = backgroundScheduler,
+        onCopyToClipboard = { text -> text.copy(context) }
     )
 
     // ==================== 4. 一次性事件 (One-shot Events) 与生命周期状态 ====================
@@ -207,16 +212,23 @@ class FileViewModel(
     // ==================== 6. 对外兼容性方法透传 (UI 层零修改) ====================
 
     // 滚动位置与点击
+    // 滚动位置与点击
     fun setListLocation(key: String, scrollState: LazyScrollState) =
-        scrollPositionStore.setLocation(key, scrollState)
+        scrollPositionStore.setLocation(
+            key,
+            LocationBean(scrollState.firstVisibleItemIndex, scrollState.firstVisibleItemScrollOffset)
+        )
 
     fun getListLocation(key: String): LocationBean =
         scrollPositionStore.getLocation(key)
 
     fun setListLocationAndClickCache(index: Int, state: LazyScrollState) {
         val paginationKey = contentState.value.source.paginationKey
-        scrollPositionStore.setClick(currentCid, index)
-        scrollPositionStore.setLocation(paginationKey, state)
+        scrollPositionStore.setClick(paginationKey, index)
+        scrollPositionStore.setLocation(
+            paginationKey,
+            LocationBean(state.firstVisibleItemIndex, state.firstVisibleItemScrollOffset)
+        )
     }
 
     // 状态与弹窗控制
@@ -227,25 +239,44 @@ class FileViewModel(
     fun loadCacheFile() = viewModelScope.launch { browserModule.loadCacheFile() }
     fun updateFileCache(cid: String) = viewModelScope.launch { browserModule.updateFileCache(cid) }
 
-    fun getFiles(cid: String) {
-        getFilesJob?.cancel()
+    // ==================== 统一导航调度实现 (实现 FileNavigator) ====================
+
+    override fun navigateTo(cid: String) {
+        searchJob?.cancel() // 1. 斩断搜索 Job，防止搜索结果迟到覆盖
+        getFilesJob?.cancel() // 2. 取消前序目录慢请求，彻底根除覆盖竞态
         getFilesJob = viewModelScope.launch {
             browserModule.getFiles(cid)
         }
     }
 
-    fun back() = viewModelScope.launch { browserModule.back() }
-    fun refresh(forceCache: Boolean = false) =
-        viewModelScope.launch { browserModule.refresh(forceCache) }
+    /** 向后兼容现有 UI 调用的门面函数 (UI 层零修改) */
+    fun getFiles(cid: String) = navigateTo(cid)
 
-    internal fun refresh(cid: String, forceCache: Boolean = false) =
+    fun back() = viewModelScope.launch {
+        searchJob?.cancel()
+        when (val result = browserModule.back()) {
+            is BackResult.NavigateTo -> navigateTo(result.targetCid)
+            else -> {}
+        }
+    }
+
+    override fun refresh(forceCache: Boolean) {
+        searchJob?.cancel()
+        viewModelScope.launch { browserModule.refresh(forceCache) }
+    }
+
+    override fun refresh(cid: String, forceCache: Boolean) {
+        searchJob?.cancel()
         viewModelScope.launch { browserModule.refresh(cid, forceCache) }
+    }
 
     fun loadMoreFiles() = viewModelScope.launch { browserModule.loadMoreFiles() }
     fun order(isRefresh: Boolean = true, order: OrderBean? = null) =
         viewModelScope.launch { browserModule.order(isRefresh, order) }
 
-    fun updateOrder(order: OrderBean) = viewModelScope.launch { browserModule.updateOrder(order) }
+    override fun updateOrder(order: OrderBean) {
+        viewModelScope.launch { browserModule.updateOrder(order) }
+    }
 
     fun search(searchKey: String) {
         searchJob?.cancel()
@@ -273,7 +304,7 @@ class FileViewModel(
     fun deleteMultiple() = viewModelScope.launch { mutatorModule.deleteMultiple() }
 
     fun deleteOrphansAndExpiredFile() = viewModelScope.launch {
-        mutatorModule.deleteOrphansAndExpiredFile()
+        syncModule.deleteOrphansAndExpiredFile()
     }
 
     fun cut(index: Int = -1) = mutatorModule.cut(index)
@@ -288,7 +319,7 @@ class FileViewModel(
     // 媒体与任务操作
     fun getImage(fileBean: FileBean) = viewModelScope.launch { mediaModule.getImage(fileBean) }
     fun getFileInfo(fileBean: FileBean) =
-        viewModelScope.launch { mutatorModule.getFileInfo(fileBean) }
+        viewModelScope.launch { mediaModule.getFileInfo(fileBean) }
 
     fun onVideoActivityResult(pickCode: String, cid: String, map: Map<String, VideoBean>) =
         viewModelScope.launch { mediaModule.onVideoActivityResult(pickCode, cid, map) }
@@ -348,8 +379,10 @@ class FileViewModel(
     fun closeDiscardVideosDialog() = closeDialog()
 
     // 外部集成
-    fun handleDeepLink(intent: Intent?) =
-        viewModelScope.launch { integrationModule.handleDeepLink(intent, context) }
+    fun handleDeepLink(intent: Intent?) = viewModelScope.launch {
+        val action = parseDeepLink(intent) ?: return@launch
+        integrationModule.handleAction(action)
+    }
 
     fun handleOfflineTask(forceRecreate: Boolean = false) =
         viewModelScope.launch {

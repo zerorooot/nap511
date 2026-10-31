@@ -102,22 +102,22 @@ class AndroidCoilCacheCleaner(private val context: Context) : CoilCacheCleaner {
 }
 /**
  * 跨模块目录导航与浏览动作协同接口
- * 由 FileBrowserModule 实现，供 Mutator、Integration、CacheSync 等领域模块单向依赖调用，
- * 彻底消除模块间循环依赖。
+ * 由 FileViewModel 门面实现，向各子领域模块注入，统管 Job 异步生命周期与竞态取消。
  */
 interface FileNavigator {
-    /** 加载指定 cid 目录的文件列表 */
-    suspend fun getFiles(cid: String)
+    /** 导航并加载指定 cid 目录（统一受 Facade 的 Job 竞态取消保护，非挂起调用） */
+    fun navigateTo(cid: String)
 
-    /** 全量刷新当前目录文件列表 */
-    suspend fun refresh(forceCache: Boolean = false)
+    /** 全量刷新当前目录 */
+    fun refresh(forceCache: Boolean = false)
 
-    /** 刷新指定 cid 目录的文件列表 */
-    suspend fun refresh(cid: String, forceCache: Boolean = false)
+    /** 刷新指定 cid 目录 */
+    fun refresh(cid: String, forceCache: Boolean = false)
 
     /** 更新当前数据源模式的排序规则 */
-    suspend fun updateOrder(order: OrderBean)
+    fun updateOrder(order: OrderBean)
 }
+
 
 
 class AndroidServiceBridge(private val context: Context) : ServiceBridge {
@@ -198,3 +198,31 @@ class AndroidAppStringProvider(private val context: Context) : AppStringProvider
 
     override fun getFilterTitle(name: String): String = "过滤 - $name"
 }
+
+/**
+ * 外部 DeepLink 领域动作抽象（纯 Kotlin 契约）
+ */
+sealed interface DeepLinkAction {
+    data object CheckMagnet : DeepLinkAction
+    data class JumpDirectory(val targetCid: String) : DeepLinkAction
+    data class CopyText(val content: String, val toastTip: String) : DeepLinkAction
+}
+
+/**
+ * 解析平台 Intent 为 DeepLinkAction 领域动作
+ */
+fun parseDeepLink(intent: Intent?): DeepLinkAction? {
+    // 解析 Scheme 和 Host: nap511://detail/check?param=3213
+    val uri = intent?.data ?: return null
+    if (uri.scheme != "nap511" || uri.host != "detail") return null
+    val command = uri.lastPathSegment ?: return null
+    val param = uri.getQueryParameter("param") ?: ""
+    return when (command) {
+        "check" -> DeepLinkAction.CheckMagnet
+        "jump" -> DeepLinkAction.JumpDirectory(param)
+        "copy" -> DeepLinkAction.CopyText(param, "复制磁力链接成功!")
+        "unzipError" -> DeepLinkAction.CopyText(param, "解压失败信息已复制到剪切板!")
+        else -> null
+    }
+}
+

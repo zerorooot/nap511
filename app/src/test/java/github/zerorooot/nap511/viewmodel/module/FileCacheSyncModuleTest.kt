@@ -48,10 +48,10 @@ class FileCacheSyncModuleTest {
     }
 
     private val fakeNavigator = object : FileNavigator {
-        override suspend fun getFiles(cid: String) {}
-        override suspend fun refresh(forceCache: Boolean) {}
-        override suspend fun refresh(cid: String, forceCache: Boolean) {}
-        override suspend fun updateOrder(order: OrderBean) {}
+        override fun navigateTo(cid: String) {}
+        override fun refresh(forceCache: Boolean) {}
+        override fun refresh(cid: String, forceCache: Boolean) {}
+        override fun updateOrder(order: OrderBean) {}
     }
 
     private val fakeStringProvider = object : AppStringProvider {

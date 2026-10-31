@@ -18,7 +18,6 @@ import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.viewmodel.formatFileBeanList
 import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.CoilCacheCleaner
-import github.zerorooot.nap511.viewmodel.platform.FileNavigator
 import github.zerorooot.nap511.viewmodel.store.FileUiStateHolder
 import github.zerorooot.nap511.viewmodel.store.ImageCacheStore
 import github.zerorooot.nap511.viewmodel.store.PagingStateStore
@@ -30,9 +29,17 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.withContext
 
 /**
+ * 返回键层级导航判定结果
+ */
+sealed interface BackResult {
+    data object Handled : BackResult
+    data class NavigateTo(val targetCid: String) : BackResult
+    data object NotHandled : BackResult
+}
+
+/**
  * 文件浏览领域模块
- * 负责目录列表加载、触底分页步进、模式化排序、搜索与分类过滤、多选状态机以及返回层级路由。
- * 实现 [FileNavigator] 协同接口，供其他领域模块单向驱动。
+ * 负责目录列表加载、触底分页步进、模式化排序、搜索与分类过滤、多选状态机以及返回层级路由判定。
  */
 class FileBrowserModule(
     private val stateHolder: FileUiStateHolder,
@@ -43,11 +50,14 @@ class FileBrowserModule(
     private val stringProvider: AppStringProvider,
     private val coilCacheCleaner: CoilCacheCleaner,
     private val settingUiStateFlow: StateFlow<SettingUiState>
-) : FileNavigator {
+) {
     private val _navigationEvent = MutableSharedFlow<NavEvent>(extraBufferCapacity = 1)
     val navigationEvent: SharedFlow<NavEvent> = _navigationEvent.asSharedFlow()
 
     private var isInitialized = false
+
+    //应用启动或 ViewModel 初始化时，settingUiStateFlow 会自动发射当前的设置数据
+    //如果不为null,会导致应用一打开就向服务端发起一次无意义的 fileRepository.order(...) 请求
     private var lastKeepFoldersOnTop: Boolean? = null
     private val settingUiState: SettingUiState
         get() = settingUiStateFlow.value
@@ -124,7 +134,7 @@ class FileBrowserModule(
     /**
      * 获取文件列表
      */
-    override suspend fun getFiles(cid: String) {
+    suspend fun getFiles(cid: String) {
         stateHolder.setRefreshing(true)
         // 1. 尝试读取缓存（内存与磁盘双级读取，支持冷启动及 LRU 淘汰后从磁盘恢复）
         val cached = FileCacheManager[cid]
@@ -303,7 +313,7 @@ class FileBrowserModule(
         }.onFailureToastAndLog()
     }
 
-    override suspend fun updateOrder(order: OrderBean) {
+    suspend fun updateOrder(order: OrderBean) {
         when (val s = stateHolder.currentContentState.source) {
             is FileListSource.Search -> {
                 App.instance.toast("暂不支持搜索模式排序")
@@ -321,7 +331,7 @@ class FileBrowserModule(
         }
     }
 
-    override suspend fun refresh(forceCache: Boolean) {
+    suspend fun refresh(forceCache: Boolean = false) {
         when (val s = stateHolder.currentContentState.source) {
             is FileListSource.Folder -> refresh(
                 stateHolder.currentContentState.currentCid,
@@ -343,7 +353,7 @@ class FileBrowserModule(
         }
     }
 
-    override suspend fun refresh(cid: String, forceCache: Boolean) {
+    suspend fun refresh(cid: String, forceCache: Boolean = false) {
         clearSelection()
         val paginationKey = "folder:$cid"
         pagingStateStore.reset(paginationKey)
@@ -583,41 +593,48 @@ class FileBrowserModule(
 
     // ==================== 返回导航层级路由 ====================
 
-    suspend fun back(): Boolean {
+    fun back(): BackResult {
         val state = stateHolder.currentContentState
         if (state.isLongClickState) {
             clearSelection()
-            return true
+            return BackResult.Handled
         }
 
         if (state.isSearchState) {
             val currentCid = state.currentCid
             val cache = FileCacheManager.getDate(currentCid)
             if (cache != null) {
+                cache.fileBeanList = formatFileBeanList(cache.fileBeanList)
                 setFiles(cache)
+                stateHolder.updateContentState {
+                    copy(
+                        source = FileListSource.Folder(currentCid),
+                        appBarTitle = stringProvider.defaultAppName
+                    )
+                }
+                return BackResult.Handled
             } else {
-                getFiles(currentCid)
+                stateHolder.updateContentState {
+                    copy(
+                        source = FileListSource.Folder(currentCid),
+                        appBarTitle = stringProvider.defaultAppName
+                    )
+                }
+                return BackResult.NavigateTo(currentCid)
             }
-            stateHolder.updateContentState {
-                copy(
-                    source = FileListSource.Folder(currentCid),
-                    appBarTitle = stringProvider.defaultAppName
-                )
-            }
-            return true
         }
 
         if (state.currentCid != "0" && state.pathList.size >= 2) {
-            getFiles(state.pathList[state.pathList.size - 2].cid)
-            return true
+            val parentCid = state.pathList[state.pathList.size - 2].cid
+            return BackResult.NavigateTo(parentCid)
         }
 
         if (state.isCutState) {
             stateHolder.updateContentState { copy(isCutState = false, cutFileList = emptyList()) }
-            return true
+            return BackResult.Handled
         }
 
-        return false
+        return BackResult.NotHandled
     }
 
     fun openSearchDialog() {

@@ -327,11 +327,52 @@ class FileBrowserModuleTest {
 
         // 触发返回上一级
         val backResult = module.back()
-        assertTrue("应当成功执行返回动作", backResult)
+        assertEquals(BackResult.NavigateTo(rootCid), backResult)
+    }
 
-        // 验证已切回根目录
-        assertEquals(rootCid, stateHolder.currentContentState.currentCid)
-        assertEquals("f_root", stateHolder.currentContentState.fileBeanList.firstOrNull()?.fileId)
+    @Test
+    fun `test back returns NavigateTo when parent cache is missing`() = runTest {
+        val rootCid = "0"
+        val childCid = "child_no_cache"
+        val childFiles = FilesBean(
+            fileBeanList = arrayListOf(FileBean(fileId = "f_child", name = "child_item", isFolder = false)),
+            cid = childCid,
+            count = 1,
+            order = "",
+            path = listOf(
+                PathBean(cid = rootCid, name = "根目录", pid = rootCid),
+                PathBean(cid = childCid, name = "子目录", pid = rootCid)
+            )
+        )
+        // Ensure rootCid is not in cache
+        FileCacheManager.remove(rootCid)
+
+        stateHolder.updateContentState {
+            copy(
+                source = FileListSource.Folder(childCid),
+                currentCid = childCid,
+                pathList = childFiles.path,
+                fileBeanList = childFiles.fileBeanList
+            )
+        }
+
+        val backResult = module.back()
+        assertEquals(BackResult.NavigateTo(rootCid), backResult)
+    }
+
+    @Test
+    fun `test back returns NotHandled when at root directory`() = runTest {
+        stateHolder.updateContentState {
+            copy(
+                source = FileListSource.Folder("0"),
+                currentCid = "0",
+                pathList = listOf(PathBean(cid = "0", name = "根目录", pid = "0")),
+                fileBeanList = emptyList()
+            )
+        }
+
+        val backResult = module.back()
+        assertEquals(BackResult.NotHandled, backResult)
     }
 
     @Test
@@ -346,6 +387,11 @@ class FileBrowserModuleTest {
         )
         // 存入缓存并落盘
         FileCacheManager.put(cid, diskFiles)
+        val diskFile = File(tempDir, "$cid.json")
+        for (i in 0 until 50) {
+            if (diskFile.exists() && diskFile.length() > 0) break
+            Thread.sleep(20)
+        }
         // 清空内存缓存，模拟冷启动或 LRU 内存淘汰
         FileCacheManager.clearMemoryOnly()
 

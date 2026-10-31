@@ -12,7 +12,10 @@ import github.zerorooot.nap511.viewmodel.store.ScrollPositionStore
 import github.zerorooot.nap511.viewmodel.store.TorrentCacheStore
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.viewmodel.platform.FileNavigator
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Before
@@ -52,14 +55,22 @@ class FileMediaModuleTest {
     }
 
     private val fakeNavigator = object : FileNavigator {
-        override suspend fun getFiles(cid: String) {}
-        override suspend fun refresh(forceCache: Boolean) {}
-        override suspend fun refresh(cid: String, forceCache: Boolean) {}
-        override suspend fun updateOrder(order: OrderBean) {}
+        override fun navigateTo(cid: String) {}
+        override fun refresh(forceCache: Boolean) {}
+        override fun refresh(cid: String, forceCache: Boolean) {}
+        override fun updateOrder(order: OrderBean) {}
+    }
+
+    private val testDispatcher = kotlinx.coroutines.test.StandardTestDispatcher()
+
+    @org.junit.After
+    fun tearDown() {
+        kotlinx.coroutines.Dispatchers.resetMain()
     }
 
     @Before
     fun setUp() {
+        kotlinx.coroutines.Dispatchers.setMain(testDispatcher)
         stateHolder = FileUiStateHolder("nap511")
         imageCacheStore = ImageCacheStore()
         torrentCacheStore = TorrentCacheStore()

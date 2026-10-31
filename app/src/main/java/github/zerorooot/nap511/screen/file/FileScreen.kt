@@ -561,7 +561,7 @@ fun FileScreen(
         pathList = contentState.pathList,
         fileBeanList = fileBeanList,
         refreshing = refreshing,
-        clickIndex = fileViewModel.clickMap.getOrDefault(contentState.currentCid, -1),
+        clickIndex = fileViewModel.clickMap.getOrDefault(contentState.source.paginationKey, -1),
         imageCache = fileViewModel.imageBeanCache[contentState.currentCid],
         contentState.source.paginationKey
     )

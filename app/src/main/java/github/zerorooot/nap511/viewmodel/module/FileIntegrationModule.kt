@@ -1,7 +1,5 @@
 package github.zerorooot.nap511.viewmodel.module
 
-import android.content.Context
-import android.content.Intent
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import github.zerorooot.nap511.bean.NavEvent
@@ -10,9 +8,9 @@ import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.FileCacheManager
-import github.zerorooot.nap511.util.copy
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.viewmodel.platform.BackgroundScheduler
+import github.zerorooot.nap511.viewmodel.platform.DeepLinkAction
 import github.zerorooot.nap511.viewmodel.platform.FileNavigator
 import github.zerorooot.nap511.viewmodel.store.FileUiStateHolder
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -24,14 +22,16 @@ import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * 外部集成领域模块
- * 负责 DeepLink Intent 协议分发、WorkManager 后台离线任务调度、
+ * 负责 DeepLink 业务动作分发、WorkManager 后台离线任务调度、
  * 系统电池优化检测以及 115 剩余存储空间查询。
+ * 纯 JVM 领域模块，零 android.* 依赖。
  */
 class FileIntegrationModule(
     private val stateHolder: FileUiStateHolder,
     private val navigator: FileNavigator,
     private val fileRepository: FileRepository,
-    private val backgroundScheduler: BackgroundScheduler
+    private val backgroundScheduler: BackgroundScheduler,
+    private val onCopyToClipboard: (String) -> Unit
 ) {
 
     private val _navigationEvent = MutableSharedFlow<NavEvent>(extraBufferCapacity = 1)
@@ -54,44 +54,25 @@ class FileIntegrationModule(
     }
 
     /**
-     * 统一处理传入的 Deep Link Intent
+     * 统一处理 DeepLink 业务动作（纯 JVM，零 android.* 依赖）
      */
-    suspend fun handleDeepLink(intent: Intent?, context: Context) {
-        val uri = intent?.data ?: return
-
-        // 解析 Scheme 和 Host: nap511://detail/check?param=3213
-        if (uri.scheme == "nap511" && uri.host == "detail") {
-            val command = uri.lastPathSegment // "check" 或 "copy"
-            val param = uri.getQueryParameter("param") ?: ""
-            XLog.i("FileIntegrationModule handleDeepLink $uri")
-            when (command) {
-                "addTask" -> {
-                    XLog.d(param)
-//                    DataStoreUtil.putData(ConfigKeyUtil.CURRENT_OFFLINE_TASK, param)
-//                    handleOfflineTask(true)
-                }
-                //  adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/check?param=3213" github.zerorooot.nap511
-                "check" -> {
-                    _navigationEvent.emit(NavEvent.NavigateToScreen(Route.VerifyMagnetLinkAccount))
-                }
-                // adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/jump?param=0" github.zerorooot.nap511
-                "jump" -> {
-                    FileCacheManager.remove(stateHolder.currentContentState.currentCid)
-                    navigator.getFiles(param)
-                }
-
-                // adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/copy?param=copy_test" github.zerorooot.nap511
-                "copy" -> {
-                    param.copy(context)
-                    XLog.d("handleIntent copy $param")
-                    App.instance.toast("复制磁力链接成功!")
-                }
-
-                "unzipError" -> {
-                    param.copy(context)
-                    XLog.d("handleIntent unzipError $intent $param")
-                    App.instance.toast("解压失败信息已复制到剪切板!")
-                }
+    suspend fun handleAction(action: DeepLinkAction) {
+        XLog.i("FileIntegrationModule handleAction $action")
+        when (action) {
+            //  adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/check?param=3213" github.zerorooot.nap511
+            is DeepLinkAction.CheckMagnet -> {
+                _navigationEvent.emit(NavEvent.NavigateToScreen(Route.VerifyMagnetLinkAccount))
+            }
+            // adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/jump?param=0" github.zerorooot.nap511
+            is DeepLinkAction.JumpDirectory -> {
+                FileCacheManager.remove(stateHolder.currentContentState.currentCid)
+                navigator.navigateTo(action.targetCid)
+            }
+            // adb shell am start -W -a android.intent.action.VIEW -d "nap511://detail/copy?param=copy_test" github.zerorooot.nap511
+            is DeepLinkAction.CopyText -> {
+                onCopyToClipboard(action.content)
+                XLog.d("FileIntegrationModule copy ${action.content}")
+                runCatching { App.instance.toast(action.toastTip) }
             }
         }
     }

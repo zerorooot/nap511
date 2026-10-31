@@ -23,9 +23,11 @@ import github.zerorooot.nap511.viewmodel.store.ImageCacheStore
 import github.zerorooot.nap511.viewmodel.store.ScrollPositionStore
 import github.zerorooot.nap511.viewmodel.store.TorrentCacheStore
 import github.zerorooot.nap511.worker.UnzipTaskItem
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.withContext
 
 /**
  * 媒体与文件查看、离线任务与解压领域模块
@@ -79,7 +81,9 @@ class FileMediaModule(
             val cachedImageBean = ImageBean(
                 url = cachedUrl, fileName = fileBean.name, pickCode = pickCode
             )
-            imageCacheStore.put(cid, pickCode, cachedImageBean)
+            withContext(Dispatchers.Main) {
+                imageCacheStore.put(cid, pickCode, cachedImageBean)
+            }
             return
         }
 
@@ -95,12 +99,36 @@ class FileMediaModule(
                     pickCode, System.currentTimeMillis() / 1000
                 ).imageBean
 
-                imageCacheStore.put(cid, pickCode, imageBean)
+                withContext(Dispatchers.Main) {
+                    imageCacheStore.put(cid, pickCode, imageBean)
+                }
                 XLog.d("FileMediaModule.getImage request success: fileBean=${fileBean.name}, imageBean=$imageBean")
             }.onFailureToastAndLog()
         } finally {
             imageCacheStore.removeLoading(loadingKey)
         }
+    }
+
+    // ==================== 文件属性详情查询 ====================
+
+    suspend fun getFileInfo(fileBean: FileBean) {
+        stateHolder.setRefreshing(true)
+        runCatching {
+            val info = if (fileBean.isFolder) {
+                fileRepository.getFileInfo(fileBean.categoryId)
+            } else {
+                fileRepository.getFileInfo(fileBean.fileId)
+            }
+            XLog.d("file ${fileBean.name} fileInfo $info ; file bean $fileBean")
+            stateHolder.updateDialogState {
+                copy(
+                    fileInfo = info,
+                    targetFileBean = fileBean,
+                    activeDialog = FileDialogState.FileInfo
+                )
+            }
+        }.onFailureToastAndLog()
+        stateHolder.setRefreshing(false)
     }
 
     // ==================== 视频播放回调与历史同步 ====================
@@ -121,7 +149,8 @@ class FileMediaModule(
             val fileList = FileCacheManager.getDate(cid)?.fileBeanList
             val index = fileList?.indexOfFirst { it.pickCode == pickCode } ?: -1
             if (index >= 0) {
-                scrollPositionStore.setClick(cid, index)
+                val paginationKey = "folder:$cid"
+                scrollPositionStore.setClick(paginationKey, index)
                 // 可能被终端页面影响。所以只有在当前目录才滚动。
                 // 无法更新非当前页的位置，未被布局，不知道非当前页面的 firstVisibleItemIndex 和 firstVisibleItemScrollOffset
                 if (cid == stateHolder.currentContentState.currentCid) {
@@ -346,8 +375,6 @@ class FileMediaModule(
     }
 
     fun closeUnzipPasswordDialog() {
-        stateHolder.updateDialogState {
-            copy(activeDialog = FileDialogState.None)
-        }
+        stateHolder.closeDialog()
     }
 }

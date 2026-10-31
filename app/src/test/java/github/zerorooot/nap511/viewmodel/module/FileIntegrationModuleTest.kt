@@ -6,6 +6,8 @@ import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.viewmodel.platform.BackgroundScheduler
 import github.zerorooot.nap511.viewmodel.platform.FileNavigator
 import github.zerorooot.nap511.viewmodel.store.FileUiStateHolder
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -39,11 +41,16 @@ class FileIntegrationModuleTest {
         override fun isIgnoringBatteryOptimizations(): Boolean = mockBatteryOptimizations
     }
 
+    private var lastNavigatedCid: String? = null
+    private var lastCopiedText: String? = null
+
     private val fakeNavigator = object : FileNavigator {
-        override suspend fun getFiles(cid: String) {}
-        override suspend fun refresh(forceCache: Boolean) {}
-        override suspend fun refresh(cid: String, forceCache: Boolean) {}
-        override suspend fun updateOrder(order: OrderBean) {}
+        override fun navigateTo(cid: String) {
+            lastNavigatedCid = cid
+        }
+        override fun refresh(forceCache: Boolean) {}
+        override fun refresh(cid: String, forceCache: Boolean) {}
+        override fun updateOrder(order: OrderBean) {}
     }
 
     @Before
@@ -52,12 +59,15 @@ class FileIntegrationModuleTest {
         mockBatteryOptimizations = true
         scheduledTaskRaw = null
         scheduledForceRecreate = null
+        lastNavigatedCid = null
+        lastCopiedText = null
 
         module = FileIntegrationModule(
             stateHolder = stateHolder,
             navigator = fakeNavigator,
             fileRepository = FileRepository(),
-            backgroundScheduler = fakeScheduler
+            backgroundScheduler = fakeScheduler,
+            onCopyToClipboard = { lastCopiedText = it }
         )
     }
 
@@ -76,5 +86,33 @@ class FileIntegrationModuleTest {
 
         assertEquals(true, scheduledForceRecreate)
         assertEquals("task_abc", scheduledTaskRaw)
+    }
+
+    @Test
+    fun `test handleAction JumpDirectory calls navigator navigateTo`() = runTest {
+        module.handleAction(github.zerorooot.nap511.viewmodel.platform.DeepLinkAction.JumpDirectory("test_cid_999"))
+        assertEquals("test_cid_999", lastNavigatedCid)
+    }
+
+    @Test
+    fun `test handleAction CopyText calls onCopyToClipboard`() = runTest {
+        module.handleAction(github.zerorooot.nap511.viewmodel.platform.DeepLinkAction.CopyText("magnet:?xt=urn:btih:123", "复制成功"))
+        assertEquals("magnet:?xt=urn:btih:123", lastCopiedText)
+    }
+
+    @Test
+    fun `test handleAction CheckMagnet emits VerifyMagnetLinkAccount route`() = runTest {
+        var event: github.zerorooot.nap511.bean.NavEvent? = null
+        backgroundScope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            module.navigationEvent.collect {
+                event = it
+            }
+        }
+        module.handleAction(github.zerorooot.nap511.viewmodel.platform.DeepLinkAction.CheckMagnet)
+        testScheduler.runCurrent()
+        assertEquals(
+            github.zerorooot.nap511.bean.NavEvent.NavigateToScreen(github.zerorooot.nap511.bean.Route.VerifyMagnetLinkAccount),
+            event
+        )
     }
 }

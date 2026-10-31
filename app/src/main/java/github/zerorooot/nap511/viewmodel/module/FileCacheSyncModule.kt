@@ -85,7 +85,7 @@ class FileCacheSyncModule(
                         }
                     } else {
                         // 若本地内存缓存意外丢失，兜底触发网络拉取
-                        navigator.getFiles(currentCid)
+                        navigator.navigateTo(currentCid)
                     }
                 }
             }
@@ -122,16 +122,23 @@ class FileCacheSyncModule(
                 coilCacheCleaner.clearMemoryCache()
                 coilCacheCleaner.clearDiskCache()
                 if (currentCid != "0") {
-                    navigator.getFiles("0")
+                    navigator.navigateTo("0")
                 }
             }
         }
     }
 
     /**
+     * 清理磁盘过期与孤立文件缓存
+     */
+    suspend fun deleteOrphansAndExpiredFile() {
+        FileCacheManager.deleteOrphansAndExpiredFile()
+    }
+
+    /**
      * 高性能检查被删目录集合是否包含当前目录或祖先目录
      */
-    private suspend fun handleFolderDeletedCheck(deletedCids: Set<String>) {
+    private fun handleFolderDeletedCheck(deletedCids: Set<String>) {
         if (deletedCids.isEmpty()) return
         val validCids = deletedCids.filter { it != "0" }.toSet()
         if (validCids.isEmpty()) return
@@ -151,7 +158,7 @@ class FileCacheSyncModule(
             App.instance.toast("当前所在目录已被删除")
             val survivingAncestorCid =
                 pathList.takeWhile { it.cid !in validCids }.lastOrNull()?.cid ?: "0"
-            navigator.getFiles(survivingAncestorCid)
+            navigator.navigateTo(survivingAncestorCid)
         }
     }
 

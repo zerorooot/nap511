@@ -34,11 +34,29 @@ class FileMutatorModuleTest {
     private lateinit var imageCacheStore: ImageCacheStore
     private lateinit var module: FileMutatorModule
 
+    private lateinit var tempDir: java.io.File
+    private val deletedCoilKeys = mutableListOf<String>()
+    private var mockDeleteResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
+    private var mockDeleteMultipleResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
+    private var shouldThrowNetworkError = false
+
+    private val fakeRepo = object : FileRepository() {
+        override suspend fun delete(pid: String, fid: String): github.zerorooot.nap511.bean.BaseReturnMessage {
+            if (shouldThrowNetworkError) throw java.io.IOException("Network Timeout")
+            return mockDeleteResult
+        }
+
+        override suspend fun deleteMultiple(data: Map<String, String>): github.zerorooot.nap511.bean.BaseReturnMessage {
+            if (shouldThrowNetworkError) throw java.io.IOException("Network Timeout")
+            return mockDeleteMultipleResult
+        }
+    }
+
     private val fakeNavigator = object : FileNavigator {
-        override suspend fun getFiles(cid: String) {}
-        override suspend fun refresh(forceCache: Boolean) {}
-        override suspend fun refresh(cid: String, forceCache: Boolean) {}
-        override suspend fun updateOrder(order: OrderBean) {}
+        override fun navigateTo(cid: String) {}
+        override fun refresh(forceCache: Boolean) {}
+        override fun refresh(cid: String, forceCache: Boolean) {}
+        override fun updateOrder(order: OrderBean) {}
     }
 
     private val fakeStringProvider = object : AppStringProvider {
@@ -48,7 +66,9 @@ class FileMutatorModuleTest {
     }
 
     private val fakeCoilCleaner = object : CoilCacheCleaner {
-        override fun deleteCoilCache(key: String) {}
+        override fun deleteCoilCache(key: String) {
+            deletedCoilKeys.add(key)
+        }
         override fun clearMemoryCache() {}
         override fun clearDiskCache() {}
         override fun getCachedUrl(key: String): String? = null
@@ -56,19 +76,35 @@ class FileMutatorModuleTest {
 
     @Before
     fun setUp() {
+        tempDir = java.nio.file.Files.createTempDirectory("fmm_test").toFile()
+        github.zerorooot.nap511.util.FileCacheManager.init(tempDir)
+        github.zerorooot.nap511.util.FileCacheManager.saveRequestCache = true
+
         stateHolder = FileUiStateHolder("nap511")
         scrollPositionStore = ScrollPositionStore()
         imageCacheStore = ImageCacheStore()
+        deletedCoilKeys.clear()
+        mockDeleteResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
+        mockDeleteMultipleResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
+        shouldThrowNetworkError = false
 
         module = FileMutatorModule(
             stateHolder = stateHolder,
             navigator = fakeNavigator,
-            fileRepository = FileRepository(),
+            fileRepository = fakeRepo,
             scrollPositionStore = scrollPositionStore,
             imageCacheStore = imageCacheStore,
             coilCacheCleaner = fakeCoilCleaner,
             stringProvider = fakeStringProvider
         )
+    }
+
+    @org.junit.After
+    fun tearDown() {
+        kotlinx.coroutines.runBlocking {
+            github.zerorooot.nap511.util.FileCacheManager.clearAll()
+        }
+        tempDir.deleteRecursively()
     }
 
     private fun createFileBean(id: String, name: String, isSelect: Boolean = false): FileBean {
@@ -165,5 +201,95 @@ class FileMutatorModuleTest {
 
         stateHolder.closeDialog()
         assertEquals(FileDialogState.None, stateHolder.currentDialogState.activeDialog)
+    }
+
+    @Test
+    fun `test delete rolls back on API failure and does not delete coil cache`() = kotlinx.coroutines.test.runTest {
+        val item = createFileBean("del_1", "item_del_1").copy(parentId = "0", photoThumb = "thumb_url")
+        stateHolder.updateContentState {
+            copy(
+                source = github.zerorooot.nap511.bean.FileListSource.Folder("0"),
+                fileBeanList = listOf(item)
+            )
+        }
+        scrollPositionStore.setClick("folder:0", 5)
+        mockDeleteResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = false, errorMsg = "删除失败权限不足")
+
+        module.delete(item)
+
+        // 验证失败后列表与点击位均已无死角回滚
+        assertEquals(1, stateHolder.currentContentState.fileBeanList.size)
+        assertEquals("del_1", stateHolder.currentContentState.fileBeanList[0].fileId)
+        assertEquals(5, scrollPositionStore.getClick("folder:0"))
+        // Coil 缓存决不能被删除
+        assertTrue(deletedCoilKeys.isEmpty())
+    }
+
+    @Test
+    fun `test delete rolls back on network exception`() = kotlinx.coroutines.test.runTest {
+        val item = createFileBean("del_2", "item_del_2").copy(parentId = "0")
+        stateHolder.updateContentState {
+            copy(
+                source = github.zerorooot.nap511.bean.FileListSource.Folder("0"),
+                fileBeanList = listOf(item)
+            )
+        }
+        scrollPositionStore.setClick("folder:0", 3)
+        shouldThrowNetworkError = true
+
+        module.delete(item)
+
+        assertEquals(1, stateHolder.currentContentState.fileBeanList.size)
+        assertEquals(3, scrollPositionStore.getClick("folder:0"))
+        assertTrue(deletedCoilKeys.isEmpty())
+    }
+
+    @Test
+    fun `test deleteMultiple rolls back on network exception and preserves totalCount`() = kotlinx.coroutines.test.runTest {
+        val item1 = createFileBean("m1", "multi1").copy(parentId = "0", isSelect = true, photoThumb = "thumb1")
+        val item2 = createFileBean("m2", "multi2").copy(parentId = "0", isSelect = true, photoThumb = "thumb2")
+        val item3 = createFileBean("m3", "multi3").copy(parentId = "0", isSelect = false)
+
+        stateHolder.updateContentState {
+            copy(
+                source = github.zerorooot.nap511.bean.FileListSource.Folder("0"),
+                fileBeanList = listOf(item1, item2, item3),
+                totalCount = 3
+            )
+        }
+        scrollPositionStore.setClick("folder:0", 10)
+        shouldThrowNetworkError = true
+
+        module.deleteMultiple("0", listOf(item1, item2))
+
+        // 验证列表、总量、点击索引均已完全恢复
+        assertEquals(3, stateHolder.currentContentState.fileBeanList.size)
+        assertEquals(3, stateHolder.currentContentState.totalCount)
+        assertEquals(10, scrollPositionStore.getClick("folder:0"))
+        assertTrue(deletedCoilKeys.isEmpty())
+    }
+
+    @Test
+    fun `test deleteMultiple succeeds and cleans coil cache only on success`() = kotlinx.coroutines.test.runTest {
+        val item1 = createFileBean("m1", "multi1").copy(parentId = "0", photoThumb = "thumb1")
+        val item2 = createFileBean("m2", "multi2").copy(parentId = "0", photoThumb = "") // 无缩略图
+
+        stateHolder.updateContentState {
+            copy(
+                source = github.zerorooot.nap511.bean.FileListSource.Folder("0"),
+                fileBeanList = listOf(item1, item2),
+                totalCount = 2
+            )
+        }
+        scrollPositionStore.setClick("folder:0", 8)
+        mockDeleteMultipleResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
+
+        module.deleteMultiple("0", listOf(item1, item2))
+
+        // 成功删除后列表被移除，Coil 缓存中仅有 photoThumb 的项被清理
+        assertTrue(stateHolder.currentContentState.fileBeanList.isEmpty())
+        assertEquals(0, stateHolder.currentContentState.totalCount)
+        assertEquals(6, scrollPositionStore.getClick("folder:0"))
+        assertEquals(listOf("pick_m1"), deletedCoilKeys)
     }
 }

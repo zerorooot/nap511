@@ -61,6 +61,10 @@ class FileMutatorModule(
         }
     }
 
+    private fun showToast(message: String) {
+        runCatching { App.instance.toast(message) }
+    }
+
     suspend fun removeFile() {
         val cutList = stateHolder.currentContentState.cutFileList
         if (cutList.isEmpty()) {
@@ -73,7 +77,7 @@ class FileMutatorModule(
 
         val fileCid = cutList[0].let { if (it.isFolder) it.parentId else it.categoryId }
         if (fileCid == targetCid) {
-            App.instance.toast("禁止原地移动～")
+            showToast("禁止原地移动～")
             return
         }
 
@@ -90,7 +94,7 @@ class FileMutatorModule(
                 "移动失败~"
             }
         }.onSuccess { message ->
-            App.instance.toast(message)
+            showToast(message)
         }.onFailureToastAndLog()
         stateHolder.setRefreshing(false)
     }
@@ -107,42 +111,23 @@ class FileMutatorModule(
                 "创建失败，${createFolder.error}"
             }
         }.onSuccess { message ->
-            App.instance.toast(message)
+            showToast(message)
         }.onFailureToastAndLog()
-    }
-
-    suspend fun getFileInfo(fileBean: FileBean) {
-        stateHolder.setRefreshing(true)
-        runCatching {
-            val info = if (fileBean.isFolder) {
-                fileRepository.getFileInfo(fileBean.categoryId)
-            } else {
-                fileRepository.getFileInfo(fileBean.fileId)
-            }
-            XLog.d("file ${fileBean.name} fileInfo $info ; file bean $fileBean")
-            stateHolder.updateDialogState {
-                copy(
-                    fileInfo = info,
-                    targetFileBean = fileBean,
-                    activeDialog = FileDialogState.FileInfo
-                )
-            }
-        }.onFailureToastAndLog()
-        stateHolder.setRefreshing(false)
     }
 
     suspend fun delete(fileBean: FileBean) {
         // 可能在搜索模式删除，故使用 pid 而非当前 cid
         val cid = fileBean.parentId
+        val paginationKey = stateHolder.currentContentState.source.paginationKey
         val beforeList = stateHolder.currentContentState.fileBeanList
-        val beforeClick = scrollPositionStore.getClick(cid)
+        val beforeClick = scrollPositionStore.getClick(paginationKey)
 
         // 提前更新内存不可变列表，优化交互响应速度并取得安全撤销句柄
         stateHolder.updateContentState {
             copy(fileBeanList = fileBeanList.filterNot { it.fileId == fileBean.fileId })
         }
         val rollback = FileCacheManager.removeItem(cid, fileBean.fileId, fileBean.isFolder)
-        scrollPositionStore.adjustClick(cid, -1)
+        scrollPositionStore.adjustClick(paginationKey, -1)
 
         // delete image bean
         imageCacheStore.remove(cid, fileBean.pickCode)
@@ -151,21 +136,23 @@ class FileMutatorModule(
 
         runCatching {
             val deleteResult = fileRepository.delete(cid, fid)
-            if (deleteResult.state) {
-                // 删除 coil 图片缓存
-                if (fileBean.photoThumb.isNotEmpty()) {
-                    coilCacheCleaner.deleteCoilCache(fileBean.pickCode)
-                }
-                "删除 ${fileBean.name} 成功"
-            } else {
-                stateHolder.updateContentState { copy(fileBeanList = beforeList) }
-                rollback?.rollback()
-                scrollPositionStore.setClick(cid, beforeClick)
-                "删除 ${fileBean.name} 失败~${deleteResult.errorMsg}"
+            check(deleteResult.state) { deleteResult.errorMsg.ifEmpty { "删除失败" } }
+            deleteResult
+        }.onSuccess {
+            // 删除 coil 图片缓存（仅在服务端成功后删除，避免失败回滚时图片丢失）
+            if (fileBean.photoThumb.isNotEmpty()) {
+                coilCacheCleaner.deleteCoilCache(fileBean.pickCode)
             }
-        }.onSuccess { message ->
-            App.instance.toast(message)
-        }.onFailureToastAndLog()
+            showToast("删除 ${fileBean.name} 成功")
+        }.onFailure { ex ->
+            // 无论是 API 业务失败还是网络超时/断网，统一触发回滚
+            stateHolder.updateContentState { copy(fileBeanList = beforeList) }
+            rollback?.rollback()
+            scrollPositionStore.setClick(paginationKey, beforeClick)
+            val errorMsg = ex.message ?: "删除 ${fileBean.name} 失败"
+            showToast(errorMsg)
+            XLog.e("delete single file failed, rolled back", ex)
+        }
     }
 
     suspend fun rename(
@@ -187,22 +174,24 @@ class FileMutatorModule(
 
         runCatching {
             val renameResult = fileRepository.rename(RenameBean(targetBean.fileId, name).toRequestBody())
-            if (renameResult.state) {
-                "重命名成功"
-            } else {
-                stateHolder.updateContentState { copy(fileBeanList = beforeList) }
-                rollback?.rollback()
-                "重命名失败"
-            }
-        }.onSuccess { message ->
-            App.instance.toast(message)
-        }.onFailureToastAndLog()
+            check(renameResult.state) { "重命名失败" }
+            renameResult
+        }.onSuccess {
+            showToast("重命名成功")
+        }.onFailure { ex ->
+            stateHolder.updateContentState { copy(fileBeanList = beforeList) }
+            rollback?.rollback()
+            val errorMsg = ex.message ?: "重命名失败"
+            showToast(errorMsg)
+            XLog.e("rename failed, rolled back", ex)
+        }
     }
 
     suspend fun deleteMultiple(targetCid: String, selectedFiles: List<FileBean>) {
         if (selectedFiles.isEmpty()) return
+        val paginationKey = stateHolder.currentContentState.source.paginationKey
         val beforeList = stateHolder.currentContentState.fileBeanList
-        val beforeClick = scrollPositionStore.getClick(targetCid)
+        val beforeClick = scrollPositionStore.getClick(paginationKey)
         val mapOf = hashMapOf<String, String>()
         mapOf["ignore_warn"] = "1"
         mapOf["pid"] = targetCid
@@ -211,9 +200,6 @@ class FileMutatorModule(
             mapOf["fid[$index]"] = fileBean.fileId
             // update image cache
             imageCacheStore.remove(targetCid, fileBean.pickCode)
-            if (fileBean.photoThumb.isNotEmpty()) {
-                coilCacheCleaner.deleteCoilCache(fileBean.pickCode)
-            }
         }
         // 提前删除并获取批量回滚闭包
         val selectedIds = selectedFiles.map { it.fileId }.toSet()
@@ -227,31 +213,36 @@ class FileMutatorModule(
                 appBarTitle = stringProvider.defaultAppName
             )
         }
-        scrollPositionStore.setClick(
-            targetCid,
-            (scrollPositionStore.getClick(targetCid) - selectedFiles.size).coerceAtLeast(0)
-        )
+        scrollPositionStore.adjustClick(paginationKey, -selectedFiles.size)
         // 先行更新内存与落盘，取得回滚句柄
         val rollback = FileCacheManager.removeItems(targetCid, selectedIds)
 
         runCatching {
             val deleteMultipleResult = fileRepository.deleteMultiple(mapOf)
-            if (deleteMultipleResult.state) {
-                "成功删除 ${selectedFiles.size} 个文件"
-            } else {
-                stateHolder.updateContentState {
-                    copy(
-                        fileBeanList = beforeList,
-                        totalCount = beforeTotalCount
-                    )
+            check(deleteMultipleResult.state) { deleteMultipleResult.errorMsg.ifEmpty { "删除失败" } }
+            deleteMultipleResult
+        }.onSuccess {
+            // 仅在网络成功后才物理清理 Coil 缩略图
+            selectedFiles.forEach { fileBean ->
+                if (fileBean.photoThumb.isNotEmpty()) {
+                    coilCacheCleaner.deleteCoilCache(fileBean.pickCode)
                 }
-                rollback?.rollback()
-                scrollPositionStore.setClick(targetCid, beforeClick)
-                "删除 ${selectedFiles.size} 个文件失败~${deleteMultipleResult.errorMsg}"
             }
-        }.onSuccess { message ->
-            App.instance.toast(message)
-        }.onFailureToastAndLog()
+            showToast("成功删除 ${selectedFiles.size} 个文件")
+        }.onFailure { ex ->
+            // 无论是接口业务返回 false 还是网络超时/断网/500，100% 触发回滚！
+            stateHolder.updateContentState {
+                copy(
+                    fileBeanList = beforeList,
+                    totalCount = beforeTotalCount
+                )
+            }
+            rollback?.rollback()
+            scrollPositionStore.setClick(paginationKey, beforeClick)
+            val errorMsg = ex.message ?: "网络异常，删除失败"
+            showToast(errorMsg)
+            XLog.e("deleteMultiple failed, rolled back", ex)
+        }
     }
 
     suspend fun deleteMultiple() {
@@ -270,10 +261,6 @@ class FileMutatorModule(
         }
     }
 
-    suspend fun deleteOrphansAndExpiredFile() {
-        FileCacheManager.deleteOrphansAndExpiredFile()
-    }
-
     /**
      * 确认批量删除移除视频：
      * 1. 组装 115 批量删除接口请求参数（原子单次请求，彻底防止频控）；
@@ -287,7 +274,7 @@ class FileMutatorModule(
         val cid = targetCid.ifEmpty { stateHolder.currentContentState.currentCid }
         val fids = discardList.map { it.fileId }.filter { it.isNotEmpty() }
         if (fids.isEmpty()) {
-            App.instance.toast("移除文件信息不全，删除取消")
+            showToast("移除文件信息不全，删除取消")
             return
         }
         val filter = stateHolder.currentContentState.fileBeanList.filter { it.fileId in fids }

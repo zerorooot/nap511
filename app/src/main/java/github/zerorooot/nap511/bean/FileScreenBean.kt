@@ -78,13 +78,6 @@ data class FileContentUiState(
     // 兼容现有引用点
     val isSearchState: Boolean
         get() = source !is FileListSource.Folder
-
-    /** 根据当前模式获取语义化默认标题 */
-    fun getDefaultAppBarTitle(context: Context): String = when (val s = source) {
-        is FileListSource.Folder -> context.getString(R.string.app_name)
-        is FileListSource.Search -> "搜索 - ${s.keyword}"
-        is FileListSource.Filter -> "过滤 - ${s.name}"
-    }
 }
 
 /**
