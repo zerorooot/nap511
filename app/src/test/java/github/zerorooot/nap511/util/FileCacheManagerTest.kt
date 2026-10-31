@@ -11,6 +11,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -33,6 +34,7 @@ class FileCacheManagerTest {
 
     @Before
     fun setUp() {
+        XLog.init()
         tempDir = Files.createTempDirectory("fcm_test").toFile()
         FileCacheManager.init(tempDir)
         FileCacheManager.saveRequestCache = true
@@ -367,6 +369,73 @@ class FileCacheManagerTest {
         FileCacheManager.notifyCacheEvent(CacheEvent.AllCleared)
 
         assertEquals(CacheEvent.AllCleared, receivedEvent)
+
+        job.cancel()
+    }
+
+    @Test
+    fun testRemoveAndGet_NeverRevivesOldSnapshot() = runBlocking {
+        val file = FileBean(fileId = "f_snap", name = "snap.txt", isFolder = false)
+        val files = FilesBean(
+            fileBeanList = arrayListOf(file),
+            cid = "snap_cid",
+            count = 1,
+            order = "",
+            path = listOf(PathBean(cid = "snap_cid", name = "快照目录", pid = "0"))
+        )
+        // 1. 写入并排队落盘
+        FileCacheManager.put("snap_cid", files)
+        assertTrue(FileCacheManager.containsKey("snap_cid"))
+
+        // 等待单线程落盘完成并验证磁盘文件存在
+        kotlinx.coroutines.delay(100)
+        val diskFile = File(tempDir, "snap_cid.json")
+        assertTrue("磁盘缓存文件必须存在", diskFile.exists())
+
+        // 2. 调用 remove 删除
+        FileCacheManager.remove("snap_cid")
+
+        // 3. 验证内存被清空，且物理磁盘文件必定已被同步删除
+        assertFalse("内存缓存必须已移除", FileCacheManager.containsKey("snap_cid"))
+        assertFalse("磁盘缓存文件必须已同步物理删除", diskFile.exists())
+
+        // 4. 紧接着调用 get("snap_cid")，验证绝对不从磁盘复活旧快照，返回 null
+        val fetched = FileCacheManager.get("snap_cid")
+        assertNull("删除后读取必须返回 null，严禁复活旧快照", fetched)
+        assertFalse(FileCacheManager.containsKey("snap_cid"))
+    }
+
+    @Test
+    fun testNotifyRemoteRefresh_EnsuresDiskDeletedBeforeEvent() = runBlocking {
+        val file = FileBean(fileId = "f_rem", name = "remote.txt", isFolder = false)
+        val files = FilesBean(
+            fileBeanList = arrayListOf(file),
+            cid = "rem_cid",
+            count = 1,
+            order = "",
+            path = listOf(PathBean(cid = "rem_cid", name = "远端目录", pid = "0"))
+        )
+        FileCacheManager.put("rem_cid", files)
+        kotlinx.coroutines.delay(100)
+        val diskFile = File(tempDir, "rem_cid.json")
+        assertTrue(diskFile.exists())
+
+        var diskExistedWhenEventReceived = true
+        var receivedEvent: CacheEvent? = null
+        val job = launch(kotlinx.coroutines.Dispatchers.Unconfined) {
+            FileCacheManager.cacheEvents.collect { event ->
+                if (event is CacheEvent.RemoteRefreshRequired && event.cid == "rem_cid") {
+                    receivedEvent = event
+                    diskExistedWhenEventReceived = diskFile.exists()
+                }
+            }
+        }
+
+        FileCacheManager.notifyRemoteRefresh("rem_cid")
+
+        assertNotNull(receivedEvent)
+        assertFalse("广播 RemoteRefreshRequired 事件时，磁盘旧文件必须已经被物理删除", diskExistedWhenEventReceived)
+        assertFalse("此时磁盘物理文件不存在", diskFile.exists())
 
         job.cancel()
     }

@@ -3,7 +3,9 @@ package github.zerorooot.nap511.viewmodel.module
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileDialogState
+import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.bean.ImageBean
+import github.zerorooot.nap511.bean.LocationBean
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.ZipStatus
@@ -150,8 +152,12 @@ class FileMediaModule(
             val fileList = FileCacheManager.getDate(cid)?.fileBeanList
             val index = fileList?.indexOfFirst { it.pickCode == pickCode } ?: -1
             if (index >= 0) {
-                val paginationKey = "folder:$cid"
+                val paginationKey = FileListSource.Folder.key(cid)
                 scrollPositionStore.setClick(paginationKey, index)
+                scrollPositionStore.setLocation(
+                    paginationKey,
+                    LocationBean(firstVisibleItemIndex = index, firstVisibleItemScrollOffset = 0)
+                )
                 // 可能被终端页面影响。所以只有在当前目录才滚动。
                 // 无法更新非当前页的位置，未被布局，不知道非当前页面的 firstVisibleItemIndex 和 firstVisibleItemScrollOffset
                 if (cid == stateHolder.currentContentState.currentCid) {

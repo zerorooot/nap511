@@ -1,6 +1,5 @@
 package github.zerorooot.nap511.bean
 
-import android.content.Context
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
@@ -8,7 +7,6 @@ import androidx.compose.material3.FabPosition
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.unit.Dp
-import github.zerorooot.nap511.R
 import github.zerorooot.nap511.screen.components.AppBarAction
 
 /**
@@ -23,12 +21,19 @@ sealed interface FileListSource {
 
     /** 普通目录浏览 */
     data class Folder(override val cid: String) : FileListSource {
-        override val paginationKey: String get() = "folder:$cid"
+        override val paginationKey: String get() = key(cid)
+        companion object {
+            fun key(cid: String): String = "folder:$cid"
+        }
     }
 
     /** 关键词搜索 */
     data class Search(override val cid: String, val keyword: String) : FileListSource {
-        override val paginationKey: String get() = "search:$cid:$keyword"
+        override val paginationKey: String get() = key(cid, keyword)
+
+        companion object {
+            fun key(cid: String, keyword: String): String = "search:$cid:$keyword"
+        }
     }
 
     /**
@@ -46,9 +51,16 @@ sealed interface FileListSource {
         val order: OrderBean,
         val fcMix: Int,
     ) : FileListSource {
-        // 关键：将排序规则融入 paginationKey。切换排序时自动重置滚动条与触底完结标记
-        override val paginationKey: String
-            get() = "filter:$cid:$filterType:${order.type}:${order.asc}:$fcMix"
+        override val paginationKey: String get() = key(cid, filterType, order, fcMix)
+
+        companion object {
+            fun key(
+                cid: String,
+                filterType: Int,
+                order: OrderBean,
+                fcMix: Int
+            ): String = "filter:$cid:$filterType:${order.type}:${order.asc}:$fcMix"
+        }
     }
 }
 
@@ -76,7 +88,7 @@ data class FileContentUiState(
     val videoOrderVersion: Int = 0
 ) {
     // 兼容现有引用点
-    val isSearchState: Boolean
+    val isQueryState: Boolean
         get() = source !is FileListSource.Folder
 }
 

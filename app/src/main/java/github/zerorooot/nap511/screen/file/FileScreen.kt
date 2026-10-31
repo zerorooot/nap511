@@ -26,7 +26,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -71,7 +70,6 @@ import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.yield
 
 @OptIn(
     ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalCoilApi::class
@@ -96,7 +94,7 @@ fun FileScreen(
         "EndOverlay" -> FabPosition.EndOverlay
         else -> FabPosition.End
     }
-    var pendingVideoScrollToTop by remember { mutableStateOf(false) }
+    var pendingStateScrollToIndex by remember { mutableIntStateOf(-1) }
     val contentState by fileViewModel.contentState.collectAsStateWithLifecycle()
     val fileBeanList = contentState.fileBeanList
     val refreshing = contentState.isRefreshing
@@ -225,19 +223,18 @@ fun FileScreen(
 
     LaunchedEffect(fileViewModel) {
         fileViewModel.videoResultEvent.collect { index ->
-            if (index !in fileViewModel.fileBeanList.indices) return@collect
-
-            // 让步一帧，确保前台恢复与基础测量完成
-            yield()
             // 根据当前页面视图模式滚动，使位置接近中央
-            val state = currentScrollState
-            val visibleCount = state.visibleItemsCount
+            val visibleCount = currentScrollState.visibleItemsCount
             val halfCount = if (visibleCount > 0) visibleCount / 2 else 4
             val targetTopIndex = (index - halfCount).coerceAtLeast(0)
-
-            runCatching {
-                state.scrollToItem(targetTopIndex, 0)
-            }
+            pendingStateScrollToIndex = targetTopIndex
+        }
+    }
+    LaunchedEffect(pendingStateScrollToIndex) {
+        if (pendingStateScrollToIndex != -1) {
+            // 此时 composition 已 apply、列表已用排序后的数据 measure
+            currentScrollState.requestScrollToItem(pendingStateScrollToIndex, 0)
+            pendingStateScrollToIndex = -1
         }
     }
 
@@ -300,21 +297,6 @@ fun FileScreen(
 
     fun myItemOnClick(i: Int) = clickHandler.myItemOnClick(i)
 
-    LaunchedEffect(pendingVideoScrollToTop) {
-        if (pendingVideoScrollToTop) {
-            // 此时 composition 已 apply、列表已用排序后的数据 measure
-            currentScrollState.requestScrollToItem(0, 0)
-            pendingVideoScrollToTop = false
-        }
-    }
-
-    suspend fun scrollToTop(animate: Boolean = false) {
-        if (animate) {
-            currentScrollState.animateScrollToItem(0, 0)
-        } else {
-            currentScrollState.scrollToItem(0, 0)
-        }
-    }
 
     fun onMenuAria2Download(index: Int) {
         if (settingUiState.aria2Url.ifEmpty { ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE } == ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE) {
@@ -332,7 +314,7 @@ fun FileScreen(
             return
         }
         // 仅当处于普通目录浏览时才保存滚动偏移。若当前为搜索或过滤模式，严禁将搜索结果视口覆盖写入当前父目录的 listLocation！
-        if (contentState.currentCid != "0" && !contentState.isLongClickState && !contentState.isSearchState) {
+        if (contentState.currentCid != "0" && !contentState.isLongClickState && !contentState.isQueryState) {
             fileViewModel.setListLocation(contentState.source.paginationKey, currentScrollState)
         }
         isBottomBarShow = true
@@ -342,7 +324,7 @@ fun FileScreen(
     }
 
     BackHandler(
-        contentState.currentCid != "0" || contentState.isLongClickState || contentState.isSearchState,
+        contentState.currentCid != "0" || contentState.isLongClickState || contentState.isQueryState,
         ::onBack
     )
 
@@ -354,7 +336,7 @@ fun FileScreen(
     fun myAppBarOnClick(action: AppBarAction) {
         when (action) {
             TopBarAction.BACK -> {
-                if (contentState.currentCid == "0" && !contentState.isLongClickState && !contentState.isSearchState) {
+                if (contentState.currentCid == "0" && !contentState.isLongClickState && !contentState.isQueryState) {
                     openDrawer()
                     return
                 }
@@ -362,8 +344,11 @@ fun FileScreen(
             }
 
             TopBarAction.SEARCH -> {
-                if (!contentState.isSearchState) {
-                    fileViewModel.setListLocation(contentState.source.paginationKey, currentScrollState)
+                if (!contentState.isQueryState) {
+                    fileViewModel.setListLocation(
+                        contentState.source.paginationKey,
+                        currentScrollState
+                    )
                 }
                 fileViewModel.openSearchDialog()
             }
@@ -383,7 +368,7 @@ fun FileScreen(
 
             MenuItemAction.VIDEO_SCHEDULE -> {
                 fileViewModel.sortByVideoTime()
-                pendingVideoScrollToTop = true
+                pendingStateScrollToIndex = 0
             }
 
             MenuItemAction.FILE_SORT -> {
@@ -444,7 +429,7 @@ fun FileScreen(
             },
             onPathDoubleClick = {
                 scope.launch {
-                    scrollToTop(animate = true)
+                    currentScrollState.animateScrollToItem(0, 0)
                 }
             },
             onPathLongClick = { name, cid ->
@@ -459,8 +444,11 @@ fun FileScreen(
             },
             onPathItemClick = {
                 if (it != contentState.currentCid) {
-                    if (contentState.currentCid != "0" && !contentState.isLongClickState && !contentState.isSearchState) {
-                        fileViewModel.setListLocation(contentState.source.paginationKey, currentScrollState)
+                    if (contentState.currentCid != "0" && !contentState.isLongClickState && !contentState.isQueryState) {
+                        fileViewModel.setListLocation(
+                            contentState.source.paginationKey,
+                            currentScrollState
+                        )
                     }
                     fileViewModel.getFiles(it)
                 }
@@ -543,7 +531,7 @@ fun FileScreen(
         fabPosition = fabPosition,
         nestedScrollConnection = nestedScrollConnection,
         currentCid = contentState.currentCid,
-        isSearchState = contentState.isSearchState
+        isSearchState = contentState.isQueryState
     )
 
     val currentAppBarOnClick by rememberUpdatedState(::myAppBarOnClick)

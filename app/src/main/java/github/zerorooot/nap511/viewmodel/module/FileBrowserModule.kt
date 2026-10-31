@@ -356,7 +356,7 @@ class FileBrowserModule(
 
     suspend fun refresh(cid: String, forceCache: Boolean = false) {
         clearSelection()
-        val paginationKey = "folder:$cid"
+        val paginationKey = FileListSource.Folder.key(cid)
         pagingStateStore.reset(paginationKey)
         stateHolder.updateContentState { copy(source = FileListSource.Folder(cid)) }
         val refreshCurrent = (cid == stateHolder.currentContentState.currentCid)
@@ -601,7 +601,7 @@ class FileBrowserModule(
             return BackResult.Handled
         }
 
-        if (state.isSearchState) {
+        if (state.isQueryState) {
             val currentCid = state.currentCid
             val cache = FileCacheManager.getDate(currentCid)
             if (cache != null) {

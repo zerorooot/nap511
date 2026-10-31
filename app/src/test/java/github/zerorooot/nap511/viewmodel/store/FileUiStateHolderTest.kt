@@ -3,7 +3,6 @@ package github.zerorooot.nap511.viewmodel.store
 import github.zerorooot.nap511.bean.FileDialogState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -34,7 +33,7 @@ class FileUiStateHolderTest {
         }
 
         assertEquals("Search: test", holder.currentContentState.appBarTitle)
-        assertTrue(holder.currentContentState.isSearchState)
+        assertTrue(holder.currentContentState.isQueryState)
     }
 
     @Test

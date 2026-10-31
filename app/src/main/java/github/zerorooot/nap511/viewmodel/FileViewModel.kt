@@ -100,7 +100,7 @@ class FileViewModel(
     val currentCid: String get() = contentState.value.currentCid
     val pathList: List<PathBean> get() = contentState.value.pathList
     val isLongClickState: Boolean get() = contentState.value.isLongClickState
-    val isSearchState: Boolean get() = contentState.value.isSearchState
+    val isQueryState: Boolean get() = contentState.value.isQueryState
     val isRefreshing: StateFlow<Boolean> = contentState
         .map { it.isRefreshing }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)

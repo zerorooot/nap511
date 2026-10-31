@@ -114,42 +114,7 @@ class FileMutatorModule(
 
     suspend fun delete(fileBean: FileBean) {
         // 可能在搜索模式删除，故使用 pid 而非当前 cid
-        val cid = fileBean.parentId
-        val paginationKey = stateHolder.currentContentState.source.paginationKey
-        val beforeList = stateHolder.currentContentState.fileBeanList
-        val beforeClick = scrollPositionStore.getClick(paginationKey)
-
-        // 提前更新内存不可变列表，优化交互响应速度并取得安全撤销句柄
-        stateHolder.updateContentState {
-            copy(fileBeanList = fileBeanList.filterNot { it.fileId == fileBean.fileId })
-        }
-        val rollback = FileCacheManager.removeItem(cid, fileBean.fileId, fileBean.isFolder)
-        scrollPositionStore.adjustClick(paginationKey, -1)
-
-        // delete image bean
-        imageCacheStore.remove(cid, fileBean.pickCode)
-
-        val fid = fileBean.fileId
-
-        runCatching {
-            val deleteResult = fileRepository.delete(cid, fid)
-            check(deleteResult.state) { deleteResult.errorMsg.ifEmpty { "删除失败" } }
-            deleteResult
-        }.onSuccess {
-            // 删除 coil 图片缓存（仅在服务端成功后删除，避免失败回滚时图片丢失）
-            if (fileBean.photoThumb.isNotEmpty()) {
-                coilCacheCleaner.deleteCoilCache(fileBean.pickCode)
-            }
-            toastProvider.showToast("删除 ${fileBean.name} 成功")
-        }.onFailure { ex ->
-            // 无论是 API 业务失败还是网络超时/断网，统一触发回滚
-            stateHolder.updateContentState { copy(fileBeanList = beforeList) }
-            rollback?.rollback()
-            scrollPositionStore.setClick(paginationKey, beforeClick)
-            val errorMsg = ex.message ?: "删除 ${fileBean.name} 失败"
-            toastProvider.showToast(errorMsg)
-            XLog.e("delete single file failed, rolled back", ex)
-        }
+        deleteMultiple(fileBean.parentId,arrayListOf(fileBean))
     }
 
     suspend fun rename(
@@ -225,7 +190,12 @@ class FileMutatorModule(
                     coilCacheCleaner.deleteCoilCache(fileBean.pickCode)
                 }
             }
-            toastProvider.showToast("成功删除 ${selectedFiles.size} 个文件")
+            val toastMsg = if (selectedFiles.size == 1) {
+                "删除 ${selectedFiles.first().name} 成功"
+            } else {
+                "成功删除 ${selectedFiles.size} 个文件"
+            }
+            toastProvider.showToast(toastMsg)
         }.onFailure { ex ->
             // 无论是接口业务返回 false 还是网络超时/断网/500，100% 触发回滚！
             stateHolder.updateContentState {

@@ -4,6 +4,7 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.util.CacheEvent
 import github.zerorooot.nap511.util.FileCacheManager
+import github.zerorooot.nap511.viewmodel.formatFileBeanList
 import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.CoilCacheCleaner
 import github.zerorooot.nap511.viewmodel.platform.FileNavigator
@@ -60,26 +61,20 @@ class FileCacheSyncModule(
                 if (event.cid == currentCid && stateHolder.currentContentState.source is FileListSource.Folder) {
                     val updatedCache = FileCacheManager.getDate(event.cid)
                     if (updatedCache != null) {
-                        val currentList = stateHolder.currentContentState.fileBeanList
-                        // 判定当前展示的条目与缓存是否已完全一致（解决 deleteMultiple 先行乐观更新后的重复重组）
-                        val isSameList = currentList.size == updatedCache.fileBeanList.size &&
-                                currentList.map { it.fileId } == updatedCache.fileBeanList.map { it.fileId }
-                        if (isSameList) {
-                            stateHolder.updateContentState {
-                                val unselectedList =
-                                    updatedCache.fileBeanList.map { it.copy(isSelect = false) }
-                                copy(
-                                    fileBeanList = unselectedList,
-                                    pathList = updatedCache.path,
-                                    totalCount = updatedCache.count,
-                                    isLongClickState = false,
-                                    appBarTitle = stringProvider.defaultAppName
-                                )
-                            }
+                        stateHolder.updateContentState {
+                            val unselectedList =
+                                updatedCache.fileBeanList.map { it.copy(isSelect = false) }
+                            copy(
+                                fileBeanList = formatFileBeanList(unselectedList),
+                                pathList = updatedCache.path,
+                                totalCount = updatedCache.count,
+                                isLongClickState = false,
+                                appBarTitle = stringProvider.defaultAppName
+                            )
                         }
 
                         // 对齐复合键分页完成状态与物理游标（以 FilesBean.isComplete 为唯一信源 SSOT）
-                        val paginationKey = "folder:${event.cid}"
+                        val paginationKey = FileListSource.Folder.key(event.cid)
                         pagingStateStore.setOffset(paginationKey, updatedCache.fileBeanList.size)
                         if (updatedCache.isComplete) {
                             pagingStateStore.markComplete(paginationKey)
@@ -146,7 +141,7 @@ class FileCacheSyncModule(
 
         validCids.forEach {
             imageCacheStore.clear(it)
-            pagingStateStore.reset("folder:$it")
+            pagingStateStore.reset(FileListSource.Folder.key(it))
         }
 
         val currentCid = stateHolder.currentContentState.currentCid
@@ -165,7 +160,8 @@ class FileCacheSyncModule(
 
     private fun resolveDirName(cid: String): String {
         val currentCid = stateHolder.currentContentState.currentCid
-        if (cid == currentCid) return stateHolder.currentContentState.pathList.lastOrNull()?.name ?: "当前目录($cid)"
+        if (cid == currentCid) return stateHolder.currentContentState.pathList.lastOrNull()?.name
+            ?: "当前目录($cid)"
         // 尝试从内存缓存中获取其面包屑末级名称
         return FileCacheManager.getDate(cid)?.path?.lastOrNull()?.name ?: "cid=$cid"
     }

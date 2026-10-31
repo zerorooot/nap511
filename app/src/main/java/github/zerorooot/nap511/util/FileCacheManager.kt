@@ -94,6 +94,9 @@ object FileCacheManager {
         }
     }
 
+    // 处于失效/物理删除处理中的 CID 墓碑集合，任何磁盘读操作若命中该集合直接判定为未命中，彻底杜绝异步时序差
+    private val tombstoneKeys = Collections.synchronizedSet(HashSet<String>())
+
     // 内存 LRU 缓存：只要 App 运行，始终存在且有效（使用 synchronizedMap 保证高并发读写安全）
     private val memoryCache: MutableMap<String, CacheWrapper> =
         Collections.synchronizedMap(LruCacheMap(MAX_MEMORY_DIRS))
@@ -118,10 +121,17 @@ object FileCacheManager {
      */
     suspend fun notifyRemoteRefresh(cid: String) =
         withContext(Dispatchers.IO) {
-            mutex.withLock {
-                memoryCache.remove(cid)
-                deleteDiskFileAsync(cid)
+            tombstoneKeys.add(cid)
+            try {
+                mutex.withLock {
+                    memoryCache.remove(cid)
+                }
+                // 挂起等待单线程调度器物理删除完成，杜绝异步时序差与旧快照复活
+                deleteDiskFileSync(cid)
+                XLog.d("FileCacheManager.notifyRemoteRefresh: cid=$cid disk file deleted, emitting RemoteRefreshRequired")
                 _cacheEvents.tryEmit(CacheEvent.RemoteRefreshRequired(cid))
+            } finally {
+                tombstoneKeys.remove(cid)
             }
         }
 
@@ -247,7 +257,7 @@ object FileCacheManager {
             if (memEntry != null) {
                 if (now - memEntry.timestamp > ttlMillis) {
                     memoryCache.remove(key)
-                    deleteDiskFileAsync(key)
+                    deleteDiskFileSync(key)
                     return@withContext null
                 }
                 return@withContext memEntry.data
@@ -266,6 +276,11 @@ object FileCacheManager {
     suspend fun getDiskCache(key: String, now: Long = System.currentTimeMillis()): CacheWrapper? =
         withContext(Dispatchers.IO) {
             if (!::cacheDir.isInitialized) return@withContext null
+            // 墓碑拦截：若当前 key 正处于物理删除处理中，立即判定未命中，严禁读取旧快照
+            if (tombstoneKeys.contains(key)) {
+                XLog.d("FileCacheManager.getDiskCache: key=$key is tombstoned, skipping disk read")
+                return@withContext null
+            }
             val diskFile = getDiskFile(key)
             if (!diskFile.exists()) {
                 return@withContext null
@@ -375,7 +390,7 @@ object FileCacheManager {
             val removedFolderCids = mutableSetOf<String>()
             if (actualIsFolder) {
                 removeFolderRecursivelyInternal(targetFolderCid, removedFolderCids)
-                deleteDiskFilesAsync(removedFolderCids)
+                deleteDiskFilesSync(removedFolderCids)
             }
 
             _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
@@ -400,7 +415,7 @@ object FileCacheManager {
      * 就地批量从父目录缓存中移除指定条目：
      * 1. 采用 Set 快速过滤；
      * 2. 级联递归移除子文件夹在内存中的记录，并收集全部被删子孙目录集合；
-     * 3. 单线程 FIFO 异步后台批量清理对应磁盘缓存，释放 Mutex 关键锁等待时间；
+     * 3. 单线程 FIFO 同步后台批量清理对应磁盘缓存，释放 Mutex 关键锁等待时间；
      * 4. 采用聚合 FoldersDeleted 事件广播，彻底杜绝循环发射导致的 UI 事件风暴。
      */
     suspend fun removeItems(
@@ -433,7 +448,7 @@ object FileCacheManager {
             cache.count = (cache.count - removedCount).coerceAtLeast(0)
             memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
             if (allDeletedFolderCids.isNotEmpty()) {
-                deleteDiskFilesAsync(allDeletedFolderCids)
+                deleteDiskFilesSync(allDeletedFolderCids)
             }
 
             _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
@@ -469,7 +484,7 @@ object FileCacheManager {
         val visited = HashSet<String>()
         mutex.withLock {
             removeFolderRecursivelyInternal(folderCid, visited)
-            deleteDiskFilesAsync(visited)
+            deleteDiskFilesSync(visited)
         }
         if (emitFolderDeleted && folderCid != "0") {
             _cacheEvents.tryEmit(CacheEvent.FolderDeleted(folderCid))
@@ -545,9 +560,15 @@ object FileCacheManager {
      * 删除某个 Key 的缓存（内存 + 磁盘）
      */
     suspend fun remove(key: String) = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            memoryCache.remove(key)
-            deleteDiskFileAsync(key)
+        tombstoneKeys.add(key)
+        try {
+            mutex.withLock {
+                memoryCache.remove(key)
+            }
+            deleteDiskFileSync(key)
+            XLog.d("FileCacheManager.remove: key=$key disk file deleted")
+        } finally {
+            tombstoneKeys.remove(key)
         }
     }
 
@@ -557,7 +578,9 @@ object FileCacheManager {
     suspend fun clearDiskOnly() = withContext(Dispatchers.IO) {
         mutex.withLock {
             if (::cacheDir.isInitialized) {
-                cacheDir.listFiles()?.forEach { it.delete() }
+                withContext(diskDispatcher) {
+                    cacheDir.listFiles()?.forEach { it.delete() }
+                }
             }
         }
     }
@@ -578,8 +601,10 @@ object FileCacheManager {
         mutex.withLock {
             memoryCache.clear()
             if (::cacheDir.isInitialized) {
-                cacheDir.listFiles()?.forEach { it.delete() }
-                cacheDir.mkdirs()
+                withContext(diskDispatcher) {
+                    cacheDir.listFiles()?.forEach { it.delete() }
+                    cacheDir.mkdirs()
+                }
             }
             _cacheEvents.tryEmit(CacheEvent.AllCleared)
         }
@@ -602,20 +627,37 @@ object FileCacheManager {
         }
     }
 
-    private fun deleteDiskFileAsync(key: String) {
+    /**
+     * 在单线程 FIFO 调度器中挂起执行物理文件删除，确保队列前序落盘完成且物理文件已被移除
+     */
+    private suspend fun deleteDiskFileSync(key: String) {
         if (!::cacheDir.isInitialized) return
-        scope.launch {
-            val file = getDiskFile(key)
-            if (file.exists()) file.delete()
+        withContext(diskDispatcher) {
+            try {
+                val file = getDiskFile(key)
+                if (file.exists()) {
+                    file.delete()
+                    XLog.d("FileCacheManager.deleteDiskFileSync: key=$key deleted")
+                }
+            } catch (e: Exception) {
+                XLog.e("deleteDiskFileSync failed for key: $key", e)
+            }
         }
     }
 
-    private fun deleteDiskFilesAsync(keys: Set<String>) {
+    private suspend fun deleteDiskFilesSync(keys: Set<String>) {
         if (!::cacheDir.isInitialized || keys.isEmpty()) return
-        scope.launch {
+        withContext(diskDispatcher) {
             keys.forEach { key ->
-                val file = getDiskFile(key)
-                if (file.exists()) file.delete()
+                try {
+                    val file = getDiskFile(key)
+                    if (file.exists()) {
+                        file.delete()
+                        XLog.d("FileCacheManager.deleteDiskFilesSync: key=$key deleted")
+                    }
+                } catch (e: Exception) {
+                    XLog.e("deleteDiskFilesSync failed for key: $key", e)
+                }
             }
         }
     }
