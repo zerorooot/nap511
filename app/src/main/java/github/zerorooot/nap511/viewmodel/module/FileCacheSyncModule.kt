@@ -2,12 +2,12 @@ package github.zerorooot.nap511.viewmodel.module
 
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.FileListSource
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.CacheEvent
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.CoilCacheCleaner
 import github.zerorooot.nap511.viewmodel.platform.FileNavigator
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import github.zerorooot.nap511.viewmodel.store.FileUiStateHolder
 import github.zerorooot.nap511.viewmodel.store.ImageCacheStore
 import github.zerorooot.nap511.viewmodel.store.PagingStateStore
@@ -24,7 +24,8 @@ class FileCacheSyncModule(
     private val pagingStateStore: PagingStateStore,
     private val coilCacheCleaner: CoilCacheCleaner,
     private val stringProvider: AppStringProvider,
-    private val onUpdateFileCache: suspend (String) -> Unit
+    private val onUpdateFileCache: suspend (String) -> Unit,
+    private val toastProvider: ToastProvider
 ) {
 
     /**
@@ -155,7 +156,7 @@ class FileCacheSyncModule(
         XLog.d("handleFolderDeletedCheck isCurrentDeleted=$isCurrentDeleted, isAncestorDeleted=$isAncestorDeleted, count=${validCids.size}")
 
         if (isCurrentDeleted || isAncestorDeleted) {
-            App.instance.toast("当前所在目录已被删除")
+            toastProvider.showToast("当前所在目录已被删除")
             val survivingAncestorCid =
                 pathList.takeWhile { it.cid !in validCids }.lastOrNull()?.cid ?: "0"
             navigator.navigateTo(survivingAncestorCid)

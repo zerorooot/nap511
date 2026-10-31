@@ -10,11 +10,15 @@ import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.screen.auth.LoginCredential
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class LoginViewModel : ViewModel() {
+class LoginViewModel(
+    private val toastProvider: ToastProvider = AndroidToastProvider(App.instance)
+) : ViewModel() {
 
     fun performLogin(credential: LoginCredential, onLoginSuccess: () -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -23,8 +27,8 @@ class LoginViewModel : ViewModel() {
                     val replace = credential.cookieString.replace(" ", "")
                         .replace("[\r\n]".toRegex(), "")
                     AuthRepository.checkLogin(replace)
-                        .onSuccess { App.instance.toast("登录成功～") }
-                        .onFailure { App.instance.toast("验证失败: ${it.localizedMessage}") }
+                        .onSuccess { toastProvider.showToast("登录成功～") }
+                        .onFailure { toastProvider.showToast("验证失败: ${it.localizedMessage}") }
                         .isSuccess
                 }
 
@@ -60,12 +64,12 @@ class LoginViewModel : ViewModel() {
                                     }
                                 }
 
-                                App.instance.toast("登录成功～")
+                                toastProvider.showToast("登录成功～")
                             }
-                            .onFailure { App.instance.toast("验证失败: ${it.localizedMessage}") }
+                            .onFailure { toastProvider.showToast("验证失败: ${it.localizedMessage}") }
                             .isSuccess
                     } catch (e: Exception) {
-                        App.instance.toast("解析配置失败")
+                        toastProvider.showToast("解析配置失败")
                         XLog.e(
                             "LoginScreen LoginCredential.ConfigFile jsonString ${credential.rawJson}",
                             e

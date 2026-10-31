@@ -6,12 +6,12 @@ import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.RemainingSpaceBean
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.viewmodel.platform.BackgroundScheduler
 import github.zerorooot.nap511.viewmodel.platform.DeepLinkAction
 import github.zerorooot.nap511.viewmodel.platform.FileNavigator
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import github.zerorooot.nap511.viewmodel.store.FileUiStateHolder
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,7 +31,8 @@ class FileIntegrationModule(
     private val navigator: FileNavigator,
     private val fileRepository: FileRepository,
     private val backgroundScheduler: BackgroundScheduler,
-    private val onCopyToClipboard: (String) -> Unit
+    private val onCopyToClipboard: (String) -> Unit,
+    private val toastProvider: ToastProvider
 ) {
 
     private val _navigationEvent = MutableSharedFlow<NavEvent>(extraBufferCapacity = 1)
@@ -72,7 +73,7 @@ class FileIntegrationModule(
             is DeepLinkAction.CopyText -> {
                 onCopyToClipboard(action.content)
                 XLog.d("FileIntegrationModule copy ${action.content}")
-                runCatching { App.instance.toast(action.toastTip) }
+                toastProvider.showToast(action.toastTip)
             }
         }
     }
@@ -88,7 +89,7 @@ class FileIntegrationModule(
                 _remainingSpace.value =
                     Gson().fromJson(spaceInfoJson, RemainingSpaceBean::class.java)
             }
-        }.onFailureToastAndLog()
+        }.onFailureToastAndLog(toastProvider)
     }
 
     /**

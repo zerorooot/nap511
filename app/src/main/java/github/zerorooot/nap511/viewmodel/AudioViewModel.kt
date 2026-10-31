@@ -23,6 +23,8 @@ import github.zerorooot.nap511.util.AudioEventBus
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.subtitle.SubtitleDelegate
+import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -50,7 +52,10 @@ data class AudioUiState(
     val subtitle: SubtitleUiState = SubtitleUiState()
 )
 
-class AudioViewModel(application: Application) : AndroidViewModel(application) {
+class AudioViewModel @JvmOverloads constructor(
+    application: Application,
+    private val toastProvider: ToastProvider = AndroidToastProvider(application)
+) : AndroidViewModel(application) {
     private val SEEK_STEP_MS = 15000L
     private val context = getApplication<Application>()
 
@@ -112,7 +117,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         override fun onError(what: Int, extra: Int) {
             viewModelScope.launch {
                 stopAudioAndService()
-                App.instance.toast("播放失败 ($what)")
+                toastProvider.showToast("播放失败 ($what)")
             }
         }
 
@@ -229,12 +234,12 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                     // 自动加载/搜集字幕候选
                     loadSubtitles(localSubtitles = localSubtitles)
                 } else {
-                    App.instance.toast("无法获取音频播放地址")
+                    toastProvider.showToast("无法获取音频播放地址")
                     updatePlayback { copy(currentMusic = null) }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                App.instance.toast("加载失败: ${e.message}")
+                toastProvider.showToast("加载失败: ${e.message}")
                 updatePlayback { copy(currentMusic = null) }
             } finally {
                 updatePlayback { copy(isLoading = false) }

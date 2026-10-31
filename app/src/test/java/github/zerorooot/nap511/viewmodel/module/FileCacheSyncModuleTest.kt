@@ -5,6 +5,7 @@ import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.util.CacheEvent
 import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.CoilCacheCleaner
+import github.zerorooot.nap511.viewmodel.platform.FakeToastProvider
 import github.zerorooot.nap511.viewmodel.store.FileUiStateHolder
 import github.zerorooot.nap511.viewmodel.store.ImageCacheStore
 import github.zerorooot.nap511.viewmodel.store.PagingStateStore
@@ -32,6 +33,7 @@ class FileCacheSyncModuleTest {
     private lateinit var imageCacheStore: ImageCacheStore
     private lateinit var pagingStateStore: PagingStateStore
     private lateinit var module: FileCacheSyncModule
+    private val fakeToastProvider = FakeToastProvider()
 
     private var memoryCacheCleared = false
     private var diskCacheCleared = false
@@ -67,6 +69,7 @@ class FileCacheSyncModuleTest {
         pagingStateStore = PagingStateStore()
         memoryCacheCleared = false
         diskCacheCleared = false
+        fakeToastProvider.clear()
 
         module = FileCacheSyncModule(
             stateHolder = stateHolder,
@@ -75,7 +78,8 @@ class FileCacheSyncModuleTest {
             pagingStateStore = pagingStateStore,
             coilCacheCleaner = fakeCoilCleaner,
             stringProvider = fakeStringProvider,
-            onUpdateFileCache = {}
+            onUpdateFileCache = {},
+            toastProvider = fakeToastProvider
         )
     }
 
@@ -107,5 +111,19 @@ class FileCacheSyncModuleTest {
         // 其他目录保持不受影响
         assertEquals("url2", imageCacheStore.get("200", "pick2")?.url)
         assertEquals(50, pagingStateStore.getOrInitOffset("folder:200", 0))
+    }
+
+    @Test
+    fun `test handleCacheEvent FolderDeleted on current directory emits toast`() = runTest {
+        stateHolder.updateContentState {
+            copy(
+                source = github.zerorooot.nap511.bean.FileListSource.Folder("current_dir"),
+                pathList = listOf(github.zerorooot.nap511.bean.PathBean(cid = "current_dir", name = "当前目录", pid = "0"))
+            )
+        }
+
+        module.handleCacheEvent(CacheEvent.FolderDeleted("current_dir"))
+
+        assertTrue(fakeToastProvider.messages.contains("当前所在目录已被删除"))
     }
 }

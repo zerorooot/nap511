@@ -7,12 +7,12 @@ import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.bean.RenameBean
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.CoilCacheCleaner
 import github.zerorooot.nap511.viewmodel.platform.FileNavigator
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import github.zerorooot.nap511.viewmodel.store.FileUiStateHolder
 import github.zerorooot.nap511.viewmodel.store.ImageCacheStore
 import github.zerorooot.nap511.viewmodel.store.ScrollPositionStore
@@ -32,6 +32,7 @@ class FileMutatorModule(
     private val imageCacheStore: ImageCacheStore,
     private val coilCacheCleaner: CoilCacheCleaner,
     private val stringProvider: AppStringProvider,
+    private val toastProvider: ToastProvider
 ) {
 
     fun cut(index: Int = -1) {
@@ -61,10 +62,6 @@ class FileMutatorModule(
         }
     }
 
-    private fun showToast(message: String) {
-        runCatching { App.instance.toast(message) }
-    }
-
     suspend fun removeFile() {
         val cutList = stateHolder.currentContentState.cutFileList
         if (cutList.isEmpty()) {
@@ -77,7 +74,7 @@ class FileMutatorModule(
 
         val fileCid = cutList[0].let { if (it.isFolder) it.parentId else it.categoryId }
         if (fileCid == targetCid) {
-            showToast("禁止原地移动～")
+            toastProvider.showToast("禁止原地移动～")
             return
         }
 
@@ -94,8 +91,8 @@ class FileMutatorModule(
                 "移动失败~"
             }
         }.onSuccess { message ->
-            showToast(message)
-        }.onFailureToastAndLog()
+            toastProvider.showToast(message)
+        }.onFailureToastAndLog(toastProvider)
         stateHolder.setRefreshing(false)
     }
 
@@ -111,8 +108,8 @@ class FileMutatorModule(
                 "创建失败，${createFolder.error}"
             }
         }.onSuccess { message ->
-            showToast(message)
-        }.onFailureToastAndLog()
+            toastProvider.showToast(message)
+        }.onFailureToastAndLog(toastProvider)
     }
 
     suspend fun delete(fileBean: FileBean) {
@@ -143,14 +140,14 @@ class FileMutatorModule(
             if (fileBean.photoThumb.isNotEmpty()) {
                 coilCacheCleaner.deleteCoilCache(fileBean.pickCode)
             }
-            showToast("删除 ${fileBean.name} 成功")
+            toastProvider.showToast("删除 ${fileBean.name} 成功")
         }.onFailure { ex ->
             // 无论是 API 业务失败还是网络超时/断网，统一触发回滚
             stateHolder.updateContentState { copy(fileBeanList = beforeList) }
             rollback?.rollback()
             scrollPositionStore.setClick(paginationKey, beforeClick)
             val errorMsg = ex.message ?: "删除 ${fileBean.name} 失败"
-            showToast(errorMsg)
+            toastProvider.showToast(errorMsg)
             XLog.e("delete single file failed, rolled back", ex)
         }
     }
@@ -177,12 +174,12 @@ class FileMutatorModule(
             check(renameResult.state) { "重命名失败" }
             renameResult
         }.onSuccess {
-            showToast("重命名成功")
+            toastProvider.showToast("重命名成功")
         }.onFailure { ex ->
             stateHolder.updateContentState { copy(fileBeanList = beforeList) }
             rollback?.rollback()
             val errorMsg = ex.message ?: "重命名失败"
-            showToast(errorMsg)
+            toastProvider.showToast(errorMsg)
             XLog.e("rename failed, rolled back", ex)
         }
     }
@@ -228,7 +225,7 @@ class FileMutatorModule(
                     coilCacheCleaner.deleteCoilCache(fileBean.pickCode)
                 }
             }
-            showToast("成功删除 ${selectedFiles.size} 个文件")
+            toastProvider.showToast("成功删除 ${selectedFiles.size} 个文件")
         }.onFailure { ex ->
             // 无论是接口业务返回 false 还是网络超时/断网/500，100% 触发回滚！
             stateHolder.updateContentState {
@@ -240,7 +237,7 @@ class FileMutatorModule(
             rollback?.rollback()
             scrollPositionStore.setClick(paginationKey, beforeClick)
             val errorMsg = ex.message ?: "网络异常，删除失败"
-            showToast(errorMsg)
+            toastProvider.showToast(errorMsg)
             XLog.e("deleteMultiple failed, rolled back", ex)
         }
     }
@@ -274,7 +271,7 @@ class FileMutatorModule(
         val cid = targetCid.ifEmpty { stateHolder.currentContentState.currentCid }
         val fids = discardList.map { it.fileId }.filter { it.isNotEmpty() }
         if (fids.isEmpty()) {
-            showToast("移除文件信息不全，删除取消")
+            toastProvider.showToast("移除文件信息不全，删除取消")
             return
         }
         val filter = stateHolder.currentContentState.fileBeanList.filter { it.fileId in fids }

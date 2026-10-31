@@ -19,6 +19,8 @@ import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.keyWord
 import github.zerorooot.nap511.util.network.parseOssErrorWithDom
 import github.zerorooot.nap511.util.subtitle.SubtitleDelegate
+import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -85,7 +87,9 @@ sealed class VideoUiEvent {
  *
  * 负责管理视频播放状态、切换视频、同步播放历史、处理请求拦截异常以及通过代理 [SubtitleDelegate] 管理字幕业务。
  */
-class VideoViewModel : ViewModel() {
+class VideoViewModel(
+    private val toastProvider: ToastProvider = AndroidToastProvider(App.instance)
+) : ViewModel() {
     internal val fileRepository: FileRepository = FileRepository.getInstance()
     internal val subtitleRepository: SubtitleRepository = SubtitleRepository.getInstance()
 
@@ -222,7 +226,7 @@ class VideoViewModel : ViewModel() {
     private fun loadVideoAt(targetIndex: Int, isPortrait: Boolean) {
         val fileBean = videoList.getOrNull(targetIndex)
         if (fileBean == null) {
-            App.instance.toast("找不到视频")
+            toastProvider.showToast("找不到视频")
             // 防假死：索引异常时恢复 loading 状态
             _uiState.update { it.copy(isLoadingEpisode = false) }
             return
@@ -272,7 +276,7 @@ class VideoViewModel : ViewModel() {
                 _uiEvent.emit(VideoUiEvent.PlayNext(video.videoUrl, video.fileName))
             }.onFailure { e ->
                 XLog.e("加载视频失败 pickCode: ${fileBean.pickCode}", e)
-                App.instance.toast("加载视频失败，请重试")
+                toastProvider.showToast("加载视频失败，请重试")
                 // 防假死：网络异常时重置 loading 状态
                 _uiState.update { it.copy(isLoadingEpisode = false) }
             }
@@ -379,7 +383,7 @@ class VideoViewModel : ViewModel() {
         viewModelScope.launch {
             _uiEvent.emit(VideoUiEvent.EpisodeListUpdated)
         }
-        App.instance.toast("已撤回：${restoredVideo.name}")
+        toastProvider.showToast("已撤回：${restoredVideo.name}")
     }
 
     /**
@@ -388,7 +392,7 @@ class VideoViewModel : ViewModel() {
     fun rePlayNewVideo() {
         if (isReloadingVideo) return
         isReloadingVideo = true
-        App.instance.toast("视频地址错误！正在重新获取新链接")
+        toastProvider.showToast("视频地址错误！正在重新获取新链接")
         viewModelScope.launch {
             try {
                 val currentInfo = _uiState.value.videoInfo ?: return@launch

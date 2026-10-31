@@ -13,6 +13,7 @@ import github.zerorooot.nap511.repository.paging.PageAppendResult
 import github.zerorooot.nap511.repository.paging.PagingOptions
 import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.CoilCacheCleaner
+import github.zerorooot.nap511.viewmodel.platform.FakeToastProvider
 import github.zerorooot.nap511.viewmodel.store.FileUiStateHolder
 import github.zerorooot.nap511.viewmodel.store.ImageCacheStore
 import github.zerorooot.nap511.viewmodel.store.PagingStateStore
@@ -51,6 +52,7 @@ class FileBrowserModuleTest {
     private lateinit var pagingStateStore: PagingStateStore
     private lateinit var imageCacheStore: ImageCacheStore
     private lateinit var module: FileBrowserModule
+    private val fakeToastProvider = FakeToastProvider()
 
     private val fakeRepo = object : FileRepository() {
         override suspend fun getFiles(
@@ -118,6 +120,7 @@ class FileBrowserModuleTest {
         stateHolder = FileUiStateHolder("nap511")
         pagingStateStore = PagingStateStore()
         imageCacheStore = ImageCacheStore()
+        fakeToastProvider.clear()
 
         module = FileBrowserModule(
             stateHolder = stateHolder,
@@ -127,7 +130,8 @@ class FileBrowserModuleTest {
             pagingCoordinator = fakeCoordinator,
             stringProvider = fakeStringProvider,
             coilCacheCleaner = fakeCoilCleaner,
-            settingUiStateFlow =  MutableStateFlow(SettingUiState())
+            settingUiStateFlow = MutableStateFlow(SettingUiState()),
+            toastProvider = fakeToastProvider
         )
     }
 
@@ -403,5 +407,14 @@ class FileBrowserModuleTest {
         assertEquals(cid, stateHolder.currentContentState.currentCid)
         assertEquals(1, stateHolder.currentContentState.fileBeanList.size)
         assertEquals("f_disk", stateHolder.currentContentState.fileBeanList.first().fileId)
+    }
+
+    @Test
+    fun `test updateOrder in search mode emits toast`() = runTest {
+        stateHolder.updateContentState {
+            copy(source = FileListSource.Search("0", "key"))
+        }
+        module.updateOrder(OrderBean(OrderEnum.update, 1))
+        assertTrue(fakeToastProvider.messages.contains("暂不支持搜索模式排序"))
     }
 }

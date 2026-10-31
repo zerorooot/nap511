@@ -33,7 +33,9 @@ import github.zerorooot.nap511.viewmodel.platform.AndroidAppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.AndroidBackgroundScheduler
 import github.zerorooot.nap511.viewmodel.platform.AndroidCoilCacheCleaner
 import github.zerorooot.nap511.viewmodel.platform.AndroidServiceBridge
+import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
 import github.zerorooot.nap511.viewmodel.platform.FileNavigator
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import github.zerorooot.nap511.viewmodel.platform.parseDeepLink
 import github.zerorooot.nap511.viewmodel.store.FileUiStateHolder
 import github.zerorooot.nap511.viewmodel.store.ImageCacheStore
@@ -108,9 +110,10 @@ class FileViewModel(
 
     // ==================== 3. 构造平台适配器并装配 5 大 Module ====================
 
+    private val toastProvider: ToastProvider = AndroidToastProvider(context)
     private val coilCacheCleaner = AndroidCoilCacheCleaner(context)
     private val serviceBridge = AndroidServiceBridge(context)
-    private val backgroundScheduler = AndroidBackgroundScheduler(context)
+    private val backgroundScheduler = AndroidBackgroundScheduler(context, toastProvider)
     private val stringProvider = AndroidAppStringProvider(context)
 
     val browserModule = FileBrowserModule(
@@ -121,7 +124,8 @@ class FileViewModel(
         pagingCoordinator = pagingCoordinator,
         stringProvider = stringProvider,
         coilCacheCleaner = coilCacheCleaner,
-        settingUiStateFlow = settingUiStateFlow
+        settingUiStateFlow = settingUiStateFlow,
+        toastProvider = toastProvider
     )
 
     val mutatorModule = FileMutatorModule(
@@ -131,7 +135,8 @@ class FileViewModel(
         scrollPositionStore = scrollPositionStore,
         imageCacheStore = imageCacheStore,
         coilCacheCleaner = coilCacheCleaner,
-        stringProvider = stringProvider
+        stringProvider = stringProvider,
+        toastProvider = toastProvider
     )
 
     val mediaModule = FileMediaModule(
@@ -145,7 +150,8 @@ class FileViewModel(
         navigator = this, // 统一注入门面自身
         onEnqueueUnzip = { taskItems ->
             UnzipQueueManager.enqueueAndStartWorker(taskItems, context)
-        }
+        },
+        toastProvider = toastProvider
     )
 
     val syncModule = FileCacheSyncModule(
@@ -155,7 +161,8 @@ class FileViewModel(
         pagingStateStore = pagingStateStore,
         coilCacheCleaner = coilCacheCleaner,
         stringProvider = stringProvider,
-        onUpdateFileCache = { cid -> browserModule.updateFileCache(cid) }
+        onUpdateFileCache = { cid -> browserModule.updateFileCache(cid) },
+        toastProvider = toastProvider
     )
 
     val integrationModule = FileIntegrationModule(
@@ -163,7 +170,8 @@ class FileViewModel(
         navigator = this, // 统一注入门面自身
         fileRepository = fileRepository,
         backgroundScheduler = backgroundScheduler,
-        onCopyToClipboard = { text -> text.copy(context) }
+        onCopyToClipboard = { text -> text.copy(context) },
+        toastProvider = toastProvider
     )
 
     // ==================== 4. 一次性事件 (One-shot Events) 与生命周期状态 ====================

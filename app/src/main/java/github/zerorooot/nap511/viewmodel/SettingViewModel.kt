@@ -17,6 +17,8 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.bean.sync.SyncPayload
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.network.UserSessionManager
+import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -27,7 +29,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class SettingViewModel(
-    private val settingsRepository: SettingsRepository = SettingsRepository.getInstance()
+    private val settingsRepository: SettingsRepository = SettingsRepository.getInstance(),
+    private val toastProvider: ToastProvider = AndroidToastProvider(App.instance)
 ) : ViewModel() {
     private val gson = GsonBuilder().setPrettyPrinting().create()
     internal val _currentLocation = MutableStateFlow(LocationBean(0, 0))
@@ -47,7 +50,7 @@ class SettingViewModel(
     fun <T : Any> saveData(key: String, newValue: T) {
         // 过滤出是字符串且小于 0 的数字，命中时弹出提示并中断执行
         (newValue as? String)?.toDoubleOrNull()?.takeIf { it <= 0.0 }?.run {
-            App.instance.toast("保存失败，数字不能小于0")
+            toastProvider.showToast("保存失败，数字不能小于0")
             return
         }
 
@@ -178,10 +181,10 @@ class SettingViewModel(
                         UserSessionManager.updateSession(cleanCookie, targetUid)
                         "账号凭据有效，账号已同步切换！"
                     }
-                    App.instance.toast(message)
+                    toastProvider.showToast(message)
                 }.onFailure { err ->
                     // 2. 鉴权失败：实行事务性拦截与保护，拒绝改写任何本地配置或会话
-                    App.instance.toast("同步失败：账号凭据已过期或验证失败，原配置与账号未受影响 (${err.localizedMessage})")
+                    toastProvider.showToast("同步失败：账号凭据已过期或验证失败，原配置与账号未受影响 (${err.localizedMessage})")
                 }
 
                 return@launch
@@ -196,10 +199,10 @@ class SettingViewModel(
                 } catch (e: Exception) {
                     "配置解析失败: ${e.localizedMessage}"
                 }
-                App.instance.toast(message)
+                toastProvider.showToast(message)
                 return@launch
             }
-            App.instance.toast("未包含任何可同步的数据")
+            toastProvider.showToast("未包含任何可同步的数据")
         }
     }
 }

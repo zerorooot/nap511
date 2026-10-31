@@ -8,7 +8,6 @@ import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.formatFileSize
 import github.zerorooot.nap511.util.network.UserSessionManager
@@ -18,6 +17,7 @@ import github.zerorooot.nap511.util.toUserFriendlyMessage
 import github.zerorooot.nap511.viewmodel.platform.CoilCacheCleaner
 import github.zerorooot.nap511.viewmodel.platform.FileNavigator
 import github.zerorooot.nap511.viewmodel.platform.ServiceBridge
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import github.zerorooot.nap511.viewmodel.store.FileUiStateHolder
 import github.zerorooot.nap511.viewmodel.store.ImageCacheStore
 import github.zerorooot.nap511.viewmodel.store.ScrollPositionStore
@@ -42,7 +42,8 @@ class FileMediaModule(
     private val coilCacheCleaner: CoilCacheCleaner,
     private val serviceBridge: ServiceBridge,
     private val navigator: FileNavigator,
-    private val onEnqueueUnzip: (List<UnzipTaskItem>) -> Unit
+    private val onEnqueueUnzip: (List<UnzipTaskItem>) -> Unit,
+    private val toastProvider: ToastProvider
 ) {
 
     private val _videoResultEvent = MutableSharedFlow<Int>(extraBufferCapacity = 1)
@@ -103,7 +104,7 @@ class FileMediaModule(
                     imageCacheStore.put(cid, pickCode, imageBean)
                 }
                 XLog.d("FileMediaModule.getImage request success: fileBean=${fileBean.name}, imageBean=$imageBean")
-            }.onFailureToastAndLog()
+            }.onFailureToastAndLog(toastProvider)
         } finally {
             imageCacheStore.removeLoading(loadingKey)
         }
@@ -127,7 +128,7 @@ class FileMediaModule(
                     activeDialog = FileDialogState.FileInfo
                 )
             }
-        }.onFailureToastAndLog()
+        }.onFailureToastAndLog(toastProvider)
         stateHolder.setRefreshing(false)
     }
 
@@ -163,7 +164,7 @@ class FileMediaModule(
     fun startSendAria2Service(index: Int) {
         val fileBean = stateHolder.currentContentState.fileBeanList.getOrNull(index) ?: return
         if (fileBean.isFolder) {
-            App.instance.toast("暂时无法下载文件夹")
+            toastProvider.showToast("暂时无法下载文件夹")
             return
         }
         serviceBridge.startSendAria2Service(fileBean)
@@ -193,7 +194,7 @@ class FileMediaModule(
         }.onSuccess { torrentTask ->
             XLog.d("getTorrentTask torrentTask $torrentTask")
             if (!torrentTask.state) {
-                App.instance.toast(torrentTask.errorMessage)
+                toastProvider.showToast(torrentTask.errorMessage)
                 stateHolder.setRefreshing(false)
                 return@onSuccess
             }
@@ -235,8 +236,8 @@ class FileMediaModule(
                 "任务添加失败，${addTorrentTask.errorMsg}"
             }
         }.onSuccess { message ->
-            App.instance.toast(message)
-        }.onFailureToastAndLog()
+            toastProvider.showToast(message)
+        }.onFailureToastAndLog(toastProvider)
     }
 
     // ==================== 在线解压相关 ====================
@@ -266,7 +267,7 @@ class FileMediaModule(
 
                     is ZipStatus.UnsupportedOrError -> {
                         XLog.w("业务不支持或发生错误: ${status.message}")
-                        App.instance.toast(status.message)
+                        toastProvider.showToast(status.message)
                         stateHolder.setRefreshing(false)
                         isInterrupted = true
                     }
@@ -278,12 +279,12 @@ class FileMediaModule(
                     is ZipStatus.Loading -> {
                         val message = "正在进行云解压，请稍等...(${status.progress}%)"
                         XLog.i("${targetBean.name} 要云解压，$message")
-                        App.instance.toast(message)
+                        toastProvider.showToast(message)
                         stateHolder.setRefreshing(false)
                         isInterrupted = true
                     }
                 }
-            }.onFailureToastAndLog()
+            }.onFailureToastAndLog(toastProvider)
 
             if (isInterrupted) return
         }
@@ -303,7 +304,7 @@ class FileMediaModule(
             val logTag = resolveCallerTag()
             val userMsg = e.toUserFriendlyMessage()
             XLog.e("[$logTag] $userMsg", e)
-            App.instance.toast(userMsg)
+            toastProvider.showToast(userMsg)
         }
     }
 
@@ -346,16 +347,16 @@ class FileMediaModule(
         runCatching {
             val decryptZip = fileRepository.decryptZip(pickCode, secret)
             if (!decryptZip) {
-                App.instance.toast("密码错误～")
+                toastProvider.showToast("密码错误～")
                 return
             }
 
             if (fileRepository.tryToExtract(pickCode)) {
                 getZipListFile(targetBean, isCheck = true)
             } else {
-                App.instance.toast("服务器解压中～")
+                toastProvider.showToast("服务器解压中～")
             }
-        }.onFailureToastAndLog()
+        }.onFailureToastAndLog(toastProvider)
     }
 
     // ==================== 弹窗快捷开启入口 ====================

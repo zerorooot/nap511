@@ -12,6 +12,8 @@ import github.zerorooot.nap511.screen.file.formatBytes
 import github.zerorooot.nap511.service.RepeatService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.onFailureToastAndLog
+import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -34,7 +36,9 @@ data class RepeatUiState(
     val categoryDetail: CategoryDetailResponse? = null
 )
 
-class RepeatFileViewModel : ViewModel() {
+class RepeatFileViewModel(
+    private val toastProvider: ToastProvider = AndroidToastProvider(App.instance)
+) : ViewModel() {
     private val repeatService: RepeatService by lazy {
         RepeatService.getInstance()
     }
@@ -95,14 +99,14 @@ class RepeatFileViewModel : ViewModel() {
     fun refreshList() {
         if (!_uiState.value.hasStartedDedup) {
             _uiState.update { it.copy(isRefreshing = false) }
-            App.instance.toast("请查重后再刷新页面")
+            toastProvider.showToast("请查重后再刷新页面")
             return
         }
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
             runCatching {
                 refreshListInternal()
-            }.onFailureToastAndLog()
+            }.onFailureToastAndLog(toastProvider)
             _uiState.update { it.copy(isLoadingList = false, isRefreshing = false) }
         }
     }
@@ -130,7 +134,7 @@ class RepeatFileViewModel : ViewModel() {
                         isListEndReached = updatedList.size >= total || newList.isEmpty()
                     )
                 }
-            }.onFailureToastAndLog()
+            }.onFailureToastAndLog(toastProvider)
             _uiState.update { it.copy(isLoadingList = false, isRefreshing = false) }
         }
     }
@@ -145,14 +149,14 @@ class RepeatFileViewModel : ViewModel() {
                 XLog.i("forceRefresh: ${result.state}, message: ${result.message}")
 
                 val success = result.state
-                App.instance.toast(if (success) "已提交全盘排重请求" else result.message)
+                toastProvider.showToast(if (success) "已提交全盘排重请求" else result.message)
 
                 if (success) {
                     _uiState.update { it.copy(hasStartedDedup = true) }
                     delay(300.milliseconds)
                     refreshListInternal()
                 }
-            }.onFailureToastAndLog()
+            }.onFailureToastAndLog(toastProvider)
             _uiState.update { it.copy(isRefreshing = false) }
         }
     }
@@ -171,7 +175,7 @@ class RepeatFileViewModel : ViewModel() {
                 val deleteRepeatFiles = repeatService.deleteRepeatFiles(field, order)
                 XLog.d("deleteRepeatFiles: $deleteRepeatFiles")
 
-                App.instance.toast(
+                toastProvider.showToast(
                     if (deleteRepeatFiles.state) {
                         "去重指令执行成功"
                     } else {
@@ -182,7 +186,7 @@ class RepeatFileViewModel : ViewModel() {
                 delay(300.milliseconds)
                 val clearEmpty = repeatService.clearEmpty()
                 XLog.i("clearEmpty: $clearEmpty")
-            }.onFailureToastAndLog()
+            }.onFailureToastAndLog(toastProvider)
             _uiState.update { RepeatUiState() }
         }
     }
@@ -192,8 +196,8 @@ class RepeatFileViewModel : ViewModel() {
             runCatching {
                 val clearEmpty = repeatService.clearEmpty()
                 XLog.i("clearEmpty: $clearEmpty")
-                App.instance.toast(clearEmpty.message)
-            }.onFailureToastAndLog()
+                toastProvider.showToast(clearEmpty.message)
+            }.onFailureToastAndLog(toastProvider)
         }
     }
 
@@ -203,7 +207,7 @@ class RepeatFileViewModel : ViewModel() {
             runCatching {
                 val categoryDetail1 = repeatService.getCategoryDetail(cid)
                 _categoryDetail.value = categoryDetail1
-            }.onFailureToastAndLog()
+            }.onFailureToastAndLog(toastProvider)
             _uiState.update { it.copy(isRefreshing = false) }
         }
     }

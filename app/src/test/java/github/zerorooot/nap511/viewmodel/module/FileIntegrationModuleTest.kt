@@ -4,6 +4,7 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.viewmodel.platform.BackgroundScheduler
+import github.zerorooot.nap511.viewmodel.platform.FakeToastProvider
 import github.zerorooot.nap511.viewmodel.platform.FileNavigator
 import github.zerorooot.nap511.viewmodel.store.FileUiStateHolder
 import kotlinx.coroutines.flow.first
@@ -27,6 +28,7 @@ class FileIntegrationModuleTest {
 
     private lateinit var stateHolder: FileUiStateHolder
     private lateinit var module: FileIntegrationModule
+    private val fakeToastProvider = FakeToastProvider()
 
     private var scheduledTaskRaw: String? = null
     private var scheduledForceRecreate: Boolean? = null
@@ -61,13 +63,15 @@ class FileIntegrationModuleTest {
         scheduledForceRecreate = null
         lastNavigatedCid = null
         lastCopiedText = null
+        fakeToastProvider.clear()
 
         module = FileIntegrationModule(
             stateHolder = stateHolder,
             navigator = fakeNavigator,
             fileRepository = FileRepository(),
             backgroundScheduler = fakeScheduler,
-            onCopyToClipboard = { lastCopiedText = it }
+            onCopyToClipboard = { lastCopiedText = it },
+            toastProvider = fakeToastProvider
         )
     }
 
@@ -95,9 +99,10 @@ class FileIntegrationModuleTest {
     }
 
     @Test
-    fun `test handleAction CopyText calls onCopyToClipboard`() = runTest {
+    fun `test handleAction CopyText calls onCopyToClipboard and emits toast`() = runTest {
         module.handleAction(github.zerorooot.nap511.viewmodel.platform.DeepLinkAction.CopyText("magnet:?xt=urn:btih:123", "复制成功"))
         assertEquals("magnet:?xt=urn:btih:123", lastCopiedText)
+        assertTrue(fakeToastProvider.messages.contains("复制成功"))
     }
 
     @Test

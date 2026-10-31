@@ -11,13 +11,13 @@ import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinator
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.viewmodel.formatFileBeanList
 import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.CoilCacheCleaner
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import github.zerorooot.nap511.viewmodel.store.FileUiStateHolder
 import github.zerorooot.nap511.viewmodel.store.ImageCacheStore
 import github.zerorooot.nap511.viewmodel.store.PagingStateStore
@@ -49,7 +49,8 @@ class FileBrowserModule(
     private val pagingCoordinator: DirectoryPagingCoordinator,
     private val stringProvider: AppStringProvider,
     private val coilCacheCleaner: CoilCacheCleaner,
-    private val settingUiStateFlow: StateFlow<SettingUiState>
+    private val settingUiStateFlow: StateFlow<SettingUiState>,
+    private val toastProvider: ToastProvider
 ) {
     private val _navigationEvent = MutableSharedFlow<NavEvent>(extraBufferCapacity = 1)
     val navigationEvent: SharedFlow<NavEvent> = _navigationEvent.asSharedFlow()
@@ -128,7 +129,7 @@ class FileBrowserModule(
             )
             files.fileBeanList = formatFileBeanList(files.fileBeanList)
             FileCacheManager[cid] = files
-        }.onFailureToastAndLog()
+        }.onFailureToastAndLog(toastProvider)
     }
 
     /**
@@ -154,7 +155,7 @@ class FileBrowserModule(
             )
             // 请求的 cid 不是 0, 但返回的 cid 是 0。证明请求的 cid 不存在
             if (cid != "0" && files.cid == "0") {
-                App.instance.toast("当前文件夹被删除！")
+                toastProvider.showToast("当前文件夹被删除！")
             }
             files.fileBeanList = formatFileBeanList(files.fileBeanList)
 
@@ -178,7 +179,7 @@ class FileBrowserModule(
                 XLog.e("getFiles Exception ", it)
                 "${it.message}，请重试～"
             }
-            App.instance.toast(message)
+            toastProvider.showToast(message)
         }
         stateHolder.setRefreshing(false)
     }
@@ -227,7 +228,7 @@ class FileBrowserModule(
             pagingStateStore.markComplete(paginationKey)
             pagingStateStore.releaseFetch(paginationKey)
             if (totalCount > limit) {
-                App.instance.toast("加载完毕")
+                toastProvider.showToast("加载完毕")
             }
             return
         }
@@ -276,12 +277,12 @@ class FileBrowserModule(
             if (result.isComplete) {
                 pagingStateStore.markComplete(paginationKey)
                 if (result.combinedList.size > limit) {
-                    App.instance.toast("加载完毕")
+                    toastProvider.showToast("加载完毕")
                 }
             }
         } catch (e: Exception) {
             XLog.e("loadMoreFiles Exception", e)
-            App.instance.toast("加载更多失败")
+            toastProvider.showToast("加载更多失败")
         } finally {
             pagingStateStore.releaseFetch(paginationKey)
             if (stateHolder.currentContentState.source.paginationKey == paginationKey) {
@@ -308,15 +309,15 @@ class FileBrowserModule(
                     refresh(currentCid)
                 }
             } else {
-                App.instance.toast("排序失败")
+                toastProvider.showToast("排序失败")
             }
-        }.onFailureToastAndLog()
+        }.onFailureToastAndLog(toastProvider)
     }
 
     suspend fun updateOrder(order: OrderBean) {
         when (val s = stateHolder.currentContentState.source) {
             is FileListSource.Search -> {
-                App.instance.toast("暂不支持搜索模式排序")
+                toastProvider.showToast("暂不支持搜索模式排序")
             }
 
             is FileListSource.Filter -> {
@@ -451,7 +452,7 @@ class FileBrowserModule(
                     appBarTitle = stringProvider.getSearchTitle(searchKey)
                 )
             }
-        }.onFailureToastAndLog()
+        }.onFailureToastAndLog(toastProvider)
         stateHolder.setRefreshing(false)
     }
 
@@ -491,7 +492,7 @@ class FileBrowserModule(
                     appBarTitle = stringProvider.getFilterTitle(name)
                 )
             }
-        }.onFailureToastAndLog()
+        }.onFailureToastAndLog(toastProvider)
         stateHolder.setRefreshing(false)
     }
 

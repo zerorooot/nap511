@@ -5,6 +5,7 @@ import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.viewmodel.platform.CoilCacheCleaner
+import github.zerorooot.nap511.viewmodel.platform.FakeToastProvider
 import github.zerorooot.nap511.viewmodel.platform.ServiceBridge
 import github.zerorooot.nap511.viewmodel.store.FileUiStateHolder
 import github.zerorooot.nap511.viewmodel.store.ImageCacheStore
@@ -18,6 +19,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Test
@@ -37,6 +39,7 @@ class FileMediaModuleTest {
     private lateinit var torrentCacheStore: TorrentCacheStore
     private lateinit var scrollPositionStore: ScrollPositionStore
     private lateinit var module: FileMediaModule
+    private val fakeToastProvider = FakeToastProvider()
 
     private var sentFileBeanToAria2: FileBean? = null
     private val fakeServiceBridge = object : ServiceBridge {
@@ -77,6 +80,7 @@ class FileMediaModuleTest {
         scrollPositionStore = ScrollPositionStore()
         sentFileBeanToAria2 = null
         coilCacheMockUrl = null
+        fakeToastProvider.clear()
 
         module = FileMediaModule(
             stateHolder = stateHolder,
@@ -87,7 +91,8 @@ class FileMediaModuleTest {
             coilCacheCleaner = fakeCoilCleaner,
             serviceBridge = fakeServiceBridge,
             navigator = fakeNavigator,
-            onEnqueueUnzip = {}
+            onEnqueueUnzip = {},
+            toastProvider = fakeToastProvider
         )
     }
 
@@ -115,6 +120,14 @@ class FileMediaModuleTest {
 
         module.startSendAria2Service(0)
         assertEquals(item, sentFileBeanToAria2)
+
+        // 尝试下载文件夹时拦截并触发 Toast
+        val folderItem = createFileBean("2", "my_folder", isFolder = true)
+        stateHolder.updateContentState {
+            copy(fileBeanList = listOf(folderItem))
+        }
+        module.startSendAria2Service(0)
+        assertTrue(fakeToastProvider.messages.contains("暂时无法下载文件夹"))
     }
 
     @Test

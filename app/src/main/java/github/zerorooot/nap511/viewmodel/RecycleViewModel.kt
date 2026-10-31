@@ -13,6 +13,8 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
+import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -23,7 +25,9 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-class RecycleViewModel : ViewModel() {
+class RecycleViewModel(
+    private val toastProvider: ToastProvider = AndroidToastProvider(App.instance)
+) : ViewModel() {
     private val _isRefreshing = MutableStateFlow(false)
     private val _recycleInfo = MutableStateFlow(RecycleInfo())
     private val _recycleFileList = MutableStateFlow<List<RecycleBean>>(emptyList())
@@ -64,10 +68,10 @@ class RecycleViewModel : ViewModel() {
                 }
 
             } catch (e: NullPointerException) {
-                App.instance.toast("获取文件列表失败，建议更新您的Cookie")
+                toastProvider.showToast("获取文件列表失败，建议更新您的Cookie")
             } catch (e: Exception) {
                 e.printStackTrace()
-                App.instance.toast("${e.message}，请重试～")
+                toastProvider.showToast("${e.message}，请重试～")
             } finally {
                 _isRefreshing.value = false
             }
@@ -103,8 +107,8 @@ class RecycleViewModel : ViewModel() {
                     SettingsRepository.saveData(ConfigKeyUtil.PASSWORD, "")
                     "删除失败，${revert.errorMsg}"
                 }
-                App.instance.toast(message)
-            }.onFailureToastAndLog()
+                toastProvider.showToast(message)
+            }.onFailureToastAndLog(toastProvider)
         }
     }
 
@@ -124,8 +128,8 @@ class RecycleViewModel : ViewModel() {
                 } else {
                     "清除失败，${recycleCleanAll.error}"
                 }
-                App.instance.toast(message)
-            }.onFailureToastAndLog()
+                toastProvider.showToast(message)
+            }.onFailureToastAndLog(toastProvider)
         }
     }
 
@@ -144,8 +148,8 @@ class RecycleViewModel : ViewModel() {
                 } else {
                     "恢复失败，${revert.error}"
                 }
-                App.instance.toast(message)
-            }.onFailureToastAndLog()
+                toastProvider.showToast(message)
+            }.onFailureToastAndLog(toastProvider)
         }
     }
 

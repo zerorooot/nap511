@@ -11,6 +11,7 @@ import github.zerorooot.nap511.viewmodel.store.FileUiStateHolder
 import github.zerorooot.nap511.viewmodel.store.ImageCacheStore
 import github.zerorooot.nap511.viewmodel.store.ScrollPositionStore
 import com.elvishew.xlog.XLog
+import github.zerorooot.nap511.viewmodel.platform.FakeToastProvider
 import github.zerorooot.nap511.viewmodel.platform.FileNavigator
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -36,6 +37,7 @@ class FileMutatorModuleTest {
 
     private lateinit var tempDir: java.io.File
     private val deletedCoilKeys = mutableListOf<String>()
+    private val fakeToastProvider = FakeToastProvider()
     private var mockDeleteResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
     private var mockDeleteMultipleResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
     private var shouldThrowNetworkError = false
@@ -84,6 +86,7 @@ class FileMutatorModuleTest {
         scrollPositionStore = ScrollPositionStore()
         imageCacheStore = ImageCacheStore()
         deletedCoilKeys.clear()
+        fakeToastProvider.clear()
         mockDeleteResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
         mockDeleteMultipleResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
         shouldThrowNetworkError = false
@@ -95,7 +98,8 @@ class FileMutatorModuleTest {
             scrollPositionStore = scrollPositionStore,
             imageCacheStore = imageCacheStore,
             coilCacheCleaner = fakeCoilCleaner,
-            stringProvider = fakeStringProvider
+            stringProvider = fakeStringProvider,
+            toastProvider = fakeToastProvider
         )
     }
 
@@ -291,5 +295,21 @@ class FileMutatorModuleTest {
         assertEquals(0, stateHolder.currentContentState.totalCount)
         assertEquals(6, scrollPositionStore.getClick("folder:0"))
         assertEquals(listOf("pick_m1"), deletedCoilKeys)
+    }
+
+    @Test
+    fun `test delete emits toast message on server failure`() = kotlinx.coroutines.test.runTest {
+        val item = createFileBean("del_toast", "item_del_toast").copy(parentId = "0")
+        stateHolder.updateContentState {
+            copy(
+                source = github.zerorooot.nap511.bean.FileListSource.Folder("0"),
+                fileBeanList = listOf(item)
+            )
+        }
+        mockDeleteResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = false, errorMsg = "文件不存在")
+
+        module.delete(item)
+
+        assertTrue(fakeToastProvider.messages.contains("文件不存在"))
     }
 }

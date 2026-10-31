@@ -20,6 +20,8 @@ import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
+import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,7 +46,9 @@ data class OfflineFileUiState(
     val completedList: List<OfflineTask> = emptyList(),
 )
 
-class OfflineFileViewModel : ViewModel() {
+class OfflineFileViewModel(
+    private val toastProvider: ToastProvider = AndroidToastProvider(App.instance)
+) : ViewModel() {
     private val _isRefreshing = MutableStateFlow(false)
     private var downloadingTask by mutableStateOf(OfflineInfo())
     private val _downloadingList = MutableStateFlow<List<OfflineTask>>(emptyList())
@@ -166,7 +170,7 @@ class OfflineFileViewModel : ViewModel() {
 
                     _offlineInfo.value = infoRes
                 }
-            }.onFailureToastAndLog(customMsg = "刷新离线任务列表失败")
+            }.onFailureToastAndLog(toastProvider, customMsg = "刷新离线任务列表失败")
             _isRefreshing.value = false
         }
     }
@@ -216,7 +220,7 @@ class OfflineFileViewModel : ViewModel() {
             return
         }
         if (currentPage == maxPage) {
-            App.instance.toast("加载完毕")
+            toastProvider.showToast("加载完毕")
             offlineInfo.isLoadedComplete = true
             return
         }
@@ -234,7 +238,7 @@ class OfflineFileViewModel : ViewModel() {
                     // 5. 追加新数据并更新页码
                     applyTaskResult(type, res)
                 }
-            }.onFailureToastAndLog(customMsg = "加载下一页失败")
+            }.onFailureToastAndLog(toastProvider, customMsg = "加载下一页失败")
             _isRefreshing.value = false
         }
     }
@@ -307,8 +311,8 @@ class OfflineFileViewModel : ViewModel() {
                     "清除失败，${clearFinish.errorMsg}"
                 }
             }.onSuccess { message ->
-                App.instance.toast(message)
-            }.onFailureToastAndLog()
+                toastProvider.showToast(message)
+            }.onFailureToastAndLog(toastProvider)
         }
     }
 
@@ -323,8 +327,8 @@ class OfflineFileViewModel : ViewModel() {
                     "清除失败，${clearError.errorMsg}"
                 }
             }.onSuccess { message ->
-                App.instance.toast(message)
-            }.onFailureToastAndLog()
+                toastProvider.showToast(message)
+            }.onFailureToastAndLog(toastProvider)
         }
     }
 
@@ -334,7 +338,7 @@ class OfflineFileViewModel : ViewModel() {
                 fileRepository.quota()
             }.onSuccess { quotaData ->
                 _quotaBean.value = quotaData
-            }.onFailureToastAndLog()
+            }.onFailureToastAndLog(toastProvider)
         }
     }
 
@@ -342,7 +346,7 @@ class OfflineFileViewModel : ViewModel() {
         viewModelScope.launch {
             runCatching {
                 fileRepository.addOfflineTask(list, currentCid, path, handle)
-            }.onFailureToastAndLog()
+            }.onFailureToastAndLog(toastProvider)
         }
     }
 
@@ -362,8 +366,8 @@ class OfflineFileViewModel : ViewModel() {
                     "删除失败，${deleteTask.errorMsg}"
                 }
             }.onSuccess { message ->
-                App.instance.toast(message)
-            }.onFailureToastAndLog()
+                toastProvider.showToast(message)
+            }.onFailureToastAndLog(toastProvider)
         }
     }
 }

@@ -2,6 +2,7 @@ package github.zerorooot.nap511.viewmodel.platform
 
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
 import androidx.concurrent.futures.await
 import androidx.work.Constraints
 import androidx.work.Data
@@ -18,12 +19,15 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.service.Sha1Service
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.deleteCoilCache
 import github.zerorooot.nap511.util.getCoilCacheUrl
 import github.zerorooot.nap511.util.isIgnoringBatteryOptimizations
 import github.zerorooot.nap511.worker.OfflineTaskWorker
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * 图片及文件缓存清理平台抽象
@@ -65,6 +69,47 @@ interface BackgroundScheduler {
 
     /** 检查当前应用是否已被加入电池优化白名单 */
     fun isIgnoringBatteryOptimizations(): Boolean
+}
+
+/**
+ * 消息与轻提示通知抽象接口
+ * 解耦领域模块对 Android 系统 Toast 与 Application 单例的依赖，
+ * 支持在单元测试中进行消息捕获与断言，或在不同 UI 形态下切换为 Snackbar/日志输出。
+ */
+interface ToastProvider {
+    /** 显示指定文本的轻提示 */
+    fun showToast(message: String, isLong: Boolean = false)
+
+    /** 显示指定字符串资源 ID 的轻提示 */
+    fun showToast(resId: Int)
+}
+
+/**
+ * Android 平台 Toast 提示器实现
+ * 统管主线程切换、Toast 连续触发时的及时取消，保证体验平滑。
+ * 强制仅持有 ApplicationContext，杜绝 Context 泄漏。
+ */
+class AndroidToastProvider(
+    context: Context
+) : ToastProvider {
+    private val appContext: Context = context.applicationContext
+    private var currentToast: Toast? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    override fun showToast(message: String, isLong: Boolean) {
+        if (message.isBlank()) return
+        scope.launch {
+            currentToast?.cancel()
+            val duration = if (isLong) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
+            currentToast = Toast.makeText(appContext, message, duration).also {
+                it.show()
+            }
+        }
+    }
+
+    override fun showToast(resId: Int) {
+        showToast(appContext.getString(resId))
+    }
 }
 
 /**
@@ -133,7 +178,10 @@ class AndroidServiceBridge(private val context: Context) : ServiceBridge {
     }
 }
 
-class AndroidBackgroundScheduler(private val context: Context) : BackgroundScheduler {
+class AndroidBackgroundScheduler(
+    private val context: Context,
+    private val toastProvider: ToastProvider = AndroidToastProvider(context)
+) : BackgroundScheduler {
     override suspend fun handleOfflineTask(currentOfflineTaskRaw: String, forceRecreate: Boolean) {
         val workManager = WorkManager.getInstance(context)
         val workQuery = WorkQuery.Builder.fromStates(
@@ -164,11 +212,11 @@ class AndroidBackgroundScheduler(private val context: Context) : BackgroundSched
         if (currentOfflineTask.isEmpty()) {
             // 如果是主动添加模式且列表为空，弹 Toast 提示
             if (forceRecreate) {
-                App.instance.toast("没有离线任务！")
+                toastProvider.showToast("没有离线任务！")
             }
             return
         }
-        App.instance.toast("开始下载！")
+        toastProvider.showToast("开始下载！")
 
         // 序列化并提交新任务
         val listType = object : TypeToken<List<String?>?>() {}.type

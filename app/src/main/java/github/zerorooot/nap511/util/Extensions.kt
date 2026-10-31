@@ -23,6 +23,7 @@ import coil.ImageLoader
 import coil.annotation.ExperimentalCoilApi
 import coil.memory.MemoryCache
 import com.elvishew.xlog.XLog
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
@@ -139,30 +140,33 @@ fun ImageLoader.deleteCoilCache(key: String) {
 }
 
 /**
- * Result<T> 扩展：统一在 onFailure 时进行 Log 打印与 Toast 提示
+ * Result<T> 扩展：统一在 onFailure 时进行 Log 打印与轻提示分发
  *
+ * @param toastProvider 抽象轻提示提供者（强制非空，杜绝静默单例回退）
  * @param tag 日志 Tag 标识（为 null 时自动推断调用方 ClassName.methodName）
  * @param customMsg 自定义提示文案（若为空则自动解析异常信息）
  */
 fun <T> Result<T>.onFailureToastAndLog(
+    toastProvider: ToastProvider,
     tag: String? = null,
     customMsg: String? = null
 ): Result<T> = onFailure { e ->
     val logTag = tag ?: resolveCallerTag()
     val userMsg = customMsg ?: e.toUserFriendlyMessage()
     XLog.e("[$logTag] $userMsg", e)
-    runCatching { App.instance.toast(userMsg) }
+    toastProvider.showToast(userMsg)
 }
 
 /**
- * 包装函数：直接执行 Block 并自动在 onFailure 时处理 Log 打印与 Toast 提示
+ * 包装函数：执行 Block 并通过注入的 ToastProvider 进行错误提示
  */
 inline fun <T> runCatchingWithToast(
+    toastProvider: ToastProvider,
     tag: String? = null,
     customMsg: String? = null,
     block: () -> T
 ): Result<T> {
-    return runCatching(block).onFailureToastAndLog(tag, customMsg)
+    return runCatching(block).onFailureToastAndLog(toastProvider, tag, customMsg)
 }
 
 fun String.keyWord(positionAfterAt: Boolean): String {
