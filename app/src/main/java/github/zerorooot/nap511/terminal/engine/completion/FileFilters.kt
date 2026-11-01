@@ -1,8 +1,7 @@
 package github.zerorooot.nap511.terminal.engine.completion
 
-import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.util.TextFileHelper
-import github.zerorooot.nap511.viewmodel.ZIP_EXTS
+import github.zerorooot.nap511.util.ZIP_EXTS
 import java.util.Locale
 
 /**

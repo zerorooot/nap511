@@ -1,9 +1,8 @@
-package github.zerorooot.nap511.viewmodel
+package github.zerorooot.nap511.util
 
 import android.annotation.SuppressLint
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.util.formatFileSize
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -61,6 +60,8 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
         val isFolder = fileBean.isFolder || fileBean.fileId.isEmpty()
         val finalFileId = if (isFolder) fileBean.categoryId else fileBean.fileId
         val finalParentId = if (isFolder) fileBean.parentId else fileBean.categoryId
+        //判断是否是星标文件
+        val isStar = fileBean.star == 1
 
         var sizeString = fileBean.sizeString
         var timeString: String
@@ -134,7 +135,8 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
             time = rawTime,
             sizeString = sizeString,
             playLongRatio = playLongRatio,
-            playLongString = playLongString
+            playLongString = playLongString,
+            isStar = isStar
         )
     }.toMutableList() as ArrayList<FileBean>
 }

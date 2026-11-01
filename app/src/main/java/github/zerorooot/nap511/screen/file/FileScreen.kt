@@ -353,6 +353,14 @@ fun FileScreen(
                 fileViewModel.openSearchDialog()
             }
 
+            TopBarAction.STAR -> {
+                fileViewModel.starMultiple()
+            }
+
+            TopBarAction.STAR_FILE_SCREEN -> {
+                App.instance.toast("开发中......")
+            }
+
             TopBarAction.SELECT_UP -> fileViewModel.selectToUp()
             TopBarAction.SELECT_DOWN -> fileViewModel.selectToDown()
             TopBarAction.CUT -> fileViewModel.cut()
@@ -364,6 +372,11 @@ fun FileScreen(
 
             MenuItemAction.GALLERY_MODE -> {
                 isImagePreviewMode = !isPreviewActive
+            }
+
+            MenuItemAction.STAR_FILE -> {
+                fileViewModel.sortByStarFile()
+                pendingStateScrollToIndex = 0
             }
 
             MenuItemAction.VIDEO_SCHEDULE -> {
@@ -471,6 +484,9 @@ fun FileScreen(
             onFileInfo = { fileBean ->
                 fileViewModel.getFileInfo(fileBean)
             },
+            onStar = { fileBean ->
+                fileViewModel.starFile(fileBean)
+            },
             onUnzip = { fileBean ->
                 if (fileBean.isFolder) {
                     App.instance.toast("不能解压文件夹！")
@@ -531,7 +547,7 @@ fun FileScreen(
         fabPosition = fabPosition,
         nestedScrollConnection = nestedScrollConnection,
         currentCid = contentState.currentCid,
-        isSearchState = contentState.isQueryState
+        isQueryState = contentState.isQueryState
     )
 
     val currentAppBarOnClick by rememberUpdatedState(::myAppBarOnClick)

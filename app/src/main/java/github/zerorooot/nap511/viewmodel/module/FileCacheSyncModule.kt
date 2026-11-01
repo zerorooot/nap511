@@ -4,7 +4,7 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.util.CacheEvent
 import github.zerorooot.nap511.util.FileCacheManager
-import github.zerorooot.nap511.viewmodel.formatFileBeanList
+import github.zerorooot.nap511.util.formatFileBeanList
 import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.CoilCacheCleaner
 import github.zerorooot.nap511.viewmodel.platform.FileNavigator
@@ -74,7 +74,7 @@ class FileCacheSyncModule(
                         }
 
                         // 对齐复合键分页完成状态与物理游标（以 FilesBean.isComplete 为唯一信源 SSOT）
-                        val paginationKey = FileListSource.Folder.key(event.cid)
+                        val paginationKey = FileListSource.folderKey(event.cid)
                         pagingStateStore.setOffset(paginationKey, updatedCache.fileBeanList.size)
                         if (updatedCache.isComplete) {
                             pagingStateStore.markComplete(paginationKey)
@@ -141,7 +141,7 @@ class FileCacheSyncModule(
 
         validCids.forEach {
             imageCacheStore.clear(it)
-            pagingStateStore.reset(FileListSource.Folder.key(it))
+            pagingStateStore.reset(FileListSource.folderKey(it))
         }
 
         val currentCid = stateHolder.currentContentState.currentCid

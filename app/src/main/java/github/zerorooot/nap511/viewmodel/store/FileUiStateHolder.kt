@@ -2,6 +2,8 @@ package github.zerorooot.nap511.viewmodel.store
 
 import github.zerorooot.nap511.bean.FileContentUiState
 import github.zerorooot.nap511.bean.FileDialogUiState
+import github.zerorooot.nap511.bean.FileListSource
+import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,9 +14,14 @@ import kotlinx.coroutines.flow.update
  * 彻底隔离文件列表浏览状态流与弹窗独立交互状态流，
  * 封装线程安全的原语 Reducer 更新方法与便捷只读访问器。
  */
-class FileUiStateHolder(defaultTitle: String) {
+class FileUiStateHolder(stringProvider: AppStringProvider) {
     /** 1. 文件列表核心浏览与模式状态流 */
-    private val _contentState = MutableStateFlow(FileContentUiState(appBarTitle = defaultTitle))
+    private val _contentState = MutableStateFlow(
+        FileContentUiState(
+            appBarTitle = stringProvider.defaultAppName,
+            source = FileListSource.Folder("0", stringProvider)
+        )
+    )
     val contentState: StateFlow<FileContentUiState> = _contentState.asStateFlow()
 
     /** 2. 弹窗交互独立状态流（与列表展示彻底物理隔离） */

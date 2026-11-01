@@ -12,9 +12,9 @@ import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinator
 import github.zerorooot.nap511.util.FileCacheManager
+import github.zerorooot.nap511.util.formatFileBeanList
 import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
-import github.zerorooot.nap511.viewmodel.formatFileBeanList
 import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.CoilCacheCleaner
 import github.zerorooot.nap511.viewmodel.platform.ToastProvider
@@ -356,9 +356,9 @@ class FileBrowserModule(
 
     suspend fun refresh(cid: String, forceCache: Boolean = false) {
         clearSelection()
-        val paginationKey = FileListSource.Folder.key(cid)
+        val paginationKey = FileListSource.folderKey(cid)
         pagingStateStore.reset(paginationKey)
-        stateHolder.updateContentState { copy(source = FileListSource.Folder(cid)) }
+        stateHolder.updateContentState { copy(source = FileListSource.Folder(cid, stringProvider)) }
         val refreshCurrent = (cid == stateHolder.currentContentState.currentCid)
         XLog.d(
             "refresh refreshCurrent:$refreshCurrent, settingUiState.forceLoadCache:${settingUiState.forceLoadCache}, forceCache:$forceCache," +
@@ -431,7 +431,7 @@ class FileBrowserModule(
 
     suspend fun search(searchKey: String) {
         val currentCid = stateHolder.currentContentState.currentCid
-        val targetSource = FileListSource.Search(currentCid, searchKey)
+        val targetSource = FileListSource.Search(currentCid, searchKey, stringProvider)
         val limit = UserSessionManager.requestLimitCount
         stateHolder.setRefreshing(true)
 
@@ -478,7 +478,14 @@ class FileBrowserModule(
             )
             val formattedList = formatFileBeanList(files.fileBeanList)
             val targetSource =
-                FileListSource.Filter(currentCid, type, name, OrderBean.from(files), fcMix)
+                FileListSource.Filter(
+                    currentCid,
+                    type,
+                    name,
+                    OrderBean.from(files),
+                    fcMix,
+                    stringProvider
+                )
 
             if (formattedList.size < limit || (files.count > 0 && formattedList.size >= files.count)) {
                 pagingStateStore.markComplete(targetSource.paginationKey)
@@ -499,8 +506,15 @@ class FileBrowserModule(
     fun sortByVideoTime() {
         stateHolder.updateContentState {
             copy(
-                fileBeanList = fileBeanList.sortedByDescending { it.playLong },
-                videoOrderVersion = videoOrderVersion + 1
+                fileBeanList = fileBeanList.sortedByDescending { it.playLong }
+            )
+        }
+    }
+
+    fun sortByStarFile() {
+        stateHolder.updateContentState {
+            copy(
+                fileBeanList = fileBeanList.sortedByDescending { it.star }
             )
         }
     }
@@ -537,7 +551,7 @@ class FileBrowserModule(
             val count = updatedList.count { it.isSelect }
             copy(
                 fileBeanList = updatedList,
-                appBarTitle = if (count > 0) count.toString() else stringProvider.defaultAppName
+                appBarTitle = if (count >= 0) count.toString() else stringProvider.defaultAppName
             )
         }
     }
@@ -555,7 +569,7 @@ class FileBrowserModule(
                 val count = list.count { it.isSelect }
                 copy(
                     fileBeanList = list,
-                    appBarTitle = if (count > 0) count.toString() else stringProvider.defaultAppName
+                    appBarTitle = if (count >= 0) count.toString() else stringProvider.defaultAppName
                 )
             } else {
                 this
@@ -609,7 +623,7 @@ class FileBrowserModule(
                 setFiles(cache)
                 stateHolder.updateContentState {
                     copy(
-                        source = FileListSource.Folder(currentCid),
+                        source = FileListSource.Folder(currentCid, stringProvider),
                         appBarTitle = stringProvider.defaultAppName
                     )
                 }
@@ -617,7 +631,7 @@ class FileBrowserModule(
             } else {
                 stateHolder.updateContentState {
                     copy(
-                        source = FileListSource.Folder(currentCid),
+                        source = FileListSource.Folder(currentCid, stringProvider),
                         appBarTitle = stringProvider.defaultAppName
                     )
                 }
@@ -648,7 +662,7 @@ class FileBrowserModule(
 
     private fun setFiles(files: FilesBean) {
         val currentOrder = OrderBean.from(files)
-        val folderSource = FileListSource.Folder(files.cid)
+        val folderSource = FileListSource.Folder(files.cid, stringProvider)
         stateHolder.updateContentState {
             copy(
                 source = folderSource,

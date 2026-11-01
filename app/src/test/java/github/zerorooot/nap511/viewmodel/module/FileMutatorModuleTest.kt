@@ -53,6 +53,11 @@ class FileMutatorModuleTest {
             if (shouldThrowNetworkError) throw java.io.IOException("Network Timeout")
             return if (!mockDeleteResult.state) mockDeleteResult else mockDeleteMultipleResult
         }
+
+        override suspend fun star(fid: String, star: Boolean): github.zerorooot.nap511.bean.BaseReturnMessage {
+            if (shouldThrowNetworkError) throw java.io.IOException("Network Timeout")
+            return mockDeleteResult
+        }
     }
 
     private val fakeNavigator = object : FileNavigator {
@@ -217,7 +222,7 @@ class FileMutatorModuleTest {
                 fileBeanList = listOf(item)
             )
         }
-        scrollPositionStore.setClick(FileListSource.Folder.key("0"), 5)
+        scrollPositionStore.setClick(FileListSource.folderKey("0"), 5)
         mockDeleteResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = false, errorMsg = "删除失败权限不足")
 
         module.delete(item)
@@ -225,7 +230,7 @@ class FileMutatorModuleTest {
         // 验证失败后列表与点击位均已无死角回滚
         assertEquals(1, stateHolder.currentContentState.fileBeanList.size)
         assertEquals("del_1", stateHolder.currentContentState.fileBeanList[0].fileId)
-        assertEquals(5, scrollPositionStore.getClick(FileListSource.Folder.key("0")))
+        assertEquals(5, scrollPositionStore.getClick(FileListSource.folderKey("0")))
         // Coil 缓存决不能被删除
         assertTrue(deletedCoilKeys.isEmpty())
     }
@@ -239,13 +244,13 @@ class FileMutatorModuleTest {
                 fileBeanList = listOf(item)
             )
         }
-        scrollPositionStore.setClick(FileListSource.Folder.key("0"), 3)
+        scrollPositionStore.setClick(FileListSource.folderKey("0"), 3)
         shouldThrowNetworkError = true
 
         module.delete(item)
 
         assertEquals(1, stateHolder.currentContentState.fileBeanList.size)
-        assertEquals(3, scrollPositionStore.getClick(FileListSource.Folder.key("0")))
+        assertEquals(3, scrollPositionStore.getClick(FileListSource.folderKey("0")))
         assertTrue(deletedCoilKeys.isEmpty())
     }
 
@@ -262,7 +267,7 @@ class FileMutatorModuleTest {
                 totalCount = 3
             )
         }
-        scrollPositionStore.setClick(FileListSource.Folder.key("0"), 10)
+        scrollPositionStore.setClick(FileListSource.folderKey("0"), 10)
         shouldThrowNetworkError = true
 
         module.deleteMultiple("0", listOf(item1, item2))
@@ -270,7 +275,7 @@ class FileMutatorModuleTest {
         // 验证列表、总量、点击索引均已完全恢复
         assertEquals(3, stateHolder.currentContentState.fileBeanList.size)
         assertEquals(3, stateHolder.currentContentState.totalCount)
-        assertEquals(10, scrollPositionStore.getClick(FileListSource.Folder.key("0")))
+        assertEquals(10, scrollPositionStore.getClick(FileListSource.folderKey("0")))
         assertTrue(deletedCoilKeys.isEmpty())
     }
 
@@ -286,7 +291,7 @@ class FileMutatorModuleTest {
                 totalCount = 2
             )
         }
-        scrollPositionStore.setClick(FileListSource.Folder.key("0"), 8)
+        scrollPositionStore.setClick(FileListSource.folderKey("0"), 8)
         mockDeleteMultipleResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
 
         module.deleteMultiple("0", listOf(item1, item2))
@@ -294,7 +299,7 @@ class FileMutatorModuleTest {
         // 成功删除后列表被移除，Coil 缓存中仅有 photoThumb 的项被清理
         assertTrue(stateHolder.currentContentState.fileBeanList.isEmpty())
         assertEquals(0, stateHolder.currentContentState.totalCount)
-        assertEquals(6, scrollPositionStore.getClick(FileListSource.Folder.key("0")))
+        assertEquals(6, scrollPositionStore.getClick(FileListSource.folderKey("0")))
         assertEquals(listOf("pick_m1"), deletedCoilKeys)
     }
 
@@ -312,5 +317,42 @@ class FileMutatorModuleTest {
         module.delete(item)
 
         assertTrue(fakeToastProvider.messages.contains("文件不存在"))
+    }
+
+    @Test
+    fun `test starMultiple toggles star state and updates cache and toasts`() = kotlinx.coroutines.test.runTest {
+        val item1 = createFileBean("s1", "star1").copy(parentId = "0", isStar = false)
+        val item2 = createFileBean("s2", "star2").copy(parentId = "0", isStar = false)
+        stateHolder.updateContentState {
+            copy(
+                source = FileListSource.Folder("0"),
+                fileBeanList = listOf(item1, item2)
+            )
+        }
+
+        module.starMultiple(listOf(item1, item2))
+
+        val list = stateHolder.currentContentState.fileBeanList
+        assertTrue(list.all { it.isStar && it.star == 1 })
+        assertTrue(fakeToastProvider.messages.contains("标记星标成功"))
+    }
+
+    @Test
+    fun `test starMultiple rolls back on failure`() = kotlinx.coroutines.test.runTest {
+        val item1 = createFileBean("s1", "star1").copy(parentId = "0", isStar = false)
+        val item2 = createFileBean("s2", "star2").copy(parentId = "0", isStar = false)
+        stateHolder.updateContentState {
+            copy(
+                source = FileListSource.Folder("0"),
+                fileBeanList = listOf(item1, item2)
+            )
+        }
+        shouldThrowNetworkError = true
+
+        module.starMultiple(listOf(item1, item2))
+
+        val list = stateHolder.currentContentState.fileBeanList
+        assertTrue(list.all { !it.isStar })
+        assertTrue(fakeToastProvider.messages.contains("Network Timeout"))
     }
 }

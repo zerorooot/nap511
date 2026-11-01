@@ -183,7 +183,18 @@ open class FileRepository {
         offset: Int = 0,
         fcMix: Int,
     ): FilesBean {
-        return fileService.getFiles(cid, showDir, aid, asc, order, limit, naturalSort, format, offset, fcMix)
+        return fileService.getFiles(
+            cid,
+            showDir,
+            aid,
+            asc,
+            order,
+            limit,
+            naturalSort,
+            format,
+            offset,
+            fcMix
+        )
     }
 
     suspend fun remainingSpace(countSpaceNum: Int = 1): JsonObject {
@@ -234,6 +245,13 @@ open class FileRepository {
         )
     }
 
+    /**
+     * 文件加⭐，true 表示加上，false 表示取消
+     */
+    open suspend fun star(fid: String, star: Boolean): BaseReturnMessage {
+        val starString = if (star) "1" else "0"
+        return fileService.star(fid, starString)
+    }
 
     suspend fun image(pickCode: String, current: Long): ImageDate {
         return fileService.image(pickCode, current)
@@ -307,7 +325,10 @@ open class FileRepository {
                 return res
             }
             val err = res.error + res.errorMsg + res.message
-            if ((err.contains("尚未执行完成") || err.contains("请稍后再试") || err.contains("尚未完成") || err.contains("操作尚未完成")) && retries < maxRetries) {
+            if ((err.contains("尚未执行完成") || err.contains("请稍后再试") || err.contains("尚未完成") || err.contains(
+                    "操作尚未完成"
+                )) && retries < maxRetries
+            ) {
                 retries++
                 delay(delayMs.milliseconds)
                 continue
@@ -320,7 +341,10 @@ open class FileRepository {
      *  @param currentCid 要移动到的目录
      *  @param removeAllFile 要移动的文件
      */
-    suspend fun removeAllFile(currentCid: String, removeAllFile: List<FileBean>): BaseReturnMessage {
+    suspend fun removeAllFile(
+        currentCid: String,
+        removeAllFile: List<FileBean>
+    ): BaseReturnMessage {
         val hashMapOf = hashMapOf<String, String>()
         hashMapOf["pid"] = currentCid
         removeAllFile.forEachIndexed { index, fileBean ->
@@ -495,7 +519,6 @@ open class FileRepository {
         }
         return zipBeanList
     }
-
 
 
     suspend fun decryptZip(pickCode: String, secret: String): Boolean {

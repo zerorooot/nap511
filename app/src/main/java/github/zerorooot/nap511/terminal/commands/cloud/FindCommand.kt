@@ -15,7 +15,7 @@ import github.zerorooot.nap511.terminal.commands.util.CommandMessages
 import github.zerorooot.nap511.terminal.commands.util.TerminalExceptionHandler
 import github.zerorooot.nap511.terminal.viewmodel.emitPath
 import github.zerorooot.nap511.terminal.viewmodel.emitSystem
-import github.zerorooot.nap511.viewmodel.formatFileBeanList
+import github.zerorooot.nap511.util.formatFileBeanList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector

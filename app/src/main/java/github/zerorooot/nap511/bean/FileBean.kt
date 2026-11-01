@@ -148,7 +148,7 @@ data class FileBean(
     @SerializedName("n") val name: String = "",
     @SerializedName("fid") val fileId: String = "",
     @SerializedName("pc") val pickCode: String = "",
-
+    @SerializedName("m") val star: Int = -1,
     @SerializedName("t") val time: String = "",
     /**
      * Time Edit / user_utime (mtime),文件修改时间 (Modification Time),
@@ -191,6 +191,7 @@ data class FileBean(
      * 播放了百分之几
      */
     val playLongRatio: String = "",
+    val isStar: Boolean=false,
     val sizeString: String = "",
     val isSelect: Boolean = false,
     // 标记为 @Transient，避免 Gson 保存到磁盘 json 中

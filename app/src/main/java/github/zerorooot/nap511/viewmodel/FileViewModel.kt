@@ -70,8 +70,8 @@ class FileViewModel(
     val settingUiStateFlow: StateFlow<SettingUiState> =
         SettingsRepository.getInstance().settingUiStateFlow
     // ==================== 1. 独立状态容器与缓存 (Store 层) ====================
-
-    val stateHolder = FileUiStateHolder(context.getString(R.string.app_name))
+    private val stringProvider = AndroidAppStringProvider(context)
+    val stateHolder = FileUiStateHolder(stringProvider)
     val scrollPositionStore = ScrollPositionStore()
     val pagingStateStore = PagingStateStore()
     val imageCacheStore = ImageCacheStore()
@@ -114,7 +114,7 @@ class FileViewModel(
     private val coilCacheCleaner = AndroidCoilCacheCleaner(context)
     private val serviceBridge = AndroidServiceBridge(context)
     private val backgroundScheduler = AndroidBackgroundScheduler(context, toastProvider)
-    private val stringProvider = AndroidAppStringProvider(context)
+
 
     val browserModule = FileBrowserModule(
         stateHolder = stateHolder,
@@ -199,7 +199,7 @@ class FileViewModel(
     // ==================== 5. Job 句柄集中管控与竞态取消 ====================
 
     private var getFilesJob: Job? = null
-    private var searchJob: Job? = null
+    private var queryJob: Job? = null
 
     init {
         // 集中监听缓存事件（长轮询任务随 ViewModel 作用域取消）
@@ -224,7 +224,10 @@ class FileViewModel(
     fun setListLocation(key: String, scrollState: LazyScrollState) =
         scrollPositionStore.setLocation(
             key,
-            LocationBean(scrollState.firstVisibleItemIndex, scrollState.firstVisibleItemScrollOffset)
+            LocationBean(
+                scrollState.firstVisibleItemIndex,
+                scrollState.firstVisibleItemScrollOffset
+            )
         )
 
     fun getListLocation(key: String): LocationBean =
@@ -250,7 +253,7 @@ class FileViewModel(
     // ==================== 统一导航调度实现 (实现 FileNavigator) ====================
 
     override fun navigateTo(cid: String) {
-        searchJob?.cancel() // 1. 斩断搜索 Job，防止搜索结果迟到覆盖
+        queryJob?.cancel() // 1. 斩断搜索 Job，防止搜索结果迟到覆盖
         getFilesJob?.cancel() // 2. 取消前序目录慢请求，彻底根除覆盖竞态
         getFilesJob = viewModelScope.launch {
             browserModule.getFiles(cid)
@@ -261,7 +264,7 @@ class FileViewModel(
     fun getFiles(cid: String) = navigateTo(cid)
 
     fun back() = viewModelScope.launch {
-        searchJob?.cancel()
+        queryJob?.cancel()
         when (val result = browserModule.back()) {
             is BackResult.NavigateTo -> navigateTo(result.targetCid)
             else -> {}
@@ -269,12 +272,12 @@ class FileViewModel(
     }
 
     override fun refresh(forceCache: Boolean) {
-        searchJob?.cancel()
+        queryJob?.cancel()
         viewModelScope.launch { browserModule.refresh(forceCache) }
     }
 
     override fun refresh(cid: String, forceCache: Boolean) {
-        searchJob?.cancel()
+        queryJob?.cancel()
         viewModelScope.launch { browserModule.refresh(cid, forceCache) }
     }
 
@@ -287,14 +290,23 @@ class FileViewModel(
     }
 
     fun search(searchKey: String) {
-        searchJob?.cancel()
-        searchJob = viewModelScope.launch { browserModule.search(searchKey) }
+        queryJob?.cancel()
+        queryJob = viewModelScope.launch { browserModule.search(searchKey) }
     }
 
-    fun filterFile(type: Int, name: String, order: OrderBean = orderBean) =
-        viewModelScope.launch { browserModule.filterFile(type, name, order) }
+    fun filterFile(type: Int, name: String, order: OrderBean = orderBean) {
+        queryJob?.cancel()
+        queryJob = viewModelScope.launch { browserModule.filterFile(type, name, order) }
+    }
+
 
     fun sortByVideoTime() = browserModule.sortByVideoTime()
+
+    fun starFile(fileBean: FileBean) = viewModelScope.launch {
+        mutatorModule.starFile(fileBean)
+    }
+
+    fun sortByStarFile() = browserModule.sortByStarFile()
     fun select(index: Int) = browserModule.select(index)
     fun selectToUp() = browserModule.selectToUp()
     fun selectToDown() = browserModule.selectToDown()
@@ -310,6 +322,7 @@ class FileViewModel(
 
     fun delete(fileBean: FileBean) = viewModelScope.launch { mutatorModule.delete(fileBean) }
     fun deleteMultiple() = viewModelScope.launch { mutatorModule.deleteMultiple() }
+    fun starMultiple() = viewModelScope.launch { mutatorModule.starMultiple() }
 
     fun deleteOrphansAndExpiredFile() = viewModelScope.launch {
         syncModule.deleteOrphansAndExpiredFile()

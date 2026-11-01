@@ -1,7 +1,6 @@
 package github.zerorooot.nap511.terminal.context
 
 import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
@@ -12,7 +11,6 @@ import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinatorImpl
 import github.zerorooot.nap511.repository.paging.PagingOptions
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.FileOpener
-import github.zerorooot.nap511.viewmodel.formatFileBeanList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

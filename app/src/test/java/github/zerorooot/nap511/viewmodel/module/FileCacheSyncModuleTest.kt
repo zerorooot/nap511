@@ -108,12 +108,12 @@ class FileCacheSyncModuleTest {
     @Test
     fun `test handleCacheEvent AllCleared purges stores and coil cache`() = runTest {
         imageCacheStore.put("100", "pick1", ImageBean("url1", "name1", "pick1"))
-        pagingStateStore.setOffset(FileListSource.Folder.key("0"), 20)
+        pagingStateStore.setOffset(FileListSource.folderKey("0"), 20)
 
         module.handleCacheEvent(CacheEvent.AllCleared)
 
         assertNull(imageCacheStore.get("100", "pick1"))
-        assertEquals(0, pagingStateStore.getOrInitOffset(FileListSource.Folder.key("0"), 0))
+        assertEquals(0, pagingStateStore.getOrInitOffset(FileListSource.folderKey("0"), 0))
         assertTrue(memoryCacheCleared)
         assertTrue(diskCacheCleared)
     }
@@ -122,17 +122,17 @@ class FileCacheSyncModuleTest {
     fun `test handleCacheEvent FolderDeleted purges target directory stores`() = runTest {
         imageCacheStore.put("100", "pick1", ImageBean("url1", "name1", "pick1"))
         imageCacheStore.put("200", "pick2", ImageBean("url2", "name2", "pick2"))
-        pagingStateStore.setOffset(FileListSource.Folder.key("100"), 30)
-        pagingStateStore.setOffset(FileListSource.Folder.key("200"), 50)
+        pagingStateStore.setOffset(FileListSource.folderKey("100"), 30)
+        pagingStateStore.setOffset(FileListSource.folderKey("200"), 50)
 
         module.handleCacheEvent(CacheEvent.FolderDeleted("100"))
 
         assertNull(imageCacheStore.get("100", "pick1"))
-        assertEquals(0, pagingStateStore.getOrInitOffset(FileListSource.Folder.key("100"), 0))
+        assertEquals(0, pagingStateStore.getOrInitOffset(FileListSource.folderKey("100"), 0))
 
         // 其他目录保持不受影响
         assertEquals("url2", imageCacheStore.get("200", "pick2")?.url)
-        assertEquals(50, pagingStateStore.getOrInitOffset(FileListSource.Folder.key("200"), 0))
+        assertEquals(50, pagingStateStore.getOrInitOffset(FileListSource.folderKey("200"), 0))
     }
 
     @Test
@@ -191,7 +191,7 @@ class FileCacheSyncModuleTest {
         assertEquals(1, currentUiList.size)
         assertEquals("f1", currentUiList[0].fileId)
         assertEquals("▶️ 50%", currentUiList[0].playLongRatio)
-        assertEquals(1, pagingStateStore.getOrInitOffset(FileListSource.Folder.key("dir1"), 0))
+        assertEquals(1, pagingStateStore.getOrInitOffset(FileListSource.folderKey("dir1"), 0))
     }
 
     @Test

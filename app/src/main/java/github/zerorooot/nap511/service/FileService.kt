@@ -144,6 +144,15 @@ interface FileService {
     ): FilesBean
 
     /**
+     * 文件加⭐，star 1表示加上，0 表示取消
+     */
+    @FormUrlEncoded
+    @POST("files/star")
+    suspend fun star(
+        @Field("file_id") fid: String,
+        @Field("star") star: String
+    ): BaseReturnMessage
+    /**
      *
     user_order:file_size
     file_id:2573609193685653011

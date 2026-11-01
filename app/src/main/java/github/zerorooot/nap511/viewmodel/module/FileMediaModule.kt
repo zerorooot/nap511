@@ -152,7 +152,7 @@ class FileMediaModule(
             val fileList = FileCacheManager.getDate(cid)?.fileBeanList
             val index = fileList?.indexOfFirst { it.pickCode == pickCode } ?: -1
             if (index >= 0) {
-                val paginationKey = FileListSource.Folder.key(cid)
+                val paginationKey = FileListSource.folderKey(cid)
                 scrollPositionStore.setClick(paginationKey, index)
                 scrollPositionStore.setLocation(
                     paginationKey,

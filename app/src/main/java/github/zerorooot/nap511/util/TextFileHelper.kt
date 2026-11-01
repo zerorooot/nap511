@@ -4,8 +4,6 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
-import github.zerorooot.nap511.viewmodel.HTML_EXTS
-import github.zerorooot.nap511.viewmodel.TXT_EXTS
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Locale

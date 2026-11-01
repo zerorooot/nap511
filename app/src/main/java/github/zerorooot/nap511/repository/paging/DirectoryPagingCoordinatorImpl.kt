@@ -8,7 +8,7 @@ import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.network.UserSessionManager
-import github.zerorooot.nap511.viewmodel.formatFileBeanList
+import github.zerorooot.nap511.util.formatFileBeanList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers

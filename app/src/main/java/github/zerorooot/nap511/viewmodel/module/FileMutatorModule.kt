@@ -7,6 +7,7 @@ import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.bean.RenameBean
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.repository.FileRepository
+import github.zerorooot.nap511.util.CacheRollback
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
@@ -114,13 +115,79 @@ class FileMutatorModule(
 
     suspend fun delete(fileBean: FileBean) {
         // 可能在搜索模式删除，故使用 pid 而非当前 cid
-        deleteMultiple(fileBean.parentId,arrayListOf(fileBean))
+        deleteMultiple(fileBean.parentId, arrayListOf(fileBean))
+    }
+
+    /**
+     * 已经在[github.zerorooot.nap511.util.formatFileBeanList]转化过，无论是文件还是文件夹，都是fileId
+     */
+    suspend fun starFile(fileBean: FileBean) {
+        starMultiple(arrayListOf(fileBean))
+    }
+
+    suspend fun starMultiple(filter: List<FileBean>) {
+        if (filter.isEmpty()) return
+        stateHolder.setRefreshing(true)
+        val beforeList = stateHolder.currentContentState.fileBeanList
+        val filterIds = filter.map { it.fileId }.toSet()
+        val targetStar = !filter[0].isStar
+        val actionText = if (targetStar) "标记星标" else "取消星标"
+        val currentCid = stateHolder.currentContentState.currentCid
+
+        // 1. 瞬时乐观更新 ViewModel UI State 内存列表并重置选择状态
+        stateHolder.updateContentState {
+            copy(
+                fileBeanList = fileBeanList.map {
+                    if (it.fileId in filterIds) it.copy(
+                        isStar = targetStar,
+                        star = if (targetStar) 1 else 0,
+                        isSelect = false
+                    ) else it
+                },
+                isLongClickState = false,
+                appBarTitle = source.appName
+            )
+        }
+
+
+        // 2. 按 parentId 分组更新 FileCacheManager 内存/磁盘缓存，并收集回滚闭包
+        val rollbacks = mutableListOf<CacheRollback>()
+        val groupByParent = filter.groupBy { it.parentId.ifEmpty { currentCid } }
+        groupByParent.forEach { (pid, beans) ->
+            FileCacheManager.starItems(pid, beans.map { it.fileId }, targetStar)?.let {
+                rollbacks.add(it)
+            }
+        }
+
+        runCatching {
+            val result = fileRepository.star(filterIds.joinToString(","), targetStar)
+            check(result.state) { result.errorMsg.ifEmpty { "${actionText}失败" } }
+            result
+        }.onSuccess {
+            toastProvider.showToast("${actionText}成功")
+        }.onFailure { ex ->
+            // UI 状态与持久化缓存同步双重回滚
+            stateHolder.updateContentState { copy(fileBeanList = beforeList) }
+            rollbacks.forEach { it.rollback() }
+            val errorMsg = ex.message ?: "${actionText}失败"
+            toastProvider.showToast(errorMsg)
+            XLog.e("starMultiple failed, rolled back", ex)
+        }
+
+        stateHolder.setRefreshing(false)
+    }
+
+    suspend fun starMultiple() {
+        val filter =
+            stateHolder.currentContentState.fileBeanList.filter { it.isSelect }
+        starMultiple(filter)
     }
 
     suspend fun rename(
         fileBean: FileBean? = stateHolder.currentDialogState.targetFileBean,
         name: String
     ) {
+        stateHolder.setRefreshing(true)
         val targetBean = fileBean ?: stateHolder.currentDialogState.targetFileBean ?: return
         val cid = stateHolder.currentContentState.currentCid
         val beforeList = stateHolder.currentContentState.fileBeanList
@@ -135,7 +202,8 @@ class FileMutatorModule(
         val rollback = FileCacheManager.renameItem(cid, targetBean.fileId, name)
 
         runCatching {
-            val renameResult = fileRepository.rename(RenameBean(targetBean.fileId, name).toRequestBody())
+            val renameResult =
+                fileRepository.rename(RenameBean(targetBean.fileId, name).toRequestBody())
             check(renameResult.state) { "重命名失败" }
             renameResult
         }.onSuccess {
@@ -147,6 +215,7 @@ class FileMutatorModule(
             toastProvider.showToast(errorMsg)
             XLog.e("rename failed, rolled back", ex)
         }
+        stateHolder.setRefreshing(false)
     }
 
     suspend fun deleteMultiple(targetCid: String, selectedFiles: List<FileBean>) {
@@ -221,7 +290,7 @@ class FileMutatorModule(
             val groupBy = filter.groupBy { it.parentId }
             groupBy.forEach { (pid, beans) ->
                 /**
-                 * 在 [github.zerorooot.nap511.viewmodel.formatFileBeanList] 中已经把文件、文件夹的 cid、fid 统一做了转换，这里直接使用 fid
+                 * 在 [github.zerorooot.nap511.util.formatFileBeanList] 中已经把文件、文件夹的 cid、fid 统一做了转换，这里直接使用 fid
                  */
                 FileCacheManager.removeItems(pid, beans.map { it.fileId })
             }
@@ -295,7 +364,6 @@ class FileMutatorModule(
             copy(activeDialog = FileDialogState.RenameFile, targetFileBean = fileBean)
         }
     }
-
 
 
     fun openDiscardVideosDialog(discardList: List<VideoBean>, targetCid: String) {

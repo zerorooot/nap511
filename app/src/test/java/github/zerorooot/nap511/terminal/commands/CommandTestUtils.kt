@@ -12,6 +12,7 @@ import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.PipelineEngine
 import github.zerorooot.nap511.terminal.engine.TerminalHistoryManager
 import github.zerorooot.nap511.util.FileCacheManager
+import github.zerorooot.nap511.util.formatFileBeanList
 import kotlinx.coroutines.flow.toList
 import okhttp3.RequestBody
 import java.io.InputStream
@@ -89,7 +90,7 @@ internal suspend fun TerminalContext.putMockFiles(
     fileCacheManager.put(
         cid,
         FilesBean(
-            fileBeanList = github.zerorooot.nap511.viewmodel.formatFileBeanList(files),
+            fileBeanList = formatFileBeanList(files),
             cid = cid,
             count = files.size,
             order = "",

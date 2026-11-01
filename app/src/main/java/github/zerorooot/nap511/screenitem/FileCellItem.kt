@@ -81,6 +81,7 @@ fun FileCellItem(
     var name by rememberFileDisplayName(fileBean)
     val size = fileBean.sizeString
     val time = fileBean.createTimeString
+    val isStar=fileBean.isStar
     Surface(
         shape = MaterialTheme.shapes.medium,
         tonalElevation = 10.dp,
@@ -167,6 +168,7 @@ fun FileCellItem(
 
                     // 2.3 文件大小与修改时间（紧凑合并）
                     val metaText = buildString {
+                        if (isStar) append("🌟 ")
                         if (isMedia && playLong.isNotEmpty()) append(playLong)
                         if (isMedia && playLongRatio.isNotEmpty()) append("$playLongRatio ")
                         if (size.isNotEmpty()) append(size)
@@ -196,6 +198,7 @@ fun FileCellItem(
                         MenuItemAction.OFFLINE_CID -> itemActions.onSetOfflineCid.invoke(fileBean)
                         MenuItemAction.FILE_INFO -> itemActions.onFileInfo.invoke(fileBean)
                         MenuItemAction.ARIA2_DOWNLOAD -> itemActions.onAria2Download.invoke(index)
+                        MenuItemAction.STAR_FILE -> itemActions.onStar.invoke(fileBean)
                         MenuItemAction.FORCE_OPEN -> itemActions.onForceOpen.invoke(index)
                         else -> {}
                     }

@@ -29,6 +29,8 @@ import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.VerticalAlignBottom
 import androidx.compose.material.icons.outlined.VerticalAlignTop
@@ -80,6 +82,7 @@ enum class MenuItemAction(
     FILE_SORT("文件排序", Icons.AutoMirrored.Outlined.Sort),
     REFRESH_FILES("强制刷新", Icons.Outlined.Refresh),
     VIDEO_SCHEDULE("视频时间", Icons.Outlined.Schedule),
+    STAR_FILE("标星文件", Icons.Outlined.StarOutline),
 
     // 离线页顶栏菜单项
     COPY_PAGE_LINK("复制本页链接", Icons.Outlined.ContentCopy),
@@ -170,6 +173,7 @@ fun FileMoreMenu(onClick: (MenuItemAction, Int) -> Unit) {
         MenuItemAction.FILE_INFO,
         MenuItemAction.FORCE_OPEN,
         MenuItemAction.UNZIP_FILE,
+        MenuItemAction.STAR_FILE,
         MenuItemAction.ARIA2_DOWNLOAD,
         MenuItemAction.DELETE_FILE
     )
@@ -182,6 +186,7 @@ fun FolderMoreMenu(onClick: (MenuItemAction, Int) -> Unit) {
         MenuItemAction.RENAME_FILE,
         MenuItemAction.OFFLINE_CID,
         MenuItemAction.FILE_INFO,
+        MenuItemAction.STAR_FILE,
         MenuItemAction.DELETE_FILE
     )
     BaseMoreMenu(listOf, onClick)
@@ -230,7 +235,8 @@ fun FileAppTopBarDropdownMenu(onClick: (MenuItemAction, Int) -> Unit) {
         MenuItemAction.GALLERY_MODE,
         MenuItemAction.FILE_SORT,
         MenuItemAction.REFRESH_FILES,
-        MenuItemAction.VIDEO_SCHEDULE
+        MenuItemAction.VIDEO_SCHEDULE,
+        MenuItemAction.STAR_FILE
     )
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }

@@ -2,6 +2,7 @@ package github.zerorooot.nap511.util
 
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
+import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.cache.CacheWrapper
@@ -322,6 +323,95 @@ object FileCacheManager {
     suspend fun putAndNotify(key: String, value: FilesBean) {
         put(key, value)
         _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(key))
+    }
+
+    /**
+     * 就地批量更新父目录缓存中指定条目的星标状态。
+     * 加锁保证线程安全，同步持久化落盘，广播变更事件，并返回撤销句柄。
+     */
+    suspend fun starItems(
+        parentCid: String,
+        fids: Collection<String>,
+        isStar: Boolean
+    ): CacheRollback? = withContext(Dispatchers.IO) {
+        if (fids.isEmpty()) return@withContext null
+        mutex.withLock {
+            val cache = memoryCache[parentCid]?.data ?: return@withContext null
+            val fidSet = fids.toSet()
+
+            val oldBeans = mutableMapOf<String, FileBean>()
+            val starInt = if (isStar) 1 else 0
+
+            var hasChange = false
+            cache.fileBeanList.forEachIndexed { index, item ->
+                val targetFid = item.categoryId.ifEmpty { item.fileId }
+                if (item.fileId in fidSet || item.categoryId in fidSet || targetFid in fidSet) {
+                    oldBeans[item.fileId] = item
+                    cache.fileBeanList[index] = item.copy(isStar = isStar, star = starInt)
+                    hasChange = true
+                }
+            }
+
+            if (!hasChange) return@withContext null
+
+            memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
+            _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
+
+            CacheRollback {
+                mutex.withLock {
+                    val curCache = memoryCache[parentCid]?.data ?: return@withLock
+                    curCache.fileBeanList.forEachIndexed { index, item ->
+                        val oldBean = oldBeans[item.fileId]
+                        if (oldBean != null) {
+                            curCache.fileBeanList[index] = oldBean
+                        }
+                    }
+                    memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
+                    _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
+                }
+            }
+        }
+    }
+
+    suspend fun starItem(
+        parentCid: String,
+        fid: String,
+        isStar: Boolean
+    ): CacheRollback? = starItems(parentCid, listOf(fid), isStar)
+
+    /**
+     * 就地更新父目录缓存中指定条目的属性（通用单项乐观变更模板）
+     */
+    suspend fun updateItem(
+        parentCid: String,
+        fid: String,
+        transform: (FileBean) -> FileBean
+    ): CacheRollback? = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val cache = memoryCache[parentCid]?.data ?: return@withContext null
+            val index = cache.fileBeanList.indexOfFirst { it.fileId == fid || it.categoryId == fid }
+            if (index < 0) return@withContext null
+
+            val oldBean = cache.fileBeanList[index]
+            val newBean = transform(oldBean)
+            cache.fileBeanList[index] = newBean
+            memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
+
+            _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
+
+            CacheRollback {
+                mutex.withLock {
+                    val curCache = memoryCache[parentCid]?.data ?: return@withLock
+                    val curIndex =
+                        curCache.fileBeanList.indexOfFirst { it.fileId == fid || it.categoryId == fid }
+                    if (curIndex >= 0) {
+                        curCache.fileBeanList[curIndex] = oldBean
+                        memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
+                        _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
+                    }
+                }
+            }
+        }
     }
 
     /**

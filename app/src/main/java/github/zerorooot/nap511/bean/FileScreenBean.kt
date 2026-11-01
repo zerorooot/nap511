@@ -8,6 +8,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.unit.Dp
 import github.zerorooot.nap511.screen.components.AppBarAction
+import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 
 /**
  * 列表数据源模型：定义当前文件列表展示的数据来源及上下文
@@ -19,21 +20,23 @@ sealed interface FileListSource {
     /** 用于分页状态、锁隔离及 Compose 滚动状态 Key 的唯一复合键 */
     val paginationKey: String
 
+    /**
+     * 对应状态的名字提供
+     */
+    val stringProvider: AppStringProvider
+    val appName: String
+
     /** 普通目录浏览 */
-    data class Folder(override val cid: String) : FileListSource {
-        override val paginationKey: String get() = key(cid)
-        companion object {
-            fun key(cid: String): String = "folder:$cid"
-        }
+    data class Folder(override val cid: String, override val stringProvider: AppStringProvider) :
+        FileListSource {
+        override val paginationKey: String get() = folderKey(cid)
+        override val appName = stringProvider.defaultAppName
     }
 
     /** 关键词搜索 */
-    data class Search(override val cid: String, val keyword: String) : FileListSource {
-        override val paginationKey: String get() = key(cid, keyword)
-
-        companion object {
-            fun key(cid: String, keyword: String): String = "search:$cid:$keyword"
-        }
+    data class Search(override val cid: String, val keyword: String, override val stringProvider: AppStringProvider) : FileListSource {
+        override val paginationKey: String get() = searchKey(cid, keyword)
+        override val appName = stringProvider.getSearchTitle(keyword)
     }
 
     /**
@@ -50,17 +53,21 @@ sealed interface FileListSource {
         val name: String,
         val order: OrderBean,
         val fcMix: Int,
+        override val stringProvider: AppStringProvider
     ) : FileListSource {
-        override val paginationKey: String get() = key(cid, filterType, order, fcMix)
+        override val paginationKey: String get() = filterKey(cid, filterType, order, fcMix)
+        override val appName = stringProvider.getFilterTitle(name)
+    }
 
-        companion object {
-            fun key(
-                cid: String,
-                filterType: Int,
-                order: OrderBean,
-                fcMix: Int
-            ): String = "filter:$cid:$filterType:${order.type}:${order.asc}:$fcMix"
-        }
+    companion object {
+        fun folderKey(cid: String): String = "folder:$cid"
+        fun searchKey(cid: String, keyword: String): String = "search:$cid:$keyword"
+        fun filterKey(
+            cid: String,
+            filterType: Int,
+            order: OrderBean,
+            fcMix: Int
+        ): String = "filter:$cid:$filterType:${order.type}:${order.asc}:$fcMix"
     }
 }
 
@@ -82,10 +89,8 @@ data class FileContentUiState(
     val cutFileList: List<FileBean> = emptyList(),
 
     // 核心数据源与分页总数
-    val source: FileListSource = FileListSource.Folder("0"),
+    val source: FileListSource,
     val totalCount: Int = 0,
-    //视频排序版本，用于LaunchedEffect滚动监听
-    val videoOrderVersion: Int = 0
 ) {
     // 兼容现有引用点
     val isQueryState: Boolean
@@ -122,7 +127,7 @@ data class FileScaffoldState(
     val fabPosition: FabPosition,
     val currentCid: String,
     val nestedScrollConnection: NestedScrollConnection,
-    val isSearchState: Boolean = false
+    val isQueryState: Boolean = false
 )
 
 /**
@@ -213,6 +218,7 @@ data class FileItemActions(
     val onCut: (Int) -> Unit,
     val onUnzip: (FileBean) -> Unit,
     val onDelete: (FileBean) -> Unit,
+    val onStar: (FileBean) -> Unit,
     val onRename: (Int) -> Unit,
     val onFileInfo: (FileBean) -> Unit,
     val onSetOfflineCid: (FileBean) -> Unit,

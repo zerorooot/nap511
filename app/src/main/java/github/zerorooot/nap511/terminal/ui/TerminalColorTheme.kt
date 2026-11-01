@@ -1,15 +1,14 @@
 package github.zerorooot.nap511.terminal.ui
 
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
-import github.zerorooot.nap511.viewmodel.AUDIO_EXTS
-import github.zerorooot.nap511.viewmodel.HTML_EXTS
-import github.zerorooot.nap511.viewmodel.IMG_EXTS
-import github.zerorooot.nap511.viewmodel.TXT_EXTS
-import github.zerorooot.nap511.viewmodel.VIDEO_EXTS
-import github.zerorooot.nap511.viewmodel.ZIP_EXTS
+import github.zerorooot.nap511.util.AUDIO_EXTS
+import github.zerorooot.nap511.util.HTML_EXTS
+import github.zerorooot.nap511.util.IMG_EXTS
+import github.zerorooot.nap511.util.TXT_EXTS
+import github.zerorooot.nap511.util.VIDEO_EXTS
+import github.zerorooot.nap511.util.ZIP_EXTS
 
 /**
  * 终端输出文件与文件夹配色主题

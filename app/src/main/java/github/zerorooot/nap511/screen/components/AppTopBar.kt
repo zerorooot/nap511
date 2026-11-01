@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.StarOutline
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Search
@@ -81,12 +82,13 @@ fun BaseTopAppBar(
 
 enum class TopBarAction(
     override val label: String,
-    override val icon: ImageVector? = null
+    override val icon: ImageVector
 ) : AppBarAction {
     BACK("返回", Icons.AutoMirrored.Rounded.ArrowBack),
     DRAWER_MENU("抽屉菜单", Icons.Rounded.Menu),
     SEARCH("搜索", Icons.Rounded.Search),
-
+    STAR("星标", Icons.Default.StarOutline),
+    STAR_FILE_SCREEN("星标", Icons.Default.StarOutline),
     SELECT_UP("上选", Icons.Default.ArrowUpward),
     SELECT_DOWN("下选", Icons.Default.ArrowDownward),
     CUT("剪切", Icons.Default.ContentCut),
@@ -118,6 +120,12 @@ fun AppTopBarNormal(
         },
         actions = {
             TopAppBarActionButton(
+                imageVector = Icons.Default.StarOutline,
+                description = "Star"
+            ) {
+                onClick.invoke(TopBarAction.STAR_FILE_SCREEN)
+            }
+            TopAppBarActionButton(
                 imageVector = Icons.Rounded.Search,
                 description = "Search"
             ) {
@@ -130,11 +138,22 @@ fun AppTopBarNormal(
     )
 }
 
+private val defaultMultipleActions = listOf(
+    TopBarAction.SELECT_UP,
+    TopBarAction.SELECT_DOWN,
+    TopBarAction.STAR,
+    TopBarAction.CUT,
+    TopBarAction.DELETE,
+    TopBarAction.SELECT_REVERSE,
+    TopBarAction.UNZIP_ALL
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppTopBarMultiple(
     title: String,
     isLandscape: Boolean = false,
+    actionsList: List<TopBarAction> = defaultMultipleActions,
     onClick: (AppBarAction) -> Unit,
     scrollBehavior: TopAppBarScrollBehavior? = null
 ) {
@@ -142,10 +161,10 @@ fun AppTopBarMultiple(
         title = { Text(text = title) },
         scrollBehavior = scrollBehavior,
         navigationIcon = {
-            IconButton(onClick = { onClick.invoke(TopBarAction.BACK) }) {
+            IconButton(onClick = { onClick(TopBarAction.BACK) }) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = "navigationIcon"
+                    contentDescription = TopBarAction.BACK.label
                 )
             }
         },
@@ -154,73 +173,21 @@ fun AppTopBarMultiple(
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState())
                 ) {
-                    TopAppBarActionTextButton(
-                        imageVector = Icons.Default.ArrowUpward,
-                        label = TopBarAction.SELECT_UP.label,
-                        onClick = { onClick.invoke(TopBarAction.SELECT_UP) }
-                    )
-                    TopAppBarActionTextButton(
-                        imageVector = Icons.Default.ArrowDownward,
-                        label = TopBarAction.SELECT_DOWN.label,
-                        onClick = { onClick.invoke(TopBarAction.SELECT_DOWN) }
-                    )
-                    TopAppBarActionTextButton(
-                        imageVector = Icons.Default.ContentCut,
-                        label = TopBarAction.CUT.label,
-                        onClick = { onClick.invoke(TopBarAction.CUT) }
-                    )
-                    TopAppBarActionTextButton(
-                        imageVector = Icons.Default.Delete,
-                        label = TopBarAction.DELETE.label,
-                        onClick = { onClick.invoke(TopBarAction.DELETE) }
-                    )
-                    TopAppBarActionTextButton(
-                        imageVector = Icons.Default.SelectAll,
-                        label = TopBarAction.SELECT_REVERSE.label,
-                        onClick = { onClick.invoke(TopBarAction.SELECT_REVERSE) }
-                    )
-                    TopAppBarActionTextButton(
-                        imageVector = Icons.Default.Cloud,
-                        label = TopBarAction.UNZIP_ALL.label,
-                        onClick = { onClick.invoke(TopBarAction.UNZIP_ALL) }
-                    )
+                    actionsList.forEach { action ->
+                        TopAppBarActionTextButton(
+                            imageVector = action.icon,
+                            label = action.label,
+                            onClick = { onClick(action) }
+                        )
+                    }
                 }
             } else {
-                TopAppBarActionButton(
-                    Icons.Default.ArrowUpward,
-                    description = "up"
-                ) {
-                    onClick.invoke(TopBarAction.SELECT_UP)
-                }
-                TopAppBarActionButton(
-                    Icons.Default.ArrowDownward,
-                    description = "down"
-                ) {
-                    onClick.invoke(TopBarAction.SELECT_DOWN)
-                }
-                TopAppBarActionButton(
-                    Icons.Default.ContentCut,
-                    description = "Cut"
-                ) {
-                    onClick.invoke(TopBarAction.CUT)
-                }
-                TopAppBarActionButton(
-                    Icons.Default.Delete,
-                    description = "delete"
-                ) {
-                    onClick.invoke(TopBarAction.DELETE)
-                }
-                TopAppBarActionButton(
-                    Icons.Default.SelectAll,
-                    description = "ic_baseline_select_reverse_24"
-                ) {
-                    onClick.invoke(TopBarAction.SELECT_REVERSE)
-                }
-                TopAppBarActionButton(
-                    Icons.Default.Cloud,
-                    description = "unzip file"
-                ) {
-                    onClick.invoke(TopBarAction.UNZIP_ALL)
+                actionsList.forEach { action ->
+                    TopAppBarActionButton(
+                        imageVector = action.icon,
+                        description = action.label,
+                        onClick = { onClick(action) }
+                    )
                 }
             }
         }
