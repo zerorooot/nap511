@@ -2,8 +2,13 @@ package github.zerorooot.nap511.viewmodel.module
 
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileDialogState
+import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.bean.OrderBean
+import github.zerorooot.nap511.bean.VideoStarAction
+import github.zerorooot.nap511.bean.BaseReturnMessage
+import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.repository.FileRepository
+import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.viewmodel.platform.CoilCacheCleaner
 import github.zerorooot.nap511.viewmodel.platform.FakeToastProvider
 import github.zerorooot.nap511.viewmodel.platform.ServiceBridge
@@ -66,6 +71,16 @@ class FileMediaModuleTest {
         override fun updateOrder(order: OrderBean) {}
     }
 
+    private var shouldThrowStarError = false
+    val starCalls = mutableListOf<Pair<String, Boolean>>()
+    private val fakeFileRepo = object : FileRepository() {
+        override suspend fun star(fid: String, star: Boolean): BaseReturnMessage {
+            if (shouldThrowStarError) throw java.io.IOException("Star network timeout")
+            starCalls.add(fid to star)
+            return BaseReturnMessage(state = true)
+        }
+    }
+
     private val testDispatcher = kotlinx.coroutines.test.StandardTestDispatcher()
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -83,6 +98,10 @@ class FileMediaModuleTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        val tempDir = java.nio.file.Files.createTempDirectory("media_test").toFile()
+        FileCacheManager.init(tempDir)
+        FileCacheManager.saveRequestCache = true
+
         stateHolder = FileUiStateHolder(fakeStringProvider)
         imageCacheStore = ImageCacheStore()
         torrentCacheStore = TorrentCacheStore()
@@ -90,10 +109,12 @@ class FileMediaModuleTest {
         sentFileBeanToAria2 = null
         coilCacheMockUrl = null
         fakeToastProvider.clear()
+        starCalls.clear()
+        shouldThrowStarError = false
 
         module = FileMediaModule(
             stateHolder = stateHolder,
-            fileRepository = FileRepository(),
+            fileRepository = fakeFileRepo,
             imageCacheStore = imageCacheStore,
             torrentCacheStore = torrentCacheStore,
             scrollPositionStore = scrollPositionStore,
@@ -168,5 +189,94 @@ class FileMediaModuleTest {
         assertNotNull(cached)
         assertEquals("https://example.com/disk_cached_image.jpg", cached?.url)
         assertEquals("image.jpg", cached?.fileName)
+    }
+
+    @Test
+    fun `test onVideoActivityResult with starList updates cache and UI state`() = runTest {
+        val cid = "folder_test"
+        val item1 = createFileBean("v1", "video1.mp4").copy(parentId = cid, isStar = false)
+        val item2 = createFileBean("v2", "video2.mp4").copy(parentId = cid, isStar = true, star = 1)
+        FileCacheManager.put(
+            cid,
+            FilesBean(
+                fileBeanList = arrayListOf(item1, item2),
+                cid = cid,
+                count = 2,
+                order = "",
+                path = emptyList()
+            )
+        )
+
+        stateHolder.updateContentState {
+            copy(
+                currentCid = cid,
+                source = FileListSource.Folder(cid, fakeStringProvider),
+                fileBeanList = listOf(item1, item2)
+            )
+        }
+
+        module.onVideoActivityResult(
+            pickCode = "pick_v1",
+            cid = cid,
+            videoHistoryMap = emptyMap(),
+            starList = listOf(
+                VideoStarAction("v1", true),
+                VideoStarAction("v2", false)
+            )
+        )
+
+        // 验证服务端 API 调用
+        assertTrue("starCalls should contain v1 true, actual=$starCalls", starCalls.any { it.first == "v1" && it.second })
+        assertTrue("starCalls should contain v2 false, actual=$starCalls", starCalls.any { it.first == "v2" && !it.second })
+
+        // 验证 StateHolder 内存状态更新
+        val uiList = stateHolder.currentContentState.fileBeanList
+        assertTrue("uiList v1 should be star, actual=$uiList", uiList.first { it.fileId == "v1" }.isStar)
+        assertTrue("uiList v2 should not be star, actual=$uiList", !uiList.first { it.fileId == "v2" }.isStar)
+
+        // 验证 FileCacheManager 缓存更新
+        val cacheList = FileCacheManager.getDate(cid)?.fileBeanList
+        assertTrue("cacheList v1 should be star, actual=${cacheList?.map { it.fileId to it.isStar }}", cacheList?.first { it.fileId == "v1" }?.isStar == true)
+        assertTrue("cacheList v2 should not be star, actual=${cacheList?.map { it.fileId to it.isStar }}", cacheList?.first { it.fileId == "v2" }?.isStar == false)
+    }
+
+    @Test
+    fun `test onVideoActivityResult with starList rolls back on failure`() = runTest {
+        val cid = "folder_test"
+        val item1 = createFileBean("v1", "video1.mp4").copy(parentId = cid, isStar = false)
+        FileCacheManager.put(
+            cid,
+            FilesBean(
+                fileBeanList = arrayListOf(item1),
+                cid = cid,
+                count = 1,
+                order = "",
+                path = emptyList()
+            )
+        )
+
+        stateHolder.updateContentState {
+            copy(
+                currentCid = cid,
+                source = FileListSource.Folder(cid, fakeStringProvider),
+                fileBeanList = listOf(item1)
+            )
+        }
+
+        shouldThrowStarError = true
+
+        module.onVideoActivityResult(
+            pickCode = "",
+            cid = cid,
+            videoHistoryMap = emptyMap(),
+            starList = listOf(VideoStarAction("v1", true))
+        )
+
+        // 验证失败提示与状态回滚
+        assertTrue(fakeToastProvider.messages.any { it.contains("Star network timeout") })
+        val uiList = stateHolder.currentContentState.fileBeanList
+        assertTrue(!uiList.first { it.fileId == "v1" }.isStar)
+        val cacheList = FileCacheManager.getDate(cid)?.fileBeanList
+        assertTrue(cacheList?.first { it.fileId == "v1" }?.isStar == false)
     }
 }

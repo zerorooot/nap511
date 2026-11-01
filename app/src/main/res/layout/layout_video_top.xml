@@ -60,6 +60,20 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
+        <!-- 0. 加星按钮 (微胶囊样式，未加星显示 ☆，加星显示 ⭐) -->
+        <TextView
+            android:id="@+id/btn_star"
+            android:layout_width="wrap_content"
+            android:layout_height="26dp"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/bg_star_inner_capsule"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:paddingHorizontal="8dp"
+            android:text="☆"
+            android:textColor="#E0E0E0"
+            android:textSize="12sp" />
+
         <!-- 1. 移除按钮 (内嵌红框小胶囊，保持原有 ID 与点击事件) -->
         <TextView
             android:id="@+id/btn_discard"

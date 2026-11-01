@@ -12,6 +12,7 @@ import github.zerorooot.nap511.bean.SubtitleStyleBean
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.bean.VideoUiState
+import github.zerorooot.nap511.bean.VideoStarAction
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.util.App
@@ -66,7 +67,8 @@ sealed class VideoUiEvent {
          * 最后一个视频的pickCode，方便selectIndex定位到视频
          */
         val pickCode: String,
-        val discardJson: String = "[]"
+        val discardJson: String = "[]",
+        val starJson: String = "[]"
     ) : VideoUiEvent()
 
     /** 触发 115 视频账号验证码弹窗事件 */
@@ -142,6 +144,12 @@ class VideoViewModel(
     @Volatile
     private var isReloadingVideo = false
 
+    /** 进入视频播放页面时的初始星标状态快照 (fileId -> isStar)，用于状态抵消与差分计算 */
+    private val initialStarMap = mutableMapOf<String, Boolean>()
+
+    /** 记录用户针对各视频变更的星标差分结果 (fileId -> isStar) */
+    private val starChanges = mutableMapOf<String, Boolean>()
+
     /**
      * 初始化视频播放参数及 UI 状态
      *
@@ -153,16 +161,28 @@ class VideoViewModel(
         videoList.clear()
         videoList.addAll(params.videoList)
         discardRecords.clear()
+
+        // 收集所有视频初始星标状态快照，用于差分抵消
+        initialStarMap.clear()
+        params.videoList.forEach {
+            if (it.fileId.isNotEmpty()) {
+                initialStarMap[it.fileId] = it.isStar
+            }
+        }
+        starChanges.clear()
+
         val initialVideoInfo = params.videoInfo
         val currentIndex = initialVideoInfo.index
         val listSize = videoList.size
+        val initialIsStar = videoList.getOrNull(currentIndex)?.isStar ?: false
 
         _uiState.update { currentState ->
             currentState.copy(
                 videoInfo = initialVideoInfo,
                 fileBeanIndex = currentIndex,
                 hasPrev = currentIndex - 1 in 0 until listSize,
-                hasNext = currentIndex + 1 in 0 until listSize
+                hasNext = currentIndex + 1 in 0 until listSize,
+                isCurrentVideoStar = initialIsStar
             )
         }
 
@@ -237,7 +257,8 @@ class VideoViewModel(
             currentState.copy(
                 fileBeanIndex = targetIndex,
                 hasPrev = targetIndex - 1 in 0 until listSize,
-                hasNext = targetIndex + 1 in 0 until listSize
+                hasNext = targetIndex + 1 in 0 until listSize,
+                isCurrentVideoStar = fileBean.isStar
             )
         }
         // 默认将视频文件名去除后缀作为初始搜索关键字
@@ -327,7 +348,8 @@ class VideoViewModel(
                     fileBeanIndex = -1,
                     hasPrev = false,
                     hasNext = false,
-                    isLoadingEpisode = false
+                    isLoadingEpisode = false,
+                    isCurrentVideoStar = false
                 )
             }
             viewModelScope.launch {
@@ -371,7 +393,8 @@ class VideoViewModel(
                 it.copy(
                     fileBeanIndex = newPlayingIndex,
                     hasPrev = newPlayingIndex - 1 in 0 until listSize,
-                    hasNext = newPlayingIndex + 1 in 0 until listSize
+                    hasNext = newPlayingIndex + 1 in 0 until listSize,
+                    isCurrentVideoStar = videoList.getOrNull(newPlayingIndex)?.isStar ?: false
                 )
             }
         } else {
@@ -424,6 +447,44 @@ class VideoViewModel(
     }
 
     /**
+     * 切换当前正在播放视频的星标状态（加星/取消星）
+     *
+     * 1. 动态翻转当前视频的 isStar 状态；
+     * 2. 更新 starChanges 差分集合：若翻转后的状态与进入页面时的初始状态一致，则自动移除差分记录，彻底避免向服务端提交无意义网络请求；
+     * 3. 同步更新 _uiState.isCurrentVideoStar，驱动顶栏按钮图标及高亮状态；
+     * 4. 触发 EpisodeListUpdated 事件，同步更新侧边栏抽屉中的选集前缀标识。
+     */
+    fun toggleCurrentVideoStar() {
+        val currentIndex = _uiState.value.fileBeanIndex
+        if (currentIndex !in videoList.indices) return
+        val currentVideo = videoList[currentIndex]
+        val targetStar = !currentVideo.isStar
+        val fid = currentVideo.fileId
+        if (fid.isEmpty()) {
+            XLog.w("toggleCurrentVideoStar: fileId is empty for video ${currentVideo.name}")
+            return
+        }
+
+        XLog.d("toggleCurrentVideoStar: fid=$fid, name=${currentVideo.name}, targetStar=$targetStar")
+        videoList[currentIndex] = currentVideo.copy(isStar = targetStar)
+
+        val initial = initialStarMap[fid] ?: false
+        if (targetStar == initial) {
+            starChanges.remove(fid)
+            XLog.d("toggleCurrentVideoStar: fid=$fid restored to initial=$initial, removed from starChanges")
+        } else {
+            starChanges[fid] = targetStar
+            XLog.d("toggleCurrentVideoStar: fid=$fid changed to targetStar=$targetStar, recorded in starChanges")
+        }
+
+        _uiState.update { it.copy(isCurrentVideoStar = targetStar) }
+
+        viewModelScope.launch {
+            _uiEvent.emit(VideoUiEvent.EpisodeListUpdated)
+        }
+    }
+
+    /**
      * 退出当前视频播放页，更新播放历史记录，并触发带有播放历史结果的退出事件
      *
      * @param currentPositionMs 当前播放进度（毫秒）
@@ -463,6 +524,13 @@ class VideoViewModel(
         val discardedVideoList = discardRecords.map { it.video }
         val discardJson = Gson().toJson(discardedVideoList)
 
+        // 计算差分星标列表，仅携带与进入播放页前状态不同的操作记录
+        val starList = starChanges.map { (fid, isStar) ->
+            VideoStarAction(fid = fid, star = isStar)
+        }
+        val starJson = Gson().toJson(starList)
+        XLog.d("VideoViewModel.back: starList count=${starList.size}, starJson=$starJson")
+
         viewModelScope.launch {
             _uiEvent.emit(
                 VideoUiEvent.FinishWithResult(
@@ -471,7 +539,8 @@ class VideoViewModel(
                     toast = toast,
                     cid = launchVideoParams.categoryId,
                     pickCode = returnPickCode,
-                    discardJson = discardJson
+                    discardJson = discardJson,
+                    starJson = starJson
                 )
             )
         }

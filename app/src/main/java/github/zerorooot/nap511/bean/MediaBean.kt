@@ -13,10 +13,19 @@ data class VideoBean(
     val currentDuration: Int = -1,
 //    val fileBeanIndex: Int = -1,
     val pickCode: String,
+    val isStar: Boolean = false,
     val fileId: String = "",
     //playNextVideo中需要用到
     val name: String = "",
     val time: String = ""
+)
+
+/**
+ * 视频星标操作包装类，记录文件 ID 与目标加星状态
+ */
+data class VideoStarAction(
+    val fid: String,
+    val star: Boolean
 )
 
 /**

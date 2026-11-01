@@ -154,7 +154,8 @@ class FileOpener(
                 name = it.name,
                 pickCode = it.pickCode,
                 fileId = it.fileId,
-                time = it.playLongString
+                time = it.playLongString,
+                isStar = it.isStar
             )
         }.ifEmpty {
             listOf(
@@ -162,7 +163,8 @@ class FileOpener(
                     name = fileBean.name,
                     pickCode = fileBean.pickCode,
                     fileId = fileBean.fileId,
-                    time = fileBean.playLongString
+                    time = fileBean.playLongString,
+                    isStar = fileBean.isStar
                 )
             )
         }

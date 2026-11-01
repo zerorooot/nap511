@@ -11,6 +11,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -117,6 +118,22 @@ class VideoActivity : AppCompatActivity() {
             isEnabled = discardEnabled
             alpha = if (discardEnabled) 1.0f else 0.4f
         }
+
+        val starEnabled =
+            !state.isLoadingEpisode && state.fileBeanIndex in viewModel.videoList.indices
+        videoPlayer.findViewById<TextView>(R.id.btn_star)?.apply {
+            isEnabled = starEnabled
+            alpha = if (starEnabled) 1.0f else 0.4f
+            if (state.isCurrentVideoStar) {
+                text = "⭐"
+                setTextColor(0xFFFFD700.toInt())
+                setBackgroundResource(R.drawable.bg_star_inner_capsule_active)
+            } else {
+                text = "☆"
+                setTextColor(0xFFE0E0E0.toInt())
+                setBackgroundResource(R.drawable.bg_star_inner_capsule)
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -222,6 +239,10 @@ class VideoActivity : AppCompatActivity() {
             // 顶部返回按钮
             backButton.setOnClickListener {
                 performBack()
+            }
+            // 加星按钮 (微胶囊按钮)
+            findViewById<View>(R.id.btn_star)?.setOnClickListener {
+                viewModel.toggleCurrentVideoStar()
             }
             // 移除按钮 (胶囊按钮)
             findViewById<View>(R.id.btn_discard)?.setOnClickListener {
@@ -353,6 +374,7 @@ class VideoActivity : AppCompatActivity() {
                                     putExtra("pickCode", event.pickCode)
                                     putExtra("cid", event.cid)
                                     putExtra("discard", event.discardJson)
+                                    putExtra("star", event.starJson)
                                 }
                                 setResult(event.resultCode, returnIntent)
                                 videoPlayer.setVideoAllCallBack(null)

@@ -16,6 +16,7 @@ import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.RemainingSpaceBean
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.bean.VideoBean
+import github.zerorooot.nap511.bean.VideoStarAction
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinator
@@ -345,8 +346,14 @@ class FileViewModel(
     fun getFileInfo(fileBean: FileBean) =
         viewModelScope.launch { mediaModule.getFileInfo(fileBean) }
 
-    fun onVideoActivityResult(pickCode: String, cid: String, map: Map<String, VideoBean>) =
-        viewModelScope.launch { mediaModule.onVideoActivityResult(pickCode, cid, map) }
+    fun onVideoActivityResult(
+        pickCode: String,
+        cid: String,
+        map: Map<String, VideoBean>,
+        starList: List<VideoStarAction> = emptyList()
+    ) = viewModelScope.launch {
+        mediaModule.onVideoActivityResult(pickCode, cid, map, starList)
+    }
 
     fun startSendAria2Service(index: Int) = mediaModule.startSendAria2Service(index)
     fun getTorrentTask(sha1: String) = viewModelScope.launch { mediaModule.getTorrentTask(sha1) }

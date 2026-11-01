@@ -6,7 +6,7 @@ import android.graphics.Typeface
 /**
  * 字体种类枚举
  */
-enum class FontFamilyType(val label: String, val typeface: Typeface) {
+enum class FontFamilyType(val label: String, val typeface: Typeface?) {
     DEFAULT("默认", Typeface.DEFAULT),
     SANS_SERIF("无衬线", Typeface.SANS_SERIF),
     SERIF("衬线", Typeface.SERIF),

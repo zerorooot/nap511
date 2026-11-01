@@ -26,6 +26,7 @@ import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.bean.SubtitleItem
 import github.zerorooot.nap511.bean.VideoBean
+import github.zerorooot.nap511.bean.VideoStarAction
 import github.zerorooot.nap511.dialog.ExitApp
 import github.zerorooot.nap511.screen.auth.LoginScreen
 import github.zerorooot.nap511.screen.file.FileScreen
@@ -128,8 +129,15 @@ fun AppNavHost(
                 Gson().fromJson(videoHistoryJson, type) ?: mutableMapOf()
             val pickCode = data?.getStringExtra("pickCode") ?: ""
             val cid = data?.getStringExtra("cid") ?: fileViewModel.currentCid
-            // 统一交给 fileViewModel 处理（更新进度 + 触发滚动事件）
-            fileViewModel.onVideoActivityResult(pickCode, cid, videoHistoryMap)
+
+            // 解析星标差分操作列表
+            val starJson = data?.getStringExtra("star") ?: "[]"
+            val starType: Type = object : TypeToken<List<VideoStarAction>>() {}.type
+            val starList: List<VideoStarAction> =
+                Gson().fromJson(starJson, starType) ?: emptyList()
+
+            // 统一交给 fileViewModel 处理（更新进度 + 触发滚动事件 + 星标同步）
+            fileViewModel.onVideoActivityResult(pickCode, cid, videoHistoryMap, starList)
 
             // 处理移除批量确认弹窗
             val discardJson = data?.getStringExtra("discard") ?: "[]"

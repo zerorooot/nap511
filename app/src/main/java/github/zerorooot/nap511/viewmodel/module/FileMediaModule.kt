@@ -8,8 +8,10 @@ import github.zerorooot.nap511.bean.ImageBean
 import github.zerorooot.nap511.bean.LocationBean
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.VideoBean
+import github.zerorooot.nap511.bean.VideoStarAction
 import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.repository.FileRepository
+import github.zerorooot.nap511.util.CacheRollback
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.formatFileSize
 import github.zerorooot.nap511.util.network.UserSessionManager
@@ -137,16 +139,20 @@ class FileMediaModule(
     // ==================== 视频播放回调与历史同步 ====================
 
     /**
-     * 处理 VideoActivity 返回的播放历史与定位结果
+     * 处理 VideoActivity 返回的播放历史、星标状态与定位结果
      */
     suspend fun onVideoActivityResult(
         pickCode: String,
         cid: String,
-        videoHistoryMap: Map<String, VideoBean>
+        videoHistoryMap: Map<String, VideoBean>,
+        starList: List<VideoStarAction> = emptyList()
     ) {
         if (videoHistoryMap.isNotEmpty()) {
             // 委托 FileCacheManager 进行播放进度更新与落盘，通过全局事件流自动驱动 UI 刷新
             FileCacheManager.updateVideoProgress(cid, videoHistoryMap)
+        }
+        if (starList.isNotEmpty()) {
+            handleVideoStarActions(cid, starList)
         }
         if (pickCode.isNotEmpty()) {
             val fileList = FileCacheManager.getDate(cid)?.fileBeanList
@@ -164,6 +170,63 @@ class FileMediaModule(
                     _videoResultEvent.tryEmit(index)
                 }
             }
+        }
+    }
+
+    /**
+     * 处理视频播放返回的星标批量变更：
+     * 1. 瞬时乐观更新缓存与 UI 状态，并收集回滚闭包；
+     * 2. 异步请求 115 服务端落盘，网络失败时自动回滚缓存与 UI 状态并弹窗提示。
+     */
+    private suspend fun handleVideoStarActions(cid: String, starList: List<VideoStarAction>) {
+        val toStarFids = starList.filter { it.star }.map { it.fid }.filter { it.isNotEmpty() }
+        val toUnstarFids = starList.filter { !it.star }.map { it.fid }.filter { it.isNotEmpty() }
+        XLog.d("handleVideoStarActions: cid=$cid, toStar=${toStarFids.size}, toUnstar=${toUnstarFids.size}")
+
+        val rollbacks = mutableListOf<CacheRollback>()
+        if (toStarFids.isNotEmpty()) {
+            FileCacheManager.starItems(cid, toStarFids, true)?.let { rollbacks.add(it) }
+        }
+        if (toUnstarFids.isNotEmpty()) {
+            FileCacheManager.starItems(cid, toUnstarFids, false)?.let { rollbacks.add(it) }
+        }
+
+        val isCurrentFolder = cid == stateHolder.currentContentState.currentCid
+        val beforeList = stateHolder.currentContentState.fileBeanList
+        if (isCurrentFolder) {
+            val starSet = toStarFids.toSet()
+            val unstarSet = toUnstarFids.toSet()
+            stateHolder.updateContentState {
+                copy(
+                    fileBeanList = fileBeanList.map { item ->
+                        when {
+                            item.fileId in starSet -> item.copy(isStar = true, star = 1)
+                            item.fileId in unstarSet -> item.copy(isStar = false, star = 0)
+                            else -> item
+                        }
+                    }
+                )
+            }
+        }
+
+        runCatching {
+            if (toStarFids.isNotEmpty()) {
+                val res = fileRepository.star(toStarFids.joinToString(","), true)
+                check(res.state) { res.errorMsg.ifEmpty { "同步加星失败" } }
+            }
+            if (toUnstarFids.isNotEmpty()) {
+                val res = fileRepository.star(toUnstarFids.joinToString(","), false)
+                check(res.state) { res.errorMsg.ifEmpty { "同步取消星失败" } }
+            }
+        }.onSuccess {
+            XLog.d("handleVideoStarActions: star sync success")
+        }.onFailure { ex ->
+            XLog.e("handleVideoStarActions failed: ${ex.message}", ex)
+            rollbacks.forEach { it.rollback() }
+            if (isCurrentFolder) {
+                stateHolder.updateContentState { copy(fileBeanList = beforeList) }
+            }
+            toastProvider.showToast("星标同步失败: ${ex.message}")
         }
     }
 

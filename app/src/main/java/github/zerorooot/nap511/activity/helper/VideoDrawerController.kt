@@ -30,14 +30,7 @@ class VideoDrawerController(
         }
 
         // 1. 选集适配器
-        val episodeTitles = viewModel.videoList.mapIndexed { index, item ->
-            val displayIndex = index + 1
-            if (item.name.isNotEmpty()) {
-                "P$displayIndex ${item.time} ${item.name}"
-            } else {
-                "第 $displayIndex 集"
-            }
-        }
+        val episodeTitles = setEpisodeTitles()
         episodeAdapter = VideoOptionAdapter(
             options = episodeTitles,
             selectedIndex = viewModel.uiState.value.fileBeanIndex
@@ -141,14 +134,19 @@ class VideoDrawerController(
      * 动态刷新选集抽屉的数据源（当发生移除或撤回导致列表变动时）
      */
     fun refreshEpisodeDrawer() {
-        val episodeTitles = viewModel.videoList.mapIndexed { index, item ->
+        val episodeTitles = setEpisodeTitles()
+        episodeAdapter.updateData(episodeTitles, viewModel.uiState.value.fileBeanIndex)
+    }
+
+    private fun setEpisodeTitles(): List<String> {
+        return viewModel.videoList.mapIndexed { index, item ->
             val displayIndex = index + 1
+            val starPrefix = if (item.isStar) "🌟 " else ""
             if (item.name.isNotEmpty()) {
-                "P$displayIndex ${item.time} ${item.name}"
+                "${starPrefix}P$displayIndex ${item.time} ${item.name}"
             } else {
-                "第 $displayIndex 集"
+                "${starPrefix}第 $displayIndex 集"
             }
         }
-        episodeAdapter.updateData(episodeTitles, viewModel.uiState.value.fileBeanIndex)
     }
 }
