@@ -552,6 +552,10 @@ class FileBrowserModule(
 
     fun sortByStarFile() {
         stateHolder.updateContentState {
+            val size = fileBeanList.filter { it.isStar }.size
+            if (size == 0) {
+                return@updateContentState this
+            }
             copy(
                 fileBeanList = fileBeanList.sortedByDescending { it.star }
             )

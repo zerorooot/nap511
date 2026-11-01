@@ -199,9 +199,9 @@ class FileMediaModule(
             stateHolder.updateContentState {
                 copy(
                     fileBeanList = fileBeanList.map { item ->
-                        when {
-                            item.fileId in starSet -> item.copy(isStar = true, star = 1)
-                            item.fileId in unstarSet -> item.copy(isStar = false, star = 0)
+                        when (item.fileId) {
+                            in starSet -> item.copy(isStar = true, star = 1)
+                            in unstarSet -> item.copy(isStar = false, star = 0)
                             else -> item
                         }
                     }

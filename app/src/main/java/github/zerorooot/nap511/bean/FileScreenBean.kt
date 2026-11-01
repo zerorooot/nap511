@@ -93,7 +93,7 @@ sealed interface FileListSource {
         ): String = "filter:$cid:$filterType:${order.type}:${order.asc}:$fcMix"
 
         fun starKey(cid: String, order: OrderBean, fcMix: Int): String =
-            "star:$cid${order.type}:${order.asc}:$fcMix"
+            "star:${order.type}:${order.asc}:$fcMix"
     }
 }
 

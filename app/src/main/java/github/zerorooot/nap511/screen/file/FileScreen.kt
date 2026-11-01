@@ -63,6 +63,7 @@ import github.zerorooot.nap511.screen.components.TopBarAction
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileOpener
+import github.zerorooot.nap511.util.LazyScrollState
 import github.zerorooot.nap511.util.asScrollState
 import github.zerorooot.nap511.util.copy
 import github.zerorooot.nap511.util.isNotificationEnabled
@@ -358,7 +359,13 @@ fun FileScreen(
             }
 
             TopBarAction.STAR_FILE_SCREEN -> {
-               fileViewModel.starFileScreen()
+                if (!contentState.isQueryState) {
+                    fileViewModel.setListLocation(
+                        contentState.source.paginationKey,
+                        currentScrollState
+                    )
+                }
+                fileViewModel.starFileScreen()
             }
 
             TopBarAction.SELECT_UP -> fileViewModel.selectToUp()
@@ -550,10 +557,14 @@ fun FileScreen(
         isQueryState = contentState.isQueryState
     )
 
-    val currentAppBarOnClick by rememberUpdatedState(::myAppBarOnClick)
-    val scaffoldActions = remember {
+    val scaffoldActions = remember(
+        gridState,
+        listState,
+        staggeredGrid,
+        contentState.source.paginationKey
+    ) {
         FileScaffoldActions(
-            onAppBarClick = { currentAppBarOnClick(it) },
+            onAppBarClick = { myAppBarOnClick(it) },
             onMusicDetailNav = { onNav(Route.MusicDetail) },
             onCancelCut = { fileViewModel.cancelCut() },
             onCutPaste = { fileViewModel.removeFile() },

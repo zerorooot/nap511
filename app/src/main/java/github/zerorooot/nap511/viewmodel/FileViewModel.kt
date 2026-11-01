@@ -5,7 +5,6 @@ import android.app.Application
 import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileContentUiState
 import github.zerorooot.nap511.bean.FileDialogUiState
@@ -70,6 +69,7 @@ class FileViewModel(
 
     val settingUiStateFlow: StateFlow<SettingUiState> =
         SettingsRepository.getInstance().settingUiStateFlow
+
     // ==================== 1. 独立状态容器与缓存 (Store 层) ====================
     private val stringProvider = AndroidAppStringProvider(context)
     val stateHolder = FileUiStateHolder(stringProvider)
@@ -219,15 +219,14 @@ class FileViewModel(
     // ==================== 6. 对外兼容性方法透传 (UI 层零修改) ====================
 
     // 滚动位置与点击
-    // 滚动位置与点击
-    fun setListLocation(key: String, scrollState: LazyScrollState) =
-        scrollPositionStore.setLocation(
-            key,
-            LocationBean(
-                scrollState.firstVisibleItemIndex,
-                scrollState.firstVisibleItemScrollOffset
-            )
+    fun setListLocation(key: String, scrollState: LazyScrollState) {
+        val locationBean = LocationBean(
+            scrollState.firstVisibleItemIndex,
+            scrollState.firstVisibleItemScrollOffset
         )
+        scrollPositionStore.setLocation(key, locationBean)
+    }
+
 
     fun getListLocation(key: String): LocationBean =
         scrollPositionStore.getLocation(key)
@@ -350,7 +349,7 @@ class FileViewModel(
         pickCode: String,
         cid: String,
         map: Map<String, VideoBean>,
-        starList: List<VideoStarAction> = emptyList()
+        starList: List<VideoStarAction>
     ) = viewModelScope.launch {
         mediaModule.onVideoActivityResult(pickCode, cid, map, starList)
     }
