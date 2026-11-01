@@ -17,6 +17,8 @@ import github.zerorooot.nap511.bean.InitUploadBean
 import github.zerorooot.nap511.bean.OfflineInfo
 import github.zerorooot.nap511.bean.OfflineListCount
 import github.zerorooot.nap511.bean.OfflineTaskType
+import github.zerorooot.nap511.bean.OrderBean
+import github.zerorooot.nap511.bean.OrderType
 import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.bean.SignBean
@@ -243,6 +245,30 @@ open class FileRepository {
             limit = limit,
             fcMix = fcMix
         )
+    }
+
+    open suspend fun starFile(
+        offset: Int,
+        order: OrderBean,
+        fcMix: Int,
+        limit: Int,
+    ): FilesBean {
+        return if (order.orderType == OrderType.STAR) {
+            fileService.starFile(
+                asc = order.asc,
+                offset = 0,
+                limit = limit,
+            )
+        } else {
+            fileService.starFile(
+                asc = order.asc,
+                offset = 0,
+                limit = limit,
+                order = order.type,
+                fcMix = fcMix,
+                customOrder = 2
+            )
+        }
     }
 
     /**

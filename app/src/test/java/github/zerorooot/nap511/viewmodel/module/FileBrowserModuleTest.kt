@@ -86,6 +86,7 @@ class FileBrowserModuleTest {
         override val defaultAppName: String = "nap511"
         override fun getSearchTitle(keyword: String): String = "搜索: $keyword"
         override fun getFilterTitle(name: String): String = "分类: $name"
+        override fun getStarTitle(): String ="星标文件"
     }
 
     private val fakeCoilCleaner = object : CoilCacheCleaner {
@@ -117,7 +118,7 @@ class FileBrowserModuleTest {
         FileCacheManager.init(tempDir)
         FileCacheManager.saveRequestCache = true
 
-        stateHolder = FileUiStateHolder("nap511")
+        stateHolder = FileUiStateHolder(fakeStringProvider)
         pagingStateStore = PagingStateStore()
         imageCacheStore = ImageCacheStore()
         fakeToastProvider.clear()
@@ -172,7 +173,7 @@ class FileBrowserModuleTest {
         module.toggleSelect(0)
         list = stateHolder.currentContentState.fileBeanList
         assertFalse(list[0].isSelect)
-        assertEquals("nap511", stateHolder.currentContentState.appBarTitle)
+        assertEquals("0", stateHolder.currentContentState.appBarTitle)
     }
 
     @Test
@@ -272,7 +273,7 @@ class FileBrowserModuleTest {
         // 切换为 Filter 源，应返回 Filter 专有排序
         val filterOrder = OrderBean(OrderEnum.size, 0)
         stateHolder.updateContentState {
-            copy(source = FileListSource.Filter("0", 4, "video", filterOrder, 0))
+            copy(source = FileListSource.Filter("0", 4, "video", filterOrder, 0,fakeStringProvider))
         }
         assertEquals(filterOrder, module.currentOrderBean)
     }
@@ -322,7 +323,7 @@ class FileBrowserModuleTest {
         // 模拟当前处于子目录
         stateHolder.updateContentState {
             copy(
-                source = FileListSource.Folder(childCid),
+                source = FileListSource.Folder(childCid,fakeStringProvider),
                 currentCid = childCid,
                 pathList = childFiles.path,
                 fileBeanList = childFiles.fileBeanList
@@ -353,7 +354,7 @@ class FileBrowserModuleTest {
 
         stateHolder.updateContentState {
             copy(
-                source = FileListSource.Folder(childCid),
+                source = FileListSource.Folder(childCid,fakeStringProvider),
                 currentCid = childCid,
                 pathList = childFiles.path,
                 fileBeanList = childFiles.fileBeanList
@@ -368,7 +369,7 @@ class FileBrowserModuleTest {
     fun `test back returns NotHandled when at root directory`() = runTest {
         stateHolder.updateContentState {
             copy(
-                source = FileListSource.Folder("0"),
+                source = FileListSource.Folder("0",fakeStringProvider),
                 currentCid = "0",
                 pathList = listOf(PathBean(cid = "0", name = "根目录", pid = "0")),
                 fileBeanList = emptyList()
@@ -412,7 +413,7 @@ class FileBrowserModuleTest {
     @Test
     fun `test updateOrder in search mode emits toast`() = runTest {
         stateHolder.updateContentState {
-            copy(source = FileListSource.Search("0", "key"))
+            copy(source = FileListSource.Search("0", "key",fakeStringProvider))
         }
         module.updateOrder(OrderBean(OrderEnum.update, 1))
         assertTrue(fakeToastProvider.messages.contains("暂不支持搜索模式排序"))

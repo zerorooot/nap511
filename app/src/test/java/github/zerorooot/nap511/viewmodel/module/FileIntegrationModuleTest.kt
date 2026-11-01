@@ -3,11 +3,11 @@ package github.zerorooot.nap511.viewmodel.module
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.repository.FileRepository
+import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.BackgroundScheduler
 import github.zerorooot.nap511.viewmodel.platform.FakeToastProvider
 import github.zerorooot.nap511.viewmodel.platform.FileNavigator
 import github.zerorooot.nap511.viewmodel.store.FileUiStateHolder
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -35,7 +35,10 @@ class FileIntegrationModuleTest {
     private var mockBatteryOptimizations: Boolean = true
 
     private val fakeScheduler = object : BackgroundScheduler {
-        override suspend fun handleOfflineTask(currentOfflineTaskRaw: String, forceRecreate: Boolean) {
+        override suspend fun handleOfflineTask(
+            currentOfflineTaskRaw: String,
+            forceRecreate: Boolean
+        ) {
             scheduledTaskRaw = currentOfflineTaskRaw
             scheduledForceRecreate = forceRecreate
         }
@@ -50,14 +53,21 @@ class FileIntegrationModuleTest {
         override fun navigateTo(cid: String) {
             lastNavigatedCid = cid
         }
+
         override fun refresh(forceCache: Boolean) {}
         override fun refresh(cid: String, forceCache: Boolean) {}
         override fun updateOrder(order: OrderBean) {}
     }
+    private val fakeStringProvider = object : AppStringProvider {
+        override val defaultAppName: String = "nap511"
+        override fun getSearchTitle(keyword: String): String = "搜索: $keyword"
+        override fun getFilterTitle(name: String): String = "分类: $name"
+        override fun getStarTitle(): String ="星标文件"
+    }
 
     @Before
     fun setUp() {
-        stateHolder = FileUiStateHolder("nap511")
+        stateHolder = FileUiStateHolder(fakeStringProvider)
         mockBatteryOptimizations = true
         scheduledTaskRaw = null
         scheduledForceRecreate = null
@@ -94,13 +104,22 @@ class FileIntegrationModuleTest {
 
     @Test
     fun `test handleAction JumpDirectory calls navigator navigateTo`() = runTest {
-        module.handleAction(github.zerorooot.nap511.viewmodel.platform.DeepLinkAction.JumpDirectory("test_cid_999"))
+        module.handleAction(
+            github.zerorooot.nap511.viewmodel.platform.DeepLinkAction.JumpDirectory(
+                "test_cid_999"
+            )
+        )
         assertEquals("test_cid_999", lastNavigatedCid)
     }
 
     @Test
     fun `test handleAction CopyText calls onCopyToClipboard and emits toast`() = runTest {
-        module.handleAction(github.zerorooot.nap511.viewmodel.platform.DeepLinkAction.CopyText("magnet:?xt=urn:btih:123", "复制成功"))
+        module.handleAction(
+            github.zerorooot.nap511.viewmodel.platform.DeepLinkAction.CopyText(
+                "magnet:?xt=urn:btih:123",
+                "复制成功"
+            )
+        )
         assertEquals("magnet:?xt=urn:btih:123", lastCopiedText)
         assertTrue(fakeToastProvider.messages.contains("复制成功"))
     }

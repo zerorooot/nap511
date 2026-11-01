@@ -24,6 +24,7 @@ sealed interface FileListSource {
      * 对应状态的名字提供
      */
     val stringProvider: AppStringProvider
+
     val appName: String
 
     /** 普通目录浏览 */
@@ -34,7 +35,11 @@ sealed interface FileListSource {
     }
 
     /** 关键词搜索 */
-    data class Search(override val cid: String, val keyword: String, override val stringProvider: AppStringProvider) : FileListSource {
+    data class Search(
+        override val cid: String,
+        val keyword: String,
+        override val stringProvider: AppStringProvider
+    ) : FileListSource {
         override val paginationKey: String get() = searchKey(cid, keyword)
         override val appName = stringProvider.getSearchTitle(keyword)
     }
@@ -59,6 +64,24 @@ sealed interface FileListSource {
         override val appName = stringProvider.getFilterTitle(name)
     }
 
+    /**
+     * 星标文件过滤
+     *
+     * @param cid 当前过滤所属的目录 ID
+     * @param filterType 分类过滤类型（1文档、2图片、3音频、4视频、5压缩、6软件）
+     * @param name 分类显示名称
+     * @param order 过滤模式专用的排序规则（独立内聚，不污染普通目录配置）
+     */
+    data class Star(
+        override val cid: String,
+        val order: OrderBean,
+        val fcMix: Int,
+        override val stringProvider: AppStringProvider
+    ) : FileListSource {
+        override val paginationKey: String get() = starKey(cid, order, fcMix)
+        override val appName = stringProvider.getStarTitle()
+    }
+
     companion object {
         fun folderKey(cid: String): String = "folder:$cid"
         fun searchKey(cid: String, keyword: String): String = "search:$cid:$keyword"
@@ -68,6 +91,9 @@ sealed interface FileListSource {
             order: OrderBean,
             fcMix: Int
         ): String = "filter:$cid:$filterType:${order.type}:${order.asc}:$fcMix"
+
+        fun starKey(cid: String, order: OrderBean, fcMix: Int): String =
+            "star:$cid${order.type}:${order.asc}:$fcMix"
     }
 }
 

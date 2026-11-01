@@ -12,8 +12,10 @@ import github.zerorooot.nap511.viewmodel.store.ImageCacheStore
 import github.zerorooot.nap511.viewmodel.store.ScrollPositionStore
 import github.zerorooot.nap511.viewmodel.store.TorrentCacheStore
 import com.elvishew.xlog.XLog
+import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.FileNavigator
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -66,15 +68,22 @@ class FileMediaModuleTest {
 
     private val testDispatcher = kotlinx.coroutines.test.StandardTestDispatcher()
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @org.junit.After
     fun tearDown() {
         kotlinx.coroutines.Dispatchers.resetMain()
     }
-
+    private val fakeStringProvider = object : AppStringProvider {
+        override val defaultAppName: String = "nap511"
+        override fun getSearchTitle(keyword: String): String = "搜索: $keyword"
+        override fun getFilterTitle(name: String): String = "分类: $name"
+        override fun getStarTitle(): String ="星标文件"
+    }
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Before
     fun setUp() {
-        kotlinx.coroutines.Dispatchers.setMain(testDispatcher)
-        stateHolder = FileUiStateHolder("nap511")
+        Dispatchers.setMain(testDispatcher)
+        stateHolder = FileUiStateHolder(fakeStringProvider)
         imageCacheStore = ImageCacheStore()
         torrentCacheStore = TorrentCacheStore()
         scrollPositionStore = ScrollPositionStore()

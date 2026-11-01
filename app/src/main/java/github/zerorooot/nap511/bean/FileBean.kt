@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.SortByAlpha
+import androidx.compose.material.icons.filled.StarOutline
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.runtime.Composable
@@ -81,15 +82,17 @@ object OrderEnum {
     const val size = "file_size"
     const val update = "user_utime"
     const val open = "user_otime"
+    const val star = "star_time"
 }
 
-enum class OrderType(val rawValue: String, val label: String) {
+enum class OrderType(val rawValue: String, val label: String, val isShow: Boolean = true) {
     NAME(OrderEnum.name, "文件名称"),
     SIZE(OrderEnum.size, "文件大小"),
     TYPE(OrderEnum.type, "文件种类"),
     UPDATE(OrderEnum.update, "修改时间"),
     CREATE(OrderEnum.create, "创建时间"),
-    OPEN(OrderEnum.open, "打开时间");
+    OPEN(OrderEnum.open, "打开时间"),
+    STAR(OrderEnum.star, "星标时间", false);
 
     val icon: ImageVector
         get() = when (this) {
@@ -99,6 +102,7 @@ enum class OrderType(val rawValue: String, val label: String) {
             UPDATE -> Icons.Default.AccessTime
             CREATE -> Icons.Default.CalendarToday
             OPEN -> Icons.Default.History
+            STAR -> Icons.Default.StarOutline
         }
 
     companion object {
@@ -191,7 +195,7 @@ data class FileBean(
      * 播放了百分之几
      */
     val playLongRatio: String = "",
-    val isStar: Boolean=false,
+    val isStar: Boolean = false,
     val sizeString: String = "",
     val isSelect: Boolean = false,
     // 标记为 @Transient，避免 Gson 保存到磁盘 json 中

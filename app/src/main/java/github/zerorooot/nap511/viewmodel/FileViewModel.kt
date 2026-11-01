@@ -135,7 +135,6 @@ class FileViewModel(
         scrollPositionStore = scrollPositionStore,
         imageCacheStore = imageCacheStore,
         coilCacheCleaner = coilCacheCleaner,
-        stringProvider = stringProvider,
         toastProvider = toastProvider
     )
 
@@ -160,7 +159,6 @@ class FileViewModel(
         imageCacheStore = imageCacheStore,
         pagingStateStore = pagingStateStore,
         coilCacheCleaner = coilCacheCleaner,
-        stringProvider = stringProvider,
         onUpdateFileCache = { cid -> browserModule.updateFileCache(cid) },
         toastProvider = toastProvider
     )
@@ -297,6 +295,11 @@ class FileViewModel(
     fun filterFile(type: Int, name: String, order: OrderBean = orderBean) {
         queryJob?.cancel()
         queryJob = viewModelScope.launch { browserModule.filterFile(type, name, order) }
+    }
+
+    fun starFileScreen() {
+        queryJob?.cancel()
+        queryJob = viewModelScope.launch { browserModule.starFileScreen(orderBean) }
     }
 
 

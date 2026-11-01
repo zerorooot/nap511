@@ -122,11 +122,13 @@ fun RenameFileDialog(name: String, position: Boolean, enter: (String?) -> Unit) 
 @Composable
 fun FileOrderDialog(
     selectOrderBean: OrderBean,
+    showStarOrder: Boolean = false,
     enter: (OrderBean?) -> Unit
 ) {
     var selectedType by remember { mutableStateOf(selectOrderBean.orderType) }
     var selectedAsc by remember { mutableIntStateOf(selectOrderBean.asc) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val visibleTypes = OrderType.entries.filter { it.isShow || showStarOrder }
 
     ModalBottomSheet(
         onDismissRequest = { enter(null) },
@@ -178,7 +180,7 @@ fun FileOrderDialog(
 
             // 排序项目列表
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                OrderType.entries.forEach { type ->
+                visibleTypes.forEach { type ->
                     val isSelected = selectedType == type
                     Surface(
                         onClick = {

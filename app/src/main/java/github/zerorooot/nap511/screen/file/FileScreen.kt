@@ -358,7 +358,7 @@ fun FileScreen(
             }
 
             TopBarAction.STAR_FILE_SCREEN -> {
-                App.instance.toast("开发中......")
+               fileViewModel.starFileScreen()
             }
 
             TopBarAction.SELECT_UP -> fileViewModel.selectToUp()

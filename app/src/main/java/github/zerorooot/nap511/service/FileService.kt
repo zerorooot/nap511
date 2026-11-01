@@ -143,6 +143,23 @@ interface FileService {
         @Query("fc_mix") fcMix: Int
     ): FilesBean
 
+    @GET("files")
+    suspend fun starFile(
+        @Query("aid") aid: Int = 1,
+        @Query("cid") cid: String = "0",
+        @Query("star") star: Int = 1,
+        @Query("offset") offset: Int = 0,
+        @Query("limit") limit: Int,
+        @Query("type") type: Int = 0,
+        @Query("show_dir") showDir: Int = 1,
+        @Query("count_folders") countFolders: Int = 1,
+        @Query("format") format: String = "json",
+        @Query("asc") asc: Int,
+        @Query("fc_mix") fcMix: Int? = null,
+        @Query("o") order: String? = null,
+        @Query("custom_order") customOrder: Int? = null,
+    ): FilesBean
+
     /**
      * 文件加⭐，star 1表示加上，0 表示取消
      */
@@ -152,6 +169,7 @@ interface FileService {
         @Field("file_id") fid: String,
         @Field("star") star: String
     ): BaseReturnMessage
+
     /**
      *
     user_order:file_size

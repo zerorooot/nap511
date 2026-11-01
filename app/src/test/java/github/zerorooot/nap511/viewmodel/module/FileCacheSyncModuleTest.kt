@@ -70,6 +70,7 @@ class FileCacheSyncModuleTest {
         override val defaultAppName: String = "nap511"
         override fun getSearchTitle(keyword: String): String = "搜索: $keyword"
         override fun getFilterTitle(name: String): String = "分类: $name"
+        override fun getStarTitle(): String ="星标文件"
     }
 
     @Before
@@ -78,7 +79,7 @@ class FileCacheSyncModuleTest {
         FileCacheManager.init(tempDir)
         FileCacheManager.saveRequestCache = true
 
-        stateHolder = FileUiStateHolder("nap511")
+        stateHolder = FileUiStateHolder(fakeStringProvider)
         imageCacheStore = ImageCacheStore()
         pagingStateStore = PagingStateStore()
         memoryCacheCleared = false
@@ -91,7 +92,6 @@ class FileCacheSyncModuleTest {
             imageCacheStore = imageCacheStore,
             pagingStateStore = pagingStateStore,
             coilCacheCleaner = fakeCoilCleaner,
-            stringProvider = fakeStringProvider,
             onUpdateFileCache = {},
             toastProvider = fakeToastProvider
         )
@@ -139,7 +139,7 @@ class FileCacheSyncModuleTest {
     fun `test handleCacheEvent FolderDeleted on current directory emits toast`() = runTest {
         stateHolder.updateContentState {
             copy(
-                source = FileListSource.Folder("current_dir"),
+                source = FileListSource.Folder("current_dir",fakeStringProvider),
                 pathList = listOf(PathBean(cid = "current_dir", name = "当前目录", pid = "0"))
             )
         }
@@ -158,7 +158,7 @@ class FileCacheSyncModuleTest {
         stateHolder.updateContentState {
             copy(
                 currentCid = "dir1",
-                source = FileListSource.Folder("dir1"),
+                source = FileListSource.Folder("dir1",fakeStringProvider),
                 fileBeanList = listOf(oldItem1, oldItem2, oldItem3),
                 totalCount = 3
             )
@@ -200,7 +200,7 @@ class FileCacheSyncModuleTest {
         stateHolder.updateContentState {
             copy(
                 currentCid = "dir1",
-                source = FileListSource.Folder("dir1"),
+                source = FileListSource.Folder("dir1",fakeStringProvider),
                 fileBeanList = listOf(item1),
                 totalCount = 1
             )

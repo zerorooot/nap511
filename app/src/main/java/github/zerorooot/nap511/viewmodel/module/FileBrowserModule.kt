@@ -72,6 +72,7 @@ class FileBrowserModule(
     val currentOrderBean: OrderBean
         get() = when (val s = stateHolder.currentContentState.source) {
             is FileListSource.Filter -> s.order
+            is FileListSource.Star -> s.order
             else -> stateHolder.currentContentState.orderBean
         }
 
@@ -329,6 +330,10 @@ class FileBrowserModule(
                 stateHolder.updateContentState { copy(orderBean = order) }
                 this.order()
             }
+
+            is FileListSource.Star -> {
+                starFileScreen(order = order)
+            }
         }
     }
 
@@ -350,6 +355,13 @@ class FileBrowserModule(
                 pagingStateStore.reset(s.paginationKey)
                 // 携带 s.order 刷新，确保用户调整后的过滤排序在下拉刷新时不丢失
                 filterFile(type = s.filterType, name = s.name, order = s.order)
+            }
+
+            is FileListSource.Star -> {
+                clearSelection()
+                pagingStateStore.reset(s.paginationKey)
+                // 携带 s.order 刷新，确保用户调整后的排序在下拉刷新时不丢失
+                starFileScreen(order = s.order)
             }
         }
     }
@@ -449,7 +461,34 @@ class FileBrowserModule(
                     isLongClickState = false,
                     fileBeanList = formattedList,
                     totalCount = files.count,
-                    appBarTitle = stringProvider.getSearchTitle(searchKey)
+                    appBarTitle = targetSource.appName
+                )
+            }
+        }.onFailureToastAndLog(toastProvider)
+        stateHolder.setRefreshing(false)
+    }
+
+    suspend fun starFileScreen(order: OrderBean) {
+        val fcMix = currentFcMix
+        val limit = UserSessionManager.requestLimitCount
+
+        stateHolder.setRefreshing(true)
+        runCatching {
+            val files = fileRepository.starFile(0, order, fcMix, limit)
+            val formattedList = formatFileBeanList(files.fileBeanList)
+            val targetSource =
+                FileListSource.Star("0", OrderBean.from(files), fcMix, stringProvider)
+
+            if (formattedList.size < limit || (files.count > 0 && formattedList.size >= files.count)) {
+                pagingStateStore.markComplete(targetSource.paginationKey)
+            }
+            stateHolder.updateContentState {
+                copy(
+                    source = targetSource,
+                    isLongClickState = false,
+                    fileBeanList = formattedList,
+                    totalCount = files.count,
+                    appBarTitle = targetSource.appName
                 )
             }
         }.onFailureToastAndLog(toastProvider)
@@ -459,7 +498,7 @@ class FileBrowserModule(
     suspend fun filterFile(
         type: Int,
         name: String,
-        order: OrderBean = stateHolder.currentContentState.orderBean
+        order: OrderBean
     ) {
         val currentCid = stateHolder.currentContentState.currentCid
         val fcMix = currentFcMix
@@ -496,7 +535,7 @@ class FileBrowserModule(
                     isLongClickState = false,
                     fileBeanList = formattedList,
                     totalCount = files.count,
-                    appBarTitle = stringProvider.getFilterTitle(name)
+                    appBarTitle = targetSource.appName
                 )
             }
         }.onFailureToastAndLog(toastProvider)
@@ -551,7 +590,7 @@ class FileBrowserModule(
             val count = updatedList.count { it.isSelect }
             copy(
                 fileBeanList = updatedList,
-                appBarTitle = if (count >= 0) count.toString() else stringProvider.defaultAppName
+                appBarTitle = if (count >= 0) count.toString() else source.appName
             )
         }
     }
@@ -569,7 +608,7 @@ class FileBrowserModule(
                 val count = list.count { it.isSelect }
                 copy(
                     fileBeanList = list,
-                    appBarTitle = if (count >= 0) count.toString() else stringProvider.defaultAppName
+                    appBarTitle = if (count >= 0) count.toString() else source.appName
                 )
             } else {
                 this
@@ -597,7 +636,7 @@ class FileBrowserModule(
             copy(
                 fileBeanList = updatedList,
                 isLongClickState = false,
-                appBarTitle = stringProvider.defaultAppName
+                appBarTitle = source.appName
             )
         }
     }
@@ -624,7 +663,7 @@ class FileBrowserModule(
                 stateHolder.updateContentState {
                     copy(
                         source = FileListSource.Folder(currentCid, stringProvider),
-                        appBarTitle = stringProvider.defaultAppName
+                        appBarTitle = source.appName
                     )
                 }
                 return BackResult.Handled
@@ -632,7 +671,7 @@ class FileBrowserModule(
                 stateHolder.updateContentState {
                     copy(
                         source = FileListSource.Folder(currentCid, stringProvider),
-                        appBarTitle = stringProvider.defaultAppName
+                        appBarTitle = source.appName
                     )
                 }
                 return BackResult.NavigateTo(currentCid)
@@ -673,7 +712,7 @@ class FileBrowserModule(
                 pathList = files.path,
                 isRefreshing = false,
                 isLongClickState = false,
-                appBarTitle = stringProvider.defaultAppName
+                appBarTitle = folderSource.appName
             )
         }
         val limit = UserSessionManager.requestLimitCount

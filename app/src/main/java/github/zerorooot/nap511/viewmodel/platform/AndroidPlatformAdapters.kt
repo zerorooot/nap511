@@ -125,6 +125,9 @@ interface AppStringProvider {
 
     /** 格式化分类过滤模式 AppBar 标题 */
     fun getFilterTitle(name: String): String
+
+    /** 格式化星标文件模式 AppBar 标题 */
+    fun getStarTitle(): String
 }
 
 @OptIn(ExperimentalCoilApi::class)
@@ -145,6 +148,7 @@ class AndroidCoilCacheCleaner(private val context: Context) : CoilCacheCleaner {
         return getCoilCacheUrl(context.imageLoader, key)
     }
 }
+
 /**
  * 跨模块目录导航与浏览动作协同接口
  * 由 FileViewModel 门面实现，向各子领域模块注入，统管 Job 异步生命周期与竞态取消。
@@ -162,7 +166,6 @@ interface FileNavigator {
     /** 更新当前数据源模式的排序规则 */
     fun updateOrder(order: OrderBean)
 }
-
 
 
 class AndroidServiceBridge(private val context: Context) : ServiceBridge {
@@ -245,6 +248,8 @@ class AndroidAppStringProvider(private val context: Context) : AppStringProvider
     override fun getSearchTitle(keyword: String): String = "搜索 - $keyword"
 
     override fun getFilterTitle(name: String): String = "过滤 - $name"
+
+    override fun getStarTitle(): String = "星标文件"
 }
 
 /**

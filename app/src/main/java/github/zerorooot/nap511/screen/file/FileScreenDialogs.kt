@@ -2,12 +2,14 @@ package github.zerorooot.nap511.screen.file
 
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elvishew.xlog.XLog
 import com.google.gson.JsonParser
 import github.zerorooot.nap511.bean.FileDialogState
+import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.dialog.Aria2Dialog
@@ -80,7 +82,12 @@ fun CreateDialogs(
         is FileDialogState.FileOrder -> {
             // 文件排序
             val orderBean = fileViewModel.currentOrderBean
-            FileOrderDialog(orderBean) { newOrder ->
+            val showStarOrder =
+                fileViewModel.contentState.collectAsState().value.source is FileListSource.Star
+            FileOrderDialog(
+                orderBean,
+                showStarOrder
+            ) { newOrder ->
                 fileViewModel.closeFileOrderDialog()
                 if (newOrder != null) {
                     fileViewModel.updateOrder(newOrder)

@@ -32,7 +32,6 @@ class FileMutatorModule(
     private val scrollPositionStore: ScrollPositionStore,
     private val imageCacheStore: ImageCacheStore,
     private val coilCacheCleaner: CoilCacheCleaner,
-    private val stringProvider: AppStringProvider,
     private val toastProvider: ToastProvider
 ) {
 
@@ -49,7 +48,7 @@ class FileMutatorModule(
                 cutFileList = itemsToCut,
                 isLongClickState = false,
                 fileBeanList = currentList.map { it.copy(isSelect = false) },
-                appBarTitle = stringProvider.defaultAppName
+                appBarTitle = source.appName
             )
         }
     }
@@ -241,7 +240,7 @@ class FileMutatorModule(
                 fileBeanList = fileBeanList.filterNot { it.fileId in selectedIds },
                 totalCount = (totalCount - selectedFiles.size).coerceAtLeast(0),
                 isLongClickState = false,
-                appBarTitle = stringProvider.defaultAppName
+                appBarTitle = source.appName
             )
         }
         scrollPositionStore.adjustClick(paginationKey, -selectedFiles.size)

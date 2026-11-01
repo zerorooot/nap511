@@ -72,7 +72,7 @@ object FileCacheManager {
     private val scope = CoroutineScope(diskDispatcher + SupervisorJob())
 
     // 最大内存目录缓存容量，超过时基于 LRU 淘汰旧目录，保障深度扫描时的内存安全与防 OOM
-    private const val MAX_MEMORY_DIRS = 50
+    private const val MAX_MEMORY_DIRS = 500
 
     private class LruCacheMap(private val capacity: Int) :
         LinkedHashMap<String, CacheWrapper>(capacity, 0.75f, true) {
@@ -245,32 +245,41 @@ object FileCacheManager {
 
 
     /**
+     * 无锁版本的缓存读取（供内部已持锁的 mutex.withLock 场景调用，彻底避免 Kotlin Mutex 非可重入引发的死锁/假死）：
+     * 1. 优先查【内存缓存】
+     * 2. 内存未命中且 saveRequestCache == true 时，查【磁盘缓存】
+     */
+    private suspend fun getWithoutLock(key: String): FilesBean? {
+        val now = System.currentTimeMillis()
+
+        // 1. 【内存缓存】最高优先级：无论 saveRequestCache 为何值，内存命中直接返回
+        val memEntry = memoryCache[key]
+        if (memEntry != null) {
+            if (now - memEntry.timestamp > ttlMillis) {
+                memoryCache.remove(key)
+                deleteDiskFileSync(key)
+                return null
+            }
+            return memEntry.data
+        }
+
+        // 2. 内存未命中，当允许读磁盘时，才查【磁盘缓存】
+        if (saveRequestCache) {
+            val diskEntry = getDiskCache(key, now) ?: return null
+            memoryCache[key] = diskEntry
+            return diskEntry.data
+        }
+        return null
+    }
+
+    /**
      * 读取缓存：
      * 1. 优先查【内存缓存】（无视 readDisk 参数，只要内存有就直接返回）
      * 2. 内存未命中且 readDisk == true 时，才查【磁盘文件】
      */
     suspend operator fun get(key: String): FilesBean? = withContext(Dispatchers.IO) {
         mutex.withLock {
-            val now = System.currentTimeMillis()
-
-            // 1. 【内存缓存】最高优先级：无论 saveRequestCache 为何值，内存命中直接返回
-            val memEntry = memoryCache[key]
-            if (memEntry != null) {
-                if (now - memEntry.timestamp > ttlMillis) {
-                    memoryCache.remove(key)
-                    deleteDiskFileSync(key)
-                    return@withContext null
-                }
-                return@withContext memEntry.data
-            }
-
-            // 2. 内存未命中，当允许读磁盘时，才查【磁盘缓存】
-            if (saveRequestCache) {
-                val diskEntry = getDiskCache(key, now) ?: return@withContext null
-                memoryCache[key] = diskEntry
-                return@withContext diskEntry.data
-            }
-            return@withContext null
+            getWithoutLock(key)
         }
     }
 
@@ -336,6 +345,9 @@ object FileCacheManager {
     ): CacheRollback? = withContext(Dispatchers.IO) {
         if (fids.isEmpty()) return@withContext null
         mutex.withLock {
+            if (getWithoutLock(parentCid) == null) {
+                return@withContext null
+            }
             val cache = memoryCache[parentCid]?.data ?: return@withContext null
             val fidSet = fids.toSet()
 
@@ -388,6 +400,9 @@ object FileCacheManager {
         transform: (FileBean) -> FileBean
     ): CacheRollback? = withContext(Dispatchers.IO) {
         mutex.withLock {
+            if (getWithoutLock(parentCid) == null) {
+                return@withContext null
+            }
             val cache = memoryCache[parentCid]?.data ?: return@withContext null
             val index = cache.fileBeanList.indexOfFirst { it.fileId == fid || it.categoryId == fid }
             if (index < 0) return@withContext null
@@ -424,6 +439,9 @@ object FileCacheManager {
         newName: String
     ): CacheRollback? = withContext(Dispatchers.IO) {
         mutex.withLock {
+            if (getWithoutLock(parentCid) == null) {
+                return@withContext null
+            }
             val cache = memoryCache[parentCid]?.data ?: return@withContext null
             val index = cache.fileBeanList.indexOfFirst { it.fileId == fid || it.categoryId == fid }
             if (index < 0) return@withContext null
@@ -463,6 +481,9 @@ object FileCacheManager {
         isFolder: Boolean? = null
     ): CacheRollback? = withContext(Dispatchers.IO) {
         mutex.withLock {
+            if (getWithoutLock(parentCid) == null) {
+                return@withContext null
+            }
             val cache = memoryCache[parentCid]?.data ?: return@withContext null
             val targetIndex =
                 cache.fileBeanList.indexOfFirst { it.fileId == fid || it.categoryId == fid }
@@ -514,6 +535,9 @@ object FileCacheManager {
     ): CacheRollback? = withContext(Dispatchers.IO) {
         if (fids.isEmpty()) return@withContext null
         mutex.withLock {
+            if (getWithoutLock(parentCid) == null) {
+                return@withContext null
+            }
             val cache = memoryCache[parentCid]?.data ?: return@withContext null
             val fidSet = fids.toSet()
             val originalList = ArrayList(cache.fileBeanList)
@@ -581,11 +605,14 @@ object FileCacheManager {
         }
     }
 
-    private fun removeFolderRecursivelyInternal(
+    private suspend fun removeFolderRecursivelyInternal(
         folderCid: String,
         visited: MutableSet<String> = HashSet()
     ) {
         if (folderCid.isEmpty() || !visited.add(folderCid)) {
+            return
+        }
+        if (getWithoutLock(folderCid) == null) {
             return
         }
         val list = memoryCache[folderCid]?.data?.fileBeanList ?: emptyList()
@@ -614,6 +641,9 @@ object FileCacheManager {
     ) = withContext(Dispatchers.IO) {
         if (videoHistoryMap.isEmpty()) return@withContext
         mutex.withLock {
+            if (getWithoutLock(cid) == null) {
+                return@withLock
+            }
             val cache = memoryCache[cid]?.data ?: return@withLock
             var hasChanges = false
             val fileList = cache.fileBeanList

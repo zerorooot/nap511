@@ -7,8 +7,8 @@ import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.FileCacheManager
-import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.formatFileBeanList
+import github.zerorooot.nap511.util.network.UserSessionManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -97,6 +97,13 @@ class DirectoryPagingCoordinatorImpl(
                 order = order.type,
                 asc = order.asc,
                 offset = currentPhysicalOffset,
+                limit = limit,
+                fcMix = fcMix
+            )
+
+            is FileListSource.Star ->fileRepository.starFile(
+                offset = currentPhysicalOffset,
+                order = order,
                 limit = limit,
                 fcMix = fcMix
             )

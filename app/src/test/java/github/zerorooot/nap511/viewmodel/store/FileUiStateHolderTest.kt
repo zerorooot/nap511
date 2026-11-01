@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.viewmodel.store
 
 import github.zerorooot.nap511.bean.FileDialogState
+import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -10,10 +11,15 @@ import org.junit.Test
 class FileUiStateHolderTest {
 
     private lateinit var holder: FileUiStateHolder
-
+    private val fakeStringProvider = object : AppStringProvider {
+        override val defaultAppName: String = "nap511"
+        override fun getSearchTitle(keyword: String): String = "搜索: $keyword"
+        override fun getFilterTitle(name: String): String = "分类: $name"
+        override fun getStarTitle(): String ="星标文件"
+    }
     @Before
     fun setUp() {
-        holder = FileUiStateHolder("nap511")
+        holder = FileUiStateHolder(fakeStringProvider)
     }
 
     @Test
@@ -28,7 +34,7 @@ class FileUiStateHolderTest {
         holder.updateContentState {
             copy(
                 appBarTitle = "Search: test",
-                source = github.zerorooot.nap511.bean.FileListSource.Search("0", "test")
+                source = github.zerorooot.nap511.bean.FileListSource.Search("0", "test",fakeStringProvider)
             )
         }
 

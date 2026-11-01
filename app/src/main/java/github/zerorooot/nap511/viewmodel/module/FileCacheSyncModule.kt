@@ -24,7 +24,6 @@ class FileCacheSyncModule(
     private val imageCacheStore: ImageCacheStore,
     private val pagingStateStore: PagingStateStore,
     private val coilCacheCleaner: CoilCacheCleaner,
-    private val stringProvider: AppStringProvider,
     private val onUpdateFileCache: suspend (String) -> Unit,
     private val toastProvider: ToastProvider
 ) {
@@ -69,7 +68,7 @@ class FileCacheSyncModule(
                                 pathList = updatedCache.path,
                                 totalCount = updatedCache.count,
                                 isLongClickState = false,
-                                appBarTitle = stringProvider.defaultAppName
+                                appBarTitle = source.appName
                             )
                         }
 

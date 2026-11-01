@@ -71,6 +71,7 @@ class FileMutatorModuleTest {
         override val defaultAppName: String = "nap511"
         override fun getSearchTitle(keyword: String): String = "搜索: $keyword"
         override fun getFilterTitle(name: String): String = "分类: $name"
+        override fun getStarTitle(): String ="星标文件"
     }
 
     private val fakeCoilCleaner = object : CoilCacheCleaner {
@@ -88,7 +89,7 @@ class FileMutatorModuleTest {
         github.zerorooot.nap511.util.FileCacheManager.init(tempDir)
         github.zerorooot.nap511.util.FileCacheManager.saveRequestCache = true
 
-        stateHolder = FileUiStateHolder("nap511")
+        stateHolder = FileUiStateHolder(fakeStringProvider)
         scrollPositionStore = ScrollPositionStore()
         imageCacheStore = ImageCacheStore()
         deletedCoilKeys.clear()
@@ -104,7 +105,6 @@ class FileMutatorModuleTest {
             scrollPositionStore = scrollPositionStore,
             imageCacheStore = imageCacheStore,
             coilCacheCleaner = fakeCoilCleaner,
-            stringProvider = fakeStringProvider,
             toastProvider = fakeToastProvider
         )
     }
@@ -218,7 +218,7 @@ class FileMutatorModuleTest {
         val item = createFileBean("del_1", "item_del_1").copy(parentId = "0", photoThumb = "thumb_url")
         stateHolder.updateContentState {
             copy(
-                source = FileListSource.Folder("0"),
+                source = FileListSource.Folder("0",fakeStringProvider),
                 fileBeanList = listOf(item)
             )
         }
@@ -240,7 +240,7 @@ class FileMutatorModuleTest {
         val item = createFileBean("del_2", "item_del_2").copy(parentId = "0")
         stateHolder.updateContentState {
             copy(
-                source = FileListSource.Folder("0"),
+                source = FileListSource.Folder("0",fakeStringProvider),
                 fileBeanList = listOf(item)
             )
         }
@@ -262,7 +262,7 @@ class FileMutatorModuleTest {
 
         stateHolder.updateContentState {
             copy(
-                source = FileListSource.Folder("0"),
+                source = FileListSource.Folder("0",fakeStringProvider),
                 fileBeanList = listOf(item1, item2, item3),
                 totalCount = 3
             )
@@ -286,7 +286,7 @@ class FileMutatorModuleTest {
 
         stateHolder.updateContentState {
             copy(
-                source = FileListSource.Folder("0"),
+                source = FileListSource.Folder("0",fakeStringProvider),
                 fileBeanList = listOf(item1, item2),
                 totalCount = 2
             )
@@ -308,7 +308,7 @@ class FileMutatorModuleTest {
         val item = createFileBean("del_toast", "item_del_toast").copy(parentId = "0")
         stateHolder.updateContentState {
             copy(
-                source = FileListSource.Folder("0"),
+                source = FileListSource.Folder("0",fakeStringProvider),
                 fileBeanList = listOf(item)
             )
         }
@@ -325,7 +325,7 @@ class FileMutatorModuleTest {
         val item2 = createFileBean("s2", "star2").copy(parentId = "0", isStar = false)
         stateHolder.updateContentState {
             copy(
-                source = FileListSource.Folder("0"),
+                source = FileListSource.Folder("0",fakeStringProvider),
                 fileBeanList = listOf(item1, item2)
             )
         }
@@ -343,7 +343,7 @@ class FileMutatorModuleTest {
         val item2 = createFileBean("s2", "star2").copy(parentId = "0", isStar = false)
         stateHolder.updateContentState {
             copy(
-                source = FileListSource.Folder("0"),
+                source = FileListSource.Folder("0",fakeStringProvider),
                 fileBeanList = listOf(item1, item2)
             )
         }
