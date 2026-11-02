@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.StarOutline
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.VideoFile
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -83,16 +85,29 @@ object OrderEnum {
     const val update = "user_utime"
     const val open = "user_otime"
     const val star = "star_time"
+
+    // 本地自定义排序标识（仅在客户端内存排序，不同步至 115 服务端）
+    const val videoDuration = "video_duration"
+    const val starFile = "star_file"
 }
 
-enum class OrderType(val rawValue: String, val label: String, val isShow: Boolean = true) {
+enum class OrderType(
+    val rawValue: String,
+    val label: String,
+    val isShow: Boolean = true,
+    val isLocalOnly: Boolean = false
+) {
     NAME(OrderEnum.name, "文件名称"),
     SIZE(OrderEnum.size, "文件大小"),
     TYPE(OrderEnum.type, "文件种类"),
     UPDATE(OrderEnum.update, "修改时间"),
     CREATE(OrderEnum.create, "创建时间"),
     OPEN(OrderEnum.open, "打开时间"),
-    STAR(OrderEnum.star, "星标时间", false);
+    STAR(OrderEnum.star, "星标时间", false),
+
+    // 本地自定义排序项
+    VIDEO_DURATION(OrderEnum.videoDuration, "视频时长", isShow = true, isLocalOnly = true),
+    STAR_FILE(OrderEnum.starFile, "标星文件", isShow = true, isLocalOnly = true);
 
     val icon: ImageVector
         get() = when (this) {
@@ -103,6 +118,8 @@ enum class OrderType(val rawValue: String, val label: String, val isShow: Boolea
             CREATE -> Icons.Default.CalendarToday
             OPEN -> Icons.Default.History
             STAR -> Icons.Default.StarOutline
+            VIDEO_DURATION -> Icons.Outlined.Schedule
+            STAR_FILE -> Icons.Outlined.StarOutline
         }
 
     companion object {

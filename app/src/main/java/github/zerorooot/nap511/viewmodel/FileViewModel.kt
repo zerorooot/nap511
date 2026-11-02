@@ -184,6 +184,9 @@ class FileViewModel(
     /** 视频播放结果回传定位事件流 */
     val videoResultEvent: SharedFlow<Int> = mediaModule.videoResultEvent
 
+    /** 列表滚顶事件流（排序切换等场景触发） */
+    val scrollToTopEvent: SharedFlow<Unit> = browserModule.scrollToTopEvent
+
     /** 存储空间状态流（供 MainScreen 抽屉独立观察） */
     val remainingSpace: StateFlow<RemainingSpaceBean> = integrationModule.remainingSpace
 
@@ -302,14 +305,10 @@ class FileViewModel(
         queryJob = viewModelScope.launch { browserModule.starFileScreen(orderBean) }
     }
 
-
-    fun sortByVideoTime() = browserModule.sortByVideoTime()
-
     fun starFile(fileBean: FileBean) = viewModelScope.launch {
         mutatorModule.starFile(fileBean)
     }
 
-    fun sortByStarFile() = browserModule.sortByStarFile()
     fun select(index: Int) = browserModule.select(index)
     fun selectToUp() = browserModule.selectToUp()
     fun selectToDown() = browserModule.selectToDown()

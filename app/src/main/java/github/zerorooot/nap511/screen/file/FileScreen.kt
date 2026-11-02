@@ -230,6 +230,12 @@ fun FileScreen(
             pendingStateScrollToIndex = targetTopIndex
         }
     }
+
+    LaunchedEffect(fileViewModel) {
+        fileViewModel.scrollToTopEvent.collect {
+            pendingStateScrollToIndex = 0
+        }
+    }
     // 此时 composition 已 apply、列表已用排序后的数据 measure
     LaunchedEffect(pendingStateScrollToIndex) {
         if (pendingStateScrollToIndex != -1) {
@@ -378,16 +384,6 @@ fun FileScreen(
 
             MenuItemAction.GALLERY_MODE -> {
                 isImagePreviewMode = !isPreviewActive
-            }
-
-            MenuItemAction.STAR_FILE -> {
-                fileViewModel.sortByStarFile()
-                currentScrollState.requestScrollToItem(0, 0)
-            }
-
-            MenuItemAction.VIDEO_SCHEDULE -> {
-                fileViewModel.sortByVideoTime()
-                currentScrollState.requestScrollToItem(0, 0)
             }
 
             MenuItemAction.FILE_SORT -> {

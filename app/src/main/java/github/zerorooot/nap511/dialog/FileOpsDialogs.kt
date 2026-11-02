@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -118,6 +120,51 @@ fun RenameFileDialog(name: String, position: Boolean, enter: (String?) -> Unit) 
     )
 }
 
+@Composable
+private fun OrderTypeItem(
+    type: OrderType,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+        else Color.Transparent,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+        ) {
+            Icon(
+                imageVector = type.icon,
+                contentDescription = null,
+                tint = if (isSelected) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = type.label,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FileOrderDialog(
@@ -128,7 +175,8 @@ fun FileOrderDialog(
     var selectedType by remember { mutableStateOf(selectOrderBean.orderType) }
     var selectedAsc by remember { mutableIntStateOf(selectOrderBean.asc) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val visibleTypes = OrderType.entries.filter { it.isShow || showStarOrder }
+    val cloudTypes = OrderType.entries.filter { !it.isLocalOnly && (it.isShow || showStarOrder) }
+    val localTypes = OrderType.entries.filter { it.isLocalOnly }
 
     ModalBottomSheet(
         onDismissRequest = { enter(null) },
@@ -178,48 +226,51 @@ fun FileOrderDialog(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-            // 排序项目列表
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                visibleTypes.forEach { type ->
-                    val isSelected = selectedType == type
-                    Surface(
-                        onClick = {
-                            selectedType = type
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                        else Color.Transparent,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
-                        ) {
-                            Icon(
-                                imageVector = type.icon,
-                                contentDescription = null,
-                                tint = if (isSelected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Text(
-                                text = type.label,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                                else MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.weight(1f)
-                            )
-                            if (isSelected) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
+            // 排序项目列表 (可滚动)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // 云端排序分组
+                Text(
+                    text = "云端排序 (同步网盘)",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 4.dp)
+                )
+
+                cloudTypes.forEach { type ->
+                    OrderTypeItem(
+                        type = type,
+                        isSelected = selectedType == type,
+                        onClick = { selectedType = type }
+                    )
+                }
+
+                if (localTypes.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // 本地排序分组
+                    Text(
+                        text = "本地排序 (仅当前视图)",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 4.dp)
+                    )
+
+                    localTypes.forEach { type ->
+                        OrderTypeItem(
+                            type = type,
+                            isSelected = selectedType == type,
+                            onClick = { selectedType = type }
+                        )
                     }
                 }
             }

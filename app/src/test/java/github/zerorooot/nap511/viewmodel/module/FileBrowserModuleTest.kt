@@ -1,11 +1,13 @@
 package github.zerorooot.nap511.viewmodel.module
 
+import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
+import github.zerorooot.nap511.bean.OrderType
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinator
@@ -53,8 +55,16 @@ class FileBrowserModuleTest {
     private lateinit var imageCacheStore: ImageCacheStore
     private lateinit var module: FileBrowserModule
     private val fakeToastProvider = FakeToastProvider()
+    private val settingFlow = MutableStateFlow(SettingUiState())
 
     private val fakeRepo = object : FileRepository() {
+        var orderCallCount = 0
+
+        override suspend fun order(body: Map<String, String>): BaseReturnMessage {
+            orderCallCount++
+            return BaseReturnMessage(state = true)
+        }
+
         override suspend fun getFiles(
             cid: String,
             showDir: Int,
@@ -122,6 +132,8 @@ class FileBrowserModuleTest {
         pagingStateStore = PagingStateStore()
         imageCacheStore = ImageCacheStore()
         fakeToastProvider.clear()
+        fakeRepo.orderCallCount = 0
+        settingFlow.value = SettingUiState(keepFoldersOnTop = true)
 
         module = FileBrowserModule(
             stateHolder = stateHolder,
@@ -131,7 +143,7 @@ class FileBrowserModuleTest {
             pagingCoordinator = fakeCoordinator,
             stringProvider = fakeStringProvider,
             coilCacheCleaner = fakeCoilCleaner,
-            settingUiStateFlow = MutableStateFlow(SettingUiState()),
+            settingUiStateFlow = settingFlow,
             toastProvider = fakeToastProvider
         )
     }
@@ -144,13 +156,23 @@ class FileBrowserModuleTest {
         tempDir.deleteRecursively()
     }
 
-    private fun createFileBean(id: String, name: String, isFolder: Boolean = false, isSelect: Boolean = false): FileBean {
+    private fun createFileBean(
+        id: String,
+        name: String,
+        isFolder: Boolean = false,
+        isSelect: Boolean = false,
+        star: Int = -1,
+        playLong: Double = 0.0
+    ): FileBean {
         return FileBean(
             fileId = id,
             name = name,
             isFolder = isFolder,
             isSelect = isSelect,
-            pickCode = "pick_$id"
+            pickCode = "pick_$id",
+            star = star,
+            isStar = star == 1,
+            playLong = playLong
         )
     }
 
@@ -417,5 +439,180 @@ class FileBrowserModuleTest {
         }
         module.updateOrder(OrderBean(OrderEnum.update, 1))
         assertTrue(fakeToastProvider.messages.contains("暂不支持搜索模式排序"))
+    }
+
+    @Test
+    fun `test local sort by star file descending with keepFoldersOnTop`() = runTest {
+        settingFlow.value = SettingUiState(keepFoldersOnTop = true)
+        val f1 = createFileBean("1", "unstarred_folder", isFolder = true, star = 0)
+        val f2 = createFileBean("2", "starred_folder", isFolder = true, star = 1)
+        val file1 = createFileBean("3", "unstarred_file", isFolder = false, star = 0)
+        val file2 = createFileBean("4", "starred_file", isFolder = false, star = 1)
+
+        stateHolder.updateContentState { copy(fileBeanList = listOf(f1, file1, f2, file2)) }
+
+        module.updateOrder(OrderBean(OrderEnum.starFile, asc = 0))
+
+        val result = stateHolder.currentContentState.fileBeanList
+        // 文件夹优先（标星在未标星前），文件次之（标星在未标星前）
+        assertEquals(listOf("2", "1", "4", "3"), result.map { it.fileId })
+        // 本地排序不调用服务端 order 接口
+        assertEquals(0, fakeRepo.orderCallCount)
+        // 本地排序纯内存重排，不改写全局 orderBean（保持原有服务端排序）
+        assertEquals(OrderEnum.name, stateHolder.currentContentState.orderBean.type)
+    }
+
+    @Test
+    fun `test local sort by star file ascending with keepFoldersOnTop`() = runTest {
+        settingFlow.value = SettingUiState(keepFoldersOnTop = true)
+        val f1 = createFileBean("1", "unstarred_folder", isFolder = true, star = 0)
+        val f2 = createFileBean("2", "starred_folder", isFolder = true, star = 1)
+        val file1 = createFileBean("3", "unstarred_file", isFolder = false, star = 0)
+        val file2 = createFileBean("4", "starred_file", isFolder = false, star = 1)
+
+        stateHolder.updateContentState { copy(fileBeanList = listOf(f2, file2, f1, file1)) }
+
+        module.updateOrder(OrderBean(OrderEnum.starFile, asc = 1))
+
+        val result = stateHolder.currentContentState.fileBeanList
+        // 文件夹优先（未标星在标星前），文件次之（未标星在标星前）
+        assertEquals(listOf("1", "2", "3", "4"), result.map { it.fileId })
+        assertEquals(0, fakeRepo.orderCallCount)
+        assertEquals(OrderEnum.name, stateHolder.currentContentState.orderBean.type)
+    }
+
+    @Test
+    fun `test local sort by star file without keepFoldersOnTop`() = runTest {
+        settingFlow.value = SettingUiState(keepFoldersOnTop = false)
+        val f1 = createFileBean("1", "unstarred_folder", isFolder = true, star = 0)
+        val f2 = createFileBean("2", "starred_folder", isFolder = true, star = 1)
+        val file1 = createFileBean("3", "unstarred_file", isFolder = false, star = 0)
+        val file2 = createFileBean("4", "starred_file", isFolder = false, star = 1)
+
+        stateHolder.updateContentState { copy(fileBeanList = listOf(f1, file1, f2, file2)) }
+
+        module.updateOrder(OrderBean(OrderEnum.starFile, asc = 0))
+
+        val result = stateHolder.currentContentState.fileBeanList
+        // 混排模式：所有标星排在前面，未标星排在后面
+        assertTrue(result[0].isStar && result[1].isStar)
+        assertTrue(!result[2].isStar && !result[3].isStar)
+        assertEquals(OrderEnum.name, stateHolder.currentContentState.orderBean.type)
+    }
+
+    @Test
+    fun `test local sort by video duration descending`() = runTest {
+        settingFlow.value = SettingUiState(keepFoldersOnTop = true)
+        val folder = createFileBean("0", "folder", isFolder = true)
+        val v1 = createFileBean("1", "short.mp4", playLong = 60.0)
+        val v2 = createFileBean("2", "long.mp4", playLong = 3600.0)
+        val v3 = createFileBean("3", "mid.mp4", playLong = 600.0)
+        val doc = createFileBean("4", "text.txt", playLong = 0.0)
+
+        stateHolder.updateContentState { copy(fileBeanList = listOf(v1, doc, folder, v2, v3)) }
+
+        module.updateOrder(OrderBean(OrderEnum.videoDuration, asc = 0))
+
+        val result = stateHolder.currentContentState.fileBeanList
+        // 文件夹置顶，视频按时长从大到小，无时长的文档沉底
+        assertEquals(listOf("0", "2", "3", "1", "4"), result.map { it.fileId })
+        assertEquals(0, fakeRepo.orderCallCount)
+        assertEquals(OrderEnum.name, stateHolder.currentContentState.orderBean.type)
+    }
+
+    @Test
+    fun `test local sort by video duration ascending`() = runTest {
+        settingFlow.value = SettingUiState(keepFoldersOnTop = true)
+        val folder = createFileBean("0", "folder", isFolder = true)
+        val v1 = createFileBean("1", "short.mp4", playLong = 60.0)
+        val v2 = createFileBean("2", "long.mp4", playLong = 3600.0)
+        val v3 = createFileBean("3", "mid.mp4", playLong = 600.0)
+        val doc = createFileBean("4", "text.txt", playLong = 0.0)
+
+        stateHolder.updateContentState { copy(fileBeanList = listOf(v2, folder, doc, v1, v3)) }
+
+        module.updateOrder(OrderBean(OrderEnum.videoDuration, asc = 1))
+
+        val result = stateHolder.currentContentState.fileBeanList
+        // 文件夹置顶，视频按时长从小到大，无时长的文档沉底
+        assertEquals(listOf("0", "1", "3", "2", "4"), result.map { it.fileId })
+        assertEquals(0, fakeRepo.orderCallCount)
+        assertEquals(OrderEnum.name, stateHolder.currentContentState.orderBean.type)
+    }
+
+    @Test
+    fun `test local sort empty state shows toast and interrupts`() = runTest {
+        val doc1 = createFileBean("1", "doc1.txt", playLong = 0.0, star = 0)
+        val doc2 = createFileBean("2", "doc2.txt", playLong = 0.0, star = 0)
+        val initialList = listOf(doc1, doc2)
+        stateHolder.updateContentState { copy(fileBeanList = initialList) }
+
+        fakeToastProvider.clear()
+        module.updateOrder(OrderBean(OrderEnum.starFile, asc = 0))
+        assertTrue(fakeToastProvider.messages.contains("当前列表没有星标文件"))
+        // 列表未被变更
+        assertEquals(initialList, stateHolder.currentContentState.fileBeanList)
+        // orderBean 未被变更
+        assertEquals(OrderEnum.name, stateHolder.currentContentState.orderBean.type)
+
+        fakeToastProvider.clear()
+        module.updateOrder(OrderBean(OrderEnum.videoDuration, asc = 0))
+        assertTrue(fakeToastProvider.messages.contains("当前列表没有视频文件"))
+        assertEquals(initialList, stateHolder.currentContentState.fileBeanList)
+        assertEquals(OrderEnum.name, stateHolder.currentContentState.orderBean.type)
+    }
+
+    @Test
+    fun `test local sort preserves existing server orderBean and does not pollute`() = runTest {
+        // 模拟当前服务端排序为修改时间倒序
+        stateHolder.updateContentState { copy(orderBean = OrderBean(OrderEnum.update, asc = 0)) }
+
+        val v1 = createFileBean("1", "short.mp4", playLong = 60.0)
+        val v2 = createFileBean("2", "long.mp4", playLong = 3600.0)
+        stateHolder.updateContentState { copy(fileBeanList = listOf(v1, v2)) }
+
+        module.updateOrder(OrderBean(OrderEnum.videoDuration, asc = 0))
+
+        // 内存列表重排：时长大排在前
+        assertEquals(listOf("2", "1"), stateHolder.currentContentState.fileBeanList.map { it.fileId })
+        // orderBean 必须依然保持修改时间，绝不被本地排序篡改
+        assertEquals(OrderEnum.update, stateHolder.currentContentState.orderBean.type)
+        assertEquals(0, stateHolder.currentContentState.orderBean.asc)
+        // currentOrderBean 用于弹窗回显，必须返回本地排序
+        assertEquals(OrderEnum.videoDuration, module.currentOrderBean.type)
+        assertEquals(0, module.currentOrderBean.asc)
+    }
+
+    @Test
+    fun `test local sort echo resets to server order on setFiles`() = runTest {
+        val v1 = createFileBean("1", "short.mp4", playLong = 60.0)
+        stateHolder.updateContentState { copy(fileBeanList = listOf(v1)) }
+
+        module.updateOrder(OrderBean(OrderEnum.videoDuration, asc = 0))
+        assertEquals(OrderEnum.videoDuration, module.currentOrderBean.type)
+
+        // 模拟进入新目录，返回服务端数据并触发 setFiles
+        module.getFiles("100")
+
+        // 重新进入新目录后，弹窗回显与底层排序均恢复为服务端真实排序
+        assertEquals(OrderEnum.name, module.currentOrderBean.type)
+        assertEquals(OrderEnum.name, stateHolder.currentContentState.orderBean.type)
+    }
+
+    @Test
+    fun `test OrderType isLocalOnly flags and OrderBean parse`() {
+        assertFalse(OrderType.NAME.isLocalOnly)
+        assertFalse(OrderType.SIZE.isLocalOnly)
+        assertFalse(OrderType.UPDATE.isLocalOnly)
+        assertTrue(OrderType.VIDEO_DURATION.isLocalOnly)
+        assertTrue(OrderType.STAR_FILE.isLocalOnly)
+
+        val videoOrder = OrderBean.parseFromUiString("视频时长⬇️")
+        assertEquals(OrderEnum.videoDuration, videoOrder.type)
+        assertEquals(0, videoOrder.asc)
+
+        val starOrder = OrderBean.parseFromUiString("标星文件⬆️")
+        assertEquals(OrderEnum.starFile, starOrder.type)
+        assertEquals(1, starOrder.asc)
     }
 }

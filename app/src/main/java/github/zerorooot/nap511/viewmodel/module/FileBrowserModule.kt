@@ -7,6 +7,7 @@ import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.OrderBean
+import github.zerorooot.nap511.bean.OrderType
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.repository.FileRepository
@@ -55,6 +56,9 @@ class FileBrowserModule(
     private val _navigationEvent = MutableSharedFlow<NavEvent>(extraBufferCapacity = 1)
     val navigationEvent: SharedFlow<NavEvent> = _navigationEvent.asSharedFlow()
 
+    private val _scrollToTopEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val scrollToTopEvent: SharedFlow<Unit> = _scrollToTopEvent.asSharedFlow()
+
     private var isInitialized = false
 
     //应用启动或 ViewModel 初始化时，settingUiStateFlow 会自动发射当前的设置数据
@@ -63,18 +67,26 @@ class FileBrowserModule(
     private val settingUiState: SettingUiState
         get() = settingUiStateFlow.value
 
+    /** 当前生效的本地自定义排序（仅在内存中针对当前视图生效，用于弹窗回显；刷新/切目录/分页时失效） */
+    private var activeLocalOrder: OrderBean? = null
+
     /**
-     * 获取当前活跃模式的排序规则：
-     * - 过滤模式：获取当前过滤专用的排序规则
-     * - 目录/其他模式：获取当前目录的排序规则
-     * 供排序弹窗回显及外部组件统一消费
+     * 服务端真实的云端排序（供网络请求及分页严格使用，绝不包含本地排序字段）
      */
-    val currentOrderBean: OrderBean
+    val serverOrderBean: OrderBean
         get() = when (val s = stateHolder.currentContentState.source) {
             is FileListSource.Filter -> s.order
             is FileListSource.Star -> s.order
             else -> stateHolder.currentContentState.orderBean
         }
+
+    /**
+     * 获取当前活跃模式的排序规则：
+     * - 若当前存在生效的本地自定义排序（标星/时长），优先返回以供排序弹窗高亮回显
+     * - 否则回退为当前模式的服务端真实排序规则
+     */
+    val currentOrderBean: OrderBean
+        get() = activeLocalOrder ?: serverOrderBean
 
     /**
      * 115 文件夹/文件混排参数：
@@ -124,8 +136,8 @@ class FileBrowserModule(
         runCatching {
             val files = fileRepository.getFiles(
                 cid = cid,
-                order = stateHolder.currentContentState.orderBean.type,
-                asc = stateHolder.currentContentState.orderBean.asc,
+                order = serverOrderBean.type,
+                asc = serverOrderBean.asc,
                 fcMix = currentFcMix
             )
             files.fileBeanList = formatFileBeanList(files.fileBeanList)
@@ -150,8 +162,8 @@ class FileBrowserModule(
         runCatching {
             val files = fileRepository.getFiles(
                 cid = cid,
-                order = stateHolder.currentContentState.orderBean.type,
-                asc = stateHolder.currentContentState.orderBean.asc,
+                order = serverOrderBean.type,
+                asc = serverOrderBean.asc,
                 fcMix = currentFcMix
             )
             // 请求的 cid 不是 0, 但返回的 cid 是 0。证明请求的 cid 不存在
@@ -236,9 +248,9 @@ class FileBrowserModule(
 
         stateHolder.setRefreshing(true)
 
-        // 记录请求发起时的上下文版本，用于并发校验防串位
+        // 记录请求发起时的上下文版本，用于并发校验防串位（分页网络请求严格采用服务端排序）
         val currentRequestSource = source
-        val currentRequestOrder = currentOrderBean
+        val currentRequestOrder = serverOrderBean
         val currentFcMix = this.currentFcMix
 
         // 获取当前物理游标起点，若未记录则默认以当前列表大小作为初始物理游标
@@ -264,8 +276,10 @@ class FileBrowserModule(
             // 【并发竞争保护】：仅在当前屏幕仍停留在发起请求的模式与上下文时才更新 UI
             if (
                 stateHolder.currentContentState.source == currentRequestSource &&
-                currentOrderBean == currentRequestOrder
+                serverOrderBean == currentRequestOrder
             ) {
+                // 分页追加数据后重置本地排序，直接以服务端返回的数据集和排序覆盖
+                activeLocalOrder = null
                 stateHolder.updateContentState {
                     copy(
                         fileBeanList = result.combinedList,
@@ -309,6 +323,7 @@ class FileBrowserModule(
                 if (isRefresh) {
                     refresh(currentCid)
                 }
+                _scrollToTopEvent.tryEmit(Unit)
             } else {
                 toastProvider.showToast("排序失败")
             }
@@ -316,6 +331,11 @@ class FileBrowserModule(
     }
 
     suspend fun updateOrder(order: OrderBean) {
+        if (order.orderType.isLocalOnly) {
+            applyLocalOrder(order)
+            return
+        }
+        activeLocalOrder = null
         when (val s = stateHolder.currentContentState.source) {
             is FileListSource.Search -> {
                 toastProvider.showToast("暂不支持搜索模式排序")
@@ -469,6 +489,7 @@ class FileBrowserModule(
     }
 
     suspend fun starFileScreen(order: OrderBean) {
+        activeLocalOrder = null
         val fcMix = currentFcMix
         val limit = UserSessionManager.requestLimitCount
 
@@ -503,6 +524,7 @@ class FileBrowserModule(
         name: String,
         order: OrderBean
     ) {
+        activeLocalOrder = null
         val currentCid = stateHolder.currentContentState.currentCid
         val fcMix = currentFcMix
         val limit = UserSessionManager.requestLimitCount
@@ -545,25 +567,85 @@ class FileBrowserModule(
         stateHolder.setRefreshing(false)
     }
 
-    fun sortByVideoTime() {
-        stateHolder.updateContentState {
-            copy(
-                fileBeanList = fileBeanList.sortedByDescending { it.playLong }
-            )
+    /**
+     * 应用本地自定义排序（仅在内存中针对当前列表重排，不同步至服务端）
+     * 1. 严格遵循 settingUiState.keepFoldersOnTop（开启置顶时文件夹优先，关闭时混排）
+     * 2. 标星排序：降序时标星在前，升序时未标星在前
+     * 3. 视频时长排序：降序时长从大到小，升序时长从小到大（无时长或非视频项始终沉底）
+     * 4. 纯内存视图重排，不改写全局 orderBean，绝不污染后续任何网络请求
+     */
+    fun applyLocalOrder(order: OrderBean) {
+        XLog.d("应用本地自定义排序: type=${order.type}, asc=${order.asc}")
+        val list = stateHolder.currentContentState.fileBeanList
+        if (list.isEmpty()) {
+            XLog.d("当前文件列表为空，忽略本地自定义排序")
+            return
         }
-    }
 
-    fun sortByStarFile() {
-        stateHolder.updateContentState {
-            val size = fileBeanList.filter { it.isStar }.size
-            if (size == 0) {
-                toastProvider.showToast("没有星标文件")
-                return@updateContentState this
+        // 针对没有匹配项给出提示并直接中断，不改变列表或任何状态
+        when (order.orderType) {
+            OrderType.STAR_FILE -> {
+                if (list.none { it.isStar }) {
+                    XLog.d("当前列表没有星标文件，中断本地排序")
+                    toastProvider.showToast("当前列表没有星标文件")
+                    return
+                }
             }
-            copy(
-                fileBeanList = fileBeanList.sortedByDescending { it.star }
-            )
+
+            OrderType.VIDEO_DURATION -> {
+                if (list.none { it.playLong > 0 || it.isVideo == 1 }) {
+                    XLog.d("当前列表没有视频文件，中断本地排序")
+                    toastProvider.showToast("当前列表没有视频文件")
+                    return
+                }
+            }
+
+            else -> {}
         }
+
+        val keepFoldersOnTop = settingUiState.keepFoldersOnTop
+        val comparator = Comparator<FileBean> { a, b ->
+            // 1. 文件夹置顶规则 (keepFoldersOnTop)
+            if (keepFoldersOnTop && a.isFolder != b.isFolder) {
+                return@Comparator if (a.isFolder) -1 else 1
+            }
+
+            // 2. 本地自定义排序规则
+            when (order.orderType) {
+                OrderType.STAR_FILE -> {
+                    val aStar = if (a.isStar) 1 else 0
+                    val bStar = if (b.isStar) 1 else 0
+                    // 降序(asc==0)：标星(1) 在前，未标星(0) 在后；升序(asc==1)：未标星(0) 在前，标星(1) 在后
+                    if (order.isAscending) aStar.compareTo(bStar) else bStar.compareTo(aStar)
+                }
+
+                OrderType.VIDEO_DURATION -> {
+                    val aDur = a.playLong
+                    val bDur = b.playLong
+                    val aHasDur = aDur > 0
+                    val bHasDur = bDur > 0
+
+                    if (aHasDur && bHasDur) {
+                        // 两者均有时长，按时长比较
+                        if (order.isAscending) aDur.compareTo(bDur) else bDur.compareTo(aDur)
+                    } else if (aHasDur != bHasDur) {
+                        // 有时长的排在前面，无时长的沉底（无论是升序还是降序）
+                        if (aHasDur) -1 else 1
+                    } else {
+                        0
+                    }
+                }
+
+                else -> 0
+            }
+        }
+
+        val sortedList = list.sortedWith(comparator)
+        activeLocalOrder = order
+        stateHolder.updateContentState {
+            copy(fileBeanList = sortedList)
+        }
+        _scrollToTopEvent.tryEmit(Unit)
     }
 
     // ==================== 选择模式内聚逻辑 ====================
@@ -708,6 +790,7 @@ class FileBrowserModule(
     }
 
     private fun setFiles(files: FilesBean) {
+        activeLocalOrder = null
         val currentOrder = OrderBean.from(files)
         val folderSource = FileListSource.Folder(files.cid, stringProvider)
         stateHolder.updateContentState {

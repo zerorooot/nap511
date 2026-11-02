@@ -234,9 +234,7 @@ fun FileAppTopBarDropdownMenu(onClick: (MenuItemAction, Int) -> Unit) {
     val listOf = listOf(
         MenuItemAction.GALLERY_MODE,
         MenuItemAction.FILE_SORT,
-        MenuItemAction.REFRESH_FILES,
-        MenuItemAction.VIDEO_SCHEDULE,
-        MenuItemAction.STAR_FILE
+        MenuItemAction.REFRESH_FILES
     )
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }

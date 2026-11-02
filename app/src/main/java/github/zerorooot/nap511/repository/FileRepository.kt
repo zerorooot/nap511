@@ -203,7 +203,7 @@ open class FileRepository {
         return fileService.remainingSpace(countSpaceNum)
     }
 
-    suspend fun order(body: Map<String, String>): BaseReturnMessage {
+    open suspend fun order(body: Map<String, String>): BaseReturnMessage {
         return fileService.order(body)
     }
 
