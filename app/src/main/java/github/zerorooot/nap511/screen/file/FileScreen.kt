@@ -63,7 +63,6 @@ import github.zerorooot.nap511.screen.components.TopBarAction
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileOpener
-import github.zerorooot.nap511.util.LazyScrollState
 import github.zerorooot.nap511.util.asScrollState
 import github.zerorooot.nap511.util.copy
 import github.zerorooot.nap511.util.isNotificationEnabled
@@ -95,7 +94,7 @@ fun FileScreen(
         "EndOverlay" -> FabPosition.EndOverlay
         else -> FabPosition.End
     }
-    var pendingStateScrollToIndex by remember { mutableIntStateOf(-1) }
+
     val contentState by fileViewModel.contentState.collectAsStateWithLifecycle()
     val fileBeanList = contentState.fileBeanList
     val refreshing = contentState.isRefreshing
@@ -228,14 +227,7 @@ fun FileScreen(
             val visibleCount = currentScrollState.visibleItemsCount
             val halfCount = if (visibleCount > 0) visibleCount / 2 else 4
             val targetTopIndex = (index - halfCount).coerceAtLeast(0)
-            pendingStateScrollToIndex = targetTopIndex
-        }
-    }
-    LaunchedEffect(pendingStateScrollToIndex) {
-        if (pendingStateScrollToIndex != -1) {
-            // 此时 composition 已 apply、列表已用排序后的数据 measure
-            currentScrollState.requestScrollToItem(pendingStateScrollToIndex, 0)
-            pendingStateScrollToIndex = -1
+            currentScrollState.requestScrollToItem(targetTopIndex, 0)
         }
     }
 
@@ -383,12 +375,12 @@ fun FileScreen(
 
             MenuItemAction.STAR_FILE -> {
                 fileViewModel.sortByStarFile()
-                pendingStateScrollToIndex = 0
+                currentScrollState.requestScrollToItem(0, 0)
             }
 
             MenuItemAction.VIDEO_SCHEDULE -> {
                 fileViewModel.sortByVideoTime()
-                pendingStateScrollToIndex = 0
+                currentScrollState.requestScrollToItem(0, 0)
             }
 
             MenuItemAction.FILE_SORT -> {

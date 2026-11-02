@@ -476,8 +476,9 @@ class FileBrowserModule(
         runCatching {
             val files = fileRepository.starFile(0, order, fcMix, limit)
             val formattedList = formatFileBeanList(files.fileBeanList)
+            val returnOrder = OrderBean.from(files)
             val targetSource =
-                FileListSource.Star("0", OrderBean.from(files), fcMix, stringProvider)
+                FileListSource.Star("0", returnOrder, fcMix, stringProvider)
 
             if (formattedList.size < limit || (files.count > 0 && formattedList.size >= files.count)) {
                 pagingStateStore.markComplete(targetSource.paginationKey)
@@ -488,7 +489,9 @@ class FileBrowserModule(
                     isLongClickState = false,
                     fileBeanList = formattedList,
                     totalCount = files.count,
-                    appBarTitle = targetSource.appName
+                    appBarTitle = targetSource.appName,
+                    pathList = files.path,
+                    isRefreshing = false,
                 )
             }
         }.onFailureToastAndLog(toastProvider)
@@ -554,6 +557,7 @@ class FileBrowserModule(
         stateHolder.updateContentState {
             val size = fileBeanList.filter { it.isStar }.size
             if (size == 0) {
+                toastProvider.showToast("没有星标文件")
                 return@updateContentState this
             }
             copy(

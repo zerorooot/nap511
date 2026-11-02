@@ -529,7 +529,7 @@ class VideoViewModel(
             VideoStarAction(fid = fid, star = isStar)
         }
         val starJson = Gson().toJson(starList)
-        XLog.d("VideoViewModel.back: starList count=${starList.size}, starJson=$starJson")
+        XLog.d("VideoViewModel.back: starList count=${starList.size}, starJson=$starJson, discardJson count=${discardedVideoList.size}, discardJson=${discardJson}")
 
         viewModelScope.launch {
             _uiEvent.emit(

@@ -122,16 +122,16 @@ fun AppNavHost(
         if (message.isNotEmpty()) {
             App.instance.toast(message)
         }
-        if (result.resultCode == Activity.RESULT_OK) {
-            val videoHistoryJson = data?.getStringExtra("videoHistory") ?: "{}"
+        if (data != null) {
+            val videoHistoryJson = data.getStringExtra("videoHistory") ?: "{}"
             val type: Type = object : TypeToken<MutableMap<String, VideoBean>>() {}.type
             val videoHistoryMap: MutableMap<String, VideoBean> =
                 Gson().fromJson(videoHistoryJson, type) ?: mutableMapOf()
-            val pickCode = data?.getStringExtra("pickCode") ?: ""
-            val cid = data?.getStringExtra("cid") ?: fileViewModel.currentCid
+            val pickCode = data.getStringExtra("pickCode") ?: ""
+            val cid = data.getStringExtra("cid") ?: fileViewModel.currentCid
 
             // 解析星标差分操作列表
-            val starJson = data?.getStringExtra("star") ?: "[]"
+            val starJson = data.getStringExtra("star") ?: "[]"
             val starType: Type = object : TypeToken<List<VideoStarAction>>() {}.type
             val starList: List<VideoStarAction> =
                 Gson().fromJson(starJson, starType) ?: emptyList()
@@ -140,7 +140,7 @@ fun AppNavHost(
             fileViewModel.onVideoActivityResult(pickCode, cid, videoHistoryMap, starList)
 
             // 处理移除批量确认弹窗
-            val discardJson = data?.getStringExtra("discard") ?: "[]"
+            val discardJson = data.getStringExtra("discard") ?: "[]"
             val discardType: Type = object : TypeToken<List<VideoBean>>() {}.type
             val discardList: List<VideoBean> =
                 Gson().fromJson(discardJson, discardType) ?: emptyList()
