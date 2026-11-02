@@ -94,7 +94,7 @@ fun FileScreen(
         "EndOverlay" -> FabPosition.EndOverlay
         else -> FabPosition.End
     }
-
+    var pendingStateScrollToIndex by remember { mutableIntStateOf(-1) }
     val contentState by fileViewModel.contentState.collectAsStateWithLifecycle()
     val fileBeanList = contentState.fileBeanList
     val refreshing = contentState.isRefreshing
@@ -227,7 +227,14 @@ fun FileScreen(
             val visibleCount = currentScrollState.visibleItemsCount
             val halfCount = if (visibleCount > 0) visibleCount / 2 else 4
             val targetTopIndex = (index - halfCount).coerceAtLeast(0)
-            currentScrollState.requestScrollToItem(targetTopIndex, 0)
+            pendingStateScrollToIndex = targetTopIndex
+        }
+    }
+    // 此时 composition 已 apply、列表已用排序后的数据 measure
+    LaunchedEffect(pendingStateScrollToIndex) {
+        if (pendingStateScrollToIndex != -1) {
+            currentScrollState.requestScrollToItem(pendingStateScrollToIndex, 0)
+            pendingStateScrollToIndex = -1
         }
     }
 
