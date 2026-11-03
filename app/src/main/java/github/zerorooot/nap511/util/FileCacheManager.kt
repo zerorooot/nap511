@@ -153,7 +153,20 @@ object FileCacheManager {
 
     fun containsKey(key: String): Boolean = memoryCache.containsKey(key)
 
-    fun getDate(key: String): FilesBean? = memoryCache[key]?.data
+    //fun getMemoryCache(key: String): FilesBean? = memoryCache[key]?.data
+
+    /**
+     * 同步获取纯内存缓存（非挂起函数，直接查询内存 LRU，不触发磁盘 IO） getMemoryCache
+     */
+    fun getDate(key: String): FilesBean? {
+        val now = System.currentTimeMillis()
+        val memEntry = memoryCache[key] ?: return null
+        if (now - memEntry.timestamp > ttlMillis) {
+            memoryCache.remove(key)
+            return null
+        }
+        return memEntry.data
+    }
 
     suspend fun loadAllCache() = withContext(Dispatchers.IO) {
         // 不保存磁盘缓存时，仅清理硬盘旧文件，保留内存缓存

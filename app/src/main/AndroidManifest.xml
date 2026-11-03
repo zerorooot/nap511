@@ -46,6 +46,24 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- 启动优化：禁用 WorkManager 与 EmojiCompat 的 ContentProvider 预初始化，改为按需惰性加载 -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <!-- 禁用启动前自动初始化 WorkManager (由 App 类实现 Configuration.Provider 按需初始化) -->
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+            <!-- 禁用启动前自动初始化 EmojiCompat (Compose Text 原生具备渲染能力) -->
+            <meta-data
+                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+
         <activity
             android:name=".activity.OfflineTaskActivity"
             android:excludeFromRecents="true"

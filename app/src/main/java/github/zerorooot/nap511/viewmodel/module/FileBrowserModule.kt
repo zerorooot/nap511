@@ -13,6 +13,7 @@ import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinator
 import github.zerorooot.nap511.util.FileCacheManager
+import github.zerorooot.nap511.util.StartupProfiler
 import github.zerorooot.nap511.util.formatFileBeanList
 import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
@@ -111,6 +112,7 @@ class FileBrowserModule(
     suspend fun loadCacheFile() {
         if (isInitialized) return
         isInitialized = true
+        StartupProfiler.step("FileBrowserModule.loadCacheFile start")
         stateHolder.setRefreshing(true)
         withContext(Dispatchers.IO) {
             // 优先校验登录状态
@@ -118,11 +120,27 @@ class FileBrowserModule(
                 stateHolder.setRefreshing(false)
                 // 未登录：静默发送跳转登录页事件
                 _navigationEvent.emit(NavEvent.NavigateToScreen(Route.Login))
+                StartupProfiler.step("FileBrowserModule.loadCacheFile: unauthenticated -> NavigateToScreen(Login)")
+                return@withContext
+            }
+
+            // 【首屏冷启动优化】：若首帧已直接从内存缓存注入了根目录 "0" 且数据不为空，无需重复覆盖重写 StateFlow 触发二次重组
+            val currentState = stateHolder.currentContentState
+            if (currentState.currentCid == "0" && currentState.fileBeanList.isNotEmpty()) {
+                XLog.d("FileBrowserModule.loadCacheFile: root files already populated from initial memory cache, items=${currentState.fileBeanList.size}")
+                val folderSource = currentState.source
+                val limit = UserSessionManager.requestLimitCount
+                if (currentState.fileBeanList.size < limit || (currentState.totalCount > 0 && currentState.fileBeanList.size >= currentState.totalCount)) {
+                    pagingStateStore.markComplete(folderSource.paginationKey)
+                }
+                stateHolder.setRefreshing(false)
+                StartupProfiler.step("FileBrowserModule.loadCacheFile: already populated, skip re-emission")
                 return@withContext
             }
 
             // FileCacheManager.loadAllCache() 已在 SplashScreenManager 加载阶段完成预加载
             getFiles("0")
+            StartupProfiler.step("FileBrowserModule.loadCacheFile: root files (0) loaded")
         }
     }
 

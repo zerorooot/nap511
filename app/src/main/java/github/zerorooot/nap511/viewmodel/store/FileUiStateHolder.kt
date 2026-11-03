@@ -1,8 +1,12 @@
 package github.zerorooot.nap511.viewmodel.store
 
+import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.FileContentUiState
 import github.zerorooot.nap511.bean.FileDialogUiState
 import github.zerorooot.nap511.bean.FileListSource
+import github.zerorooot.nap511.bean.OrderBean
+import github.zerorooot.nap511.util.FileCacheManager
+import github.zerorooot.nap511.util.formatFileBeanList
 import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,10 +21,7 @@ import kotlinx.coroutines.flow.update
 class FileUiStateHolder(stringProvider: AppStringProvider) {
     /** 1. 文件列表核心浏览与模式状态流 */
     private val _contentState = MutableStateFlow(
-        FileContentUiState(
-            appBarTitle = stringProvider.defaultAppName,
-            source = FileListSource.Folder("0", stringProvider)
-        )
+        createInitialContentState(stringProvider)
     )
     val contentState: StateFlow<FileContentUiState> = _contentState.asStateFlow()
 
@@ -52,5 +53,36 @@ class FileUiStateHolder(stringProvider: AppStringProvider) {
     /** 关闭当前弹窗并重置弹窗状态 */
     fun closeDialog() {
         _dialogState.update { FileDialogUiState() }
+    }
+
+    companion object {
+        /**
+         * 创建初始 UI 状态：
+         * 【冷启动性能优化】：若 FileCacheManager 已经在预加载阶段将根目录 "0" 读入内存缓存，
+         * 则直接首帧装填，避免启动后因异步读取产生空白列表闪烁及二次全量重组。
+         */
+        fun createInitialContentState(stringProvider: AppStringProvider): FileContentUiState {
+            val folderSource = FileListSource.Folder("0", stringProvider)
+            val cached = runCatching { FileCacheManager.getDate("0") }.getOrNull()
+            if (cached != null) {
+                XLog.d("FileUiStateHolder: Hit root memory cache on init, items=${cached.fileBeanList.size}")
+                val formattedList = formatFileBeanList(cached.fileBeanList)
+                return FileContentUiState(
+                    source = folderSource,
+                    fileBeanList = formattedList,
+                    currentCid = "0",
+                    totalCount = cached.count,
+                    orderBean = OrderBean.from(cached),
+                    pathList = cached.path,
+                    isRefreshing = false,
+                    isLongClickState = false,
+                    appBarTitle = folderSource.appName
+                )
+            }
+            return FileContentUiState(
+                appBarTitle = stringProvider.defaultAppName,
+                source = folderSource
+            )
+        }
     }
 }

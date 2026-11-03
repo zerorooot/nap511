@@ -18,19 +18,26 @@ import androidx.lifecycle.lifecycleScope
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.SplashScreenManager
+import github.zerorooot.nap511.util.StartupProfiler
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        StartupProfiler.step("MainActivity.onCreate start")
         // 统一通过 SplashScreenManager 管理动态启动屏的安装、挂起判断与渐隐退场
         // 确保必须在 super.onCreate 之前调用
         // 在 SplashScreen 显示期间发起预加载流程（数据就绪后自动将 isReady 设为 true 促使 SplashScreen 淡出）
         SplashScreenManager.setup(this, lifecycleScope)
         super.onCreate(savedInstanceState)
+        StartupProfiler.step("MainActivity super.onCreate completed")
         //不设置会报错：No NavigationEventDispatcher was provided via LocalNavigationEventDispatcherOwner
         initializeViewTreeOwners()
         enableEdgeToEdge()
 
+        StartupProfiler.step("MainActivity.setContent start")
         setContent {
+            LaunchedEffect(Unit) {
+                StartupProfiler.step("MainActivity Compose initial composition completed")
+            }
             val settingsRepository = SettingsRepository.getInstance()
             val settingUiState by settingsRepository.settingUiStateFlow
                 .collectAsStateWithLifecycle()
@@ -79,6 +86,11 @@ class MainActivity : AppCompatActivity() {
                     )
                 }
             }
+        }
+        StartupProfiler.step("MainActivity.onCreate end (setContent registered)")
+        window.decorView.post {
+            StartupProfiler.step("MainActivity decorView first frame post/draw")
+            StartupProfiler.finish("Startup Completed (First Frame Drawn)")
         }
     }
 

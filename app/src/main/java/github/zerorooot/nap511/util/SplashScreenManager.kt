@@ -45,46 +45,36 @@ object SplashScreenManager {
         activity: ComponentActivity,
         scope: CoroutineScope,
     ): SplashScreen {
+        StartupProfiler.step("SplashScreenManager.setup start")
         // 1. 初始化并挂载系统 SplashScreen
         val splashScreen = activity.installSplashScreen()
+        StartupProfiler.step("SplashScreenManager installSplashScreen completed")
 
         scope.launch(Dispatchers.IO) {
+            StartupProfiler.step("SplashScreenManager preheat coroutine started")
             //【冷启动性能优化】磁盘文件缓存（如 0.json 等）在后台异步加载，不阻塞 SplashScreen 淡出退场
             launch {
+                StartupProfiler.step("SplashScreenManager FileCacheManager.loadAllCache start")
                 FileCacheManager.loadAllCache()
+                StartupProfiler.step("SplashScreenManager FileCacheManager.loadAllCache completed")
             }
 
             // 核心账号凭证就绪后，直接在 IO 线程置 isReady = true（无需切主线程排队），使首帧 onPreDraw 即可立即通过
             isReady = true
+            StartupProfiler.step("SplashScreenManager isReady set to true")
         }
 
         // 2. 挂起控制：在核心状态（如 DataStore 配置及预加载）加载完成前，保持动态 SplashScreen 显示
         // 返回 true 表示正在加载必要配置，继续保持动画展示；
-        //返回 false 表示就绪，触发平滑退出动画。
+        // 返回 false 表示就绪，系统自动以硬件加速平滑退场。
+        var conditionSatisfiedLogged = false
         splashScreen.setKeepOnScreenCondition {
-            !isReady
-        }
-
-        // 3. 定制优雅平滑的退场动效（Alpha 渐隐动画）
-        splashScreen.setOnExitAnimationListener { splashScreenViewProvider ->
-            val splashView = splashScreenViewProvider.view
-
-            // 使用 ObjectAnimator 创建透明度从 1.0f 到 0.0f 的平滑过渡
-            val fadeOut = ObjectAnimator.ofFloat(
-                splashView,
-                View.ALPHA,
-                1f,
-                0f
-            ).apply {
-                interpolator = AccelerateInterpolator()
-                duration = EXIT_ANIMATION_DURATION
-                // 动画结束时必须调用 remove()，由系统安全移除 SplashScreen 视图层，防止内存泄漏
-                doOnEnd {
-                    splashScreenViewProvider.remove()
-                }
+            val keep = !isReady
+            if (!keep && !conditionSatisfiedLogged) {
+                conditionSatisfiedLogged = true
+                StartupProfiler.step("SplashScreen keepOnScreenCondition satisfied (ready to exit)")
             }
-
-            fadeOut.start()
+            keep
         }
 
         return splashScreen
