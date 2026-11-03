@@ -119,8 +119,6 @@ class OfflineTaskActivity : ComponentActivity() {
                             .toSet()
                             .toMutableList()
 
-
-                    App.instance.toast("开始下载！")
                     XLog.d(
                         "startOfflineTaskImmediately , workInfos size=${workInfos.size}"
                     )
@@ -193,7 +191,7 @@ class OfflineTaskActivity : ComponentActivity() {
                         )
                         val allPath = SettingsRepository.getDataSuspend(
                             ConfigKeyUtil.DEFAULT_OFFLINE_PATH,
-                            "根目录/云下载"
+                            "/根目录/云下载"
                         )
                         val path = allPath.substringAfterLast("/")
                         val size = currentOfflineTaskList.size

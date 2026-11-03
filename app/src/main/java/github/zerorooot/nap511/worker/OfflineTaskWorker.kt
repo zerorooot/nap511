@@ -24,6 +24,7 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.OfflineTaskActivity
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
+import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileCacheManager
 import java.util.StringJoiner
@@ -75,7 +76,7 @@ class OfflineTaskWorker(
         XLog.i("OfflineTaskWorker cid $cid addTaskReturn $addTaskReturn task size=${a.size} currentOfflineTask: $a")
 
         val state = addTaskReturn.first
-        val message = if (state) "成功添加任务到'$path'目录" else addTaskReturn.second
+        val message = addTaskReturn.second
         if (state) {
             //清空缓存
             SettingsRepository.saveData(
@@ -84,10 +85,14 @@ class OfflineTaskWorker(
             )
         }
         XLog.v("OfflineTaskWorker checkOfflineTask $message")
-        //只有失败才弹通知
-        if (!state) {
+
+        if (state) {
+            App.instance.toast(message)
+        } else {
+            //只有失败才弹通知
             toast(message, a, cid)
         }
+
         val addTaskData = Data.Builder()
             .putBoolean("state", state)
             .putString("return", message)
@@ -148,7 +153,7 @@ class OfflineTaskWorker(
     override suspend fun getForegroundInfo(): ForegroundInfo {
         createNotificationChannel()
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setContentTitle("正在下载文件...")
+            .setContentTitle("正在提交连接...")
             .setContentText("请保持网络连接")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true) // 前台服务运行中不可滑动消除

@@ -24,10 +24,12 @@ import com.elvishew.xlog.printer.file.clean.FileLastModifiedCleanStrategy
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.network.NetworkClient
 import github.zerorooot.nap511.util.network.OneOneFiveImageExpirationInterceptor
+import github.zerorooot.nap511.util.network.UserSessionManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
@@ -69,12 +71,24 @@ class App : Application(), ImageLoaderFactory {
         ComposeFoundationFlags.isNewContextMenuEnabled = false
         super.onCreate()
         instance = this
-
-        // 初始化 FileCacheManager 单例目录
-        FileCacheManager.init(File(this.cacheDir, "file_list_cache"))
-
         // 预热 SettingsRepository，在应用进程启动时即触发后台异步预读 DataStore
         val settingsRepository = SettingsRepository.getInstance()
+        appScope.launch {
+            // 初始化 FileCacheManager 单例目录
+            FileCacheManager.init(File(this@App.cacheDir, "file_list_cache"))
+
+            val settings = settingsRepository.settingUiStateFlow.first { it.isLoaded }
+            // 同步快速完成会话网络凭证初始化
+            val limit = settings.requestLimitCount.toIntOrNull() ?: 200
+            UserSessionManager.init(
+                cookie = settings.cookie,
+                uid = settings.uid,
+                requestLimitCount = limit
+            )
+
+            FileCacheManager.saveRequestCache = settings.saveRequestCache
+        }
+
 
         // 同步初始化 XLog 日志框架，确保在冷启动或独立 Activity 启动时 XLog 已就绪
         initLog()

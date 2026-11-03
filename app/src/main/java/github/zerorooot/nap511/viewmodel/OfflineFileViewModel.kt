@@ -345,7 +345,15 @@ class OfflineFileViewModel(
     fun addTask(list: List<String>, currentCid: String, path: String, handle: (Boolean) -> Unit) {
         viewModelScope.launch {
             runCatching {
-                fileRepository.addOfflineTask(list, currentCid, path, handle)
+                val addOfflineTask = fileRepository.addOfflineTask(list, currentCid, path, handle)
+                toastProvider.showToast(addOfflineTask.second)
+                if (addOfflineTask.first) {
+                    //清空缓存
+                    SettingsRepository.saveData(
+                        ConfigKeyUtil.CURRENT_OFFLINE_TASK,
+                        ""
+                    )
+                }
             }.onFailureToastAndLog(toastProvider)
         }
     }

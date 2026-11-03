@@ -8,10 +8,8 @@ import androidx.core.animation.doOnEnd
 import androidx.core.splashscreen.SplashScreen
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import github.zerorooot.nap511.repository.SettingsRepository
-import github.zerorooot.nap511.util.network.UserSessionManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -46,30 +44,17 @@ object SplashScreenManager {
     fun setup(
         activity: ComponentActivity,
         scope: CoroutineScope,
-        settingsRepository: SettingsRepository,
     ): SplashScreen {
         // 1. 初始化并挂载系统 SplashScreen
         val splashScreen = activity.installSplashScreen()
 
         scope.launch(Dispatchers.IO) {
-            // 等待 DataStore 基础配置载入完成
-            val settings = settingsRepository.settingUiStateFlow.first { it.isLoaded }
-
-            // 1. 同步快速完成会话网络凭证初始化
-            val limit = settings.requestLimitCount.toIntOrNull() ?: 200
-            UserSessionManager.init(
-                cookie = settings.cookie,
-                uid = settings.uid,
-                requestLimitCount = limit
-            )
-
-            // 2. 【冷启动性能优化】磁盘文件缓存（如 0.json 等）在后台异步加载，不阻塞 SplashScreen 淡出退场
+            //【冷启动性能优化】磁盘文件缓存（如 0.json 等）在后台异步加载，不阻塞 SplashScreen 淡出退场
             launch {
-                FileCacheManager.saveRequestCache = settings.saveRequestCache
                 FileCacheManager.loadAllCache()
             }
 
-            // 3. 核心账号凭证就绪后，直接在 IO 线程置 isReady = true（无需切主线程排队），使首帧 onPreDraw 即可立即通过
+            // 核心账号凭证就绪后，直接在 IO 线程置 isReady = true（无需切主线程排队），使首帧 onPreDraw 即可立即通过
             isReady = true
         }
 

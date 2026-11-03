@@ -51,6 +51,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import github.zerorooot.nap511.bean.ForceOpenType
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderType
@@ -301,7 +302,11 @@ fun DiscardVideosDialog(
 ) {
     AlertDialog(
         modifier = Modifier.widthIn(max = 560.dp),
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},// 外部事件不再触发关闭；也可保留为 onDismiss
+        properties = DialogProperties(
+            dismissOnClickOutside = false, // 点击弹窗外部（旁边遮罩）不关闭
+            dismissOnBackPress = false      // 按系统返回键/侧滑手势不关闭，确保只能点击确认或取消
+        ),
         title = {
             Text(text = "确认删除移除视频", style = MaterialTheme.typography.titleMedium)
         },

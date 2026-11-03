@@ -118,7 +118,7 @@ open class FileRepository {
         val downloadPath = setDownloadPath(currentCid)
         XLog.i("add task downloadPath $downloadPath")
         if (!downloadPath.state) {
-            App.instance.toast("设置离线位置失败，默认保存到\"云下载\"目录")
+            return Pair(false, downloadPath.error)
         }
         val quota = offlineService.quota()
         val surplus = quota.surplus - list.size
@@ -137,25 +137,12 @@ open class FileRepository {
         val message = if (addTask.state) {
             "成功将任务添加到‘${offlinePath}’目录，剩余配额${surplus}个"
         } else {
-            //把失败的离线链接保存起来
-            val currentOfflineTaskList =
-                SettingsRepository.getDataSuspend(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
-                    .split("\n")
-                    .filter { i -> i != "" && i != " " }.toSet().toMutableList()
-            currentOfflineTaskList.addAll(list)
-            val stringJoiner = StringJoiner("\n")
-            currentOfflineTaskList.toSet().forEach { stringJoiner.add(it) }
-            //写入缓存
-            SettingsRepository.saveData(
-                ConfigKeyUtil.CURRENT_OFFLINE_TASK, stringJoiner.toString()
-            )
             if (addTask.errorMsg.contains("请验证账号")) {
                 handle.invoke(true)
             }
             "任务添加失败，${addTask.errorMsg}"
         }
 
-        App.instance.toast(message)
         return Pair(addTask.state, message)
     }
 

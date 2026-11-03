@@ -21,17 +21,17 @@ import github.zerorooot.nap511.util.SplashScreenManager
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        val settingsRepository = SettingsRepository.getInstance()
         // 统一通过 SplashScreenManager 管理动态启动屏的安装、挂起判断与渐隐退场
         // 确保必须在 super.onCreate 之前调用
         // 在 SplashScreen 显示期间发起预加载流程（数据就绪后自动将 isReady 设为 true 促使 SplashScreen 淡出）
-        SplashScreenManager.setup(this, lifecycleScope, settingsRepository)
+        SplashScreenManager.setup(this, lifecycleScope)
         super.onCreate(savedInstanceState)
         //不设置会报错：No NavigationEventDispatcher was provided via LocalNavigationEventDispatcherOwner
         initializeViewTreeOwners()
         enableEdgeToEdge()
 
         setContent {
+            val settingsRepository = SettingsRepository.getInstance()
             val settingUiState by settingsRepository.settingUiStateFlow
                 .collectAsStateWithLifecycle()
 
