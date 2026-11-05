@@ -1,30 +1,12 @@
 package github.zerorooot.nap511.screenitem
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import coil.size.Scale
+import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.screen.components.MenuItemAction
 import github.zerorooot.nap511.screen.components.RecycleMoreMenu
@@ -41,93 +23,52 @@ fun RecycleCellItem(
     val size = recycleBean.fileSizeString
     val time = recycleBean.modifiedTimeString
     val parentName = recycleBean.parentName
-    val imageData = recycleBean.photoThumb.ifEmpty { image }
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        tonalElevation = 10.dp,
-        modifier = modifier.padding(1.dp)
-    ) {
-        Card(
-            modifier = Modifier
-                .padding(4.dp, 4.dp)
-                .height(85.dp),
-        ) {
-            Row(
-                Modifier.fillMaxSize()
-            ) {
-                Box(
-                    Modifier
-                        .height(60.dp)
-                        .align(Alignment.CenterVertically)
-                ) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(imageData)
-                            .memoryCacheKey(recycleBean.id)
-                            .diskCacheKey(recycleBean.id)
-                            .scale(Scale.FILL)
-                            .placeholder(image)
-                            .error(image) // 加载失败时也显示占位图
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = "File Thumbnail",
-                        modifier = Modifier.size(60.dp), // 用 size 替代 height + width
-                        contentScale = ContentScale.Fit
-                    )
+
+    BaseCellCard(
+        modifier = modifier,
+        leadingContent = {
+            FileThumbnail(
+                iconRes = image,
+                thumbUrl = recycleBean.photoThumb,
+                cacheKey = recycleBean.id,
+                contentDescription = "Recycle Thumbnail",
+                onLoadSuccess = {
+                    XLog.d("RecycleCellItem [缩略图加载成功] index=$index, name=$name")
+                },
+                onLoadError = {
+                    XLog.w("RecycleCellItem [缩略图加载失败] index=$index, name=$name")
                 }
-
-                Column(
-                    verticalArrangement = Arrangement.SpaceEvenly,
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .weight(0.7f)
-                ) {
-                    AutoSizableTextField(
-                        value = name,
-                        modifier = Modifier
-                            .padding(start = 4.dp, top = 9.dp)
-                            .fillMaxWidth(),
-                        minFontSize = 10.sp,
-                        maxLines = 2
-                    )
-                    Text(
-                        modifier = Modifier.padding(start = 4.dp, top = 4.dp),
-                        text = parentName,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .padding(start = 5.dp)
-                            .fillMaxSize()
-                    ) {
-                        Text(
-                            text = size,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1
-                        )
-                        Text(
-                            text = time,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-
-                    }
-                }
-
-                RecycleMoreMenu { itemAction, _ ->
-                    menuOnClick.invoke(itemAction, index)
-                }
-
+            )
+        },
+        titleContent = {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        subtitleContent = if (parentName.isNotEmpty()) {
+            {
+                Text(
+                    text = parentName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
-
+        } else null,
+        metadataContent = {
+            BaseCellMetadata(
+                metaList = listOf(size, time)
+            )
+        },
+        trailingContent = {
+            RecycleMoreMenu { itemAction, _ ->
+                XLog.d("RecycleCellItem [菜单点击] index=$index, action=$itemAction, name=$name")
+                menuOnClick.invoke(itemAction, index)
+            }
         }
-
-
-    }
+    )
 }

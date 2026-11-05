@@ -2,8 +2,10 @@ package github.zerorooot.nap511.screen.file
 
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -42,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
@@ -431,6 +434,9 @@ fun OfflineFileContent(
                         LazyVerticalGrid(
                             state = gridState,
                             columns = GridCells.Adaptive(minSize = gridCellMinSize),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
                             gridItemsIndexed(
@@ -454,7 +460,9 @@ fun OfflineFileContent(
                     ) {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            state = listState
+                            state = listState,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             itemsIndexed(
                                 items = currentSubList,

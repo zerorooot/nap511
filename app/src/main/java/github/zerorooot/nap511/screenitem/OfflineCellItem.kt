@@ -1,43 +1,27 @@
 package github.zerorooot.nap511.screenitem
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.screen.components.MenuItemAction
 import github.zerorooot.nap511.screen.components.OfflineFileMoreMenu
 
-
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OfflineCellItem(
     offlineTask: OfflineTask,
+    modifier: Modifier = Modifier,
     itemOnClick: (OfflineTask) -> Unit,
     menuOnClick: (MenuItemAction) -> Unit
 ) {
@@ -46,67 +30,31 @@ fun OfflineCellItem(
     val size = offlineTask.sizeString
     val time = offlineTask.timeString
     val percent = offlineTask.percentString
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        tonalElevation = 10.dp,
-        modifier = Modifier
-            .padding(1.dp)
-            .combinedClickable(
-                onClick = {
-                    itemOnClick.invoke(offlineTask)
-                }
-            ),
-    ) {
-        Card(
-            modifier = Modifier
-                .padding(4.dp, 4.dp)
-                .height(80.dp),
-        ) {
-            Row(
-                Modifier
-                    .fillMaxSize()
-            ) {
-                Box(
-                    Modifier
-                        .height(60.dp)
-                        .align(Alignment.CenterVertically)
-                ) {
-                    Image(
-                        painter = painterResource(image),
-                        modifier = Modifier
-                            .height(60.dp)
-                            .width(60.dp),
-                        contentScale = ContentScale.Fit,
-                        contentDescription = "",
-                    )
-                }
 
-                Column(
-                    verticalArrangement = Arrangement.SpaceEvenly,
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .weight(0.7f)
-                ) {
-                    AutoSizableTextField(
-                        value = name,
-                        modifier = Modifier
-                            .padding(start = 4.dp, top = 9.dp)
-                            .fillMaxWidth(),
-                        minFontSize = 10.sp,
-                        maxLines = 2
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .padding(start = 5.dp, top = 9.dp)
-                            .fillMaxSize()
-                    ) {
-                        Text(
-                            text = size,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1
-                        )
+    BaseCellCard(
+        modifier = modifier,
+        onClick = {
+            XLog.d("OfflineCellItem [点击] name=$name")
+            itemOnClick.invoke(offlineTask)
+        },
+        leadingContent = {
+            FileThumbnail(
+                iconRes = image,
+                contentDescription = "Offline Task Icon"
+            )
+        },
+        titleContent = {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        metadataContent = {
+            BaseCellMetadata(
+                prefixContent = if (percent.isNotEmpty()) {
+                    {
                         Box(
                             modifier = Modifier
                                 .background(
@@ -122,27 +70,19 @@ fun OfflineCellItem(
                                 maxLines = 1
                             )
                         }
-                        Text(
-                            text = time,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
                     }
-                }
-
-                OfflineFileMoreMenu { itemAction, _ ->
-                    menuOnClick.invoke(itemAction)
-                }
+                } else null,
+                metaList = listOf(size, time)
+            )
+        },
+        trailingContent = {
+            OfflineFileMoreMenu { itemAction, _ ->
+                XLog.d("OfflineCellItem [菜单点击] action=$itemAction, name=$name")
+                menuOnClick.invoke(itemAction)
             }
-
         }
-
-
-    }
+    )
 }
-
 
 @Preview
 @Composable
@@ -153,6 +93,9 @@ fun p() {
         percentString = "43%",
         timeString = "2023-02-13 12:43"
     )
-    OfflineCellItem(offlineTask, {}, { _ -> })
-
+    OfflineCellItem(
+        offlineTask = offlineTask,
+        itemOnClick = {},
+        menuOnClick = { _ -> }
+    )
 }

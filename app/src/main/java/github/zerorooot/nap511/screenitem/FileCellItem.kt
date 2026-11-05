@@ -1,50 +1,16 @@
 package github.zerorooot.nap511.screenitem
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalFontFamilyResolver
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.Paragraph
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import coil.imageLoader
-import coil.request.ImageRequest
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
@@ -52,7 +18,6 @@ import github.zerorooot.nap511.bean.FileItemActions
 import github.zerorooot.nap511.screen.components.FileMoreMenu
 import github.zerorooot.nap511.screen.components.FolderMoreMenu
 import github.zerorooot.nap511.screen.components.MenuItemAction
-import github.zerorooot.nap511.util.getCoilCacheUrl
 
 internal const val EXPIRED_IMAGE_TIP = "图片已过期，请刷新"
 
@@ -67,7 +32,6 @@ internal fun rememberFileDisplayName(fileBean: FileBean): MutableState<String> =
         mutableStateOf(fileBean.name)
     }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FileCellItem(
     fileBean: FileBean,
@@ -81,249 +45,97 @@ fun FileCellItem(
     var name by rememberFileDisplayName(fileBean)
     val size = fileBean.sizeString
     val time = fileBean.createTimeString
-    val isStar=fileBean.isStar
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        tonalElevation = 10.dp,
-        modifier = modifier
-            .padding(1.dp)
-            .combinedClickable(onClick = {
-                itemActions.onItemClick.invoke(index)
-            }, onLongClick = {
-                itemActions.onItemLongClick.invoke(index)
-            }),
-        color = if (fileBean.isSelect) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface) {
-        Card(
-            modifier = Modifier
-                .padding(4.dp, 4.dp)
-                .height(80.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if ((clickIndex == index) && !fileBean.isSelect) MaterialTheme.colorScheme.surfaceContainerLow else Color.Transparent
-            ),
-        ) {
-            Row(
-                Modifier.fillMaxSize()
-            ) {
-                Box(
-                    Modifier
-                        .height(60.dp)
-                        .align(Alignment.CenterVertically)
-                ) {
-                    if (fileBean.photoThumb == "") {
-                        Image(
-                            painter = painterResource(image),
-                            modifier = Modifier.size(60.dp), // 用 size 替代 height + width
-                            contentScale = ContentScale.Fit,
-                            contentDescription = "File Photo",
-                        )
-                    } else {
-                        val context = LocalContext.current
-                        val imageLoader = context.imageLoader
+    val isStar = fileBean.isStar
+    val isVideo = fileBean.isVideo == 1
+    val isAudio = fileBean.fileIco == R.drawable.mp3
+    val playLong = fileBean.playLongString
+    val playProgress = if (fileBean.playLong > 0 && fileBean.currentPlayTime > 0) {
+        (fileBean.currentPlayTime.toFloat() / fileBean.playLong.toFloat()).coerceIn(0f, 1f)
+    } else 0f
 
-                        val imageData = getCoilCacheUrl(imageLoader, fileBean.fileId)
-                            ?: fileBean.photoThumb.ifEmpty { image }
-
-                        AsyncImage(
-                            model = ImageRequest.Builder(context).data(imageData)
-                            .memoryCacheKey(fileBean.fileId).diskCacheKey(fileBean.fileId)
-                            .scale(coil.size.Scale.FILL).placeholder(image)
-                            .error(R.drawable.ic_image_broken) // 加载失败时也显示占位图
-                            .crossfade(true).build(),
-                            onSuccess = { successState ->
-                                // 图片重新加载成功时，若名称处于过期提示状态则立即恢复为真实文件名
-                                if (name != fileBean.name) {
-                                    name = fileBean.name
-                                }
-                                XLog.d("FileCellItem [图片加载成功] index=$index, name=${fileBean.name}, imageData=$imageData, source=${successState.result.dataSource}")
-                            },
-                            onError = {
-                                name = EXPIRED_IMAGE_TIP
-                            },
-                            contentDescription = "File Thumbnail",
-                            modifier = Modifier.size(60.dp), // 用 size 替代 height + width
-                            contentScale = ContentScale.Fit
-                        )
+    BaseCellCard(
+        modifier = modifier,
+        isSelected = fileBean.isSelect,
+        isHighlighted = (clickIndex == index) && !fileBean.isSelect,
+        onClick = {
+            XLog.d("FileCellItem [点击] index=$index, name=${fileBean.name}, isSelect=${fileBean.isSelect}")
+            itemActions.onItemClick.invoke(index)
+        },
+        onLongClick = {
+            XLog.d("FileCellItem [长按] index=$index, name=${fileBean.name}")
+            itemActions.onItemLongClick.invoke(index)
+        },
+        leadingContent = {
+            FileThumbnail(
+                iconRes = image,
+                thumbUrl = fileBean.photoThumb,
+                cacheKey = fileBean.fileId,
+                isVideo = isVideo,
+                videoDuration = playLong,
+                playProgress = playProgress,
+                contentDescription = "File Thumbnail",
+                onLoadSuccess = {
+                    if (name != fileBean.name) {
+                        name = fileBean.name
                     }
+                    XLog.d("FileCellItem [图片加载成功] index=$index, name=${fileBean.name}")
+                },
+                onLoadError = {
+                    name = EXPIRED_IMAGE_TIP
+                    XLog.w("FileCellItem [图片加载失败/过期] index=$index, name=${fileBean.name}")
                 }
-
-                val playLong = fileBean.playLongString
-                val playLongRatio = fileBean.playLongRatio
-                val isMedia = fileBean.isVideo == 1 || fileBean.fileIco == R.drawable.mp3
-
-                Column(
-                    verticalArrangement = Arrangement.SpaceEvenly,
-                    modifier = Modifier
-                        .padding(start = 8.dp, top = 2.dp, bottom = 2.dp)
-                        .fillMaxHeight()
-                        .weight(1f)
-                ) {
-                    // 1. 文件名（无中间信息时可支持显示 2 行）
-                    AutoSizableTextField(
-                        value = name,
-                        modifier = Modifier.fillMaxWidth(),
-                        fontSize = 15.sp,
-                        minFontSize = 10.sp,
-                        maxLines = 3
-                    )
-
-                    // 2.3 文件大小与修改时间（紧凑合并）
-                    val metaText = buildString {
-                        if (isStar) append("🌟 ")
-                        if (isMedia && playLong.isNotEmpty()) append(playLong)
-                        if (isMedia && playLongRatio.isNotEmpty()) append("$playLongRatio ")
-                        if (size.isNotEmpty()) append(size)
-                        if (size.isNotEmpty() && time.isNotEmpty()) append(" ")
-                        if (time.isNotEmpty()) append(time)
-                    }
-                    if (metaText.isNotEmpty()) {
-                        Text(
-                            text = metaText,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                    }
-
-
-                }
-
-                val dispatchMenuClick: (MenuItemAction, Int) -> Unit = { action, _ ->
-                    when (action) {
-                        MenuItemAction.CUT_FILE -> itemActions.onCut.invoke(index)
-                        MenuItemAction.DELETE_FILE -> itemActions.onDelete.invoke(fileBean)
-                        MenuItemAction.UNZIP_FILE -> itemActions.onUnzip.invoke(fileBean)
-                        MenuItemAction.RENAME_FILE -> itemActions.onRename.invoke(index)
-                        MenuItemAction.OFFLINE_CID -> itemActions.onSetOfflineCid.invoke(fileBean)
-                        MenuItemAction.FILE_INFO -> itemActions.onFileInfo.invoke(fileBean)
-                        MenuItemAction.ARIA2_DOWNLOAD -> itemActions.onAria2Download.invoke(index)
-                        MenuItemAction.STAR_FILE -> itemActions.onStar.invoke(fileBean)
-                        MenuItemAction.FORCE_OPEN -> itemActions.onForceOpen.invoke(index)
-                        else -> {}
-                    }
-                }
-
-                if (fileBean.isFolder) {
-                    FolderMoreMenu(dispatchMenuClick)
-                } else {
-                    FileMoreMenu(dispatchMenuClick)
-                }
-
-
-            }
-
-        }
-
-
-    }
-}
-
-@Composable
-fun AutoSizableTextField(
-    value: String,
-    modifier: Modifier = Modifier,
-    fontSize: TextUnit = 16.sp,
-    maxLines: Int = Int.MAX_VALUE,
-    minFontSize: TextUnit,
-    scaleFactor: Float = 0.9f,
-) {
-    // 将普通 String 包装为 Compose State，使 BoxWithConstraints（底层为 SubcomposeLayout）
-    // 的独立子组合在测量阶段建立对状态的直接 Snapshot 订阅，从而在文本变化时自动触发重测与重绘
-    val currentValue by rememberUpdatedState(value)
-
-    BoxWithConstraints(
-        modifier = modifier
-    ) {
-        val textValue = currentValue
-        var nFontSize = fontSize
-
-        // 1. 将 Composable 环境的变量提取到 lambda 外部
-        val density = LocalDensity.current
-        val fontFamilyResolver = LocalFontFamilyResolver.current
-
-        // 2. 移除 @Composable 注解，直接作为普通 lambda
-        val calculateParagraph = {
-            Paragraph(
-                text = textValue,
-                style = TextStyle(fontSize = nFontSize),
-                // 3. 直接使用 BoxWithConstraints 提供的 constraints
-                constraints = Constraints(maxWidth = constraints.maxWidth),
-                density = density,
-                fontFamilyResolver = fontFamilyResolver,
-                maxLines = maxLines,
-                // 4. 将 ellipsis = false 替换为 overflow = TextOverflow.Clip
-                overflow = TextOverflow.Clip
-                // 5. 移除了无法推断泛型的 spanStyles 和 placeholders，直接使用底层默认参数
             )
-        }
+        },
+        titleContent = {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        metadataContent = {
+            val metaList = buildList {
+                if (isAudio && playLong.isNotEmpty()) {
+                    add(playLong.trim())
+                } else if (isVideo && fileBean.playLongRatio.isNotEmpty()) {
+                    add(fileBean.playLongRatio.trim())
+                }
+                if (size.isNotEmpty()) {
+                    add(size)
+                }
+                if (time.isNotEmpty()) {
+                    add(time)
+                }
+            }
+            BaseCellMetadata(
+                isStar = isStar,
+                metaList = metaList
+            )
+        },
+        trailingContent = {
+            val dispatchMenuClick: (MenuItemAction, Int) -> Unit = { action, _ ->
+                XLog.d("FileCellItem [菜单点击] index=$index, action=$action, name=${fileBean.name}")
+                when (action) {
+                    MenuItemAction.CUT_FILE -> itemActions.onCut.invoke(index)
+                    MenuItemAction.DELETE_FILE -> itemActions.onDelete.invoke(fileBean)
+                    MenuItemAction.UNZIP_FILE -> itemActions.onUnzip.invoke(fileBean)
+                    MenuItemAction.RENAME_FILE -> itemActions.onRename.invoke(index)
+                    MenuItemAction.OFFLINE_CID -> itemActions.onSetOfflineCid.invoke(fileBean)
+                    MenuItemAction.FILE_INFO -> itemActions.onFileInfo.invoke(fileBean)
+                    MenuItemAction.ARIA2_DOWNLOAD -> itemActions.onAria2Download.invoke(index)
+                    MenuItemAction.STAR_FILE -> itemActions.onStar.invoke(fileBean)
+                    MenuItemAction.FORCE_OPEN -> itemActions.onForceOpen.invoke(index)
+                    else -> {}
+                }
+            }
 
-        var intrinsics = calculateParagraph()
-
-        with(density) {
-            while ((intrinsics.height.toDp() > maxHeight || intrinsics.didExceedMaxLines) && nFontSize >= minFontSize) {
-                nFontSize *= scaleFactor
-                intrinsics = calculateParagraph()
+            if (fileBean.isFolder) {
+                FolderMoreMenu(dispatchMenuClick)
+            } else {
+                FileMoreMenu(dispatchMenuClick)
             }
         }
-
-        Text(
-            text = textValue,
-            style = TextStyle(fontSize = nFontSize),
-            maxLines = maxLines,
-            overflow = TextOverflow.Ellipsis, // 确保超出 2 行时末尾正常显示省略号
-            fontWeight = FontWeight.Bold,
-        )
-    }
+    )
 }
-
-//@Composable
-//fun AutoSizableTextField(
-//    value: String,
-//    modifier: Modifier = Modifier,
-//    fontSize: TextUnit = 16.sp,
-//    maxLines: Int = Int.MAX_VALUE,
-//    minFontSize: TextUnit,
-//    scaleFactor: Float = 0.9f,
-//) {
-//    BoxWithConstraints(
-//        modifier = modifier
-//    ) {
-//        var nFontSize = fontSize
-//
-//        val calculateParagraph = @Composable {
-//            Paragraph(
-//                text = value,
-//                style = TextStyle(fontSize = nFontSize),
-//                constraints = Constraints(
-//                    maxWidth = ceil(
-//                        with(
-//                            LocalDensity.current
-//                        ) { maxWidth.toPx() }).toInt()
-//                ),
-//                density = LocalDensity.current,
-//                fontFamilyResolver = LocalFontFamilyResolver.current,
-//                spanStyles = listOf(),
-//                placeholders = listOf(),
-//                maxLines = maxLines,
-//                ellipsis = false
-//            )
-//        }
-//
-//        var intrinsics = calculateParagraph()
-//        with(LocalDensity.current) {
-//            while ((intrinsics.height.toDp() > maxHeight || intrinsics.didExceedMaxLines) && nFontSize >= minFontSize) {
-//                nFontSize *= scaleFactor
-//                intrinsics = calculateParagraph()
-//            }
-//        }
-//
-//        Text(
-//            text = value,
-//            style = TextStyle(fontSize = nFontSize),
-//            maxLines = maxLines,
-//            fontWeight = FontWeight.Bold,
-//        )
-//    }
-//}
 

@@ -1,8 +1,10 @@
 package github.zerorooot.nap511.screen.file
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -177,6 +179,9 @@ fun RecycleContent(
                     LazyVerticalGrid(
                         state = gridState,
                         columns = GridCells.Adaptive(minSize = gridCellMinSize),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
                         gridItemsIndexed(
@@ -200,7 +205,12 @@ fun RecycleContent(
                         thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
                     )
                 ) {
-                    LazyColumn(Modifier.fillMaxSize(), state = listState) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        state = listState,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
                         itemsIndexed(
                             items = uiState.recycleFileList,
                             key = { _, item -> item.hashCode() }

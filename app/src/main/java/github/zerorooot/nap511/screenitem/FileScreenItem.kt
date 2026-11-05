@@ -2,6 +2,7 @@ package github.zerorooot.nap511.screenitem
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -109,6 +110,9 @@ fun FileGridList(
         LazyVerticalGrid(
             state = gridState,
             columns = GridCells.Adaptive(minSize = displayConfig.gridCellMinSize),
+            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.fillMaxSize()
         ) {
             gridItemsIndexed(
@@ -149,6 +153,8 @@ fun FileColumnList(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = listState,
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             itemsIndexed(
                 items = dataState.fileBeanList,

@@ -184,6 +184,9 @@ fun RepeatFileScreen(
                     LazyVerticalGrid(
                         state = gridState,
                         columns = GridCells.Adaptive(minSize = gridCellMinSize),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
                         gridItems(uiState.fileList, key = { it.fileId }) { item ->
@@ -201,7 +204,10 @@ fun RepeatFileScreen(
                     )
                 ) {
                     LazyColumn(
-                        state = listState, modifier = Modifier.fillMaxSize()
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         items(uiState.fileList, key = { it.fileId }) { item ->
                             RepeatFileCardItem(

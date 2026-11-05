@@ -81,7 +81,7 @@ enum class MenuItemAction(
     FILE_SORT("文件排序", Icons.AutoMirrored.Outlined.Sort),
     REFRESH_FILES("强制刷新", Icons.Outlined.Refresh),
     VIDEO_SCHEDULE("视频时间", Icons.Outlined.Schedule),
-    STAR_FILE("标星文件", Icons.Outlined.StarOutline),
+    STAR_FILE("文件标星", Icons.Outlined.StarOutline),
 
     // 离线页顶栏菜单项
     COPY_PAGE_LINK("复制本页链接", Icons.Outlined.ContentCopy),
