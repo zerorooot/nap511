@@ -285,9 +285,13 @@ fun HtmlWebViewTopBarDropdownMenu(onClick: (MenuItemAction, Int) -> Unit) {
 
 @Composable
 fun FileAppTopBarMultipleDropdownMenu(
-    listOf: List<AppBarAction>,
     onClick: (AppBarAction, Int) -> Unit
 ) {
+    val listOf = listOf(
+        TopBarAction.SELECT_REVERSE,
+        TopBarAction.SELECT_UP,
+        TopBarAction.SELECT_DOWN
+    )
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }
 

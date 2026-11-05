@@ -738,6 +738,33 @@ class FileBrowserModule(
         }
     }
 
+    fun selectAll() {
+        stateHolder.updateContentState {
+            val list = fileBeanList.map { it.copy(isSelect = true) }
+            copy(
+                fileBeanList = list,
+                appBarTitle = list.size.toString(),
+                isLongClickState = true
+            )
+        }
+        XLog.d("selectAll: 已全选 ${stateHolder.currentContentState.fileBeanList.size} 项")
+    }
+
+    fun toggleSelectAll() {
+        stateHolder.updateContentState {
+            val isAllSelected = fileBeanList.isNotEmpty() && fileBeanList.all { it.isSelect }
+            val targetSelect = !isAllSelected
+            val list = fileBeanList.map { it.copy(isSelect = targetSelect) }
+            val count = if (targetSelect) list.size else 0
+            copy(
+                fileBeanList = list,
+                appBarTitle = count.toString(),
+                isLongClickState = true // 保留多选状态机，便于继续点选
+            )
+        }
+        XLog.d("toggleSelectAll: 切换全选状态，当前选中数: ${stateHolder.currentContentState.appBarTitle}")
+    }
+
     fun clearSelection() {
         stateHolder.updateContentState {
             val updatedList = fileBeanList.map { it.copy(isSelect = false) }

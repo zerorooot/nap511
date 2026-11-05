@@ -237,6 +237,49 @@ class FileBrowserModuleTest {
     }
 
     @Test
+    fun `test selectAll selects all items and keeps multi-select state`() {
+        val items = (1..5).map { createFileBean(it.toString(), "item$it") }
+        stateHolder.updateContentState {
+            copy(fileBeanList = items)
+        }
+
+        module.selectAll()
+
+        val content = stateHolder.currentContentState
+        assertTrue(content.isLongClickState)
+        assertEquals("5", content.appBarTitle)
+        assertTrue(content.fileBeanList.all { it.isSelect })
+    }
+
+    @Test
+    fun `test toggleSelectAll toggles between select all and zero selection keeping multi-select mode`() {
+        val items = (1..3).map { createFileBean(it.toString(), "item$it") }
+        stateHolder.updateContentState {
+            copy(fileBeanList = items)
+        }
+
+        // 第一次调用：未全选 -> 全选
+        module.toggleSelectAll()
+        var content = stateHolder.currentContentState
+        assertTrue(content.isLongClickState)
+        assertEquals("3", content.appBarTitle)
+        assertTrue(content.fileBeanList.all { it.isSelect })
+
+        // 第二次调用：已全选 -> 0 项选中（保持多选态，不自动退出）
+        module.toggleSelectAll()
+        content = stateHolder.currentContentState
+        assertTrue(content.isLongClickState)
+        assertEquals("0", content.appBarTitle)
+        assertTrue(content.fileBeanList.none { it.isSelect })
+
+        // 在 0 选状态下调用 back：应正确退出多选模式
+        val backResult = module.back()
+        assertEquals(BackResult.Handled, backResult)
+        assertFalse(stateHolder.currentContentState.isLongClickState)
+        assertEquals("nap511", stateHolder.currentContentState.appBarTitle)
+    }
+
+    @Test
     fun `test selectToUp and selectToDown`() {
         val items = (0..4).map { createFileBean(it.toString(), "item$it") }
         stateHolder.updateContentState {

@@ -313,11 +313,14 @@ class FileViewModel(
     fun selectToUp() = browserModule.selectToUp()
     fun selectToDown() = browserModule.selectToDown()
     fun selectReverse() = browserModule.selectReverse()
+    fun selectAll() = browserModule.selectAll()
+    fun toggleSelectAll() = browserModule.toggleSelectAll()
     fun clearSelection() = browserModule.clearSelection()
     fun startMultiSelect(index: Int) = browserModule.startMultiSelect(index)
     fun recoverFromLongPress() = browserModule.recoverFromLongPress()
 
     // 文件操作（增删改移）
+    fun onMultiSelectRename() = mutatorModule.onMultiSelectRename()
     fun createFolder(name: String) = viewModelScope.launch { mutatorModule.createFolder(name) }
     fun rename(fileBean: FileBean? = null, name: String) =
         viewModelScope.launch { mutatorModule.rename(fileBean, name) }

@@ -465,8 +465,8 @@ class FileMutatorModuleTest {
     }
 
     @Test
-    fun `test batchRename supports folders with categoryId`() = kotlinx.coroutines.test.runTest {
-        val folder = FileBean(fileId = "", categoryId = "c100", name = "旧目录", isFolder = true, isSelect = true)
+    fun `test batchRename supports folders`() = kotlinx.coroutines.test.runTest {
+        val folder = FileBean(fileId = "c100", categoryId = "c100", name = "旧目录", isFolder = true, isSelect = true)
         stateHolder.updateContentState {
             copy(
                 source = FileListSource.Folder("0", fakeStringProvider),
@@ -507,5 +507,57 @@ class FileMutatorModuleTest {
         assertEquals("item2_renamed.txt", updated.find { it.fileId == "f2" }?.name)
         assertFalse(stateHolder.currentContentState.isLongClickState)
         assertTrue(fakeToastProvider.messages.contains("成功重命名 2 个文件"))
+    }
+
+    @Test
+    fun `test onMultiSelectRename smart dispatch with 0, 1, and multiple items`() {
+        val item1 = createFileBean("1", "item1.txt", isSelect = false)
+        val item2 = createFileBean("2", "item2.txt", isSelect = false)
+        stateHolder.updateContentState {
+            copy(fileBeanList = listOf(item1, item2))
+        }
+
+        // 1. 0 项选中：不弹窗，吐司提示
+        module.onMultiSelectRename()
+        assertEquals(FileDialogState.None, stateHolder.currentDialogState.activeDialog)
+        assertTrue(fakeToastProvider.messages.contains("请先选择需要重命名的文件"))
+
+        // 2. 1 项选中：调起 RenameFile 弹窗并绑定目标 bean
+        stateHolder.updateContentState {
+            copy(fileBeanList = listOf(item1.copy(isSelect = true), item2))
+        }
+        module.onMultiSelectRename()
+        assertEquals(FileDialogState.RenameFile, stateHolder.currentDialogState.activeDialog)
+        assertEquals("1", stateHolder.currentDialogState.targetFileBean?.fileId)
+
+        // 关闭弹窗
+        module.closeBatchRenameDialog() // 重置
+
+        // 3. 2 项选中：调起 BatchRename 批量重命名弹窗
+        stateHolder.updateContentState {
+            copy(fileBeanList = listOf(item1.copy(isSelect = true), item2.copy(isSelect = true)))
+        }
+        module.onMultiSelectRename()
+        assertEquals(FileDialogState.BatchRename, stateHolder.currentDialogState.activeDialog)
+    }
+
+    @Test
+    fun `test rename in multi-select mode updates name and exits multi-select`() = kotlinx.coroutines.test.runTest {
+        val item = createFileBean("1", "old.txt", isSelect = true)
+        stateHolder.updateContentState {
+            copy(
+                fileBeanList = listOf(item),
+                isLongClickState = true,
+                appBarTitle = "1"
+            )
+        }
+
+        module.rename(item, "new.txt")
+
+        val updated = stateHolder.currentContentState
+        assertEquals("new.txt", updated.fileBeanList.first().name)
+        assertFalse("单文件重命名后应清除 isSelect", updated.fileBeanList.first().isSelect)
+        assertFalse("单文件重命名后应退出多选", updated.isLongClickState)
+        assertEquals("nap511", updated.appBarTitle)
     }
 }

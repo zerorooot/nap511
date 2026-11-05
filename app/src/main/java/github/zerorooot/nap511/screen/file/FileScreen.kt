@@ -381,11 +381,12 @@ fun FileScreen(
             TopBarAction.CUT -> fileViewModel.cut()
             TopBarAction.DELETE -> fileViewModel.deleteMultiple()
             TopBarAction.SELECT_REVERSE -> fileViewModel.selectReverse()
+            TopBarAction.TOGGLE_SELECT_ALL -> fileViewModel.toggleSelectAll()
             TopBarAction.UNZIP_ALL -> {
                 fileViewModel.openUnzipAllFileDialog()
             }
             TopBarAction.BATCH_RENAME -> {
-                fileViewModel.openBatchRenameDialog()
+                fileViewModel.onMultiSelectRename()
             }
 
             MenuItemAction.GALLERY_MODE -> {
@@ -413,6 +414,9 @@ fun FileScreen(
             fileViewModel.startMultiSelect(i)
             if (!isTopBarShow) {
                 isTopBarShow = true
+            }
+            if (!isBottomBarShow) {
+                isBottomBarShow = true
             }
         } else {
             fileViewModel.clearSelection()
@@ -555,7 +559,9 @@ fun FileScreen(
         fabPosition = fabPosition,
         nestedScrollConnection = nestedScrollConnection,
         currentCid = contentState.currentCid,
-        isQueryState = contentState.isQueryState
+        isQueryState = contentState.isQueryState,
+        isAllSelected = contentState.isAllSelected,
+        selectedCount = contentState.selectedCount
     )
 
     val scaffoldActions = remember(

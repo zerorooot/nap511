@@ -121,6 +121,12 @@ data class FileContentUiState(
     // 兼容现有引用点
     val isQueryState: Boolean
         get() = source !is FileListSource.Folder
+
+    val selectedCount: Int
+        get() = fileBeanList.count { it.isSelect }
+
+    val isAllSelected: Boolean
+        get() = fileBeanList.isNotEmpty() && fileBeanList.all { it.isSelect }
 }
 
 /**
@@ -153,7 +159,9 @@ data class FileScaffoldState(
     val fabPosition: FabPosition,
     val currentCid: String,
     val nestedScrollConnection: NestedScrollConnection,
-    val isQueryState: Boolean = false
+    val isQueryState: Boolean = false,
+    val isAllSelected: Boolean = false,
+    val selectedCount: Int = 0
 )
 
 /**

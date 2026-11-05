@@ -444,7 +444,7 @@ class FileCacheManagerTest {
     fun testRenameItemsAndRollback() = runBlocking {
         val file1 = FileBean(fileId = "f1", name = "file1.txt", isFolder = false)
         val file2 = FileBean(fileId = "f2", name = "file2.txt", isFolder = false)
-        val folder = FileBean(fileId = "", categoryId = "c100", name = "旧目录", isFolder = true)
+        val folder = FileBean(fileId = "c100", categoryId = "c100", name = "旧目录", isFolder = true)
         val parentFiles = FilesBean(
             fileBeanList = arrayListOf(file1, file2, folder),
             cid = "0",
@@ -482,7 +482,7 @@ class FileCacheManagerTest {
         val updatedList = FileCacheManager.getDate("0")?.fileBeanList
         assertEquals("file1_renamed.txt", updatedList?.find { it.fileId == "f1" }?.name)
         assertEquals("file2.txt", updatedList?.find { it.fileId == "f2" }?.name)
-        assertEquals("新目录", updatedList?.find { it.categoryId == "c100" }?.name)
+        assertEquals("新目录", updatedList?.find { it.fileId == "c100" }?.name)
 
         // 验证子目录自身面包屑同步更新
         assertEquals("新目录", FileCacheManager.getDate("c100")?.path?.lastOrNull()?.name)
@@ -495,7 +495,7 @@ class FileCacheManagerTest {
         rollback?.rollback()
         val restoredList = FileCacheManager.getDate("0")?.fileBeanList
         assertEquals("file1.txt", restoredList?.find { it.fileId == "f1" }?.name)
-        assertEquals("旧目录", restoredList?.find { it.categoryId == "c100" }?.name)
+        assertEquals("旧目录", restoredList?.find { it.fileId == "c100" }?.name)
         assertEquals("旧目录", FileCacheManager.getDate("c100")?.path?.lastOrNull()?.name)
 
         job.cancel()

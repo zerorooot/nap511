@@ -33,6 +33,7 @@ import github.zerorooot.nap511.bean.FileScaffoldActions
 import github.zerorooot.nap511.bean.FileScaffoldState
 import github.zerorooot.nap511.screen.components.AppTopBarMultiple
 import github.zerorooot.nap511.screen.components.AppTopBarNormal
+import github.zerorooot.nap511.screen.components.FileMultiSelectBottomBar
 import github.zerorooot.nap511.screen.components.MiniPlayerBar
 import github.zerorooot.nap511.screenitem.FileListContent
 import github.zerorooot.nap511.screenitem.FilePathBar
@@ -40,6 +41,7 @@ import github.zerorooot.nap511.screenitem.FileScreenFab
 import github.zerorooot.nap511.screenitem.NotificationPermissionBanner
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 
+private enum class BottomBarMode { Multiple, MiniPlayer, None }
 private enum class TopBarMode { Multiple, Root, Back }
 
 @Composable
@@ -55,6 +57,12 @@ fun FileScaffold(
         state.isQueryState -> TopBarMode.Back
         state.currentCid == "0" -> TopBarMode.Root
         else -> TopBarMode.Back
+    }
+    val bottomBarMode = when {
+        !state.isBottomBarShow -> BottomBarMode.None
+        state.isLongClickState && !state.isLandscape -> BottomBarMode.Multiple
+        state.hasCurrentMusic -> BottomBarMode.MiniPlayer
+        else -> BottomBarMode.None
     }
     Scaffold(
         //直接设置
@@ -83,15 +91,18 @@ fun FileScaffold(
                 ) { m ->
                     when (m) {
                         TopBarMode.Multiple -> AppTopBarMultiple(
-                            title = state.appBarTitle,
                             isLandscape = state.isLandscape,
+                            isAllSelected = state.isAllSelected,
+                            selectedCount = state.selectedCount,
                             onClick = actions.onAppBarClick
                         )
+
                         TopBarMode.Root -> AppTopBarNormal(
                             title = state.appBarTitle,
                             imageVector = Icons.Rounded.Menu,
                             onClick = actions.onAppBarClick
                         )
+
                         TopBarMode.Back -> AppTopBarNormal(
                             title = state.appBarTitle,
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
@@ -105,19 +116,35 @@ fun FileScaffold(
         modifier = modifier.nestedScroll(state.nestedScrollConnection),
         bottomBar = {
             AnimatedVisibility(
-                visible = state.hasCurrentMusic && state.isBottomBarShow,
+                visible = bottomBarMode != BottomBarMode.None,
                 enter = slideInVertically(initialOffsetY = { it }),
                 exit = slideOutVertically(targetOffsetY = { it }),
+                label = "bottomBarVisibility"
             ) {
-                MiniPlayerBar(audioViewModel = audioViewModel) {
-                    actions.onMusicDetailNav()
+                AnimatedContent(
+                    targetState = bottomBarMode,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = "bottomBarMode"
+                ) { mode ->
+                    when (mode) {
+                        BottomBarMode.Multiple -> FileMultiSelectBottomBar(
+                            selectedCount = state.selectedCount,
+                            onActionClick = actions.onAppBarClick
+                        )
+
+                        BottomBarMode.MiniPlayer -> MiniPlayerBar(audioViewModel = audioViewModel) {
+                            actions.onMusicDetailNav()
+                        }
+
+                        BottomBarMode.None -> {}
+                    }
                 }
             }
         },
         floatingActionButton = {
             FileScreenFab(
                 isCutState = state.isCutState,
-                visible = state.isBottomBarShow,
+                visible = state.isBottomBarShow && !state.isLongClickState,
                 onCancelCut = actions.onCancelCut,
                 onCutPaste = actions.onCutPaste,
                 onAddFolder = actions.onAddFolder
