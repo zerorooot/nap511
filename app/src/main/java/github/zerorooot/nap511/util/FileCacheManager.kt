@@ -485,6 +485,78 @@ object FileCacheManager {
     }
 
     /**
+     * 就地批量重命名父目录缓存中的文件或目录，若包含目录则同步更新子目录自身缓存中的面包屑末级名称。
+     * 基于不可变 copy 模式更新，单次加锁、单次异步刷盘、单次广播 LocalUiUpdated 事件，彻底杜绝事件风暴。
+     *
+     * @param parentCid 父目录 ID
+     * @param renameMap 待更新映射字典 (fid/categoryId -> newName)
+     * @return 失败或撤销时的 CacheRollback 句柄
+     */
+    suspend fun renameItems(
+        parentCid: String,
+        renameMap: Map<String, String>
+    ): CacheRollback? = withContext(Dispatchers.IO) {
+        if (renameMap.isEmpty()) return@withContext null
+        mutex.withLock {
+            if (getWithoutLock(parentCid) == null) {
+                return@withContext null
+            }
+            val cache = memoryCache[parentCid]?.data ?: return@withContext null
+
+            val rollbackMap = mutableMapOf<String, String>()
+            val updatedFolders = mutableListOf<String>()
+            var hasChanges = false
+
+            for (index in cache.fileBeanList.indices) {
+                val item = cache.fileBeanList[index]
+                /**
+                 * fid与cid已经在 [github.zerorooot.nap511.util.formatFileBeanList] 中统一了，所以统一使用fid
+                 */
+                val key = if (renameMap.containsKey(item.fileId)) item.fileId else null
+
+                if (key != null) {
+                    val newName = renameMap[key]
+                    if (!newName.isNullOrBlank() && newName != item.name) {
+                        rollbackMap[key] = item.name
+                        // 采用 copy 生成新实例替换，遵守 FileBean 只读属性规范
+                        cache.fileBeanList[index] = item.copy(name = newName)
+                        hasChanges = true
+
+                        if (item.isFolder) {
+                            val folderCid = item.categoryId.ifEmpty { key }
+                            updatedFolders.add(folderCid)
+                            memoryCache[folderCid]?.let { subEntry ->
+                                subEntry.data.path.lastOrNull()?.name = newName
+                                flushToDiskAsync(folderCid, subEntry)
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!hasChanges) return@withContext null
+
+            // 1. 父目录单次异步写盘
+            memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
+
+            // 2. 单次广播父目录 UI 更新事件
+            _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
+
+            // 3. 同步广播发生名称变更的子目录自身 LocalUiUpdated 事件（与单项 rename 对齐）
+            updatedFolders.forEach { folderCid ->
+                _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(folderCid))
+            }
+
+            XLog.d("renameItems: 成功就地更新目录 $parentCid 下的 ${rollbackMap.size} 项缓存数据")
+
+            // 4. 返回复合回滚撤销句柄
+            CacheRollback {
+                renameItems(parentCid, rollbackMap)
+            }
+        }
+    }
+
+    /**
      * 就地从父目录缓存中移除指定文件或目录，并递减计数；若删除项为目录，则级联清理其子孙目录缓存。
      * 返回支持撤销现场的 CacheRollback 句柄。
      */

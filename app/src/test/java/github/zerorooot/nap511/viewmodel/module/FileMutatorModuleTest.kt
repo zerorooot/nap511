@@ -41,6 +41,8 @@ class FileMutatorModuleTest {
     private val fakeToastProvider = FakeToastProvider()
     private var mockDeleteResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
     private var mockDeleteMultipleResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
+    private var mockRenameResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
+    private var renameCallCount = 0
     private var shouldThrowNetworkError = false
 
     private val fakeRepo = object : FileRepository() {
@@ -57,6 +59,12 @@ class FileMutatorModuleTest {
         override suspend fun star(fid: String, star: Boolean): github.zerorooot.nap511.bean.BaseReturnMessage {
             if (shouldThrowNetworkError) throw java.io.IOException("Network Timeout")
             return mockDeleteResult
+        }
+
+        override suspend fun rename(renameBean: okhttp3.RequestBody): github.zerorooot.nap511.bean.BaseReturnMessage {
+            if (shouldThrowNetworkError) throw java.io.IOException("Network Timeout")
+            renameCallCount++
+            return mockRenameResult
         }
     }
 
@@ -96,6 +104,8 @@ class FileMutatorModuleTest {
         fakeToastProvider.clear()
         mockDeleteResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
         mockDeleteMultipleResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
+        mockRenameResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
+        renameCallCount = 0
         shouldThrowNetworkError = false
 
         module = FileMutatorModule(
@@ -354,5 +364,148 @@ class FileMutatorModuleTest {
         val list = stateHolder.currentContentState.fileBeanList
         assertTrue(list.all { !it.isStar })
         assertTrue(fakeToastProvider.messages.contains("Network Timeout"))
+    }
+
+    @Test
+    fun `test openBatchRenameDialog requires selected items`() {
+        // 无选中项时拦截并 Toast
+        stateHolder.updateContentState {
+            copy(fileBeanList = listOf(createFileBean("1", "old1.txt", isSelect = false)))
+        }
+        module.openBatchRenameDialog()
+        assertEquals(FileDialogState.None, stateHolder.currentDialogState.activeDialog)
+        assertTrue(fakeToastProvider.messages.contains("请先选择需要重命名的文件"))
+
+        // 有选中项时正常开启
+        stateHolder.updateContentState {
+            copy(fileBeanList = listOf(createFileBean("1", "old1.txt", isSelect = true)))
+        }
+        module.openBatchRenameDialog()
+        assertEquals(FileDialogState.BatchRename, stateHolder.currentDialogState.activeDialog)
+
+        module.closeBatchRenameDialog()
+        assertEquals(FileDialogState.None, stateHolder.currentDialogState.activeDialog)
+    }
+
+    @Test
+    fun `test batchRename successfully updates UI, clears selection, and calls repository`() = kotlinx.coroutines.test.runTest {
+        val item1 = createFileBean("1", "old1.txt", isSelect = true)
+        val item2 = createFileBean("2", "old2.txt", isSelect = true)
+        val item3 = createFileBean("3", "old3.txt", isSelect = false)
+        stateHolder.updateContentState {
+            copy(
+                source = FileListSource.Folder("0", fakeStringProvider),
+                currentCid = "0",
+                fileBeanList = listOf(item1, item2, item3),
+                isLongClickState = true
+            )
+        }
+
+        val renameMap = mapOf(
+            "1" to "new1.txt",
+            "2" to "new2.txt"
+        )
+        module.batchRename(renameMap)
+
+        val updatedList = stateHolder.currentContentState.fileBeanList
+        assertEquals("new1.txt", updatedList.find { it.fileId == "1" }?.name)
+        assertEquals("new2.txt", updatedList.find { it.fileId == "2" }?.name)
+        assertEquals("old3.txt", updatedList.find { it.fileId == "3" }?.name)
+        assertFalse("多选状态应被重置", stateHolder.currentContentState.isLongClickState)
+        assertTrue("所有条目的选中状态应被清除", updatedList.none { it.isSelect })
+        assertEquals(1, renameCallCount)
+        assertTrue(fakeToastProvider.messages.contains("成功重命名 2 个文件"))
+    }
+
+    @Test
+    fun `test batchRename chunks into batches of 100`() = kotlinx.coroutines.test.runTest {
+        val items = (1..150).map { i ->
+            createFileBean("id_$i", "old_$i.txt", isSelect = true)
+        }
+        stateHolder.updateContentState {
+            copy(
+                source = FileListSource.Folder("0", fakeStringProvider),
+                currentCid = "0",
+                fileBeanList = items,
+                isLongClickState = true
+            )
+        }
+
+        val renameMap = (1..150).associate { i -> "id_$i" to "new_$i.txt" }
+        module.batchRename(renameMap)
+
+        assertEquals("150 项应按 100 拆分成 2 次分批请求", 2, renameCallCount)
+        assertTrue(fakeToastProvider.messages.contains("成功重命名 150 个文件"))
+        val updatedList = stateHolder.currentContentState.fileBeanList
+        assertEquals("new_1.txt", updatedList.first().name)
+        assertEquals("new_150.txt", updatedList.last().name)
+    }
+
+    @Test
+    fun `test batchRename rolls back on network error`() = kotlinx.coroutines.test.runTest {
+        val item1 = createFileBean("1", "old1.txt", isSelect = true)
+        val item2 = createFileBean("2", "old2.txt", isSelect = true)
+        stateHolder.updateContentState {
+            copy(
+                source = FileListSource.Folder("0", fakeStringProvider),
+                currentCid = "0",
+                fileBeanList = listOf(item1, item2),
+                isLongClickState = true
+            )
+        }
+
+        shouldThrowNetworkError = true
+        val renameMap = mapOf("1" to "new1.txt", "2" to "new2.txt")
+        module.batchRename(renameMap)
+
+        val list = stateHolder.currentContentState.fileBeanList
+        assertEquals("old1.txt", list.find { it.fileId == "1" }?.name)
+        assertEquals("old2.txt", list.find { it.fileId == "2" }?.name)
+        assertTrue(fakeToastProvider.messages.contains("Network Timeout"))
+    }
+
+    @Test
+    fun `test batchRename supports folders with categoryId`() = kotlinx.coroutines.test.runTest {
+        val folder = FileBean(fileId = "", categoryId = "c100", name = "旧目录", isFolder = true, isSelect = true)
+        stateHolder.updateContentState {
+            copy(
+                source = FileListSource.Folder("0", fakeStringProvider),
+                currentCid = "0",
+                fileBeanList = listOf(folder),
+                isLongClickState = true
+            )
+        }
+
+        val renameMap = mapOf("c100" to "新目录")
+        module.batchRename(renameMap)
+
+        val updated = stateHolder.currentContentState.fileBeanList.first()
+        assertEquals("新目录", updated.name)
+        assertFalse(updated.isSelect)
+        assertEquals(1, renameCallCount)
+        assertTrue(fakeToastProvider.messages.contains("成功重命名 1 个文件"))
+    }
+
+    @Test
+    fun `test batchRename across different parent directories`() = kotlinx.coroutines.test.runTest {
+        val itemP1 = FileBean(fileId = "f1", name = "item1.txt", parentId = "p1", isSelect = true)
+        val itemP2 = FileBean(fileId = "f2", name = "item2.txt", parentId = "p2", isSelect = true)
+        stateHolder.updateContentState {
+            copy(
+                source = FileListSource.Search("0", "query", fakeStringProvider),
+                currentCid = "0",
+                fileBeanList = listOf(itemP1, itemP2),
+                isLongClickState = true
+            )
+        }
+
+        val renameMap = mapOf("f1" to "item1_renamed.txt", "f2" to "item2_renamed.txt")
+        module.batchRename(renameMap)
+
+        val updated = stateHolder.currentContentState.fileBeanList
+        assertEquals("item1_renamed.txt", updated.find { it.fileId == "f1" }?.name)
+        assertEquals("item2_renamed.txt", updated.find { it.fileId == "f2" }?.name)
+        assertFalse(stateHolder.currentContentState.isLongClickState)
+        assertTrue(fakeToastProvider.messages.contains("成功重命名 2 个文件"))
     }
 }

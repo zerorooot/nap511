@@ -11,7 +11,6 @@ import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.AutoFixHigh
-import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.ContentCut
@@ -29,7 +28,6 @@ import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.VerticalAlignBottom
@@ -53,13 +51,14 @@ import androidx.compose.ui.unit.dp
 
 sealed interface AppBarAction {
     val label: String
-    val icon: ImageVector?
+    val icon: ImageVector
+    val isDestructive: Boolean
 }
 
 enum class MenuItemAction(
     override val label: String,
     override val icon: ImageVector,
-    val isDestructive: Boolean = false
+    override val isDestructive: Boolean = false
 ) : AppBarAction {
     // 文件列表菜单项
     CUT_FILE("剪切文件", Icons.Outlined.ContentCut),
@@ -110,11 +109,11 @@ enum class MenuItemAction(
 }
 
 @Composable
-private fun MyDropdownMenu(
-    listItems: List<MenuItemAction>,
+private fun <T : AppBarAction> MyDropdownMenu(
+    listItems: List<T>,
     modifier: Modifier,
     icon: @Composable () -> Unit,
-    onClick: (MenuItemAction, Int) -> Unit
+    onClick: (T, Int) -> Unit
 ) {
     var expanded by remember {
         mutableStateOf(false)
@@ -179,6 +178,7 @@ fun FileMoreMenu(onClick: (MenuItemAction, Int) -> Unit) {
     )
     BaseMoreMenu(listOf, onClick)
 }
+
 @Composable
 fun FolderMoreMenu(onClick: (MenuItemAction, Int) -> Unit) {
     val listOf = listOf(
@@ -212,7 +212,7 @@ fun OfflineFileMoreMenu(onClick: (MenuItemAction, Int) -> Unit) {
 }
 
 @Composable
-fun BaseMoreMenu(listOf: List<MenuItemAction>, onClick: (MenuItemAction, Int) -> Unit) {
+fun <T : AppBarAction> BaseMoreMenu(listOf: List<T>, onClick: (T, Int) -> Unit) {
     MyDropdownMenu(
         listOf,
         Modifier
@@ -284,9 +284,17 @@ fun HtmlWebViewTopBarDropdownMenu(onClick: (MenuItemAction, Int) -> Unit) {
 }
 
 @Composable
-private fun BaseAppTorBarMenu(
-    listOf: List<MenuItemAction>,
-    onClick: (MenuItemAction, Int) -> Unit
+fun FileAppTopBarMultipleDropdownMenu(
+    listOf: List<AppBarAction>,
+    onClick: (AppBarAction, Int) -> Unit
+) {
+    BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
+}
+
+@Composable
+private fun <T : AppBarAction> BaseAppTorBarMenu(
+    listOf: List<T>,
+    onClick: (T, Int) -> Unit
 ) {
     MyDropdownMenu(
         listOf,

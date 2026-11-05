@@ -18,10 +18,11 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
@@ -46,6 +47,10 @@ import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -82,7 +87,8 @@ fun BaseTopAppBar(
 
 enum class TopBarAction(
     override val label: String,
-    override val icon: ImageVector
+    override val icon: ImageVector,
+    override val isDestructive: Boolean = false
 ) : AppBarAction {
     BACK("返回", Icons.AutoMirrored.Rounded.ArrowBack),
     DRAWER_MENU("抽屉菜单", Icons.Rounded.Menu),
@@ -94,7 +100,8 @@ enum class TopBarAction(
     CUT("剪切", Icons.Default.ContentCut),
     DELETE("删除", Icons.Default.Delete),
     SELECT_REVERSE("反选", Icons.Default.SelectAll),
-    UNZIP_ALL("解压", Icons.Default.Cloud),
+    UNZIP_ALL("解压", Icons.Default.FolderZip),
+    BATCH_RENAME("命名", Icons.Default.Edit),
 
     CLEAR_ALL_RECYCLE("清空所有文件", Icons.Default.DeleteForever)
 }
@@ -138,13 +145,17 @@ fun AppTopBarNormal(
     )
 }
 
-private val defaultMultipleActions = listOf(
+private val primaryMultipleActions = listOf(
     TopBarAction.SELECT_UP,
     TopBarAction.SELECT_DOWN,
-    TopBarAction.STAR,
-    TopBarAction.CUT,
-    TopBarAction.DELETE,
     TopBarAction.SELECT_REVERSE,
+    TopBarAction.DELETE
+)
+
+private val overflowMultipleActions = listOf(
+    TopBarAction.BATCH_RENAME,
+    TopBarAction.CUT,
+    TopBarAction.STAR,
     TopBarAction.UNZIP_ALL
 )
 
@@ -153,7 +164,6 @@ private val defaultMultipleActions = listOf(
 fun AppTopBarMultiple(
     title: String,
     isLandscape: Boolean = false,
-    actionsList: List<TopBarAction> = defaultMultipleActions,
     onClick: (AppBarAction) -> Unit,
     scrollBehavior: TopAppBarScrollBehavior? = null
 ) {
@@ -173,7 +183,7 @@ fun AppTopBarMultiple(
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState())
                 ) {
-                    actionsList.forEach { action ->
+                    (primaryMultipleActions + overflowMultipleActions).forEach { action ->
                         TopAppBarActionTextButton(
                             imageVector = action.icon,
                             label = action.label,
@@ -182,13 +192,18 @@ fun AppTopBarMultiple(
                     }
                 }
             } else {
-                actionsList.forEach { action ->
+                primaryMultipleActions.forEach { action ->
                     TopAppBarActionButton(
                         imageVector = action.icon,
                         description = action.label,
                         onClick = { onClick(action) }
                     )
                 }
+                FileAppTopBarMultipleDropdownMenu(
+                    listOf = overflowMultipleActions,
+                    onClick = { itemValue, _ ->
+                        onClick.invoke(itemValue)
+                    })
             }
         }
     )

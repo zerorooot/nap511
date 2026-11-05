@@ -321,6 +321,8 @@ class FileViewModel(
     fun createFolder(name: String) = viewModelScope.launch { mutatorModule.createFolder(name) }
     fun rename(fileBean: FileBean? = null, name: String) =
         viewModelScope.launch { mutatorModule.rename(fileBean, name) }
+    fun batchRename(renameMap: Map<String, String>) =
+        viewModelScope.launch { mutatorModule.batchRename(renameMap) }
 
     fun delete(fileBean: FileBean) = viewModelScope.launch { mutatorModule.delete(fileBean) }
     fun deleteMultiple() = viewModelScope.launch { mutatorModule.deleteMultiple() }
@@ -387,6 +389,7 @@ class FileViewModel(
     // 弹窗快捷开启与关闭方法透传
     fun openCreateFolderDialog() = mutatorModule.openCreateFolderDialog()
     fun openRenameFileDialog(fileBean: FileBean) = mutatorModule.openRenameFileDialog(fileBean)
+    fun openBatchRenameDialog() = mutatorModule.openBatchRenameDialog()
     fun openDiscardVideosDialog(discardList: List<VideoBean>, targetCid: String) =
         mutatorModule.openDiscardVideosDialog(discardList, targetCid)
 
@@ -399,6 +402,7 @@ class FileViewModel(
     fun closeCreateFolderDialog() = closeDialog()
     fun closeSearchDialog() = closeDialog()
     fun closeRenameFileDialog() = closeDialog()
+    fun closeBatchRenameDialog() = closeDialog()
     fun closeFileInfoDialog() = closeDialog()
     fun closeFileOrderDialog() = closeDialog()
     fun closeAria2Dialog() = closeDialog()

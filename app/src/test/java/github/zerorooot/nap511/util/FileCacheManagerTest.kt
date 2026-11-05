@@ -439,4 +439,85 @@ class FileCacheManagerTest {
 
         job.cancel()
     }
+
+    @Test
+    fun testRenameItemsAndRollback() = runBlocking {
+        val file1 = FileBean(fileId = "f1", name = "file1.txt", isFolder = false)
+        val file2 = FileBean(fileId = "f2", name = "file2.txt", isFolder = false)
+        val folder = FileBean(fileId = "", categoryId = "c100", name = "旧目录", isFolder = true)
+        val parentFiles = FilesBean(
+            fileBeanList = arrayListOf(file1, file2, folder),
+            cid = "0",
+            count = 3,
+            order = "",
+            path = listOf(PathBean(cid = "0", name = "根目录", pid = "0"))
+        )
+        val folderSelf = FilesBean(
+            fileBeanList = arrayListOf(),
+            cid = "c100",
+            count = 0,
+            order = "",
+            path = listOf(
+                PathBean(cid = "0", name = "根目录", pid = "0"),
+                PathBean(cid = "c100", name = "旧目录", pid = "0")
+            )
+        )
+        FileCacheManager.put("0", parentFiles)
+        FileCacheManager.put("c100", folderSelf)
+
+        val events = mutableListOf<CacheEvent>()
+        val job = launch(kotlinx.coroutines.Dispatchers.Unconfined) {
+            FileCacheManager.cacheEvents.collect { events.add(it) }
+        }
+
+        // 批量重命名文件与文件夹
+        val renameMap = mapOf(
+            "f1" to "file1_renamed.txt",
+            "c100" to "新目录"
+        )
+        val rollback = FileCacheManager.renameItems("0", renameMap)
+        assertNotNull(rollback)
+
+        // 验证父目录中的条目更新
+        val updatedList = FileCacheManager.getDate("0")?.fileBeanList
+        assertEquals("file1_renamed.txt", updatedList?.find { it.fileId == "f1" }?.name)
+        assertEquals("file2.txt", updatedList?.find { it.fileId == "f2" }?.name)
+        assertEquals("新目录", updatedList?.find { it.categoryId == "c100" }?.name)
+
+        // 验证子目录自身面包屑同步更新
+        assertEquals("新目录", FileCacheManager.getDate("c100")?.path?.lastOrNull()?.name)
+
+        // 验证事件广播：父目录 1 次 LocalUiUpdated，子目录 1 次 LocalUiUpdated
+        assertTrue(events.any { it is CacheEvent.LocalUiUpdated && it.cid == "0" })
+        assertTrue(events.any { it is CacheEvent.LocalUiUpdated && it.cid == "c100" })
+
+        // 测试原子回滚
+        rollback?.rollback()
+        val restoredList = FileCacheManager.getDate("0")?.fileBeanList
+        assertEquals("file1.txt", restoredList?.find { it.fileId == "f1" }?.name)
+        assertEquals("旧目录", restoredList?.find { it.categoryId == "c100" }?.name)
+        assertEquals("旧目录", FileCacheManager.getDate("c100")?.path?.lastOrNull()?.name)
+
+        job.cancel()
+    }
+
+    @Test
+    fun testRenameItemsNoChangesReturnsNull() = runBlocking {
+        val file1 = FileBean(fileId = "f1", name = "file1.txt", isFolder = false)
+        val parentFiles = FilesBean(
+            fileBeanList = arrayListOf(file1),
+            cid = "0",
+            count = 1,
+            order = "",
+            path = listOf(PathBean(cid = "0", name = "根目录", pid = "0"))
+        )
+        FileCacheManager.put("0", parentFiles)
+
+        // 同名或空映射
+        val rollbackEmpty = FileCacheManager.renameItems("0", emptyMap())
+        assertNull(rollbackEmpty)
+
+        val rollbackSame = FileCacheManager.renameItems("0", mapOf("f1" to "file1.txt"))
+        assertNull(rollbackSame)
+    }
 }

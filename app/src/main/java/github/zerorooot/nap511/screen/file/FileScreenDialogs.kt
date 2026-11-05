@@ -4,6 +4,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elvishew.xlog.XLog
@@ -13,6 +14,7 @@ import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.dialog.Aria2Dialog
+import github.zerorooot.nap511.dialog.BatchRenameDialog
 import github.zerorooot.nap511.dialog.CreateFolderDialog
 import github.zerorooot.nap511.dialog.CreateSelectTorrentFileDialog
 import github.zerorooot.nap511.dialog.DiscardVideosDialog
@@ -175,6 +177,25 @@ fun CreateDialogs(
 
         is FileDialogState.UnzipAllFile -> {
             UnzipAllFile(fileViewModel)
+        }
+
+        is FileDialogState.BatchRename -> {
+            val contentState by fileViewModel.contentState.collectAsStateWithLifecycle()
+            val selectedFiles = remember(contentState.fileBeanList) {
+                contentState.fileBeanList.filter { it.isSelect }
+            }
+            if (selectedFiles.isNotEmpty()) {
+                BatchRenameDialog(
+                    targetFiles = selectedFiles,
+                    onDismissRequest = { fileViewModel.closeBatchRenameDialog() },
+                    onConfirm = { renameMap ->
+                        fileViewModel.batchRename(renameMap)
+                        fileViewModel.closeBatchRenameDialog()
+                    }
+                )
+            } else {
+                fileViewModel.closeBatchRenameDialog()
+            }
         }
 
         // 移除确认删除弹窗

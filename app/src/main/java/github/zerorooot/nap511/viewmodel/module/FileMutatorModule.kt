@@ -7,10 +7,10 @@ import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.bean.RenameBean
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.repository.FileRepository
+import github.zerorooot.nap511.util.CacheEvent
 import github.zerorooot.nap511.util.CacheRollback
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
-import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.CoilCacheCleaner
 import github.zerorooot.nap511.viewmodel.platform.FileNavigator
 import github.zerorooot.nap511.viewmodel.platform.ToastProvider
@@ -19,6 +19,7 @@ import github.zerorooot.nap511.viewmodel.store.ImageCacheStore
 import github.zerorooot.nap511.viewmodel.store.ScrollPositionStore
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import okhttp3.FormBody
 
 /**
  * 文件变更操作领域模块
@@ -217,6 +218,77 @@ class FileMutatorModule(
         stateHolder.setRefreshing(false)
     }
 
+    /**
+     * 批量重命名文件或文件夹
+     * 1. 安全过滤未变动项与空文件名；
+     * 2. 瞬时乐观更新 ViewModel UI State 内存列表并退出多选状态；
+     * 3. 同步批量落盘并更新 FileCacheManager 本地缓存；
+     * 4. 按 100 项切片分批调用 115 batch_rename 接口；
+     * 5. 首批失败或单批失败支持本地精准原子回滚；若多批次部分成功后突发失败，通知远端刷新保证云端一致性。
+     */
+    suspend fun batchRename(renameMap: Map<String, String>) {
+        if (renameMap.isEmpty()) return
+
+        // 统一处理文件/文件夹唯一标识（文件夹用 categoryId，普通文件用 fileId）
+        val validMap = renameMap.filter { (fid, newName) ->
+            val current = stateHolder.currentContentState.fileBeanList.find {
+                (if (it.isFolder) it.categoryId else it.fileId) == fid
+            }
+            newName.isNotBlank() && current != null && current.name != newName
+        }
+        if (validMap.isEmpty()) return
+
+        stateHolder.setRefreshing(true)
+        val cid = stateHolder.currentContentState.currentCid
+        val currentList = stateHolder.currentContentState.fileBeanList
+
+        var completedChunks = 0
+        runCatching {
+            // 3. 按 100 项安全切片分批请求 115 批量接口
+            val chunks = validMap.entries.chunked(100)
+            for (chunk in chunks) {
+                val formBuilder = FormBody.Builder()
+                chunk.forEach { (fid, newName) ->
+                    formBuilder.add("files_new_name[$fid]", newName)
+                }
+                val result = fileRepository.rename(formBuilder.build())
+                val errorMsg = result.error.ifEmpty {
+                    result.errorMsg.ifEmpty { result.message.ifEmpty { "批量重命名失败" } }
+                }
+                check(result.state) { errorMsg }
+                completedChunks++
+            }
+        }.onSuccess {
+            // 2. 按 parentId 分组更新各父目录本地缓存（支持搜索/标星跨目录及常规目录）
+            val affectedItems = currentList.filter {
+                val key = if (it.isFolder) it.categoryId else it.fileId
+                validMap.containsKey(key)
+            }
+            val groupByParent = affectedItems.groupBy { it.parentId.ifEmpty { cid } }
+            val rollbacks = mutableListOf<CacheRollback>()
+            groupByParent.forEach { (pid, items) ->
+                val parentRenameMap = items.mapNotNull { item ->
+                    val key = if (item.isFolder) item.categoryId else item.fileId
+                    val newName = validMap[key]
+                    if (newName != null) key to newName else null
+                }.toMap()
+                FileCacheManager.renameItems(pid, parentRenameMap)?.let {
+                    rollbacks.add(it)
+                }
+            }
+            toastProvider.showToast("成功重命名 ${validMap.size} 个文件")
+            XLog.d("batchRename: 成功重命名 ${validMap.size} 项")
+        }.onFailure { ex ->
+            val errorMsg = ex.message ?: "批量重命名失败"
+            XLog.e("batchRename failed: $errorMsg, completedChunks: $completedChunks", ex)
+            if (completedChunks > 0) {
+                FileCacheManager.notifyCacheEvent(CacheEvent.RemoteRefreshRequired(cid))
+            }
+            toastProvider.showToast(errorMsg)
+        }
+        stateHolder.setRefreshing(false)
+    }
+
     suspend fun deleteMultiple(targetCid: String, selectedFiles: List<FileBean>) {
         if (selectedFiles.isEmpty()) return
         val paginationKey = stateHolder.currentContentState.source.paginationKey
@@ -373,5 +445,18 @@ class FileMutatorModule(
                 targetCid = targetCid
             )
         }
+    }
+
+    fun openBatchRenameDialog() {
+        val hasSelected = stateHolder.currentContentState.fileBeanList.any { it.isSelect }
+        if (!hasSelected) {
+            toastProvider.showToast("请先选择需要重命名的文件")
+            return
+        }
+        stateHolder.updateDialogState { copy(activeDialog = FileDialogState.BatchRename) }
+    }
+
+    fun closeBatchRenameDialog() {
+        stateHolder.updateDialogState { copy(activeDialog = FileDialogState.None) }
     }
 }

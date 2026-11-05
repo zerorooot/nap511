@@ -384,6 +384,9 @@ fun FileScreen(
             TopBarAction.UNZIP_ALL -> {
                 fileViewModel.openUnzipAllFileDialog()
             }
+            TopBarAction.BATCH_RENAME -> {
+                fileViewModel.openBatchRenameDialog()
+            }
 
             MenuItemAction.GALLERY_MODE -> {
                 isImagePreviewMode = !isPreviewActive
