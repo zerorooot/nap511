@@ -70,6 +70,7 @@ fun FileCellItem(
                 iconRes = image,
                 thumbUrl = fileBean.photoThumb,
                 cacheKey = fileBean.fileId,
+                isStar = isStar,
                 isVideo = isVideo,
                 videoDuration = playLong,
                 playProgress = playProgress,
@@ -99,7 +100,10 @@ fun FileCellItem(
                 if (isAudio && playLong.isNotEmpty()) {
                     add(playLong.trim())
                 } else if (isVideo && fileBean.playLongRatio.isNotEmpty()) {
-                    add(fileBean.playLongRatio.trim())
+                    val ratioText = fileBean.playLongRatio.replace("▶️", "").trim()
+                    if (ratioText.isNotEmpty()) {
+                        add(ratioText)
+                    }
                 }
                 if (size.isNotEmpty()) {
                     add(size)
@@ -109,7 +113,6 @@ fun FileCellItem(
                 }
             }
             BaseCellMetadata(
-                isStar = isStar,
                 metaList = metaList
             )
         },

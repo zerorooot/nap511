@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -99,25 +100,27 @@ fun BaseCellCard(
         border = border,
         modifier = modifier
             .fillMaxWidth()
+            .height(84.dp)
             .clip(cardShape) // 先进行形状裁切，确保长按与点击水波纹严格限制在 12dp 圆角内部
             .then(clickModifier)
     ) {
         CompositionLocalProvider(LocalContentColor provides contentColor) {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxSize()
                     .padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // 左侧槽位：52dp 图标或缩略图
                 leadingContent()
 
-                // 中间内容列：标题、副标题（路径等）、元数据（大小、时间、标签等）
+                // 中间内容列：紧凑居中对齐标题、副标题（路径等）、元数据
                 Column(
                     modifier = Modifier
                         .weight(1f)
+                        .fillMaxHeight()
                         .padding(start = 12.dp, end = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                    verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically)
                 ) {
                     titleContent()
                     subtitleContent?.invoke()
@@ -143,6 +146,7 @@ fun FileThumbnail(
     modifier: Modifier = Modifier,
     thumbUrl: String = "",
     cacheKey: String = "",
+    isStar: Boolean = false,
     isVideo: Boolean = false,
     videoDuration: String = "",
     playProgress: Float = 0f,
@@ -188,6 +192,24 @@ fun FileThumbnail(
                     onLoadError?.invoke()
                 }
             )
+        }
+
+        // 星标左上角半透明徽标（彻底解放文字行的水平排版空间）
+        if (isStar) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(3.dp)
+                    .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(4.dp))
+                    .padding(2.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = "Starred",
+                    tint = Color(0xFFFFB300),
+                    modifier = Modifier.size(11.dp)
+                )
+            }
         }
 
         // 视频时长半透明胶囊
@@ -240,7 +262,7 @@ fun BaseCellMetadata(
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
         modifier = modifier
     ) {
         if (isStar) {
@@ -253,7 +275,7 @@ fun BaseCellMetadata(
         }
         prefixContent?.invoke()
 
-        val text = metaList.filter { it.isNotBlank() }.joinToString(" · ")
+        val text = metaList.filter { it.isNotBlank() }.joinToString("\u2009·\u2009")
         if (text.isNotEmpty()) {
             Text(
                 text = text,
