@@ -131,9 +131,14 @@ fun FileScreen(
 
     val isPreviewActive by rememberUpdatedState(isImagePreviewMode ?: isAutoImagePreview)
 
+    // 优化：异步获取通知开关状态，首帧默认置为 true，避免主线程初次组合时执行 Binder IPC 跨进程查询
     var isNotificationEnabled by remember {
-        mutableStateOf(context.isNotificationEnabled())
+        mutableStateOf(true)
     }
+    LaunchedEffect(Unit) {
+        isNotificationEnabled = context.isNotificationEnabled()
+    }
+
     var isNotificationBannerDismissed by rememberSaveable { mutableStateOf(false) }
 
     val notificationSettingLauncher = rememberLauncherForActivityResult(

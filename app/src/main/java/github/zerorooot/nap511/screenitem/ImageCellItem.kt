@@ -1,34 +1,41 @@
 package github.zerorooot.nap511.screenitem
 
 import android.util.LruCache
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
@@ -39,12 +46,10 @@ import github.zerorooot.nap511.bean.FileItemActions
 import github.zerorooot.nap511.bean.ImageBean
 import github.zerorooot.nap511.util.getCoilCacheUrl
 
-
 // 全局内存缓存图片宽高比，避免快速滑动和 Item 离屏复用时高度重置引发瀑布流跳动闪烁
 // 限定最多保存 1150 张图片的宽高比，超过后自动淘汰最久未使用的条目
 private val aspectRatioCache = object : LruCache<String, Float>(1150) {}
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ImageCellItem(
     fileBean: FileBean,
@@ -61,12 +66,17 @@ fun ImageCellItem(
     val hdUrl = imageBean?.url
     val isHdLoaded = isImageHdPreview && !hdUrl.isNullOrEmpty()
     val cacheKey = fileBean.fileId.ifEmpty { fileBean.pickCode.ifEmpty { name } }
+    val isStar = fileBean.isStar
+    val isVideo = fileBean.isVideo == 1
+    val playLong = fileBean.playLongString
+    val playProgress = if (fileBean.playLong > 0 && fileBean.currentPlayTime > 0) {
+        (fileBean.currentPlayTime.toFloat() / fileBean.playLong.toFloat()).coerceIn(0f, 1f)
+    } else 0f
 
     // 开启高清模式且 photoThumb 非空且未缓存过 ImageBean 时发起请求；
     // 将 fileBean.photoThumb 纳入 Key，确保此前请求失败（imageBean 仍为 null）并在下拉刷新获取新缩略图后能重新触发请求
     if (isImageHdPreview && fileBean.photoThumb.isNotEmpty() && imageBean == null) {
         LaunchedEffect(fileBean.pickCode, index, fileBean.photoThumb) {
-            //  XLog.d("ImageCellItem [触发高清图请求] index=$index, name=${fileBean.name}, pickCode=${fileBean.pickCode}")
             itemActions.onLoadImage?.invoke(fileBean)
         }
     }
@@ -76,42 +86,25 @@ fun ImageCellItem(
         mutableFloatStateOf(aspectRatioCache[cacheKey] ?: 1.0f)
     }
 
-    Card(
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(
-            containerColor = if (fileBean.isSelect) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else if (clickIndex == index) {
-                // MaterialTheme.colorScheme.surfaceContainerLow
-                MaterialTheme.colorScheme.surfaceBright
-            } else {
-                MaterialTheme.colorScheme.surfaceContainer
-            }
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(4.dp)
-            .combinedClickable(
-                onClick = {
-                    XLog.d("ImageCellItem [点击] index=$index, name=${fileBean.name}")
-                    itemActions.onItemClick.invoke(index)
-                },
-                onLongClick = {
-                    XLog.d("ImageCellItem [长按] index=$index, name=${fileBean.name}")
-                    itemActions.onItemLongClick.invoke(index)
-                }
-            )
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            // 顶部图片/缩略图预览区域
+    BaseVerticalCellCard(
+        modifier = modifier,
+        isSelected = fileBean.isSelect,
+        isHighlighted = (clickIndex == index) && !fileBean.isSelect,
+        onClick = {
+            XLog.d("ImageCellItem [点击] index=$index, name=${fileBean.name}")
+            itemActions.onItemClick.invoke(index)
+        },
+        onLongClick = {
+            XLog.d("ImageCellItem [长按] index=$index, name=${fileBean.name}")
+            itemActions.onItemLongClick.invoke(index)
+        },
+        mediaContent = {
+            // 顶部贴边大图预览区域
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(aspectRatio.coerceIn(0.65f, 1.5f))
-                    .padding(4.dp),
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f)),
                 contentAlignment = Alignment.Center
             ) {
                 if (fileBean.photoThumb.isEmpty()) {
@@ -120,7 +113,7 @@ fun ImageCellItem(
                         painter = painterResource(image),
                         contentDescription = "File Icon",
                         modifier = Modifier
-                            .padding(16.dp)
+                            .padding(24.dp)
                             .fillMaxSize(),
                         contentScale = ContentScale.Fit
                     )
@@ -128,8 +121,8 @@ fun ImageCellItem(
                     val context = LocalContext.current
                     val coilCacheKey = if (isHdLoaded) fileBean.pickCode else fileBean.fileId
                     val imageData = getCoilCacheUrl(context.imageLoader, coilCacheKey)
-                        ?: if (isHdLoaded) hdUrl else fileBean.photoThumb.ifEmpty { image }
-                    // 有缩略图：按比例裁切填充显示照片
+                        ?: if (isHdLoaded) hdUrl else fileBean.photoThumb
+
                     val imageRequestBuilder = ImageRequest.Builder(context)
                         .data(imageData)
                         .memoryCacheKey(coilCacheKey)
@@ -169,27 +162,89 @@ fun ImageCellItem(
                                 "ImageCellItem [图片加载失败] index=$index, name=${fileBean.name}, isLoaded=$isHdLoaded, url=$imageData, error=${errorState.result.throwable.message}"
                             )
                         },
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(MaterialTheme.shapes.medium),// 设置圆角曲率与 Card 保持一致
+                        modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
                 }
-            }
 
-            // 底部文件名文本
-            Text(
-                text = name,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                // 1. 收藏星标微徽章（左上角半透明黑底胶囊）
+                if (isStar) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(4.dp)
+                            .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(4.dp))
+                            .padding(2.5.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = "Starred",
+                            tint = Color(0xFFFFB300),
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                }
+
+                // 2. 视频时长半透明胶囊（右下角）
+                if (isVideo && playLong.isNotEmpty()) {
+                    val bottomPadding = if (playProgress > 0f) 6.dp else 4.dp
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 4.dp, bottom = bottomPadding)
+                            .background(Color.Black.copy(alpha = 0.68f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 4.dp, vertical = 1.5.dp)
+                    ) {
+                        Text(
+                            text = playLong.trim(),
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                // 3. 视频播放进度条（底部 3.5dp 平直高对比进度条）
+                if (isVideo && playProgress > 0f) {
+                    LinearProgressIndicator(
+                        progress = { playProgress.coerceIn(0f, 1f) },
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(3.5.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = Color.Black.copy(alpha = 0.65f),
+                        strokeCap = StrokeCap.Butt
+                    )
+                }
+            }
+        },
+        textContent = {
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 6.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                // 1. 文件名（最多 2 行展示）
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                // 2. 属性元数据（文件大小、进度比例与创建时间）
+                BaseCellMetadata(
+                    metaList = listOf(
+                        fileBean.playLongRatio.trim(),
+                        fileBean.sizeString.trim(),
+                        fileBean.createTimeString.trim()
+                    )
+                )
+            }
         }
-    }
+    )
 }
 
 

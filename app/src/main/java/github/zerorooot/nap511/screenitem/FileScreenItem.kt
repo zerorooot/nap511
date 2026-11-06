@@ -67,6 +67,7 @@ fun FileStaggeredGridList(
         LazyVerticalStaggeredGrid(
             state = staggeredGridState,
             columns = StaggeredGridCells.Adaptive(minSize = displayConfig.gridCellMinSize),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalItemSpacing = 8.dp,
             modifier = Modifier.fillMaxSize()

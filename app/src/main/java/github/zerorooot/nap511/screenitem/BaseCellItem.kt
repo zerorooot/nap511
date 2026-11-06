@@ -135,6 +135,74 @@ fun BaseCellCard(
 }
 
 /**
+ * 现代 MD3 垂直瀑布流卡片插槽式底座容器
+ *
+ * 专为图片/多媒体瀑布流（ImageCellItem 等）设计，与 BaseCellCard 共享统一的设计语言与视觉令牌：
+ * 12dp 平滑圆角、未选中微边框、选中品牌色高亮与 1.5dp 边框、点击水波纹内部裁切。
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun BaseVerticalCellCard(
+    modifier: Modifier = Modifier,
+    isSelected: Boolean = false,
+    isHighlighted: Boolean = false,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    mediaContent: @Composable () -> Unit,
+    textContent: (@Composable () -> Unit)? = null,
+) {
+    val cardShape = RoundedCornerShape(12.dp)
+    val containerColor = when {
+        isSelected -> MaterialTheme.colorScheme.primaryContainer
+        isHighlighted -> MaterialTheme.colorScheme.surfaceContainerHigh
+        else -> MaterialTheme.colorScheme.surfaceContainerLow
+    }
+    val contentColor = when {
+        isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+    val border = if (isSelected) {
+        BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+    } else {
+        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+    }
+
+    val clickModifier = if (onClick != null || onLongClick != null) {
+        Modifier.combinedClickable(
+            onClick = onClick ?: {},
+            onLongClick = onLongClick
+        )
+    } else {
+        Modifier
+    }
+
+    Card(
+        shape = cardShape,
+        colors = CardDefaults.cardColors(
+            containerColor = containerColor,
+            contentColor = contentColor
+        ),
+        border = border,
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(cardShape) // 先进行形状裁切，确保长按与点击水波纹严格限制在 12dp 圆角内部
+            .then(clickModifier)
+    ) {
+        CompositionLocalProvider(LocalContentColor provides contentColor) {
+            Column(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // 顶部媒体展示区（贴边大图）
+                mediaContent()
+
+                // 底部文字与元数据区域
+                textContent?.invoke()
+            }
+        }
+    }
+}
+
+/**
  * 统一 52dp 文件缩略图底座组件
  *
  * 支持普通文件矢量图标居中内缩、异步图片/视频海报裁切填充加载、Coil 缓存获取、
