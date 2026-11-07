@@ -12,7 +12,6 @@ import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 
 /**
  * 列表数据源模型：定义当前文件列表展示的数据来源及上下文
- * todo 是否要加上fcmix？因为现在Folder支持单个文件夹中的混排
  */
 sealed interface FileListSource {
     /** 当前关联的目录 CID */
@@ -258,6 +257,7 @@ data class FileItemActions(
     val onUnzip: (FileBean) -> Unit,
     val onDelete: (FileBean) -> Unit,
     val onStar: (FileBean) -> Unit,
+    val onTop: (FileBean) -> Unit = {},
     val onRename: (Int) -> Unit,
     val onFileInfo: (FileBean) -> Unit,
     val onSetOfflineCid: (FileBean) -> Unit,

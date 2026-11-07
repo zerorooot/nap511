@@ -46,6 +46,11 @@ class FileMutatorModuleTest {
     private var shouldThrowNetworkError = false
 
     private val fakeRepo = object : FileRepository() {
+        var topCallCount = 0
+        var lastTopFid: String? = null
+        var lastTopBool: Boolean? = null
+        var mockTopResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
+
         override suspend fun delete(pid: String, fid: String): github.zerorooot.nap511.bean.BaseReturnMessage {
             if (shouldThrowNetworkError) throw java.io.IOException("Network Timeout")
             return mockDeleteResult
@@ -61,6 +66,14 @@ class FileMutatorModuleTest {
             return mockDeleteResult
         }
 
+        override suspend fun top(fid: String, top: Boolean): github.zerorooot.nap511.bean.BaseReturnMessage {
+            if (shouldThrowNetworkError) throw java.io.IOException("Network Timeout")
+            topCallCount++
+            lastTopFid = fid
+            lastTopBool = top
+            return mockTopResult
+        }
+
         override suspend fun rename(renameBean: okhttp3.RequestBody): github.zerorooot.nap511.bean.BaseReturnMessage {
             if (shouldThrowNetworkError) throw java.io.IOException("Network Timeout")
             renameCallCount++
@@ -69,9 +82,14 @@ class FileMutatorModuleTest {
     }
 
     private val fakeNavigator = object : FileNavigator {
+        var refreshCallCount = 0
         override fun navigateTo(cid: String) {}
-        override fun refresh(forceCache: Boolean) {}
-        override fun refresh(cid: String, forceCache: Boolean) {}
+        override fun refresh(forceCache: Boolean) {
+            refreshCallCount++
+        }
+        override fun refresh(cid: String, forceCache: Boolean) {
+            refreshCallCount++
+        }
         override fun updateOrder(order: OrderBean, fcMix: Int) {}
     }
 
@@ -93,6 +111,11 @@ class FileMutatorModuleTest {
 
     @Before
     fun setUp() {
+        try {
+            com.elvishew.xlog.XLog.init()
+        } catch (_: Throwable) {}
+        github.zerorooot.nap511.worker.UnzipQueueManager.clear()
+
         tempDir = java.nio.file.Files.createTempDirectory("fmm_test").toFile()
         github.zerorooot.nap511.util.FileCacheManager.init(tempDir)
         github.zerorooot.nap511.util.FileCacheManager.saveRequestCache = true
@@ -107,6 +130,11 @@ class FileMutatorModuleTest {
         mockRenameResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
         renameCallCount = 0
         shouldThrowNetworkError = false
+        fakeRepo.topCallCount = 0
+        fakeRepo.lastTopFid = null
+        fakeRepo.lastTopBool = null
+        fakeRepo.mockTopResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
+        fakeNavigator.refreshCallCount = 0
 
         module = FileMutatorModule(
             stateHolder = stateHolder,
@@ -559,5 +587,78 @@ class FileMutatorModuleTest {
         assertFalse("单文件重命名后应清除 isSelect", updated.fileBeanList.first().isSelect)
         assertFalse("单文件重命名后应退出多选", updated.isLongClickState)
         assertEquals("nap511", updated.appBarTitle)
+    }
+
+    @Test
+    fun `test topFile toggles to pinned and calls navigator refresh on success`() = kotlinx.coroutines.test.runTest {
+        val item = createFileBean("1", "doc.txt").copy(isPinned = false, isTop = 0)
+        module.topFile(item)
+
+        assertEquals(1, fakeRepo.topCallCount)
+        assertEquals("1", fakeRepo.lastTopFid)
+        assertEquals(true, fakeRepo.lastTopBool)
+        assertTrue(fakeToastProvider.messages.contains("置顶成功"))
+        assertEquals(1, fakeNavigator.refreshCallCount)
+    }
+
+    @Test
+    fun `test topFile toggles to unpinned when item is already pinned`() = kotlinx.coroutines.test.runTest {
+        val item = createFileBean("1", "doc.txt").copy(isPinned = true, isTop = 1)
+        module.topFile(item)
+
+        assertEquals(1, fakeRepo.topCallCount)
+        assertEquals("1", fakeRepo.lastTopFid)
+        assertEquals(false, fakeRepo.lastTopBool)
+        assertTrue(fakeToastProvider.messages.contains("取消置顶成功"))
+        assertEquals(1, fakeNavigator.refreshCallCount)
+    }
+
+    @Test
+    fun `test topMultiple with selected items passes comma separated fids`() = kotlinx.coroutines.test.runTest {
+        val item1 = createFileBean("10", "file1.txt", isSelect = true).copy(isPinned = false, isTop = 0)
+        val item2 = createFileBean("20", "file2.txt", isSelect = true).copy(isPinned = false, isTop = 0)
+        val item3 = createFileBean("30", "file3.txt", isSelect = false)
+        stateHolder.updateContentState {
+            copy(fileBeanList = listOf(item1, item2, item3), isLongClickState = true)
+        }
+
+        module.topMultiple()
+
+        assertEquals(1, fakeRepo.topCallCount)
+        assertEquals("10,20", fakeRepo.lastTopFid)
+        assertEquals(true, fakeRepo.lastTopBool)
+        assertTrue(fakeToastProvider.messages.contains("置顶成功"))
+        assertEquals(1, fakeNavigator.refreshCallCount)
+    }
+
+    @Test
+    fun `test topMultiple does nothing when filter is empty`() = kotlinx.coroutines.test.runTest {
+        module.topMultiple(emptyList())
+
+        assertEquals(0, fakeRepo.topCallCount)
+        assertEquals(0, fakeNavigator.refreshCallCount)
+    }
+
+    @Test
+    fun `test topMultiple handles failure and does not trigger refresh`() = kotlinx.coroutines.test.runTest {
+        fakeRepo.mockTopResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = false, errorMsg = "置顶失败: 权限不足")
+        val item = createFileBean("1", "doc.txt")
+        module.topFile(item)
+
+        assertEquals(1, fakeRepo.topCallCount)
+        assertTrue(fakeToastProvider.messages.contains("置顶失败: 权限不足"))
+        assertEquals(0, fakeNavigator.refreshCallCount)
+        assertFalse(stateHolder.currentContentState.isRefreshing)
+    }
+
+    @Test
+    fun `test topMultiple handles network exception and does not crash`() = kotlinx.coroutines.test.runTest {
+        shouldThrowNetworkError = true
+        val item = createFileBean("1", "doc.txt")
+        module.topFile(item)
+
+        assertTrue(fakeToastProvider.messages.contains("Network Timeout"))
+        assertEquals(0, fakeNavigator.refreshCallCount)
+        assertFalse(stateHolder.currentContentState.isRefreshing)
     }
 }

@@ -62,6 +62,8 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
         val finalParentId = if (isFolder) fileBean.parentId else fileBean.categoryId
         //判断是否是星标文件
         val isStar = fileBean.star == 1
+        //判断是否是置顶文件/文件夹
+        val isPinned = fileBean.isTop == 1
 
         var sizeString = fileBean.sizeString
         var timeString: String
@@ -136,7 +138,8 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
             sizeString = sizeString,
             playLongRatio = playLongRatio,
             playLongString = playLongString,
-            isStar = isStar
+            isStar = isStar,
+            isPinned = isPinned
         )
     }.toMutableList() as ArrayList<FileBean>
 }

@@ -238,20 +238,6 @@ class FileBrowserModuleTest {
         assertEquals("1", stateHolder.currentContentState.appBarTitle)
     }
 
-    @Test
-    fun `test selectAll selects all items and keeps multi-select state`() {
-        val items = (1..5).map { createFileBean(it.toString(), "item$it") }
-        stateHolder.updateContentState {
-            copy(fileBeanList = items)
-        }
-
-        module.selectAll()
-
-        val content = stateHolder.currentContentState
-        assertTrue(content.isLongClickState)
-        assertEquals("5", content.appBarTitle)
-        assertTrue(content.fileBeanList.all { it.isSelect })
-    }
 
     @Test
     fun `test toggleSelectAll toggles between select all and zero selection keeping multi-select mode`() {

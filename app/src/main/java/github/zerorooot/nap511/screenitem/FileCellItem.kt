@@ -70,6 +70,7 @@ fun FileCellItem(
                 iconRes = image,
                 thumbUrl = fileBean.photoThumb,
                 cacheKey = fileBean.fileId,
+                isTop = fileBean.isPinned,
                 isStar = isStar,
                 isVideo = isVideo,
                 videoDuration = playLong,
@@ -127,6 +128,7 @@ fun FileCellItem(
                     MenuItemAction.OFFLINE_CID -> itemActions.onSetOfflineCid.invoke(fileBean)
                     MenuItemAction.FILE_INFO -> itemActions.onFileInfo.invoke(fileBean)
                     MenuItemAction.ARIA2_DOWNLOAD -> itemActions.onAria2Download.invoke(index)
+                    MenuItemAction.TOP_FILE -> itemActions.onTop.invoke(fileBean)
                     MenuItemAction.STAR_FILE -> itemActions.onStar.invoke(fileBean)
                     MenuItemAction.FORCE_OPEN -> itemActions.onForceOpen.invoke(index)
                     else -> {}

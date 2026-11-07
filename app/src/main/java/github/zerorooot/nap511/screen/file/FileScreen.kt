@@ -373,6 +373,10 @@ fun FileScreen(
                 fileViewModel.openSearchDialog()
             }
 
+            TopBarAction.TOP -> {
+                fileViewModel.topMultiple()
+            }
+
             TopBarAction.STAR -> {
                 fileViewModel.starMultiple()
             }
@@ -507,6 +511,9 @@ fun FileScreen(
             },
             onFileInfo = { fileBean ->
                 fileViewModel.getFileInfo(fileBean)
+            },
+            onTop = { fileBean ->
+                fileViewModel.topFile(fileBean)
             },
             onStar = { fileBean ->
                 fileViewModel.starFile(fileBean)

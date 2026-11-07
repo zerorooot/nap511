@@ -58,6 +58,7 @@ fun FileMultiSelectBottomBar(
 
     // 归入 DropdownMenu 溢出菜单的次要/拓展操作
     val secondaryActions = listOf(
+        TopBarAction.TOP,
         TopBarAction.STAR,
         TopBarAction.UNZIP_ALL,
     )

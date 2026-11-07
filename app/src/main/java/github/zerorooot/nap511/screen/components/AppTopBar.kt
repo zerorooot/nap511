@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Settings
@@ -92,6 +93,7 @@ enum class TopBarAction(
     BACK("返回", Icons.AutoMirrored.Rounded.ArrowBack),
     DRAWER_MENU("抽屉菜单", Icons.Rounded.Menu),
     SEARCH("搜索", Icons.Rounded.Search),
+    TOP("文件置顶", Icons.Default.PushPin, shortLabel = "置顶"),
     STAR("文件标星", Icons.Default.StarOutline, shortLabel = "标星"),
     STAR_FILE_SCREEN("星标文件", Icons.Default.StarOutline),
     SELECT_UP("向上全选", Icons.Default.ArrowUpward, shortLabel = "上选"),
@@ -153,6 +155,7 @@ private val landscapeActions = listOf(
     TopBarAction.CUT,
     TopBarAction.BATCH_RENAME,
     TopBarAction.DELETE,
+    TopBarAction.TOP,
     TopBarAction.STAR,
     TopBarAction.UNZIP_ALL
 )

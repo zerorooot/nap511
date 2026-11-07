@@ -200,6 +200,11 @@ data class FileBean(
     @SerializedName("s") val size: String = "0",
     @SerializedName("current_time") val currentPlayTime: Int = 0,
     @SerializedName("play_long") val playLong: Double = 0.00,
+    /**
+     * 文件/文件夹是否置顶，1 为置顶，0 为不置顶
+     */
+    @SerializedName("is_top") val isTop: Int = 0,
+    val isPinned: Boolean = false,
     val isFolder: Boolean = false,
     val modifiedTimeString: String = "",
     val createTimeString: String = "",

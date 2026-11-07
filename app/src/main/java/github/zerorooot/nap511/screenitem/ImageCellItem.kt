@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -67,6 +69,7 @@ fun ImageCellItem(
     val isHdLoaded = isImageHdPreview && !hdUrl.isNullOrEmpty()
     val cacheKey = fileBean.fileId.ifEmpty { fileBean.pickCode.ifEmpty { name } }
     val isStar = fileBean.isStar
+    val isTop = fileBean.isPinned
     val isVideo = fileBean.isVideo == 1
     val playLong = fileBean.playLongString
     val playProgress = if (fileBean.playLong > 0 && fileBean.currentPlayTime > 0) {
@@ -167,21 +170,42 @@ fun ImageCellItem(
                     )
                 }
 
-                // 1. 收藏星标微徽章（左上角半透明黑底胶囊）
-                if (isStar) {
-                    Box(
+                // 1. 置顶与收藏星标微徽章（左上角半透明黑底胶囊，水平并排）
+                if (isTop || isStar) {
+                    Row(
                         modifier = Modifier
                             .align(Alignment.TopStart)
-                            .padding(4.dp)
-                            .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(4.dp))
-                            .padding(2.5.dp)
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.5.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = "Starred",
-                            tint = Color(0xFFFFB300),
-                            modifier = Modifier.size(12.dp)
-                        )
+                        if (isTop) {
+                            Box(
+                                modifier = Modifier
+                                    .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(4.dp))
+                                    .padding(2.5.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.PushPin,
+                                    contentDescription = "Pinned",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                        }
+                        if (isStar) {
+                            Box(
+                                modifier = Modifier
+                                    .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(4.dp))
+                                    .padding(2.5.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Star,
+                                    contentDescription = "Starred",
+                                    tint = Color(0xFFFFB300),
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                        }
                     }
                 }
 

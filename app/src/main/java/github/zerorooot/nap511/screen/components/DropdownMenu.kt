@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.FindInPage
 import androidx.compose.material.icons.outlined.FolderZip
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Schedule
@@ -81,6 +82,7 @@ enum class MenuItemAction(
     FILE_SORT("文件排序", Icons.AutoMirrored.Outlined.Sort),
     REFRESH_FILES("强制刷新", Icons.Outlined.Refresh),
     VIDEO_SCHEDULE("视频时间", Icons.Outlined.Schedule),
+    TOP_FILE("文件置顶", Icons.Outlined.PushPin),
     STAR_FILE("文件标星", Icons.Outlined.StarOutline),
 
     // 离线页顶栏菜单项
@@ -172,6 +174,7 @@ fun FileMoreMenu(onClick: (MenuItemAction, Int) -> Unit) {
         MenuItemAction.FILE_INFO,
         MenuItemAction.FORCE_OPEN,
         MenuItemAction.UNZIP_FILE,
+        MenuItemAction.TOP_FILE,
         MenuItemAction.STAR_FILE,
         MenuItemAction.ARIA2_DOWNLOAD,
         MenuItemAction.DELETE_FILE
@@ -186,6 +189,7 @@ fun FolderMoreMenu(onClick: (MenuItemAction, Int) -> Unit) {
         MenuItemAction.RENAME_FILE,
         MenuItemAction.OFFLINE_CID,
         MenuItemAction.FILE_INFO,
+        MenuItemAction.TOP_FILE,
         MenuItemAction.STAR_FILE,
         MenuItemAction.DELETE_FILE
     )

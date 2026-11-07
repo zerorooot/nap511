@@ -334,10 +334,11 @@ class FileBrowserModule(
 
     suspend fun order(
         isRefresh: Boolean = true,
+        cid: String? = null,
         order: OrderBean? = null,
         fcMix: Int = currentFcMix
     ) {
-        val currentCid = stateHolder.currentContentState.currentCid
+        val currentCid = cid ?: stateHolder.currentContentState.currentCid
         val b = order ?: stateHolder.currentContentState.orderBean
         val map = mapOf(
             "user_order" to b.type,
@@ -348,7 +349,7 @@ class FileBrowserModule(
 
         runCatching {
             val orderResult = fileRepository.order(map)
-            XLog.d("order=$orderResult, currentCid=$currentCid, fcMix=$fcMix")
+            XLog.d("order=$orderResult, map=$map")
             if (orderResult.state) {
                 // ★ 同时保存新选中的 orderBean 和 fcMix
                 stateHolder.updateContentState { copy(orderBean = b, fcMix = fcMix) }
@@ -375,16 +376,17 @@ class FileBrowserModule(
             }
 
             is FileListSource.Filter -> {
-                this.order(false, order, fcMix)
+                this.order(isRefresh = false, order = order, fcMix = fcMix)
                 filterFile(type = s.filterType, name = s.name, order = order)
             }
 
             is FileListSource.Folder -> {
-                this.order(true, order, fcMix)
+                this.order(isRefresh = true, order = order, fcMix = fcMix)
             }
 
             is FileListSource.Star -> {
-                starFileScreen(order = order)
+                this.order(isRefresh = false, cid = "0", order = order, fcMix = fcMix)
+                starFileScreen(order = order, fcMix)
             }
         }
     }
@@ -405,15 +407,15 @@ class FileBrowserModule(
             is FileListSource.Filter -> {
                 clearSelection()
                 pagingStateStore.reset(s.paginationKey)
-                // 携带 s.order 刷新，确保用户调整后的过滤排序在下拉刷新时不丢失
-                filterFile(type = s.filterType, name = s.name, order = s.order)
+                // 携带 s.order 和 s.fcMix 刷新，确保用户调整后的过滤排序在下拉刷新时不丢失
+                filterFile(type = s.filterType, name = s.name, order = s.order, fcMix = s.fcMix)
             }
 
             is FileListSource.Star -> {
                 clearSelection()
                 pagingStateStore.reset(s.paginationKey)
-                // 携带 s.order 刷新，确保用户调整后的排序在下拉刷新时不丢失
-                starFileScreen(order = s.order)
+                // 携带 s.order 和 s.fcMix 刷新，确保用户调整后的排序在下拉刷新时不丢失
+                starFileScreen(order = s.order, fcMix = s.fcMix)
             }
         }
     }
@@ -425,7 +427,8 @@ class FileBrowserModule(
         stateHolder.updateContentState { copy(source = FileListSource.Folder(cid, stringProvider)) }
         val refreshCurrent = (cid == stateHolder.currentContentState.currentCid)
         // 如果外部传了明确的 fcMix 就用（比如刚排序完），没传就用 currentFcMix
-        val targetFcMix = fcMix ?: if (refreshCurrent) stateHolder.currentContentState.fcMix else currentFcMix
+        val targetFcMix =
+            fcMix ?: if (refreshCurrent) stateHolder.currentContentState.fcMix else currentFcMix
         XLog.d(
             "refresh refreshCurrent:$refreshCurrent, settingUiState.forceLoadCache:${settingUiState.forceLoadCache}, forceCache:$forceCache," +
                     "order = ${stateHolder.currentContentState.orderBean.type}, asc = ${stateHolder.currentContentState.orderBean.asc}, fcMix = $targetFcMix"
@@ -522,9 +525,8 @@ class FileBrowserModule(
         stateHolder.setRefreshing(false)
     }
 
-    suspend fun starFileScreen(order: OrderBean) {
+    suspend fun starFileScreen(order: OrderBean, fcMix: Int = currentFcMix) {
         activeLocalOrder = null
-        val fcMix = currentFcMix
         val limit = UserSessionManager.requestLimitCount
 
         stateHolder.setRefreshing(true)
@@ -545,6 +547,7 @@ class FileBrowserModule(
                     fileBeanList = formattedList,
                     totalCount = files.count,
                     appBarTitle = targetSource.appName,
+                    fcMix = fcMix,
                     pathList = files.path,
                     isRefreshing = false,
                 )
@@ -556,11 +559,11 @@ class FileBrowserModule(
     suspend fun filterFile(
         type: Int,
         name: String,
-        order: OrderBean
+        order: OrderBean,
+        fcMix: Int = currentFilesBeanFcMix
     ) {
         activeLocalOrder = null
         val currentCid = stateHolder.currentContentState.currentCid
-        val fcMix = currentFcMix
         val limit = UserSessionManager.requestLimitCount
         stateHolder.setRefreshing(true)
 
@@ -591,6 +594,7 @@ class FileBrowserModule(
             stateHolder.updateContentState {
                 copy(
                     source = targetSource,
+                    fcMix = targetSource.fcMix,
                     isLongClickState = false,
                     fileBeanList = formattedList,
                     totalCount = files.count,
@@ -677,7 +681,10 @@ class FileBrowserModule(
         val sortedList = list.sortedWith(comparator)
         activeLocalOrder = order
         stateHolder.updateContentState {
-            copy(fileBeanList = sortedList)
+            copy(
+                fileBeanList = sortedList,
+                fcMix = fcMix
+            )
         }
         _scrollToTopEvent.tryEmit(Unit)
     }
@@ -754,17 +761,6 @@ class FileBrowserModule(
         }
     }
 
-    fun selectAll() {
-        stateHolder.updateContentState {
-            val list = fileBeanList.map { it.copy(isSelect = true) }
-            copy(
-                fileBeanList = list,
-                appBarTitle = list.size.toString(),
-                isLongClickState = true
-            )
-        }
-        XLog.d("selectAll: 已全选 ${stateHolder.currentContentState.fileBeanList.size} 项")
-    }
 
     fun toggleSelectAll() {
         stateHolder.updateContentState {
@@ -814,7 +810,8 @@ class FileBrowserModule(
                 stateHolder.updateContentState {
                     copy(
                         source = FileListSource.Folder(currentCid, stringProvider),
-                        appBarTitle = source.appName
+                        appBarTitle = source.appName,
+                        fcMix = cache.fcMix
                     )
                 }
                 return BackResult.Handled

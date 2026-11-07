@@ -308,11 +308,14 @@ class FileViewModel(
         mutatorModule.starFile(fileBean)
     }
 
+    fun topFile(fileBean: FileBean) = viewModelScope.launch {
+        mutatorModule.topFile(fileBean)
+    }
+
     fun select(index: Int) = browserModule.select(index)
     fun selectToUp() = browserModule.selectToUp()
     fun selectToDown() = browserModule.selectToDown()
     fun selectReverse() = browserModule.selectReverse()
-    fun selectAll() = browserModule.selectAll()
     fun toggleSelectAll() = browserModule.toggleSelectAll()
     fun clearSelection() = browserModule.clearSelection()
     fun startMultiSelect(index: Int) = browserModule.startMultiSelect(index)
@@ -329,6 +332,7 @@ class FileViewModel(
     fun delete(fileBean: FileBean) = viewModelScope.launch { mutatorModule.delete(fileBean) }
     fun deleteMultiple() = viewModelScope.launch { mutatorModule.deleteMultiple() }
     fun starMultiple() = viewModelScope.launch { mutatorModule.starMultiple() }
+    fun topMultiple() = viewModelScope.launch { mutatorModule.topMultiple() }
 
     fun deleteOrphansAndExpiredFile() = viewModelScope.launch {
         syncModule.deleteOrphansAndExpiredFile()

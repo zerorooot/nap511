@@ -185,6 +185,48 @@ class FileMutatorModule(
         starMultiple(filter)
     }
 
+    /**
+     * 文件/文件夹置顶与取消置顶（单项）
+     */
+    suspend fun topFile(fileBean: FileBean) {
+        topMultiple(arrayListOf(fileBean))
+    }
+
+    /**
+     * 批量置顶/取消置顶文件或文件夹。
+     * 置顶接口调用成功后直接触发全量刷新重新拉取服务端最新排序，失败时重置刷新状态并提示错误。
+     */
+    suspend fun topMultiple(filter: List<FileBean>) {
+        if (filter.isEmpty()) return
+        val filterIds = filter.map { it.fileId.ifEmpty { it.categoryId } }.toSet()
+        val targetTop = !(filter[0].isPinned || filter[0].isTop == 1)
+        val actionText = if (targetTop) "置顶" else "取消置顶"
+        XLog.d("topMultiple: targetTop=$targetTop, count=${filter.size}, filterIds=$filterIds")
+
+        stateHolder.setRefreshing(true)
+        runCatching {
+            val result = fileRepository.top(filterIds.joinToString(","), targetTop)
+            check(result.state) { result.errorMsg.ifEmpty { "${actionText}失败" } }
+            result
+        }.onSuccess {
+            XLog.d("topMultiple: ${actionText}成功，调用 navigator.refresh()")
+            toastProvider.showToast("${actionText}成功")
+            // 无参 refresh 兼容所有数据源模式，由拉取过程接管 loading 动画并在返回时清空多选状态
+            navigator.refresh()
+        }.onFailure { ex ->
+            stateHolder.setRefreshing(false)
+            val errorMsg = ex.message ?: "${actionText}失败"
+            toastProvider.showToast(errorMsg)
+            XLog.e("topMultiple failed", ex)
+        }
+    }
+
+    suspend fun topMultiple() {
+        val filter =
+            stateHolder.currentContentState.fileBeanList.filter { it.isSelect }
+        topMultiple(filter)
+    }
+
     suspend fun rename(
         fileBean: FileBean? = stateHolder.currentDialogState.targetFileBean,
         name: String

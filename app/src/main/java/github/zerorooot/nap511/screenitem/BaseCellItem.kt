@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -213,6 +214,7 @@ fun FileThumbnail(
     modifier: Modifier = Modifier,
     thumbUrl: String = "",
     cacheKey: String = "",
+    isTop: Boolean = false,
     isStar: Boolean = false,
     isVideo: Boolean = false,
     videoDuration: String = "",
@@ -261,21 +263,42 @@ fun FileThumbnail(
             )
         }
 
-        // 星标左上角半透明徽标（彻底解放文字行的水平排版空间）
-        if (isStar) {
-            Box(
+        // 置顶与星标左上角并排半透明徽标（彻底解放文字行的水平排版空间）
+        if (isTop || isStar) {
+            Row(
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(3.dp)
-                    .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(4.dp))
-                    .padding(2.dp)
+                    .padding(3.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Star,
-                    contentDescription = "Starred",
-                    tint = Color(0xFFFFB300),
-                    modifier = Modifier.size(11.dp)
-                )
+                if (isTop) {
+                    Box(
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(4.dp))
+                            .padding(2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.PushPin,
+                            contentDescription = "Pinned",
+                            tint = Color.White,
+                            modifier = Modifier.size(11.dp)
+                        )
+                    }
+                }
+                if (isStar) {
+                    Box(
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(4.dp))
+                            .padding(2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = "Starred",
+                            tint = Color(0xFFFFB300),
+                            modifier = Modifier.size(11.dp)
+                        )
+                    }
+                }
             }
         }
 

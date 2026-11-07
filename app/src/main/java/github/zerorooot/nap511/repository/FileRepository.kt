@@ -253,7 +253,8 @@ open class FileRepository {
                 limit = limit,
                 order = order.type,
                 fcMix = fcMix,
-                customOrder = 2
+                //加了这个，文件夹置顶就无效了
+//                customOrder = 2
             )
         }
     }
@@ -264,6 +265,14 @@ open class FileRepository {
     open suspend fun star(fid: String, star: Boolean): BaseReturnMessage {
         val starString = if (star) "1" else "0"
         return fileService.star(fid, starString)
+    }
+
+    /**
+     * 文件加⭐，true 表示加上，false 表示取消
+     */
+    open suspend fun top(fid: String, top: Boolean): BaseReturnMessage {
+        val topString = if (top) "1" else "0"
+        return fileService.top(fid, topString)
     }
 
     suspend fun image(pickCode: String, current: Long): ImageDate {

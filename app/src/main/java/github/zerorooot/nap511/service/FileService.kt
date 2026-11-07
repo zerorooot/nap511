@@ -171,6 +171,17 @@ interface FileService {
     ): BaseReturnMessage
 
     /**
+     * 文件置顶，top 1表示置顶，0 表示取消
+     */
+    @FormUrlEncoded
+    @POST("files/top")
+    suspend fun top(
+        @Field("file_id") fid: String,
+        @Field("top") top: String,
+        @Field("format") format: String = "json"
+    ): BaseReturnMessage
+
+    /**
      *
     user_order:file_size
     file_id:2573609193685653011
