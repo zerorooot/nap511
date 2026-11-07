@@ -73,7 +73,6 @@ class FileBrowserModule(
 
     /**
      * 服务端真实的云端排序（供网络请求及分页严格使用，绝不包含本地排序字段）
-     * todo 排序dialog中的文件夹置顶选项是否要同步？
      */
     val serverOrderBean: OrderBean
         get() = when (val s = stateHolder.currentContentState.source) {

@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
 import github.zerorooot.nap511.BuildConfig
@@ -38,6 +39,11 @@ object DrawerMenuItems {
                 Icons.Default.Settings,
                 ConfigKeyUtil.ADVANCED_SETTINGS,
                 Route.AdvancedSettings
+            ),
+            DrawerMenuItem(
+                Icons.Default.Info,
+                ConfigKeyUtil.ABOUT_APP,
+                Route.AboutApp
             ),
         ).apply {
             if (isLogEnabled) {

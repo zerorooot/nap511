@@ -8,6 +8,17 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+fun getGitCommitHash(): String {
+    return try {
+        val process = ProcessBuilder("git", "rev-parse", "--short", "HEAD").start()
+        val text = process.inputStream.bufferedReader().readText().trim()
+        process.waitFor()
+        text.ifEmpty { "unknown" }
+    } catch (_: Throwable) {
+        "unknown"
+    }
+}
+
 android {
     namespace = "github.zerorooot.nap511"
     compileSdk = 37
@@ -19,6 +30,7 @@ android {
         targetSdk = 37
         versionCode = 14
         versionName = "1.8"
+        buildConfigField("String", "GIT_SHA", "\"${getGitCommitHash()}\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -22,8 +22,8 @@ sealed interface Route : NavKey {
     data object OfflineList : Route
 
     @Serializable
-    data class OfflineFileInfoDialog(val task: OfflineTask) : Route {
-    }
+    data class OfflineFileInfoDialog(val task: OfflineTask) : Route
+
 
     @Serializable
     data object RecycleBin : Route
@@ -65,10 +65,14 @@ sealed interface Route : NavKey {
     @Serializable
     data class HtmlWebViewScreen(val title: String = "网页") : Route
 
+    @Serializable
+    data object AboutApp : Route
 
-    // 假设在别的 Screen 中跳转的“详情页”或“子页面”（带参数示例）
-//    @Serializable
-//    data class FileDetail(val fileId: String, val fileName: String) : Route
+    @Serializable
+    data object OpenSourceLicense : Route
+
+    @Serializable
+    data object Disclaimer : Route
 }
 
 // 定义导航事件

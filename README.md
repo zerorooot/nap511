@@ -1,5 +1,4 @@
 #  nap511
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/zerorooot/nap511) 
 [![Latest Release](https://img.shields.io/github/v/release/zerorooot/nap511?label=Latest%20Release)](https://github.com/zerorooot/nap511/releases)
 [![License](https://img.shields.io/github/license/zerorooot/nap511.svg)](https://github.com/zerorooot/nap511/blob/main/LICENSE)
 

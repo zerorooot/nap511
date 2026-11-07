@@ -253,5 +253,10 @@ class ConfigKeyUtil {
          * 离线task的标签
          */
         const val OFFLINE_TASK_WORKER = "OfflineTaskWorker"
+
+        /**
+         * 关于应用
+         */
+        const val ABOUT_APP = "关于应用"
     }
 }

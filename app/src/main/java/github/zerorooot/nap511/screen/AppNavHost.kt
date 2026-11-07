@@ -28,6 +28,9 @@ import github.zerorooot.nap511.bean.SubtitleItem
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoStarAction
 import github.zerorooot.nap511.dialog.ExitApp
+import github.zerorooot.nap511.screen.about.AboutScreen
+import github.zerorooot.nap511.screen.about.DisclaimerScreen
+import github.zerorooot.nap511.screen.about.OpenSourceLicenseScreen
 import github.zerorooot.nap511.screen.auth.LoginScreen
 import github.zerorooot.nap511.screen.file.FileScreen
 import github.zerorooot.nap511.screen.file.OfflineDownloadScreen
@@ -299,6 +302,26 @@ fun AppNavHost(
                             "Terminal" -> onNavigate(Route.Terminal)
                         }
                     }
+                )
+            }
+
+            entry<Route.AboutApp> {
+                AboutScreen(
+                    onDrawerClick = onOpenDrawer,
+                    onNavigateToLicense = { onNavigate(Route.OpenSourceLicense) },
+                    onNavigateToDisclaimer = { onNavigate(Route.Disclaimer) }
+                )
+            }
+
+            entry<Route.OpenSourceLicense> {
+                OpenSourceLicenseScreen(
+                    onBack = onPopBack
+                )
+            }
+
+            entry<Route.Disclaimer> {
+                DisclaimerScreen(
+                    onBack = onPopBack
                 )
             }
 

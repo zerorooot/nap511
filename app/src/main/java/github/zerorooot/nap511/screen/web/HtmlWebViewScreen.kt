@@ -87,10 +87,14 @@ fun HtmlWebViewScreen(
             isSearchOpen = false
             searchQuery = ""
             webViewInstance?.clearMatches()
-        } else if (webViewInstance?.canGoBack() == true) {
-            webViewInstance?.goBack()
         } else {
-            onBack()
+            val backList = webViewInstance?.copyBackForwardList()
+            val currentIndex = backList?.currentIndex ?: 0
+            if (currentIndex > 0 && webViewInstance?.canGoBack() == true) {
+                webViewInstance?.goBack()
+            } else {
+                onBack()
+            }
         }
     }
 
@@ -198,7 +202,6 @@ fun HtmlWebViewScreen(
                                 handler?.proceed()
                             }
                         }
-                        loadDataWithBaseURL(null, htmlContent, "text/html", currentEncoding, null)
                     }
                 },
                 update = { webView ->
