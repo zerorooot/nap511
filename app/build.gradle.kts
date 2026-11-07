@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -14,10 +17,41 @@ android {
         applicationId = "github.zerorooot.nap511"
         minSdk = 26
         targetSdk = 37
-        versionCode = 13
-        versionName = "1.7"
+        versionCode = 14
+        versionName = "1.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        create("release") {
+            val keystorePropertiesFile = rootProject.file("keystore.properties")
+            val keystoreProperties = Properties()
+            if (keystorePropertiesFile.exists()) {
+                keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+            }
+
+            val storeFilePath = keystoreProperties["storeFile"] as String?
+                ?: System.getenv("KEYSTORE_FILE")
+            val storePasswordParam = keystoreProperties["storePassword"] as String?
+                ?: System.getenv("KEYSTORE_PASSWORD")
+            val keyAliasParam = keystoreProperties["keyAlias"] as String?
+                ?: System.getenv("KEY_ALIAS")
+            val keyPasswordParam = keystoreProperties["keyPassword"] as String?
+                ?: System.getenv("KEY_PASSWORD")
+
+            val keystoreFile = storeFilePath?.let { path ->
+                val f = file(path)
+                if (f.exists()) f else rootProject.file(path)
+            }
+
+            if (keystoreFile != null && keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = storePasswordParam
+                keyAlias = keyAliasParam
+                keyPassword = keyPasswordParam
+            }
+        }
     }
 
     buildTypes {
@@ -28,6 +62,13 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            val releaseSigning = signingConfigs.getByName("release")
+            // 如果存在私钥则使用 release 签名，否则回退到 Android 默认的 debug 签名
+            signingConfig = if (releaseSigning.storeFile != null) {
+                releaseSigning
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
     compileOptions {

@@ -34,3 +34,10 @@ app/release/
 lib/
 docs/
 /skills
+
+# Keystore & secret property files
+*.jks
+*.keystore
+*.p12
+*.pepk
+keystore.properties*
