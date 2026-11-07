@@ -1,27 +1,21 @@
 package github.zerorooot.nap511.util
 
 import com.elvishew.xlog.XLog
-import com.google.gson.Gson
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.VideoBean
-import github.zerorooot.nap511.bean.cache.CacheWrapper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.Collections
 import java.util.StringJoiner
-import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 
 /**
@@ -52,55 +46,49 @@ fun interface CacheRollback {
 }
 
 object FileCacheManager {
-    private lateinit var cacheDir: File
-
-    @Volatile
-    var saveRequestCache: Boolean = true
-
-    private const val ttlMillis: Long = 7 * 24 * 3600 * 1000L // 7 天过期
-
-    private val gson = Gson()
-    private val mutex = Mutex()
-    private val wrapperType = CacheWrapper::class.java
-
-    // 单线程 FIFO 调度器：天然保证磁盘落盘与删除的时序绝对一致，避免多线程异步写覆盖和回滚反序竞态
-    private val diskDispatcher = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "FileCacheManager-DiskIO").apply { isDaemon = true }
-    }.asCoroutineDispatcher()
-
-    // 独立后台协程作用域，用于不阻塞关键链路的磁盘异步持久化与后台加载任务
-    private val scope = CoroutineScope(diskDispatcher + SupervisorJob())
+    private var cacheDir: File? = null
 
     // 最大内存目录缓存容量，超过时基于 LRU 淘汰旧目录，保障深度扫描时的内存安全与防 OOM
     private const val MAX_MEMORY_DIRS = 500
 
-    private class LruCacheMap(private val capacity: Int) :
-        LinkedHashMap<String, CacheWrapper>(capacity, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CacheWrapper>?): Boolean {
-            if (size <= capacity) return false
-            // 若最老元素是根目录 "0"，不能直接淘汰 "0"，应在超过容量时保留 "0" 并移除次老元素
-            if (eldest?.key == "0") {
-                // 找到第一个非 "0" 的键进行淘汰
-                val iterator = iterator()
-                while (iterator.hasNext()) {
-                    val entry = iterator.next()
-                    if (entry.key != "0") {
-                        iterator.remove()
-                        break
-                    }
-                }
-                return false
+    @Volatile
+    private var _saveRequestCache: Boolean = true
+
+    // 默认实例化支持纯内存运行的 Engine，未调用 init(cacheDir) 时同样可以安全在内存中读写，杜绝未初始化崩溃
+    @Volatile
+    private var engine: TwoLevelCacheEngine = TwoLevelCacheEngine(
+        cacheDir = null,
+        maxMemoryDirs = MAX_MEMORY_DIRS,
+        saveRequestCacheInitial = _saveRequestCache
+    )
+
+    // 独立后台协程作用域，用于不阻塞关键链路的磁盘异步持久化与后台加载任务
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    var saveRequestCache: Boolean
+        get() = engine.saveRequestCache
+        set(value) {
+            updateConfig(saveRequestCache = value)
+        }
+
+    /**
+     * 动态热更新配置项（容量与落盘开关）
+     */
+    fun updateConfig(maxMemoryDirs: Int? = null, saveRequestCache: Boolean? = null): Job {
+        if (saveRequestCache != null) {
+            _saveRequestCache = saveRequestCache
+            // 同步立即生效底层标志位，防止单测/启动设值竞态
+            engine.saveRequestCache = saveRequestCache
+        }
+        return scope.launch {
+            if (maxMemoryDirs != null || saveRequestCache != null) {
+                engine.updateConfig(maxMemoryDirs = maxMemoryDirs, saveRequestCache = saveRequestCache)
+                XLog.d("FileCacheManager.updateConfig applied: maxMemoryDirs=$maxMemoryDirs, saveRequestCache=$saveRequestCache")
             }
-            return true
         }
     }
 
-    // 处于失效/物理删除处理中的 CID 墓碑集合，任何磁盘读操作若命中该集合直接判定为未命中，彻底杜绝异步时序差
-    private val tombstoneKeys = Collections.synchronizedSet(HashSet<String>())
-
-    // 内存 LRU 缓存：只要 App 运行，始终存在且有效（使用 synchronizedMap 保证高并发读写安全）
-    private val memoryCache: MutableMap<String, CacheWrapper> =
-        Collections.synchronizedMap(LruCacheMap(MAX_MEMORY_DIRS))
+    fun getMaxMemoryDirs(): Int = engine.getMaxMemoryDirs()
 
     // 全局缓存变更事件流（带缓冲，避免高频变更时产生阻塞挂起）
     private val _cacheEvents = MutableSharedFlow<CacheEvent>(
@@ -122,18 +110,9 @@ object FileCacheManager {
      */
     suspend fun notifyRemoteRefresh(cid: String) =
         withContext(Dispatchers.IO) {
-            tombstoneKeys.add(cid)
-            try {
-                mutex.withLock {
-                    memoryCache.remove(cid)
-                }
-                // 挂起等待单线程调度器物理删除完成，杜绝异步时序差与旧快照复活
-                deleteDiskFileSync(cid)
-                XLog.d("FileCacheManager.notifyRemoteRefresh: cid=$cid disk file deleted, emitting RemoteRefreshRequired")
-                _cacheEvents.tryEmit(CacheEvent.RemoteRefreshRequired(cid))
-            } finally {
-                tombstoneKeys.remove(cid)
-            }
+            engine.remove(cid)
+            XLog.d("FileCacheManager.notifyRemoteRefresh: cid=$cid disk file deleted, emitting RemoteRefreshRequired")
+            _cacheEvents.tryEmit(CacheEvent.RemoteRefreshRequired(cid))
         }
 
     /**
@@ -146,143 +125,79 @@ object FileCacheManager {
 
     fun init(cacheDir: File) {
         this.cacheDir = cacheDir
-        if (!cacheDir.exists()) {
-            cacheDir.mkdirs()
-        }
+        engine.close()
+        engine = TwoLevelCacheEngine(
+            cacheDir = cacheDir,
+            maxMemoryDirs = MAX_MEMORY_DIRS,
+            saveRequestCacheInitial = _saveRequestCache
+        )
     }
 
-    fun containsKey(key: String): Boolean = memoryCache.containsKey(key)
+    fun containsKey(key: String): Boolean = engine.containsMemory(key)
 
     //fun getMemoryCache(key: String): FilesBean? = memoryCache[key]?.data
 
     /**
      * 同步获取纯内存缓存（非挂起函数，直接查询内存 LRU，不触发磁盘 IO） getMemoryCache
      */
-    fun getDate(key: String): FilesBean? {
-        val now = System.currentTimeMillis()
-        val memEntry = memoryCache[key] ?: return null
-        if (now - memEntry.timestamp > ttlMillis) {
-            memoryCache.remove(key)
-            return null
-        }
-        return memEntry.data
-    }
+    fun getDate(key: String): FilesBean? = engine.peekMemory(key)
 
     suspend fun loadAllCache() = withContext(Dispatchers.IO) {
-        // 不保存磁盘缓存时，仅清理硬盘旧文件，保留内存缓存
-        if (!saveRequestCache) {
-            clearDiskOnly()
-            return@withContext
-        }
-
-        if (!::cacheDir.isInitialized) return@withContext
-
-        // 1. 优先只加载 key="0"（根目录/首页）的缓存，确保主界面快速获得数据
-        getDiskCache("0")?.let {
-            memoryCache["0"] = it
-        }
-
-        // 2. 在后台异步加载其余文件及清理过期缓存，不阻塞启动流程/SplashScreen
-        scope.launch {
-            cacheDir.listFiles()?.forEach { file ->
-                val key = file.name.substringBeforeLast(".")
-                if (key != "0") {
-                    getDiskCache(key)?.let { diskWrapper ->
-                        // 使用 putIfAbsent 避免启动时后台预加载覆盖运行中刚刚产生的新缓存
-                        memoryCache.putIfAbsent(key, diskWrapper)
-                    }
-                }
-            }
-        }
+        engine.preload()
     }
 
     /**
      * 清理磁盘过期、孤立文件
      */
     suspend fun deleteOrphansAndExpiredFile() = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            if (!::cacheDir.isInitialized) return@withContext
-            val now = System.currentTimeMillis()
+        val allDiskKeys = engine.getAllDiskKeys().toMutableSet()
+        allDiskKeys.remove("0")
+        if (allDiskKeys.isEmpty()) return@withContext
 
-            // 1. 获取磁盘上所有缓存文件的 key 集合（排除根目录 "0"）
-            val allDiskKeys = cacheDir.listFiles()
-                ?.map { it.name.substringBeforeLast(".") }
-                ?.toMutableSet() ?: return@withContext
-            allDiskKeys.remove("0")
-
-            val reachableKeys = mutableSetOf<String>()
-
-            // 2. 深度优先遍历可达树 (Supports Disk Fallback)
-            suspend fun walk(cid: String) {
-                // 优先查内存，未命中则查磁盘
-                val cacheWrapper = memoryCache[cid] ?: getDiskCache(cid, now) ?: return
-
-                // 如果该目录缓存本身已过期，不再继续向下遍历
-                if (now - cacheWrapper.timestamp > ttlMillis) return
-
-                // 标记当前目录为可达
-                if (cid != "0") {
-                    reachableKeys.add(cid)
-                }
-
-                val folderList = cacheWrapper.data.fileBeanList.filter { it.isFolder }
-                for (item in folderList) {
-                    val subCid = item.categoryId.ifEmpty { item.fileId }
-                    if (subCid.isNotEmpty() && subCid != "0" && !reachableKeys.contains(subCid)) {
-                        walk(subCid)
-                    }
-                }
-            }
-
-            // 3. 从根节点 "0" 开始递归遍历
-            walk("0")
-
-            // 4. 孤立文件 = 磁盘所有文件 - 可达文件
-            val orphanKeys = allDiskKeys - reachableKeys
-            if (orphanKeys.isEmpty()) return@withContext
-
-            // 5. 同步清理内存与磁盘
-            val deletedNames = StringJoiner("；")
-            orphanKeys.forEach { key ->
-                memoryCache[key]?.data?.path?.lastOrNull()?.name?.let {
-                    deletedNames.add(it)
-                }
-                memoryCache.remove(key)
-                val file = getDiskFile(key)
-                if (file.exists()) file.delete()
-            }
-
-            XLog.d("deleteIndividualFile 清理了 ${orphanKeys.size} 个孤立/过期缓存文件: $deletedNames")
-        }
-    }
-
-
-    /**
-     * 无锁版本的缓存读取（供内部已持锁的 mutex.withLock 场景调用，彻底避免 Kotlin Mutex 非可重入引发的死锁/假死）：
-     * 1. 优先查【内存缓存】
-     * 2. 内存未命中且 saveRequestCache == true 时，查【磁盘缓存】
-     */
-    private suspend fun getWithoutLock(key: String): FilesBean? {
-        val now = System.currentTimeMillis()
-
-        // 1. 【内存缓存】最高优先级：无论 saveRequestCache 为何值，内存命中直接返回
-        val memEntry = memoryCache[key]
-        if (memEntry != null) {
-            if (now - memEntry.timestamp > ttlMillis) {
-                memoryCache.remove(key)
-                deleteDiskFileSync(key)
-                return null
-            }
-            return memEntry.data
+        // 严格边界防护：若根目录无法加载（冷启动未就绪或已过期），直接中止清理，严防误判导致全盘缓存被当作孤立文件清空
+        if (engine.get("0") == null) {
+            XLog.w("deleteOrphansAndExpiredFile: 根目录 '0' 缓存不存在，终止清理以防误删全盘缓存")
+            return@withContext
         }
 
-        // 2. 内存未命中，当允许读磁盘时，才查【磁盘缓存】
-        if (saveRequestCache) {
-            val diskEntry = getDiskCache(key, now) ?: return null
-            memoryCache[key] = diskEntry
-            return diskEntry.data
+        val reachableKeys = mutableSetOf<String>()
+
+        // 2. 深度优先遍历可达树 (Supports Disk Fallback)
+        suspend fun walk(cid: String) {
+            // 优先查内存，未命中则查磁盘
+            val cacheWrapper = engine.get(cid) ?: return
+
+            // 标记当前目录为可达
+            if (cid != "0") {
+                reachableKeys.add(cid)
+            }
+
+            val folderList = cacheWrapper.fileBeanList.filter { it.isFolder }
+            for (item in folderList) {
+                val subCid = item.categoryId.ifEmpty { item.fileId }
+                if (subCid.isNotEmpty() && subCid != "0" && !reachableKeys.contains(subCid)) {
+                    walk(subCid)
+                }
+            }
         }
-        return null
+
+        // 3. 从根节点 "0" 开始递归遍历
+        walk("0")
+
+        // 4. 孤立文件 = 磁盘所有文件 - 可达文件
+        val orphanKeys = allDiskKeys - reachableKeys
+        if (orphanKeys.isEmpty()) return@withContext
+
+        // 5. 同步清理内存与磁盘
+        val deletedNames = StringJoiner("；")
+        orphanKeys.forEach { key ->
+            engine.peekMemory(key)?.path?.lastOrNull()?.name?.let {
+                deletedNames.add(it)
+            }
+        }
+        engine.removeBatch(orphanKeys)
+
+        XLog.d("deleteIndividualFile 清理了 ${orphanKeys.size} 个孤立/过期缓存文件: $deletedNames")
     }
 
     /**
@@ -290,57 +205,16 @@ object FileCacheManager {
      * 1. 优先查【内存缓存】（无视 readDisk 参数，只要内存有就直接返回）
      * 2. 内存未命中且 readDisk == true 时，才查【磁盘文件】
      */
-    suspend operator fun get(key: String): FilesBean? = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            getWithoutLock(key)
-        }
-    }
-
-    suspend fun getDiskCache(key: String, now: Long = System.currentTimeMillis()): CacheWrapper? =
-        withContext(Dispatchers.IO) {
-            if (!::cacheDir.isInitialized) return@withContext null
-            // 墓碑拦截：若当前 key 正处于物理删除处理中，立即判定未命中，严禁读取旧快照
-            if (tombstoneKeys.contains(key)) {
-                XLog.d("FileCacheManager.getDiskCache: key=$key is tombstoned, skipping disk read")
-                return@withContext null
-            }
-            val diskFile = getDiskFile(key)
-            if (!diskFile.exists()) {
-                return@withContext null
-            }
-            try {
-                val json = diskFile.readText()
-                val diskEntry: CacheWrapper? = gson.fromJson(json, wrapperType)
-
-                if (diskEntry != null) {
-                    if (now - diskEntry.timestamp > ttlMillis) {
-                        diskFile.delete()
-                        return@withContext null
-                    }
-                    return@withContext diskEntry
-                }
-            } catch (e: Exception) {
-                diskFile.delete()
-            }
-            return@withContext null
-        }
+    suspend operator fun get(key: String): FilesBean? = engine.get(key)
 
     suspend operator fun set(key: String, value: FilesBean) = put(key, value)
-
 
     /**
      * 写入/更新缓存：
      * 1. 【内存缓存】：无条件写入！保证运行时始终有缓存
      * 2. 【磁盘缓存】：仅当 saveToDisk == true 时写入文件
      */
-    suspend fun put(key: String, value: FilesBean) =
-        withContext(Dispatchers.IO) {
-            mutex.withLock {
-                val entry = CacheWrapper(data = value)
-                memoryCache[key] = entry
-                flushToDiskAsync(key, entry)
-            }
-        }
+    suspend fun put(key: String, value: FilesBean) = engine.put(key, value)
 
     suspend fun putAndNotify(key: String, value: FilesBean) {
         put(key, value)
@@ -357,90 +231,47 @@ object FileCacheManager {
         isStar: Boolean
     ): CacheRollback? = withContext(Dispatchers.IO) {
         if (fids.isEmpty()) return@withContext null
-        mutex.withLock {
-            if (getWithoutLock(parentCid) == null) {
-                return@withContext null
-            }
-            val cache = memoryCache[parentCid]?.data ?: return@withContext null
-            val fidSet = fids.toSet()
+        val fidSet = fids.toSet()
+        val oldBeans = mutableMapOf<String, FileBean>()
+        val starInt = if (isStar) 1 else 0
+        var hasChange = false
 
-            val oldBeans = mutableMapOf<String, FileBean>()
-            val starInt = if (isStar) 1 else 0
-
-            var hasChange = false
-            cache.fileBeanList.forEachIndexed { index, item ->
+        val updated = engine.update(parentCid) { cache ->
+            val newList = ArrayList(cache.fileBeanList)
+            newList.forEachIndexed { index, item ->
                 val targetFid = item.categoryId.ifEmpty { item.fileId }
                 if (item.fileId in fidSet || item.categoryId in fidSet || targetFid in fidSet) {
-                    oldBeans[item.fileId] = item
-                    cache.fileBeanList[index] = item.copy(isStar = isStar, star = starInt)
+                    val key = item.fileId.ifEmpty { item.categoryId }
+                    oldBeans[key] = item
+                    newList[index] = item.copy(isStar = isStar, star = starInt)
                     hasChange = true
                 }
             }
+            if (hasChange) cache.copy(fileBeanList = newList) else null
+        }
 
-            if (!hasChange) return@withContext null
+        if (!hasChange || updated == null) return@withContext null
 
-            memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
-            _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
+        XLog.d("FileCacheManager.starItems: Successfully starred ${oldBeans.size} items in parentCid=$parentCid, isStar=$isStar")
+        _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
 
-            CacheRollback {
-                mutex.withLock {
-                    val curCache = memoryCache[parentCid]?.data ?: return@withLock
-                    curCache.fileBeanList.forEachIndexed { index, item ->
-                        val oldBean = oldBeans[item.fileId]
-                        if (oldBean != null) {
-                            curCache.fileBeanList[index] = oldBean
-                        }
+        CacheRollback {
+            engine.update(parentCid) { curCache ->
+                val restoredList = ArrayList(curCache.fileBeanList)
+                restoredList.forEachIndexed { index, item ->
+                    val key = item.fileId.ifEmpty { item.categoryId }
+                    val oldBean = oldBeans[key]
+                    if (oldBean != null) {
+                        restoredList[index] = oldBean
                     }
-                    memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
-                    _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
                 }
+                curCache.copy(fileBeanList = restoredList)
             }
+            XLog.d("FileCacheManager.starItems: Rolled back ${oldBeans.size} items in parentCid=$parentCid")
+            _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
         }
     }
 
-    suspend fun starItem(
-        parentCid: String,
-        fid: String,
-        isStar: Boolean
-    ): CacheRollback? = starItems(parentCid, listOf(fid), isStar)
-
-    /**
-     * 就地更新父目录缓存中指定条目的属性（通用单项乐观变更模板）
-     */
-    suspend fun updateItem(
-        parentCid: String,
-        fid: String,
-        transform: (FileBean) -> FileBean
-    ): CacheRollback? = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            if (getWithoutLock(parentCid) == null) {
-                return@withContext null
-            }
-            val cache = memoryCache[parentCid]?.data ?: return@withContext null
-            val index = cache.fileBeanList.indexOfFirst { it.fileId == fid || it.categoryId == fid }
-            if (index < 0) return@withContext null
-
-            val oldBean = cache.fileBeanList[index]
-            val newBean = transform(oldBean)
-            cache.fileBeanList[index] = newBean
-            memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
-
-            _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
-
-            CacheRollback {
-                mutex.withLock {
-                    val curCache = memoryCache[parentCid]?.data ?: return@withLock
-                    val curIndex =
-                        curCache.fileBeanList.indexOfFirst { it.fileId == fid || it.categoryId == fid }
-                    if (curIndex >= 0) {
-                        curCache.fileBeanList[curIndex] = oldBean
-                        memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
-                        _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
-                    }
-                }
-            }
-        }
-    }
 
     /**
      * 就地重命名父目录缓存中的文件或子目录，若为目录则同步更新子目录自身缓存中的面包屑末级名称。
@@ -451,36 +282,44 @@ object FileCacheManager {
         fid: String,
         newName: String
     ): CacheRollback? = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            if (getWithoutLock(parentCid) == null) {
-                return@withContext null
-            }
-            val cache = memoryCache[parentCid]?.data ?: return@withContext null
+        var oldName: String? = null
+        var isFolder = false
+        var folderCid = ""
+
+        val updatedParent = engine.update(parentCid) { cache ->
             val index = cache.fileBeanList.indexOfFirst { it.fileId == fid || it.categoryId == fid }
-            if (index < 0) return@withContext null
+            if (index < 0) return@update null
 
             val oldBean = cache.fileBeanList[index]
-            val oldName = oldBean.name
-            cache.fileBeanList[index] = oldBean.copy(name = newName)
-            memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
+            oldName = oldBean.name
+            isFolder = oldBean.isFolder
+            folderCid = oldBean.categoryId.ifEmpty { fid }
 
-            val isFolder = oldBean.isFolder
-            val folderCid = oldBean.categoryId.ifEmpty { fid }
-            if (isFolder) {
-                memoryCache[folderCid]?.let { subEntry ->
-                    subEntry.data.path.lastOrNull()?.name = newName
-                    flushToDiskAsync(folderCid, subEntry)
-                }
-            }
+            val newList = ArrayList(cache.fileBeanList)
+            newList[index] = oldBean.copy(name = newName)
+            cache.copy(fileBeanList = newList)
+        }
 
-            _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
-            if (isFolder) {
-                _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(folderCid))
-            }
+        val capturedOldName = oldName
+        if (updatedParent == null || capturedOldName == null) return@withContext null
 
-            CacheRollback {
-                renameItem(parentCid, fid, oldName)
+        if (isFolder && folderCid.isNotEmpty()) {
+            engine.update(folderCid) { subCache ->
+                val pathList = subCache.path.toMutableList()
+                if (pathList.isNotEmpty()) {
+                    pathList[pathList.lastIndex] = pathList.last().copy(name = newName)
+                    subCache.copy(path = pathList)
+                } else null
             }
+        }
+
+        _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
+        if (isFolder && folderCid.isNotEmpty()) {
+            _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(folderCid))
+        }
+
+        CacheRollback {
+            renameItem(parentCid, fid, capturedOldName)
         }
     }
 
@@ -497,62 +336,68 @@ object FileCacheManager {
         renameMap: Map<String, String>
     ): CacheRollback? = withContext(Dispatchers.IO) {
         if (renameMap.isEmpty()) return@withContext null
-        mutex.withLock {
-            if (getWithoutLock(parentCid) == null) {
-                return@withContext null
-            }
-            val cache = memoryCache[parentCid]?.data ?: return@withContext null
 
-            val rollbackMap = mutableMapOf<String, String>()
-            val updatedFolders = mutableListOf<String>()
-            var hasChanges = false
+        val rollbackMap = mutableMapOf<String, String>()
+        val updatedFolders = mutableListOf<Pair<String, String>>()
+        var hasChanges = false
 
-            for (index in cache.fileBeanList.indices) {
-                val item = cache.fileBeanList[index]
+        val updatedParent = engine.update(parentCid) { cache ->
+            val newList = ArrayList(cache.fileBeanList)
+            for (index in newList.indices) {
+                val item = newList[index]
                 /**
-                 * fid与cid已经在 [github.zerorooot.nap511.util.formatFileBeanList] 中统一了，所以统一使用fid
+                 * fid与cid已经在 [github.zerorooot.nap511.util.formatFileBeanList] 中统一了，同时兼容 categoryId 容错
                  */
-                val key = if (renameMap.containsKey(item.fileId)) item.fileId else null
+                val key = if (renameMap.containsKey(item.fileId)) {
+                    item.fileId
+                } else if (renameMap.containsKey(item.categoryId)) {
+                    item.categoryId
+                } else null
 
                 if (key != null) {
                     val newName = renameMap[key]
                     if (!newName.isNullOrBlank() && newName != item.name) {
                         rollbackMap[key] = item.name
                         // 采用 copy 生成新实例替换，遵守 FileBean 只读属性规范
-                        cache.fileBeanList[index] = item.copy(name = newName)
+                        newList[index] = item.copy(name = newName)
                         hasChanges = true
 
                         if (item.isFolder) {
                             val folderCid = item.categoryId.ifEmpty { key }
-                            updatedFolders.add(folderCid)
-                            memoryCache[folderCid]?.let { subEntry ->
-                                subEntry.data.path.lastOrNull()?.name = newName
-                                flushToDiskAsync(folderCid, subEntry)
-                            }
+                            updatedFolders.add(folderCid to newName)
                         }
                     }
                 }
             }
+            if (hasChanges) cache.copy(fileBeanList = newList) else null
+        }
 
-            if (!hasChanges) return@withContext null
+        if (!hasChanges || updatedParent == null) return@withContext null
 
-            // 1. 父目录单次异步写盘
-            memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
-
-            // 2. 单次广播父目录 UI 更新事件
-            _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
-
-            // 3. 同步广播发生名称变更的子目录自身 LocalUiUpdated 事件（与单项 rename 对齐）
-            updatedFolders.forEach { folderCid ->
-                _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(folderCid))
+        // 同步更新子目录自身缓存中的面包屑末级名称
+        updatedFolders.forEach { (folderCid, newName) ->
+            engine.update(folderCid) { subCache ->
+                val pathList = subCache.path.toMutableList()
+                if (pathList.isNotEmpty()) {
+                    pathList[pathList.lastIndex] = pathList.last().copy(name = newName)
+                    subCache.copy(path = pathList)
+                } else null
             }
+        }
 
-            XLog.d("renameItems: 成功就地更新目录 $parentCid 下的 ${rollbackMap.size} 项缓存数据")
+        // 1. 父目录单次广播
+        _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
 
-            // 4. 返回复合回滚撤销句柄
-            CacheRollback {
-                renameItems(parentCid, rollbackMap)
-            }
+        // 2. 同步广播发生名称变更的子目录自身 LocalUiUpdated 事件（与单项 rename 对齐）
+        updatedFolders.forEach { (folderCid, _) ->
+            _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(folderCid))
+        }
+
+        XLog.d("renameItems: 成功就地更新目录 $parentCid 下的 ${rollbackMap.size} 项缓存数据")
+
+        // 3. 返回复合回滚撤销句柄
+        CacheRollback {
+            renameItems(parentCid, rollbackMap)
         }
     }
 
@@ -565,45 +410,47 @@ object FileCacheManager {
         fid: String,
         isFolder: Boolean? = null
     ): CacheRollback? = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            if (getWithoutLock(parentCid) == null) {
-                return@withContext null
-            }
-            val cache = memoryCache[parentCid]?.data ?: return@withContext null
+        var originalList: ArrayList<FileBean>? = null
+        var originalCount = 0
+        var removedItem: FileBean? = null
+
+        val updatedParent = engine.update(parentCid) { cache ->
             val targetIndex =
                 cache.fileBeanList.indexOfFirst { it.fileId == fid || it.categoryId == fid }
-            if (targetIndex < 0) return@withContext null
+            if (targetIndex < 0) return@update null
 
-            val originalList = ArrayList(cache.fileBeanList)
-            val originalCount = cache.count
+            originalList = ArrayList(cache.fileBeanList)
+            originalCount = cache.count
 
-            val removedItem = cache.fileBeanList.removeAt(targetIndex)
-            cache.count = (cache.count - 1).coerceAtLeast(0)
-            memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
+            val newList = ArrayList(cache.fileBeanList)
+            removedItem = newList.removeAt(targetIndex)
+            val newCount = (cache.count - 1).coerceAtLeast(0)
+            cache.copy(fileBeanList = newList, count = newCount)
+        }
 
-            val actualIsFolder = isFolder ?: removedItem.isFolder
-            val targetFolderCid = removedItem.categoryId.ifEmpty { fid }
-            val removedFolderCids = mutableSetOf<String>()
-            if (actualIsFolder) {
-                removeFolderRecursivelyInternal(targetFolderCid, removedFolderCids)
-                deleteDiskFilesSync(removedFolderCids)
-            }
+        val capturedRemovedItem = removedItem
+        if (updatedParent == null || capturedRemovedItem == null) return@withContext null
 
-            _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
-            if (actualIsFolder) {
-                _cacheEvents.tryEmit(CacheEvent.FolderDeleted(targetFolderCid))
-            }
+        val actualIsFolder = isFolder ?: capturedRemovedItem.isFolder
+        val targetFolderCid = capturedRemovedItem.categoryId.ifEmpty { fid }
+        val removedFolderCids = mutableSetOf<String>()
+        if (actualIsFolder) {
+            collectSubFoldersRecursively(targetFolderCid, removedFolderCids)
+            engine.removeBatch(removedFolderCids)
+        }
 
-            CacheRollback {
-                mutex.withLock {
-                    val curCache = memoryCache[parentCid]?.data ?: return@withLock
-                    curCache.fileBeanList.clear()
-                    curCache.fileBeanList.addAll(originalList)
-                    curCache.count = originalCount
-                    memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
-                    _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
+        _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
+        if (actualIsFolder) {
+            _cacheEvents.tryEmit(CacheEvent.FolderDeleted(targetFolderCid))
+        }
+
+        CacheRollback {
+            engine.update(parentCid) { curCache ->
+                originalList?.let { orig ->
+                    curCache.copy(fileBeanList = ArrayList(orig), count = originalCount)
                 }
             }
+            _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
         }
     }
 
@@ -619,18 +466,17 @@ object FileCacheManager {
         fids: Collection<String>
     ): CacheRollback? = withContext(Dispatchers.IO) {
         if (fids.isEmpty()) return@withContext null
-        mutex.withLock {
-            if (getWithoutLock(parentCid) == null) {
-                return@withContext null
-            }
-            val cache = memoryCache[parentCid]?.data ?: return@withContext null
-            val fidSet = fids.toSet()
-            val originalList = ArrayList(cache.fileBeanList)
-            val originalCount = cache.count
-            val allDeletedFolderCids = mutableSetOf<String>()
+        val fidSet = fids.toSet()
+        var originalList: ArrayList<FileBean>? = null
+        var originalCount = 0
+        val allDeletedFolderCids = mutableSetOf<String>()
+        var removedCount = 0
 
-            val iterator = cache.fileBeanList.listIterator()
-            var removedCount = 0
+        val updatedParent = engine.update(parentCid) { cache ->
+            val newList = ArrayList(cache.fileBeanList)
+            val iterator = newList.listIterator()
+            val foldersToRemove = mutableListOf<String>()
+
             while (iterator.hasNext()) {
                 val item = iterator.next()
                 if (item.fileId in fidSet || item.categoryId in fidSet) {
@@ -638,33 +484,44 @@ object FileCacheManager {
                     iterator.remove()
                     if (item.isFolder) {
                         val subCid = item.categoryId.ifEmpty { item.fileId }
-                        removeFolderRecursivelyInternal(subCid, allDeletedFolderCids)
+                        foldersToRemove.add(subCid)
                     }
                 }
             }
-            if (removedCount == 0) return@withContext null
+            if (removedCount == 0) return@update null
 
-            cache.count = (cache.count - removedCount).coerceAtLeast(0)
-            memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
-            if (allDeletedFolderCids.isNotEmpty()) {
-                deleteDiskFilesSync(allDeletedFolderCids)
-            }
+            originalList = ArrayList(cache.fileBeanList)
+            originalCount = cache.count
+            allDeletedFolderCids.addAll(foldersToRemove)
 
-            _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
-            if (allDeletedFolderCids.isNotEmpty()) {
-                _cacheEvents.tryEmit(CacheEvent.FoldersDeleted(allDeletedFolderCids))
-            }
+            val newCount = (cache.count - removedCount).coerceAtLeast(0)
+            cache.copy(fileBeanList = newList, count = newCount)
+        }
 
-            CacheRollback {
-                mutex.withLock {
-                    val curCache = memoryCache[parentCid]?.data ?: return@withLock
-                    curCache.fileBeanList.clear()
-                    curCache.fileBeanList.addAll(originalList)
-                    curCache.count = originalCount
-                    memoryCache[parentCid]?.let { flushToDiskAsync(parentCid, it) }
-                    _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
+        if (updatedParent == null || removedCount == 0) return@withContext null
+
+        val subFoldersToRecurse = ArrayList(allDeletedFolderCids)
+        allDeletedFolderCids.clear()
+        for (folderCid in subFoldersToRecurse) {
+            collectSubFoldersRecursively(folderCid, allDeletedFolderCids)
+        }
+
+        if (allDeletedFolderCids.isNotEmpty()) {
+            engine.removeBatch(allDeletedFolderCids)
+        }
+
+        _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
+        if (allDeletedFolderCids.isNotEmpty()) {
+            _cacheEvents.tryEmit(CacheEvent.FoldersDeleted(allDeletedFolderCids))
+        }
+
+        CacheRollback {
+            engine.update(parentCid) { curCache ->
+                originalList?.let { orig ->
+                    curCache.copy(fileBeanList = ArrayList(orig), count = originalCount)
                 }
             }
+            _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(parentCid))
         }
     }
 
@@ -681,41 +538,33 @@ object FileCacheManager {
         emitFolderDeleted: Boolean = true
     ) = withContext(Dispatchers.IO) {
         val visited = HashSet<String>()
-        mutex.withLock {
-            removeFolderRecursivelyInternal(folderCid, visited)
-            deleteDiskFilesSync(visited)
-        }
+        collectSubFoldersRecursively(folderCid, visited)
+        engine.removeBatch(visited)
+
         if (emitFolderDeleted && folderCid != "0") {
             _cacheEvents.tryEmit(CacheEvent.FolderDeleted(folderCid))
         }
     }
 
-    private suspend fun removeFolderRecursivelyInternal(
+    private suspend fun collectSubFoldersRecursively(
         folderCid: String,
         visited: MutableSet<String> = HashSet()
     ) {
         if (folderCid.isEmpty() || !visited.add(folderCid)) {
             return
         }
-        if (getWithoutLock(folderCid) == null) {
-            return
-        }
-        val list = memoryCache[folderCid]?.data?.fileBeanList ?: emptyList()
+        val cache = engine.get(folderCid) ?: return
+        val list = cache.fileBeanList
         for (item in list) {
             if (item.isFolder) {
                 val subFolderCid = item.categoryId.ifEmpty { item.fileId }
                 // 严格边界保护：非空、非根目录且未访问过
-                if (subFolderCid.isNotEmpty() && subFolderCid != "0" && !visited.contains(
-                        subFolderCid
-                    )
-                ) {
-                    removeFolderRecursivelyInternal(subFolderCid, visited)
+                if (subFolderCid.isNotEmpty() && subFolderCid != "0" && !visited.contains(subFolderCid)) {
+                    collectSubFoldersRecursively(subFolderCid, visited)
                 }
             }
         }
-        memoryCache.remove(folderCid)
     }
-
 
     /**
      * 批量更新指定目录下视频文件的播放进度比例（playLongRatio），加锁更新、同步刷盘并广播变动事件。
@@ -725,14 +574,10 @@ object FileCacheManager {
         videoHistoryMap: Map<String, VideoBean>
     ) = withContext(Dispatchers.IO) {
         if (videoHistoryMap.isEmpty()) return@withContext
-        mutex.withLock {
-            if (getWithoutLock(cid) == null) {
-                return@withLock
-            }
-            val cache = memoryCache[cid]?.data ?: return@withLock
-            var hasChanges = false
-            val fileList = cache.fileBeanList
+        var hasChanges = false
 
+        val updated = engine.update(cid) { cache ->
+            val fileList = ArrayList(cache.fileBeanList)
             videoHistoryMap.forEach { (pickCode, bean) ->
                 val index = fileList.indexOfFirst { it.pickCode == pickCode }
                 if (index != -1) {
@@ -752,120 +597,35 @@ object FileCacheManager {
                     }
                 }
             }
+            if (hasChanges) cache.copy(fileBeanList = fileList) else null
+        }
 
-            if (hasChanges) {
-                memoryCache[cid]?.let { flushToDiskAsync(cid, it) }
-                XLog.d("updateVideoProgress CacheEvent.LocalUiUpdated")
-                _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(cid))
-            }
+        if (hasChanges && updated != null) {
+            XLog.d("updateVideoProgress CacheEvent.LocalUiUpdated")
+            _cacheEvents.tryEmit(CacheEvent.LocalUiUpdated(cid))
         }
     }
 
     /**
      * 删除某个 Key 的缓存（内存 + 磁盘）
      */
-    suspend fun remove(key: String) = withContext(Dispatchers.IO) {
-        tombstoneKeys.add(key)
-        try {
-            mutex.withLock {
-                memoryCache.remove(key)
-            }
-            deleteDiskFileSync(key)
-            XLog.d("FileCacheManager.remove: key=$key disk file deleted")
-        } finally {
-            tombstoneKeys.remove(key)
-        }
-    }
+    suspend fun remove(key: String) = engine.remove(key)
 
     /**
      * 仅清空磁盘文件，保留内存中的缓存
      */
-    suspend fun clearDiskOnly() = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            if (::cacheDir.isInitialized) {
-                withContext(diskDispatcher) {
-                    cacheDir.listFiles()?.forEach { it.delete() }
-                }
-            }
-        }
-    }
+    suspend fun clearDiskOnly() = engine.clearDiskOnly()
 
     /**
      * 仅清空内存缓存（用于模拟低内存淘汰或冷启动，保留磁盘缓存）
      */
-    suspend fun clearMemoryOnly() = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            memoryCache.clear()
-        }
-    }
+    suspend fun clearMemoryOnly() = engine.clearMemoryOnly()
 
     /**
      * 清空全部缓存（内存 + 磁盘）
      */
     suspend fun clearAll() = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            memoryCache.clear()
-            if (::cacheDir.isInitialized) {
-                withContext(diskDispatcher) {
-                    cacheDir.listFiles()?.forEach { it.delete() }
-                    cacheDir.mkdirs()
-                }
-            }
-            _cacheEvents.tryEmit(CacheEvent.AllCleared)
-        }
+        engine.clearAll()
+        _cacheEvents.tryEmit(CacheEvent.AllCleared)
     }
-
-
-    /**
-     * 单线程 FIFO 异步落盘：将 JSON 序列化与文件 IO 移至后台 scope 执行，避免阻塞全局 Mutex 锁与调用方线程，且杜绝并发写乱序
-     */
-    private fun flushToDiskAsync(key: String, entry: CacheWrapper) {
-        if (!saveRequestCache || !::cacheDir.isInitialized) return
-        scope.launch {
-            try {
-                val diskFile = getDiskFile(key)
-                val json = gson.toJson(entry, wrapperType)
-                diskFile.writeText(json)
-            } catch (e: Exception) {
-                XLog.e("flushToDiskAsync failed for key: $key", e)
-            }
-        }
-    }
-
-    /**
-     * 在单线程 FIFO 调度器中挂起执行物理文件删除，确保队列前序落盘完成且物理文件已被移除
-     */
-    private suspend fun deleteDiskFileSync(key: String) {
-        if (!::cacheDir.isInitialized) return
-        withContext(diskDispatcher) {
-            try {
-                val file = getDiskFile(key)
-                if (file.exists()) {
-                    file.delete()
-                    XLog.d("FileCacheManager.deleteDiskFileSync: key=$key deleted")
-                }
-            } catch (e: Exception) {
-                XLog.e("deleteDiskFileSync failed for key: $key", e)
-            }
-        }
-    }
-
-    private suspend fun deleteDiskFilesSync(keys: Set<String>) {
-        if (!::cacheDir.isInitialized || keys.isEmpty()) return
-        withContext(diskDispatcher) {
-            keys.forEach { key ->
-                try {
-                    val file = getDiskFile(key)
-                    if (file.exists()) {
-                        file.delete()
-                        XLog.d("FileCacheManager.deleteDiskFilesSync: key=$key deleted")
-                    }
-                } catch (e: Exception) {
-                    XLog.e("deleteDiskFilesSync failed for key: $key", e)
-                }
-            }
-        }
-    }
-
-    private fun getDiskFile(key: String): File = File(cacheDir, "${key}.json")
 }

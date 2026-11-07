@@ -42,7 +42,6 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
-import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.util.getCoilCacheUrl
 
@@ -286,15 +285,17 @@ fun FileThumbnail(
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 3.dp, bottom = bottomPadding)
+                    .padding(end = 2.5.dp, bottom = bottomPadding)
                     .background(Color.Black.copy(alpha = 0.68f), RoundedCornerShape(4.dp))
-                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                    .padding(horizontal = 2.5.dp, vertical = 1.dp)
             ) {
                 Text(
                     text = videoDuration.trim(),
                     color = Color.White,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Medium
+                    fontSize = 8.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
         }

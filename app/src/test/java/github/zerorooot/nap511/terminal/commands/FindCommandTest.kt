@@ -1,11 +1,14 @@
 package github.zerorooot.nap511.terminal.commands
 
+import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.PathBean
+import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -13,6 +16,14 @@ import org.junit.Test
  * 覆盖：指定目录查找、-type 类型选择、-size 尺寸过滤、-empty 空文件/空目录匹配及 -name / -suffix 模糊匹配
  */
 class FindCommandTest {
+
+    @Before
+    fun setUp() {
+        try {
+            XLog.init()
+        } catch (_: Throwable) {}
+        UnzipQueueManager.clear()
+    }
 
     /**
      * 测试在特定指定目录下搜索与 -type d 目录类型筛选

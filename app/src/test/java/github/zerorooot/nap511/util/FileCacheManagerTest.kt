@@ -520,4 +520,150 @@ class FileCacheManagerTest {
         val rollbackSame = FileCacheManager.renameItems("0", mapOf("f1" to "file1.txt"))
         assertNull(rollbackSame)
     }
+
+    @Test
+    fun testDeleteOrphansAbortsWhenRootNotLoaded() = runBlocking {
+        // 准备一个非根目录的缓存文件
+        val file1 = FileBean(fileId = "sub_f1", name = "sub.txt", isFolder = false)
+        val subFiles = FilesBean(
+            fileBeanList = arrayListOf(file1),
+            cid = "c100",
+            count = 1,
+            order = "",
+            path = listOf(PathBean(cid = "c100", name = "子目录", pid = "0"))
+        )
+        FileCacheManager.put("c100", subFiles)
+        kotlinx.coroutines.delay(100)
+
+        val diskFile = File(tempDir, "c100.json")
+        assertTrue(diskFile.exists())
+
+        // 此时根目录 "0" 根本未被写入或加载
+        assertNull(FileCacheManager["0"])
+
+        // 执行 GC 清理：必须严格中止，绝不能误删 c100.json
+        FileCacheManager.deleteOrphansAndExpiredFile()
+
+        assertTrue("根目录不存在时，孤立文件清理必须严格中止，禁止误删任何磁盘文件", diskFile.exists())
+    }
+
+    @Test
+    fun testStarItemsRollbackWithRawFolderWithoutFileId() = runBlocking {
+        // 构造未经 formatFileBeanList 统一处理的原始数据（fileId 为空，仅有 categoryId）
+        val rawFolder1 = FileBean(fileId = "", categoryId = "folder_101", name = "RawFolder1", isFolder = true, star = 0)
+        val rawFolder2 = FileBean(fileId = "", categoryId = "folder_102", name = "RawFolder2", isFolder = true, star = 0)
+        val parentFiles = FilesBean(
+            fileBeanList = arrayListOf(rawFolder1, rawFolder2),
+            cid = "0",
+            count = 2,
+            order = "",
+            path = listOf(PathBean(cid = "0", name = "Root", pid = "0"))
+        )
+        FileCacheManager.put("0", parentFiles)
+
+        // 批量对两个原始文件夹进行加星
+        val rollback = FileCacheManager.starItems("0", listOf("folder_101", "folder_102"), true)
+        assertNotNull(rollback)
+
+        val starredData = FileCacheManager["0"]
+        assertNotNull(starredData)
+        assertTrue(starredData!!.fileBeanList.all { it.isStar && it.star == 1 })
+
+        // 触发撤销回滚
+        rollback?.rollback()
+
+        // 验证两个文件夹均正确恢复为未星标状态，没有被空字符串 key 冲突覆盖
+        val restoredData = FileCacheManager["0"]
+        assertNotNull(restoredData)
+        assertEquals(0, restoredData!!.fileBeanList[0].star)
+        assertFalse(restoredData.fileBeanList[0].isStar)
+        assertEquals(0, restoredData.fileBeanList[1].star)
+        assertFalse(restoredData.fileBeanList[1].isStar)
+    }
+
+    @Test
+    fun testUpdateConfigPassThroughAndImmediateEffect() = runBlocking {
+        // 1. 通过门面层 updateConfig 关闭磁盘落盘
+        val disableJob = FileCacheManager.updateConfig(saveRequestCache = false)
+        disableJob.join()
+
+        // 验证 FileCacheManager 与底层 Engine 标志位同步立即生效
+        assertFalse(FileCacheManager.saveRequestCache)
+
+        val file1 = FileBean(fileId = "f_no_disk", name = "no_disk.txt")
+        val files1 = FilesBean(
+            fileBeanList = arrayListOf(file1),
+            cid = "c_no_disk",
+            count = 1,
+            order = "",
+            path = listOf(PathBean(cid = "c_no_disk", name = "NoDisk", pid = "0"))
+        )
+        FileCacheManager.put("c_no_disk", files1)
+        kotlinx.coroutines.delay(100)
+
+        // 验证内存中有缓存，但磁盘上没有生成文件
+        assertTrue(FileCacheManager.containsKey("c_no_disk"))
+        assertFalse(File(tempDir, "c_no_disk.json").exists())
+
+        // 2. 通过属性 setter 再次开启（内部路由给 updateConfig）
+        FileCacheManager.saveRequestCache = true
+        assertTrue(FileCacheManager.saveRequestCache)
+
+        val file2 = FileBean(fileId = "f_with_disk", name = "with_disk.txt")
+        val files2 = FilesBean(
+            fileBeanList = arrayListOf(file2),
+            cid = "c_with_disk",
+            count = 1,
+            order = "",
+            path = listOf(PathBean(cid = "c_with_disk", name = "WithDisk", pid = "0"))
+        )
+        FileCacheManager.put("c_with_disk", files2)
+        kotlinx.coroutines.delay(100)
+
+        // 验证开启后磁盘正常落盘
+        assertTrue(FileCacheManager.containsKey("c_with_disk"))
+        assertTrue(File(tempDir, "c_with_disk.json").exists())
+    }
+
+    @Test
+    fun testUpdateConfigDynamicTrimToSizeViaFacade() = runBlocking {
+        fun makeDummy(cid: String) = FilesBean(
+            fileBeanList = arrayListOf(FileBean(fileId = "f_$cid", name = cid)),
+            cid = cid,
+            count = 1,
+            order = "",
+            path = listOf(PathBean(cid = cid, name = cid, pid = "0"))
+        )
+
+        // 写入根目录与 4 个普通子目录
+        FileCacheManager.put("0", makeDummy("0"))
+        FileCacheManager.put("d1", makeDummy("d1"))
+        FileCacheManager.put("d2", makeDummy("d2"))
+        FileCacheManager.put("d3", makeDummy("d3"))
+        FileCacheManager.put("d4", makeDummy("d4"))
+
+        assertTrue(FileCacheManager.containsKey("0"))
+        assertTrue(FileCacheManager.containsKey("d1"))
+        assertTrue(FileCacheManager.containsKey("d2"))
+        assertTrue(FileCacheManager.containsKey("d3"))
+        assertTrue(FileCacheManager.containsKey("d4"))
+
+        // 通过门面层 updateConfig 动态缩容普通目录容量为 2
+        val trimJob = FileCacheManager.updateConfig(maxMemoryDirs = 2)
+        trimJob.join()
+
+        assertEquals(2, FileCacheManager.getMaxMemoryDirs())
+
+        // 根目录 "0" 享有常驻保护，严禁被缩容淘汰
+        assertTrue("根目录必须常驻内存，严禁被 trimToSize 淘汰", FileCacheManager.containsKey("0"))
+
+        // 普通目录较老的前两个（d1, d2）被 LRU 淘汰，最新访问的 d3, d4 保留在内存中
+        assertFalse("最老普通目录 d1 应当被淘汰", FileCacheManager.containsKey("d1"))
+        assertFalse("次老普通目录 d2 应当被淘汰", FileCacheManager.containsKey("d2"))
+        assertTrue("最新普通目录 d3 应当保留", FileCacheManager.containsKey("d3"))
+        assertTrue("最新普通目录 d4 应当保留", FileCacheManager.containsKey("d4"))
+
+        // 恢复默认容量以避免影响后续测试
+        FileCacheManager.updateConfig(maxMemoryDirs = 500).join()
+    }
 }

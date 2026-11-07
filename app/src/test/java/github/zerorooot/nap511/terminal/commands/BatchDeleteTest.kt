@@ -1,14 +1,17 @@
 package github.zerorooot.nap511.terminal.commands
 
+import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.terminal.commands.file.BatchTargetItem
 import github.zerorooot.nap511.terminal.commands.file.TerminalBatchFileOps
 import github.zerorooot.nap511.terminal.commands.file.resolveEffectiveParentCid
+import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -24,6 +27,14 @@ import org.junit.Test
  * 7. FindCommand -delete 树形与全局搜索同目录批量移入回收站。
  */
 class BatchDeleteTest {
+
+    @Before
+    fun setUp() {
+        try {
+            XLog.init()
+        } catch (_: Throwable) {}
+        UnzipQueueManager.clear()
+    }
 
     /**
      * 1. 验证 FileBean.resolveEffectiveParentCid 契约规则

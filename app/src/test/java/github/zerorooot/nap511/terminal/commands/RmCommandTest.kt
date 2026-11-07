@@ -1,12 +1,15 @@
 package github.zerorooot.nap511.terminal.commands
 
+import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.PathBean
+import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -14,6 +17,14 @@ import org.junit.Test
  * 覆盖：参数校验、根目录/工作目录安全保护、交互式确认与取消、转义与特殊字符文件名删除
  */
 class RmCommandTest {
+
+    @Before
+    fun setUp() {
+        try {
+            XLog.init()
+        } catch (_: Throwable) {}
+        UnzipQueueManager.clear()
+    }
 
     /**
      * 测试参数校验与路径防护
