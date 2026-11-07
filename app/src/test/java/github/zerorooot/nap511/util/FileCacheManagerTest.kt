@@ -17,6 +17,7 @@ import org.junit.Before
 import org.junit.Test
 import java.io.File
 import java.nio.file.Files
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * FileCacheManager 单元测试集合
@@ -625,15 +626,16 @@ class FileCacheManagerTest {
         assertTrue(File(tempDir, "c_with_disk.json").exists())
     }
 
+    private fun makeDummy(cid: String) = FilesBean(
+        fileBeanList = arrayListOf(FileBean(fileId = "f_$cid", name = cid)),
+        cid = cid,
+        count = 1,
+        order = "",
+        path = listOf(PathBean(cid = cid, name = cid, pid = "0"))
+    )
+
     @Test
     fun testUpdateConfigDynamicTrimToSizeViaFacade() = runBlocking {
-        fun makeDummy(cid: String) = FilesBean(
-            fileBeanList = arrayListOf(FileBean(fileId = "f_$cid", name = cid)),
-            cid = cid,
-            count = 1,
-            order = "",
-            path = listOf(PathBean(cid = cid, name = cid, pid = "0"))
-        )
 
         // 写入根目录与 4 个普通子目录
         FileCacheManager.put("0", makeDummy("0"))
@@ -665,5 +667,24 @@ class FileCacheManagerTest {
 
         // 恢复默认容量以避免影响后续测试
         FileCacheManager.updateConfig(maxMemoryDirs = 500).join()
+    }
+
+    @Test
+    fun testGetDateFallsBackToDiskWhenMemoryCleared() = runBlocking {
+        val dummy = makeDummy("cid_disk_fallback")
+        FileCacheManager.put("cid_disk_fallback", dummy)
+        kotlinx.coroutines.delay(100.milliseconds) // 等待单线程落盘
+
+        // 清空纯内存
+        FileCacheManager.clearMemoryOnly()
+        assertFalse(FileCacheManager.containsKey("cid_disk_fallback"))
+        assertNull(FileCacheManager.peekMemory("cid_disk_fallback"))
+
+        // getDate 必须自动从磁盘回源读取并回填内存
+        val loaded = FileCacheManager.getDate("cid_disk_fallback")
+        assertNotNull("getDate 在内存淘汰但磁盘存在时必须成功加载", loaded)
+        assertEquals("cid_disk_fallback", loaded?.cid)
+        assertTrue("getDate 成功读取磁盘后必须自动回填内存", FileCacheManager.containsKey("cid_disk_fallback"))
+        assertEquals("cid_disk_fallback", FileCacheManager.peekMemory("cid_disk_fallback")?.cid)
     }
 }

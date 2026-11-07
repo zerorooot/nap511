@@ -163,8 +163,8 @@ interface FileNavigator {
     /** 刷新指定 cid 目录 */
     fun refresh(cid: String, forceCache: Boolean = false)
 
-    /** 更新当前数据源模式的排序规则 */
-    fun updateOrder(order: OrderBean)
+    /** 更新当前数据源模式的排序规则及混排参数 */
+    fun updateOrder(order: OrderBean, fcMix: Int)
 }
 
 

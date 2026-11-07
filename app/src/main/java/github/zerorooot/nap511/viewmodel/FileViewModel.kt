@@ -108,6 +108,7 @@ class FileViewModel(
     val totalCount: Int get() = contentState.value.totalCount
     val orderBean: OrderBean get() = contentState.value.orderBean
     val currentOrderBean: OrderBean get() = browserModule.currentOrderBean
+    val currentFilesBeanFcMix: Int get() = browserModule.currentFilesBeanFcMix
 
     // ==================== 3. 构造平台适配器并装配 5 大 Module ====================
 
@@ -283,11 +284,9 @@ class FileViewModel(
     }
 
     fun loadMoreFiles() = viewModelScope.launch { browserModule.loadMoreFiles() }
-    fun order(isRefresh: Boolean = true, order: OrderBean? = null) =
-        viewModelScope.launch { browserModule.order(isRefresh, order) }
 
-    override fun updateOrder(order: OrderBean) {
-        viewModelScope.launch { browserModule.updateOrder(order) }
+    override fun updateOrder(order: OrderBean, fcMix: Int) {
+        viewModelScope.launch { browserModule.updateOrder(order, fcMix) }
     }
 
     fun search(searchKey: String) {

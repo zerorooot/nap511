@@ -22,6 +22,7 @@ import org.junit.Before
 import org.junit.Test
 import java.io.File
 import java.nio.file.Files
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * TwoLevelCacheEngine 存储引擎专项单元测试集合
@@ -430,7 +431,7 @@ class TwoLevelCacheEngineTest {
     fun testPreloadCallbackDoesNotDeadlockWhenAccessingEngine() = runBlocking {
         // 1. 准备磁盘根目录缓存
         engine.put("0", createDummyFiles("0", "root_for_callback_test"))
-        delay(100)
+        delay(100.milliseconds)
         engine.clearMemoryOnly()
         assertFalse(engine.containsMemory("0"))
 
@@ -481,5 +482,34 @@ class TwoLevelCacheEngineTest {
         } finally {
             memoryOnlyEngine.close()
         }
+    }
+
+    @Test
+    fun testGetSyncFallsBackToDiskAndBackfillsMemoryWhenMemoryEvicted() = runBlocking {
+        // 1. 写入普通目录与根目录
+        engine.put("d_sync", createDummyFiles("d_sync", "disk_folder_sync"))
+        engine.put("0", createDummyFiles("0", "disk_root_sync"))
+        delay(100) // 等待单线程落盘
+
+        // 2. 清空内存（模拟 LRU 淘汰或冷启动）
+        engine.clearMemoryOnly()
+        assertFalse(engine.containsMemory("d_sync"))
+        assertFalse(engine.containsMemory("0"))
+        assertNull(engine.peekMemory("d_sync"))
+        assertNull(engine.peekMemory("0"))
+
+        // 3. getSync 读取普通目录：必须从磁盘同步读出并回填内存
+        val folderResult = engine.getSync("d_sync")
+        assertNotNull("getSync 在内存为空但磁盘存在缓存时必须成功读出", folderResult)
+        assertEquals("disk_folder_sync", folderResult?.path?.firstOrNull()?.name)
+        assertTrue("getSync 读盘成功后必须自动回填内存", engine.containsMemory("d_sync"))
+        assertEquals("disk_folder_sync", engine.peekMemory("d_sync")?.path?.firstOrNull()?.name)
+
+        // 4. getSync 读取根目录：必须从磁盘同步读出并回填 rootCache
+        val rootResult = engine.getSync("0")
+        assertNotNull("getSync 在根目录内存为空时必须成功从磁盘恢复", rootResult)
+        assertEquals("disk_root_sync", rootResult?.path?.firstOrNull()?.name)
+        assertTrue("getSync 读盘成功后必须自动回填 rootCache", engine.containsMemory("0"))
+        assertEquals("disk_root_sync", engine.peekMemory("0")?.path?.firstOrNull()?.name)
     }
 }

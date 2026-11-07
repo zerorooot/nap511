@@ -84,15 +84,17 @@ fun CreateDialogs(
         is FileDialogState.FileOrder -> {
             // 文件排序
             val orderBean = fileViewModel.currentOrderBean
+            val currentFcMix = fileViewModel.currentFilesBeanFcMix
             val showStarOrder =
                 fileViewModel.contentState.collectAsState().value.source is FileListSource.Star
             FileOrderDialog(
-                orderBean,
-                showStarOrder
-            ) { newOrder ->
+                selectOrderBean = orderBean,
+                initialFcMix = currentFcMix,
+                showStarOrder = showStarOrder
+            ) { newOrder, newFcMix ->
                 fileViewModel.closeFileOrderDialog()
                 if (newOrder != null) {
-                    fileViewModel.updateOrder(newOrder)
+                    fileViewModel.updateOrder(newOrder, newFcMix)
                 }
             }
         }

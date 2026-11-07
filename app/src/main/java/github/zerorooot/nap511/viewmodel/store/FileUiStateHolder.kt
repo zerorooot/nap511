@@ -74,6 +74,7 @@ class FileUiStateHolder(stringProvider: AppStringProvider) {
                     totalCount = cached.count,
                     orderBean = OrderBean.from(cached),
                     pathList = cached.path,
+                    fcMix = cached.fcMix, // 从根目录缓存读入 fcMix
                     isRefreshing = false,
                     isLongClickState = false,
                     appBarTitle = folderSource.appName

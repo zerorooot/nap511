@@ -131,9 +131,11 @@ class TwoLevelCacheEngine(
     }
 
     /**
-     * 无锁版本的缓存读取（供内部已持锁的 mutex.withLock 场景调用，彻底避免 Kotlin Mutex 非可重入引发的死锁/假死）
+     * 同步获取缓存：
+     * 1. 优先查【内存缓存】（根目录查 rootCache，普通目录查 LRU）
+     * 2. 内存未命中且 saveRequestCache == true 时，同步从【磁盘缓存】加载并回填内存
      */
-    internal suspend fun getWithoutLock(key: String): FilesBean? {
+    fun getSync(key: String): FilesBean? {
         val now = System.currentTimeMillis()
 
         // 1. 内存缓存检查
@@ -161,7 +163,7 @@ class TwoLevelCacheEngine(
 
         // 2. 磁盘缓存回源
         if (saveRequestCache) {
-            val diskEntry = getDiskCache(key, now) ?: return null
+            val diskEntry = getDiskCacheSync(key, now) ?: return null
             if (key == "0") {
                 rootCache = diskEntry
             } else {
@@ -173,43 +175,57 @@ class TwoLevelCacheEngine(
     }
 
     /**
+     * 无锁版本的缓存读取（供内部已持锁的 mutex.withLock 场景调用，彻底避免 Kotlin Mutex 非可重入引发的死锁/假死）
+     */
+    internal fun getWithoutLock(key: String): FilesBean? {
+        return getSync(key)
+    }
+
+    /**
+     * 读取磁盘缓存（同步版本，基于 AtomicFile 崩溃恢复机制、带墓碑拦截与 TTL 检测）
+     */
+    fun getDiskCacheSync(key: String, now: Long = System.currentTimeMillis()): CacheWrapper? {
+        if (cacheDir == null || !cacheDir.exists()) return null
+        // 墓碑拦截：若当前 key 正处于物理删除处理中，立即判定未命中，严禁读取旧快照
+        if (tombstoneKeys.contains(key)) {
+            XLog.d("TwoLevelCacheEngine.getDiskCacheSync: key=$key is tombstoned, skipping disk read")
+            return null
+        }
+        val diskFile = getDiskFile(key)
+        val bakFile = File(cacheDir, "${diskFile.name}.bak")
+        if (!diskFile.exists() && !bakFile.exists()) {
+            return null
+        }
+        val atomicFile = AtomicFile(diskFile)
+        try {
+            val bytes = atomicFile.readFully()
+            val json = String(bytes, Charsets.UTF_8)
+            val diskEntry: CacheWrapper? = gson.fromJson(json, wrapperType)
+
+            if (diskEntry != null) {
+                if (now - diskEntry.timestamp > ttlMillis) {
+                    atomicFile.delete()
+                    return null
+                }
+                return diskEntry
+            }
+        } catch (_: FileNotFoundException) {
+            return null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            XLog.w("TwoLevelCacheEngine.getDiskCacheSync: corrupted file for key=$key, deleting", e)
+            atomicFile.delete()
+        }
+        return null
+    }
+
+    /**
      * 读取磁盘缓存（基于 AtomicFile 崩溃恢复机制、带墓碑拦截与 TTL 检测）
      */
     suspend fun getDiskCache(key: String, now: Long = System.currentTimeMillis()): CacheWrapper? =
         withContext(Dispatchers.IO) {
-            if (cacheDir == null || !cacheDir.exists()) return@withContext null
-            // 墓碑拦截：若当前 key 正处于物理删除处理中，立即判定未命中，严禁读取旧快照
-            if (tombstoneKeys.contains(key)) {
-                XLog.d("TwoLevelCacheEngine.getDiskCache: key=$key is tombstoned, skipping disk read")
-                return@withContext null
-            }
-            val diskFile = getDiskFile(key)
-            val bakFile = File(cacheDir, "${diskFile.name}.bak")
-            if (!diskFile.exists() && !bakFile.exists()) {
-                return@withContext null
-            }
-            val atomicFile = AtomicFile(diskFile)
-            try {
-                val bytes = atomicFile.readFully()
-                val json = String(bytes, Charsets.UTF_8)
-                val diskEntry: CacheWrapper? = gson.fromJson(json, wrapperType)
-
-                if (diskEntry != null) {
-                    if (now - diskEntry.timestamp > ttlMillis) {
-                        atomicFile.delete()
-                        return@withContext null
-                    }
-                    return@withContext diskEntry
-                }
-            } catch (e: FileNotFoundException) {
-                return@withContext null
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                XLog.w("TwoLevelCacheEngine.getDiskCache: corrupted file for key=$key, deleting", e)
-                atomicFile.delete()
-            }
-            return@withContext null
+            getDiskCacheSync(key, now)
         }
 
     /**
@@ -494,16 +510,14 @@ class TwoLevelCacheEngine(
         }
     }
 
-    private suspend fun deleteDiskFileSync(key: String) {
+    private fun deleteDiskFileSync(key: String) {
         if (cacheDir == null) return
-        withContext(diskDispatcher) {
-            try {
-                val file = getDiskFile(key)
-                AtomicFile(file).delete()
-                XLog.d("TwoLevelCacheEngine.deleteDiskFileSync: key=$key deleted")
-            } catch (e: Exception) {
-                XLog.e("TwoLevelCacheEngine.deleteDiskFileSync failed for key: $key", e)
-            }
+        try {
+            val file = getDiskFile(key)
+            AtomicFile(file).delete()
+            XLog.d("TwoLevelCacheEngine.deleteDiskFileSync: key=$key deleted")
+        } catch (e: Exception) {
+            XLog.e("TwoLevelCacheEngine.deleteDiskFileSync failed for key: $key", e)
         }
     }
 

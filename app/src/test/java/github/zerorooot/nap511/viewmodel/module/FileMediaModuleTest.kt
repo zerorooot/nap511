@@ -68,7 +68,7 @@ class FileMediaModuleTest {
         override fun navigateTo(cid: String) {}
         override fun refresh(forceCache: Boolean) {}
         override fun refresh(cid: String, forceCache: Boolean) {}
-        override fun updateOrder(order: OrderBean) {}
+        override fun updateOrder(order: OrderBean, fcMix: Int) {}
     }
 
     private var shouldThrowStarError = false

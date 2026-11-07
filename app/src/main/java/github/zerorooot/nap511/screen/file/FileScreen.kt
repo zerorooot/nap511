@@ -309,7 +309,13 @@ fun FileScreen(
         }
     }
 
-    fun myItemOnClick(i: Int) = clickHandler.myItemOnClick(i)
+    fun myItemOnClick(i: Int) {
+        if (fileViewModel.fileBeanList[i].isFolder) {
+            isBottomBarShow = true
+            isTopBarShow = true
+        }
+        clickHandler.myItemOnClick(i)
+    }
 
 
     fun onMenuAria2Download(index: Int) {
@@ -390,6 +396,7 @@ fun FileScreen(
             TopBarAction.UNZIP_ALL -> {
                 fileViewModel.openUnzipAllFileDialog()
             }
+
             TopBarAction.BATCH_RENAME -> {
                 fileViewModel.onMultiSelectRename()
             }

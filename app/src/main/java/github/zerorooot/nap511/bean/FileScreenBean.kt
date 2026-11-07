@@ -12,6 +12,7 @@ import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 
 /**
  * 列表数据源模型：定义当前文件列表展示的数据来源及上下文
+ * todo 是否要加上fcmix？因为现在Folder支持单个文件夹中的混排
  */
 sealed interface FileListSource {
     /** 当前关联的目录 CID */
@@ -108,6 +109,10 @@ data class FileContentUiState(
     val isRefreshing: Boolean = false,
     val appBarTitle: String,
     val orderBean: OrderBean = OrderBean(OrderEnum.name, 1),
+    /**
+     *  0 置顶，1 混排
+     */
+    val fcMix: Int = 0,
 
     // 交互模式状态
     val isLongClickState: Boolean = false,

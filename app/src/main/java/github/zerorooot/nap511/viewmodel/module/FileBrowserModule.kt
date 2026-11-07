@@ -73,6 +73,7 @@ class FileBrowserModule(
 
     /**
      * 服务端真实的云端排序（供网络请求及分页严格使用，绝不包含本地排序字段）
+     * todo 排序dialog中的文件夹置顶选项是否要同步？
      */
     val serverOrderBean: OrderBean
         get() = when (val s = stateHolder.currentContentState.source) {
@@ -96,6 +97,12 @@ class FileBrowserModule(
      */
     val currentFcMix: Int
         get() = if (settingUiState.keepFoldersOnTop) 0 else 1
+
+    /**
+     * 当前展示目录实际关联的 FilesBean fcMix 配置（0：文件夹置顶，1：文件混排）。
+     */
+    val currentFilesBeanFcMix: Int
+        get() = stateHolder.currentContentState.fcMix
 
     /** 响应系统设置变更（保持置顶状态与排序联动） */
     suspend fun onSettingsChanged(keepFoldersOnTop: Boolean) {
@@ -166,7 +173,7 @@ class FileBrowserModule(
     /**
      * 获取文件列表
      */
-    suspend fun getFiles(cid: String) {
+    suspend fun getFiles(cid: String, fcMix: Int = currentFcMix) {
         stateHolder.setRefreshing(true)
         // 1. 尝试读取缓存（内存与磁盘双级读取，支持冷启动及 LRU 淘汰后从磁盘恢复）
         val cached = FileCacheManager[cid]
@@ -182,7 +189,7 @@ class FileBrowserModule(
                 cid = cid,
                 order = serverOrderBean.type,
                 asc = serverOrderBean.asc,
-                fcMix = currentFcMix
+                fcMix = fcMix
             )
             // 请求的 cid 不是 0, 但返回的 cid 是 0。证明请求的 cid 不存在
             if (cid != "0" && files.cid == "0") {
@@ -269,7 +276,8 @@ class FileBrowserModule(
         // 记录请求发起时的上下文版本，用于并发校验防串位（分页网络请求严格采用服务端排序）
         val currentRequestSource = source
         val currentRequestOrder = serverOrderBean
-        val currentFcMix = this.currentFcMix
+        // 读取首屏已缓存的该目录 fcMix ,防止在 FileOrderDialog 设置了fcmix,但不生效
+        val currentFcMix = stateHolder.currentContentState.fcMix
 
         // 获取当前物理游标起点，若未记录则默认以当前列表大小作为初始物理游标
         val currentPhysicalOffset =
@@ -324,22 +332,28 @@ class FileBrowserModule(
         }
     }
 
-    suspend fun order(isRefresh: Boolean = true, order: OrderBean? = null) {
+    suspend fun order(
+        isRefresh: Boolean = true,
+        order: OrderBean? = null,
+        fcMix: Int = currentFcMix
+    ) {
         val currentCid = stateHolder.currentContentState.currentCid
         val b = order ?: stateHolder.currentContentState.orderBean
         val map = mapOf(
             "user_order" to b.type,
             "user_asc" to b.asc.toString(),
             "file_id" to currentCid,
-            "fc_mix" to currentFcMix.toString()
+            "fc_mix" to fcMix.toString()
         )
 
         runCatching {
             val orderResult = fileRepository.order(map)
-            XLog.d("order=$orderResult, currentCid=$currentCid")
+            XLog.d("order=$orderResult, currentCid=$currentCid, fcMix=$fcMix")
             if (orderResult.state) {
+                // ★ 同时保存新选中的 orderBean 和 fcMix
+                stateHolder.updateContentState { copy(orderBean = b, fcMix = fcMix) }
                 if (isRefresh) {
-                    refresh(currentCid)
+                    refresh(currentCid, fcMix = fcMix)
                 }
                 _scrollToTopEvent.tryEmit(Unit)
             } else {
@@ -348,9 +362,10 @@ class FileBrowserModule(
         }.onFailureToastAndLog(toastProvider)
     }
 
-    suspend fun updateOrder(order: OrderBean) {
+    suspend fun updateOrder(order: OrderBean, fcMix: Int) {
+        XLog.d("updateOrder called: order=$order, fcMix=$fcMix")
         if (order.orderType.isLocalOnly) {
-            applyLocalOrder(order)
+            applyLocalOrder(order, fcMix)
             return
         }
         activeLocalOrder = null
@@ -360,13 +375,12 @@ class FileBrowserModule(
             }
 
             is FileListSource.Filter -> {
-                this.order(false, order)
+                this.order(false, order, fcMix)
                 filterFile(type = s.filterType, name = s.name, order = order)
             }
 
             is FileListSource.Folder -> {
-                stateHolder.updateContentState { copy(orderBean = order) }
-                this.order()
+                this.order(true, order, fcMix)
             }
 
             is FileListSource.Star -> {
@@ -404,15 +418,17 @@ class FileBrowserModule(
         }
     }
 
-    suspend fun refresh(cid: String, forceCache: Boolean = false) {
+    suspend fun refresh(cid: String, forceCache: Boolean = false, fcMix: Int? = null) {
         clearSelection()
         val paginationKey = FileListSource.folderKey(cid)
         pagingStateStore.reset(paginationKey)
         stateHolder.updateContentState { copy(source = FileListSource.Folder(cid, stringProvider)) }
         val refreshCurrent = (cid == stateHolder.currentContentState.currentCid)
+        // 如果外部传了明确的 fcMix 就用（比如刚排序完），没传就用 currentFcMix
+        val targetFcMix = fcMix ?: if (refreshCurrent) stateHolder.currentContentState.fcMix else currentFcMix
         XLog.d(
             "refresh refreshCurrent:$refreshCurrent, settingUiState.forceLoadCache:${settingUiState.forceLoadCache}, forceCache:$forceCache," +
-                    "order = ${stateHolder.currentContentState.orderBean.type}, asc = ${stateHolder.currentContentState.orderBean.asc}, fcMix = $currentFcMix"
+                    "order = ${stateHolder.currentContentState.orderBean.type}, asc = ${stateHolder.currentContentState.orderBean.asc}, fcMix = $targetFcMix"
         )
 
         if (settingUiState.forceLoadCache || forceCache) {
@@ -434,7 +450,7 @@ class FileBrowserModule(
 
         if (refreshCurrent) {
             // 当前目录由 getFiles(currentCid) 在新列表返回时同步调用 clearImageCache(currentCid)
-            getFiles(stateHolder.currentContentState.currentCid)
+            getFiles(stateHolder.currentContentState.currentCid, fcMix = targetFcMix)
         } else {
             imageCacheStore.clear(cid)
             updateFileCache(cid)
@@ -592,8 +608,8 @@ class FileBrowserModule(
      * 3. 视频时长排序：降序时长从大到小，升序时长从小到大（无时长或非视频项始终沉底）
      * 4. 纯内存视图重排，不改写全局 orderBean，绝不污染后续任何网络请求
      */
-    fun applyLocalOrder(order: OrderBean) {
-        XLog.d("应用本地自定义排序: type=${order.type}, asc=${order.asc}")
+    fun applyLocalOrder(order: OrderBean, fcMix: Int = currentFcMix) {
+        XLog.d("应用本地自定义排序: type=${order.type}, asc=${order.asc}, fcMix=$fcMix")
         val list = stateHolder.currentContentState.fileBeanList
         if (list.isEmpty()) {
             XLog.d("当前文件列表为空，忽略本地自定义排序")
@@ -621,7 +637,7 @@ class FileBrowserModule(
             else -> {}
         }
 
-        val keepFoldersOnTop = settingUiState.keepFoldersOnTop
+        val keepFoldersOnTop = (fcMix == 0)
         val comparator = Comparator<FileBean> { a, b ->
             // 1. 文件夹置顶规则 (keepFoldersOnTop)
             if (keepFoldersOnTop && a.isFolder != b.isFolder) {
@@ -845,6 +861,7 @@ class FileBrowserModule(
                 currentCid = files.cid,
                 totalCount = files.count,
                 orderBean = currentOrder,
+                fcMix = files.fcMix, // 从网络/缓存返回的真实值同步至 UI 状态
                 pathList = files.path,
                 isRefreshing = false,
                 isLongClickState = false,

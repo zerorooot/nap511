@@ -139,8 +139,14 @@ object FileCacheManager {
 
     /**
      * 同步获取纯内存缓存（非挂起函数，直接查询内存 LRU，不触发磁盘 IO） getMemoryCache
+     * 在内存未命中且开启落盘时，自动从磁盘文件同步回源并回填内存
      */
-    fun getDate(key: String): FilesBean? = engine.peekMemory(key)
+    fun getDate(key: String): FilesBean? = engine.getSync(key)
+
+    /**
+     * 同步获取纯内存缓存（直接查询内存 LRU，不触发磁盘 IO）
+     */
+    fun peekMemory(key: String): FilesBean? = engine.peekMemory(key)
 
     suspend fun loadAllCache() = withContext(Dispatchers.IO) {
         engine.preload()

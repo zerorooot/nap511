@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,6 +36,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -125,18 +127,19 @@ fun RenameFileDialog(name: String, position: Boolean, enter: (String?) -> Unit) 
 private fun OrderTypeItem(
     type: OrderType,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
         color = if (isSelected) MaterialTheme.colorScheme.primaryContainer
         else Color.Transparent,
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
         ) {
             Icon(
                 imageVector = type.icon,
@@ -145,21 +148,23 @@ private fun OrderTypeItem(
                 else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp)
             )
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = type.label,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                 color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
                 else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             if (isSelected) {
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
@@ -170,17 +175,19 @@ private fun OrderTypeItem(
 @Composable
 fun FileOrderDialog(
     selectOrderBean: OrderBean,
+    initialFcMix: Int = 0,
     showStarOrder: Boolean = false,
-    enter: (OrderBean?) -> Unit
+    enter: (OrderBean?, Int) -> Unit
 ) {
     var selectedType by remember { mutableStateOf(selectOrderBean.orderType) }
     var selectedAsc by remember { mutableIntStateOf(selectOrderBean.asc) }
+    var keepFoldersOnTop by remember { mutableStateOf(initialFcMix == 0) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val cloudTypes = OrderType.entries.filter { !it.isLocalOnly && (it.isShow || showStarOrder) }
     val localTypes = OrderType.entries.filter { it.isLocalOnly }
 
     ModalBottomSheet(
-        onDismissRequest = { enter(null) },
+        onDismissRequest = { enter(null, initialFcMix) },
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 6.dp,
@@ -200,6 +207,39 @@ fun FileOrderDialog(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
+
+            // 文件夹置顶开关条目
+            Surface(
+                onClick = { keepFoldersOnTop = !keepFoldersOnTop },
+                shape = RoundedCornerShape(12.dp),
+                color = Color.Transparent,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Folder,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "文件夹置顶",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Switch(
+                        checked = keepFoldersOnTop,
+                        onCheckedChange = { keepFoldersOnTop = it }
+                    )
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
             // 升序 / 降序切换胶囊
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -244,12 +284,23 @@ fun FileOrderDialog(
                     modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 4.dp)
                 )
 
-                cloudTypes.forEach { type ->
-                    OrderTypeItem(
-                        type = type,
-                        isSelected = selectedType == type,
-                        onClick = { selectedType = type }
-                    )
+                cloudTypes.chunked(2).forEach { rowTypes ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        rowTypes.forEach { type ->
+                            OrderTypeItem(
+                                type = type,
+                                isSelected = selectedType == type,
+                                onClick = { selectedType = type },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        if (rowTypes.size < 2) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
                 }
 
                 if (localTypes.isNotEmpty()) {
@@ -266,12 +317,23 @@ fun FileOrderDialog(
                         modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 4.dp)
                     )
 
-                    localTypes.forEach { type ->
-                        OrderTypeItem(
-                            type = type,
-                            isSelected = selectedType == type,
-                            onClick = { selectedType = type }
-                        )
+                    localTypes.chunked(2).forEach { rowTypes ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            rowTypes.forEach { type ->
+                                OrderTypeItem(
+                                    type = type,
+                                    isSelected = selectedType == type,
+                                    onClick = { selectedType = type },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            if (rowTypes.size < 2) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
                     }
                 }
             }
@@ -279,7 +341,10 @@ fun FileOrderDialog(
             // 确认按钮
             Button(
                 onClick = {
-                    enter(OrderBean(type = selectedType.rawValue, asc = selectedAsc))
+                    enter(
+                        OrderBean(type = selectedType.rawValue, asc = selectedAsc),
+                        if (keepFoldersOnTop) 0 else 1
+                    )
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {

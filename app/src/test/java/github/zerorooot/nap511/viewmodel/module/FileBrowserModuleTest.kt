@@ -59,9 +59,11 @@ class FileBrowserModuleTest {
 
     private val fakeRepo = object : FileRepository() {
         var orderCallCount = 0
+        var lastOrderBody: Map<String, String>? = null
 
         override suspend fun order(body: Map<String, String>): BaseReturnMessage {
             orderCallCount++
+            lastOrderBody = body
             return BaseReturnMessage(state = true)
         }
 
@@ -480,7 +482,7 @@ class FileBrowserModuleTest {
         stateHolder.updateContentState {
             copy(source = FileListSource.Search("0", "key",fakeStringProvider))
         }
-        module.updateOrder(OrderBean(OrderEnum.update, 1))
+        module.updateOrder(OrderBean(OrderEnum.update, 1),1)
         assertTrue(fakeToastProvider.messages.contains("暂不支持搜索模式排序"))
     }
 
@@ -494,7 +496,7 @@ class FileBrowserModuleTest {
 
         stateHolder.updateContentState { copy(fileBeanList = listOf(f1, file1, f2, file2)) }
 
-        module.updateOrder(OrderBean(OrderEnum.starFile, asc = 0))
+        module.updateOrder(OrderBean(OrderEnum.starFile, asc = 0), fcMix = module.currentFcMix)
 
         val result = stateHolder.currentContentState.fileBeanList
         // 文件夹优先（标星在未标星前），文件次之（标星在未标星前）
@@ -515,7 +517,7 @@ class FileBrowserModuleTest {
 
         stateHolder.updateContentState { copy(fileBeanList = listOf(f2, file2, f1, file1)) }
 
-        module.updateOrder(OrderBean(OrderEnum.starFile, asc = 1))
+        module.updateOrder(OrderBean(OrderEnum.starFile, asc = 1), fcMix = module.currentFcMix)
 
         val result = stateHolder.currentContentState.fileBeanList
         // 文件夹优先（未标星在标星前），文件次之（未标星在标星前）
@@ -534,7 +536,7 @@ class FileBrowserModuleTest {
 
         stateHolder.updateContentState { copy(fileBeanList = listOf(f1, file1, f2, file2)) }
 
-        module.updateOrder(OrderBean(OrderEnum.starFile, asc = 0))
+        module.updateOrder(OrderBean(OrderEnum.starFile, asc = 0), fcMix = module.currentFcMix)
 
         val result = stateHolder.currentContentState.fileBeanList
         // 混排模式：所有标星排在前面，未标星排在后面
@@ -554,7 +556,7 @@ class FileBrowserModuleTest {
 
         stateHolder.updateContentState { copy(fileBeanList = listOf(v1, doc, folder, v2, v3)) }
 
-        module.updateOrder(OrderBean(OrderEnum.videoDuration, asc = 0))
+        module.updateOrder(OrderBean(OrderEnum.videoDuration, asc = 0), fcMix = module.currentFcMix)
 
         val result = stateHolder.currentContentState.fileBeanList
         // 文件夹置顶，视频按时长从大到小，无时长的文档沉底
@@ -574,7 +576,7 @@ class FileBrowserModuleTest {
 
         stateHolder.updateContentState { copy(fileBeanList = listOf(v2, folder, doc, v1, v3)) }
 
-        module.updateOrder(OrderBean(OrderEnum.videoDuration, asc = 1))
+        module.updateOrder(OrderBean(OrderEnum.videoDuration, asc = 1), fcMix = module.currentFcMix)
 
         val result = stateHolder.currentContentState.fileBeanList
         // 文件夹置顶，视频按时长从小到大，无时长的文档沉底
@@ -591,7 +593,7 @@ class FileBrowserModuleTest {
         stateHolder.updateContentState { copy(fileBeanList = initialList) }
 
         fakeToastProvider.clear()
-        module.updateOrder(OrderBean(OrderEnum.starFile, asc = 0))
+        module.updateOrder(OrderBean(OrderEnum.starFile, asc = 0), fcMix = module.currentFcMix)
         assertTrue(fakeToastProvider.messages.contains("当前列表没有星标文件"))
         // 列表未被变更
         assertEquals(initialList, stateHolder.currentContentState.fileBeanList)
@@ -599,7 +601,7 @@ class FileBrowserModuleTest {
         assertEquals(OrderEnum.name, stateHolder.currentContentState.orderBean.type)
 
         fakeToastProvider.clear()
-        module.updateOrder(OrderBean(OrderEnum.videoDuration, asc = 0))
+        module.updateOrder(OrderBean(OrderEnum.videoDuration, asc = 0), fcMix = module.currentFcMix)
         assertTrue(fakeToastProvider.messages.contains("当前列表没有视频文件"))
         assertEquals(initialList, stateHolder.currentContentState.fileBeanList)
         assertEquals(OrderEnum.name, stateHolder.currentContentState.orderBean.type)
@@ -614,7 +616,7 @@ class FileBrowserModuleTest {
         val v2 = createFileBean("2", "long.mp4", playLong = 3600.0)
         stateHolder.updateContentState { copy(fileBeanList = listOf(v1, v2)) }
 
-        module.updateOrder(OrderBean(OrderEnum.videoDuration, asc = 0))
+        module.updateOrder(OrderBean(OrderEnum.videoDuration, asc = 0), fcMix = module.currentFcMix)
 
         // 内存列表重排：时长大排在前
         assertEquals(listOf("2", "1"), stateHolder.currentContentState.fileBeanList.map { it.fileId })
@@ -631,7 +633,7 @@ class FileBrowserModuleTest {
         val v1 = createFileBean("1", "short.mp4", playLong = 60.0)
         stateHolder.updateContentState { copy(fileBeanList = listOf(v1)) }
 
-        module.updateOrder(OrderBean(OrderEnum.videoDuration, asc = 0))
+        module.updateOrder(OrderBean(OrderEnum.videoDuration, asc = 0), fcMix = module.currentFcMix)
         assertEquals(OrderEnum.videoDuration, module.currentOrderBean.type)
 
         // 模拟进入新目录，返回服务端数据并触发 setFiles
@@ -657,5 +659,87 @@ class FileBrowserModuleTest {
         val starOrder = OrderBean.parseFromUiString("标星文件⬆️")
         assertEquals(OrderEnum.starFile, starOrder.type)
         assertEquals(1, starOrder.asc)
+    }
+
+    @Test
+    fun `test updateOrder passes explicit fcMix to repository order`() = runTest {
+        // 初始处于 Folder 模式
+        stateHolder.updateContentState {
+            copy(source = FileListSource.Folder("123", fakeStringProvider), currentCid = "123")
+        }
+
+        // 显式传入混排模式 fcMix = 1
+        module.updateOrder(OrderBean(OrderEnum.size, asc = 1), fcMix = 1)
+        assertEquals(1, fakeRepo.orderCallCount)
+        assertEquals("1", fakeRepo.lastOrderBody?.get("fc_mix"))
+        assertEquals(OrderEnum.size, fakeRepo.lastOrderBody?.get("user_order"))
+        assertEquals("1", fakeRepo.lastOrderBody?.get("user_asc"))
+
+        // 显式传入置顶模式 fcMix = 0
+        module.updateOrder(OrderBean(OrderEnum.name, asc = 0), fcMix = 0)
+        assertEquals(2, fakeRepo.orderCallCount)
+        assertEquals("0", fakeRepo.lastOrderBody?.get("fc_mix"))
+        assertEquals(OrderEnum.name, fakeRepo.lastOrderBody?.get("user_order"))
+        assertEquals("0", fakeRepo.lastOrderBody?.get("user_asc"))
+    }
+
+    @Test
+    fun `test local sort respects explicit fcMix parameter`() = runTest {
+        // 全局配置设为置顶，但显式向本地排序传递 fcMix = 1（混排）
+        settingFlow.value = SettingUiState(keepFoldersOnTop = true)
+        val f1 = createFileBean("1", "unstarred_folder", isFolder = true, star = 0)
+        val f2 = createFileBean("2", "starred_folder", isFolder = true, star = 1)
+        val file1 = createFileBean("3", "unstarred_file", isFolder = false, star = 0)
+        val file2 = createFileBean("4", "starred_file", isFolder = false, star = 1)
+
+        stateHolder.updateContentState { copy(fileBeanList = listOf(f1, file1, f2, file2)) }
+
+        // 显式指定 fcMix = 1（混排），即使全局 keepFoldersOnTop 为 true，本地也必须执行混排
+        module.updateOrder(OrderBean(OrderEnum.starFile, asc = 0), fcMix = 1)
+
+        val mixedResult = stateHolder.currentContentState.fileBeanList
+        // 混排模式：所有标星优先（无论文件夹与否）
+        assertEquals(listOf("2", "4", "1", "3"), mixedResult.map { it.fileId })
+
+        // 切换为显式 fcMix = 0（置顶）
+        module.updateOrder(OrderBean(OrderEnum.starFile, asc = 0), fcMix = 0)
+        val onTopResult = stateHolder.currentContentState.fileBeanList
+        // 置顶模式：文件夹优先
+        assertEquals(listOf("2", "1", "4", "3"), onTopResult.map { it.fileId })
+    }
+
+    @Test
+    fun `test currentFilesBeanFcMix priority between cache and currentFcMix`() = runTest {
+        val cid = "test_cid"
+        stateHolder.updateContentState {
+            copy(source = FileListSource.Folder(cid, fakeStringProvider), currentCid = cid)
+        }
+
+        // 1. currentFilesBeanFcMix 反映 stateHolder.currentContentState.fcMix 的值
+        settingFlow.value = SettingUiState(keepFoldersOnTop = true)
+        assertEquals(0, module.currentFcMix)
+        assertEquals(0, module.currentFilesBeanFcMix)
+
+        stateHolder.updateContentState { copy(fcMix = 1) }
+        assertEquals(1, module.currentFilesBeanFcMix)
+
+        // 2. 从缓存读取数据 (getFiles) 时，更新 stateHolder 并以缓存的 fcMix 为准
+        stateHolder.updateContentState { copy(fcMix = 0) }
+        val cachedFiles = FilesBean(
+            fileBeanList = arrayListOf(),
+            cid = cid,
+            count = 0,
+            order = OrderEnum.name,
+            fcMix = 1,
+            path = emptyList()
+        )
+        FileCacheManager.put(cid, cachedFiles)
+
+        module.getFiles(cid)
+
+        // 即使全局设置为 keepFoldersOnTop = true (对应 currentFcMix = 0)，加载缓存后仍返回缓存的 fcMix = 1
+        settingFlow.value = SettingUiState(keepFoldersOnTop = true)
+        assertEquals(0, module.currentFcMix)
+        assertEquals(1, module.currentFilesBeanFcMix)
     }
 }
