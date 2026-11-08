@@ -8,6 +8,7 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.adapter.VideoOptionAdapter
 import github.zerorooot.nap511.player.MyGSYVideoPlayer
@@ -59,12 +60,36 @@ class VideoDrawerController(
             videoPlayer.hideAllDrawers()
         }
 
-        // 3. 画面比例适配器
+        // 3. 画面比例与画面旋转适配器
         val scaleTypes = intArrayOf(0, 1, 2, 3, 4)
-        val scaleTitles = listOf("默认", "16:9", "4:3", "全屏", "拉伸")
+        val scaleTitles = listOf(
+            "默认", "16:9", "4:3", "全屏", "拉伸",
+            "顺时针旋转 90°", "逆时针旋转 90°", "恢复默认角度"
+        )
         val defaultScaleIndex = 0
-        scaleAdapter = VideoOptionAdapter(scaleTitles, defaultScaleIndex) { index, _ ->
-            videoPlayer.setAspectScale(scaleTypes[index])
+        scaleAdapter = VideoOptionAdapter(
+            options = scaleTitles,
+            selectedIndex = defaultScaleIndex,
+            isOptionSelectable = { it < 5 }
+        ) { index, title ->
+            when (index) {
+                in 0..4 -> {
+                    XLog.d("VideoDrawerController: 切换画面比例: $title (type=${scaleTypes[index]})")
+                    videoPlayer.setAspectScale(scaleTypes[index])
+                }
+                5 -> {
+                    XLog.d("VideoDrawerController: 顺时针旋转 90°")
+                    videoPlayer.rotateVideo(90)
+                }
+                6 -> {
+                    XLog.d("VideoDrawerController: 逆时针旋转 90°")
+                    videoPlayer.rotateVideo(-90)
+                }
+                7 -> {
+                    XLog.d("VideoDrawerController: 恢复默认画面角度")
+                    videoPlayer.resetVideoRotation()
+                }
+            }
             videoPlayer.hideAllDrawers()
         }
 

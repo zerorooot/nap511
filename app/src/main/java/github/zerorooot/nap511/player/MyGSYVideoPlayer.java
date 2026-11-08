@@ -60,6 +60,10 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
 
     private int mType = 0;
 
+    // 画面旋转控制：视频原生角度（元数据）与用户手动旋转偏移角度
+    private int mIntrinsicRotation = 0;
+    private int mCustomRotation = 0;
+
     long forwardRewindIncrementMs = 15000;
     private TextView batteryTextView;
     private TextView timeTextView;
@@ -291,6 +295,79 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
             showProgressDialog(time, seekTime, mSeekTimePosition, totalTime, totalTimeDuration);
         }, 100);
         new Handler(Objects.requireNonNull(Looper.myLooper())).postDelayed(this::dismissProgressDialog, 600);
+    }
+
+    @Override
+    public void onInfo(int what, int extra) {
+        if (getGSYVideoManager() != null && what == getGSYVideoManager().getRotateInfoFlag()) {
+            XLog.d(TAG + " 收到视频原生旋转信息: " + extra);
+            mIntrinsicRotation = extra;
+            applyEffectiveRotation();
+            return;
+        }
+        super.onInfo(what, extra);
+    }
+
+    @Override
+    protected boolean setUp(String url, boolean cacheWithPlay, java.io.File cachePath, String title, boolean changeState) {
+        // 装载或切换新视频时，自动复位画面旋转角度
+        XLog.d(TAG + " setUp 自动复位画面旋转角度为 0");
+        mIntrinsicRotation = 0;
+        mCustomRotation = 0;
+        mRotate = 0;
+        return super.setUp(url, cacheWithPlay, cachePath, title, changeState);
+    }
+
+    /**
+     * 相对增减视频画面旋转角度（顺时针为正，逆时针为负）
+     *
+     * @param deltaDegrees 旋转增量（例如 90, -90）
+     */
+    public void rotateVideo(int deltaDegrees) {
+        mCustomRotation = (mCustomRotation + deltaDegrees) % 360;
+        if (mCustomRotation < 0) {
+            mCustomRotation += 360;
+        }
+        XLog.d(TAG + " rotateVideo: delta=" + deltaDegrees + ", customRotation=" + mCustomRotation);
+        applyEffectiveRotation();
+    }
+
+    /**
+     * 重置自定义视频画面旋转角度为 0°
+     */
+    public void resetVideoRotation() {
+        XLog.d(TAG + " resetVideoRotation: 重置自定义旋转为 0");
+        mCustomRotation = 0;
+        applyEffectiveRotation();
+    }
+
+    /**
+     * 合成原生角度与用户自定义角度并应用到渲染视图 (TextureView)
+     */
+    private void applyEffectiveRotation() {
+        int effective = (mIntrinsicRotation + mCustomRotation) % 360;
+        if (effective < 0) {
+            effective += 360;
+        }
+        mRotate = effective;
+        XLog.d(TAG + " applyEffectiveRotation: intrinsic=" + mIntrinsicRotation
+                + ", custom=" + mCustomRotation + ", effective=" + effective);
+        if (mTextureView != null) {
+            mTextureView.setRotation(effective);
+            mTextureView.requestLayout();
+        }
+    }
+
+    public int getCustomRotation() {
+        return mCustomRotation;
+    }
+
+    public int getIntrinsicRotation() {
+        return mIntrinsicRotation;
+    }
+
+    public int getEffectiveRotation() {
+        return (mIntrinsicRotation + mCustomRotation) % 360;
     }
 
     public void playNext(String url, String title) {

@@ -102,7 +102,7 @@ fun FileCellItem(
                 if (isAudio && playLong.isNotEmpty()) {
                     add(playLong.trim())
                 } else if (isVideo && fileBean.playLongRatio.isNotEmpty()) {
-                    val ratioText = fileBean.playLongRatio.replace("▶️", "").trim()
+                    val ratioText = fileBean.playLongRatio.trim()
                     if (ratioText.isNotEmpty()) {
                         add(ratioText)
                     }

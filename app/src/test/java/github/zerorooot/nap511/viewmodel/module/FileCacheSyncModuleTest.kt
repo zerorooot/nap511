@@ -190,7 +190,7 @@ class FileCacheSyncModuleTest {
         val currentUiList = stateHolder.currentContentState.fileBeanList
         assertEquals(1, currentUiList.size)
         assertEquals("f1", currentUiList[0].fileId)
-        assertEquals("▶️ 50%", currentUiList[0].playLongRatio)
+        assertEquals("50%", currentUiList[0].playLongRatio)
         assertEquals(1, pagingStateStore.getOrInitOffset(FileListSource.folderKey("dir1"), 0))
     }
 

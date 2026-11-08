@@ -28,6 +28,8 @@ app/src/test/java/github/zerorooot/nap511/*
 !app/src/test/java/github/zerorooot/nap511/terminal/
 !app/src/test/java/github/zerorooot/nap511/util/
 !app/src/test/java/github/zerorooot/nap511/viewmodel/
+!app/src/test/java/github/zerorooot/nap511/adapter/
+!app/src/test/java/github/zerorooot/nap511/player/
 app/release/
 .artifacts
 .proxyai

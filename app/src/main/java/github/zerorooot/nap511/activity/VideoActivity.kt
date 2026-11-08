@@ -508,7 +508,7 @@ class VideoActivity : AppCompatActivity() {
             // 当前是竖屏，强制转为横屏
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)
         } else {
-            // 当前是横屏，强制转为竖屏
+            // 当前是横屏，强制转为竖屏，在平板中可能会触发 Letterbox
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
         }
     }

@@ -93,7 +93,7 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
             if (fileBean.currentPlayTime != 0 && fileBean.playLong != 0.00) {
                 val playTime =
                     ((fileBean.currentPlayTime.toFloat() / fileBean.playLong) * 100).roundToInt()
-                playLongRatio = "▶️ $playTime%"
+                playLongRatio = "$playTime%"
             }
         }
 
@@ -105,7 +105,7 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
             isFolder -> R.drawable.folder
             fileBean.isVideo == 1 || ext in VIDEO_EXTS -> {
                 playLongString =
-                    playLongString.ifBlank { generateTime(fileBean.playLong.toLong()) + " " }
+                    playLongString.ifBlank { generateTime(fileBean.playLong.toLong())}
                 R.drawable.mp4
             }
 

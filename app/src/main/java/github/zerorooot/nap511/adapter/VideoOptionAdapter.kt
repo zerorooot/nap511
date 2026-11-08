@@ -13,6 +13,7 @@ import github.zerorooot.nap511.R
 class VideoOptionAdapter(
     private var options: List<String>,
     private var selectedIndex: Int = 0,
+    private val isOptionSelectable: ((Int) -> Boolean)? = null,
     private val onOptionSelected: (Int, String) -> Unit
 ) : RecyclerView.Adapter<VideoOptionAdapter.ViewHolder>() {
 
@@ -31,7 +32,9 @@ class VideoOptionAdapter(
         val titleText = options[position]
         holder.tvTitle.text = titleText
 
-        if (position == selectedIndex) {
+        // 判断当前项是否具备单选高亮属性（如非单选操作项不显示选中态）
+        val isSelectable = isOptionSelectable?.invoke(position) ?: true
+        if (isSelectable && position == selectedIndex) {
             holder.cardOption.setCardBackgroundColor("#3342A5F5".toColorInt())
             holder.tvTitle.setTypeface(null, Typeface.BOLD)
             holder.tvTitle.setTextColor("#42A5F5".toColorInt())
@@ -42,7 +45,7 @@ class VideoOptionAdapter(
         }
 
         holder.itemView.setOnClickListener {
-            if (selectedIndex != position) {
+            if (isSelectable && selectedIndex != position) {
                 val oldIndex = selectedIndex
                 selectedIndex = position
                 notifyItemChanged(oldIndex)
@@ -53,6 +56,12 @@ class VideoOptionAdapter(
     }
 
     override fun getItemCount(): Int = options.size
+
+    fun getSelectedIndex(): Int = selectedIndex
+
+    fun getOptions(): List<String> = options
+
+    fun isOptionSelectable(position: Int): Boolean = isOptionSelectable?.invoke(position) ?: true
 
     fun updateSelectedIndex(newIndex: Int) {
         if (selectedIndex != newIndex) {

@@ -316,7 +316,7 @@ class FileCacheManagerTest {
         val updatedV2 = updatedList?.first { it.fileId == "v2" }
 
         // 50 / 100 = 50%
-        assertEquals("▶️ 50%", updatedV1?.playLongRatio)
+        assertEquals("50%", updatedV1?.playLongRatio)
         // 非视频文件保持原样
         assertEquals("", updatedV2?.playLongRatio)
     }
