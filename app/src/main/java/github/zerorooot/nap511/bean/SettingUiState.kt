@@ -108,4 +108,6 @@ data class SettingUiState(
 
     /** 自动加载字幕 Automatic subtitle */
     @SerializedName(ConfigKeyUtil.AUTOMATIC_SUBTITLE) val automaticSubtitle: Boolean = false,
+    /** 是否在多选删除时跳过置顶或星标文件/文件夹 */
+    @SerializedName(ConfigKeyUtil.SKIP_PINNED_OR_STARRED_DELETE) val skipPinnedOrStarredDelete: Boolean = false,
 )

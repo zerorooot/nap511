@@ -10,6 +10,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -27,7 +29,6 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Restore
-import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.Translate
@@ -81,9 +82,11 @@ enum class MenuItemAction(
     GALLERY_MODE("瀑布视图", Icons.Outlined.Image),
     FILE_SORT("文件排序", Icons.AutoMirrored.Outlined.Sort),
     REFRESH_FILES("强制刷新", Icons.Outlined.Refresh),
-    VIDEO_SCHEDULE("视频时间", Icons.Outlined.Schedule),
     TOP_FILE("文件置顶", Icons.Outlined.PushPin),
+    UN_TOP_FILE("取消置顶", Icons.Filled.PushPin),
+
     STAR_FILE("文件标星", Icons.Outlined.StarOutline),
+    UN_STAR_FILE("取消标星", Icons.Filled.Star),
 
     // 离线页顶栏菜单项
     COPY_PAGE_LINK("复制本页链接", Icons.Outlined.ContentCopy),
@@ -167,15 +170,19 @@ private fun <T : AppBarAction> MyDropdownMenu(
 }
 
 @Composable
-fun FileMoreMenu(onClick: (MenuItemAction, Int) -> Unit) {
+fun FileMoreMenu(
+    isPinned: Boolean = false,
+    isStar: Boolean = false,
+    onClick: (MenuItemAction, Int) -> Unit
+) {
     val listOf = listOf(
         MenuItemAction.CUT_FILE,
         MenuItemAction.RENAME_FILE,
         MenuItemAction.FILE_INFO,
         MenuItemAction.FORCE_OPEN,
         MenuItemAction.UNZIP_FILE,
-        MenuItemAction.TOP_FILE,
-        MenuItemAction.STAR_FILE,
+        if (isPinned) MenuItemAction.UN_TOP_FILE else MenuItemAction.TOP_FILE,
+        if (isStar) MenuItemAction.UN_STAR_FILE else MenuItemAction.STAR_FILE,
         MenuItemAction.ARIA2_DOWNLOAD,
         MenuItemAction.DELETE_FILE
     )
@@ -183,14 +190,18 @@ fun FileMoreMenu(onClick: (MenuItemAction, Int) -> Unit) {
 }
 
 @Composable
-fun FolderMoreMenu(onClick: (MenuItemAction, Int) -> Unit) {
+fun FolderMoreMenu(
+    isPinned: Boolean = false,
+    isStar: Boolean = false,
+    onClick: (MenuItemAction, Int) -> Unit
+) {
     val listOf = listOf(
         MenuItemAction.CUT_FILE,
         MenuItemAction.RENAME_FILE,
         MenuItemAction.OFFLINE_CID,
         MenuItemAction.FILE_INFO,
-        MenuItemAction.TOP_FILE,
-        MenuItemAction.STAR_FILE,
+        if (isPinned) MenuItemAction.UN_TOP_FILE else MenuItemAction.TOP_FILE,
+        if (isStar) MenuItemAction.UN_STAR_FILE else MenuItemAction.STAR_FILE,
         MenuItemAction.DELETE_FILE
     )
     BaseMoreMenu(listOf, onClick)
@@ -287,17 +298,6 @@ fun HtmlWebViewTopBarDropdownMenu(onClick: (MenuItemAction, Int) -> Unit) {
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
 }
 
-@Composable
-fun FileAppTopBarMultipleDropdownMenu(
-    onClick: (AppBarAction, Int) -> Unit
-) {
-    val listOf = listOf(
-        TopBarAction.SELECT_REVERSE,
-        TopBarAction.SELECT_UP,
-        TopBarAction.SELECT_DOWN
-    )
-    BaseAppTorBarMenu(listOf = listOf, onClick = onClick)
-}
 
 @Composable
 private fun <T : AppBarAction> BaseAppTorBarMenu(

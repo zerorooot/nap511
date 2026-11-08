@@ -166,18 +166,18 @@ fun LazyListScope.mediaPlaybackPreferenceItems(
     }
     item {
         SwitchPreferenceItem(
-            title = "字幕自动加载",
-            summary = "自动加载与视频文件同名/同前缀的 SRT 字幕（如果字幕存在）",
-            checked = uiState.automaticSubtitle,
-            onCheckedChange = { onSaveConfig(ConfigKeyUtil.AUTOMATIC_SUBTITLE, it) }
-        )
-    }
-    item {
-        SwitchPreferenceItem(
             title = "隐藏电池提醒",
             summary = "关闭首页弹出的后台电池优化提醒 Banner",
             checked = uiState.hideBatteryBanner,
             onCheckedChange = { onSaveConfig(ConfigKeyUtil.HIDE_BATTERY_BANNER, it) }
+        )
+    }
+    item {
+        SwitchPreferenceItem(
+            title = "字幕自动加载",
+            summary = "自动加载与视频文件同名/同前缀的 SRT 字幕（如果字幕存在）",
+            checked = uiState.automaticSubtitle,
+            onCheckedChange = { onSaveConfig(ConfigKeyUtil.AUTOMATIC_SUBTITLE, it) }
         )
     }
     item {
@@ -308,6 +308,14 @@ fun LazyListScope.fileCachePreferenceItems(
             summary = "下拉刷新时，强制清除当前目录下所有已缓存的文件数据",
             checked = uiState.forceLoadCache,
             onCheckedChange = { onSaveConfig(ConfigKeyUtil.FORCE_LOAD_CACHE, it) }
+        )
+    }
+    item {
+        SwitchPreferenceItem(
+            title = "删除跳过置顶星标",
+            summary = "多选批量删除时，自动跳过被置顶或星标的文件/文件夹\n注：若所选文件夹内部包含置顶或星标文件，仍会随文件夹一并删除",
+            checked = uiState.skipPinnedOrStarredDelete,
+            onCheckedChange = { onSaveConfig(ConfigKeyUtil.SKIP_PINNED_OR_STARRED_DELETE, it) }
         )
     }
     item {

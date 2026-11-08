@@ -46,6 +46,7 @@ fun FileCellItem(
     val size = fileBean.sizeString
     val time = fileBean.createTimeString
     val isStar = fileBean.isStar
+    val pinned = fileBean.isPinned
     val isVideo = fileBean.isVideo == 1
     val isAudio = fileBean.fileIco == R.drawable.mp3
     val playLong = fileBean.playLongString
@@ -70,7 +71,7 @@ fun FileCellItem(
                 iconRes = image,
                 thumbUrl = fileBean.photoThumb,
                 cacheKey = fileBean.fileId,
-                isTop = fileBean.isPinned,
+                isTop = pinned,
                 isStar = isStar,
                 isVideo = isVideo,
                 videoDuration = playLong,
@@ -128,17 +129,29 @@ fun FileCellItem(
                     MenuItemAction.OFFLINE_CID -> itemActions.onSetOfflineCid.invoke(fileBean)
                     MenuItemAction.FILE_INFO -> itemActions.onFileInfo.invoke(fileBean)
                     MenuItemAction.ARIA2_DOWNLOAD -> itemActions.onAria2Download.invoke(index)
-                    MenuItemAction.TOP_FILE -> itemActions.onTop.invoke(fileBean)
-                    MenuItemAction.STAR_FILE -> itemActions.onStar.invoke(fileBean)
+                    MenuItemAction.TOP_FILE, MenuItemAction.UN_TOP_FILE -> itemActions.onTop.invoke(
+                        fileBean
+                    )
+                    MenuItemAction.STAR_FILE, MenuItemAction.UN_STAR_FILE -> itemActions.onStar.invoke(
+                        fileBean
+                    )
                     MenuItemAction.FORCE_OPEN -> itemActions.onForceOpen.invoke(index)
                     else -> {}
                 }
             }
 
             if (fileBean.isFolder) {
-                FolderMoreMenu(dispatchMenuClick)
+                FolderMoreMenu(
+                    isPinned = pinned,
+                    isStar = isStar,
+                    dispatchMenuClick
+                )
             } else {
-                FileMoreMenu(dispatchMenuClick)
+                FileMoreMenu(
+                    isPinned = pinned,
+                    isStar = isStar,
+                    dispatchMenuClick
+                )
             }
         }
     )

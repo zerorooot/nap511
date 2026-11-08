@@ -164,6 +164,11 @@ class ConfigKeyUtil {
         const val KEEP_FOLDERS_ON_TOP = "KeepFoldersOnTop"
 
         /**
+         * 多选删除时，跳过置顶或星标文件/文件夹
+         */
+        const val SKIP_PINNED_OR_STARRED_DELETE = "skipPinnedOrStarredDelete"
+
+        /**
          * 动态配色
          */
         const val DYNAMIC_COLOR = "dynamicColor"

@@ -51,6 +51,9 @@ class FileMutatorModuleTest {
         var lastTopBool: Boolean? = null
         var mockTopResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
 
+        var deleteMultipleCallCount = 0
+        var lastDeleteMultipleData: Map<String, String>? = null
+
         override suspend fun delete(pid: String, fid: String): github.zerorooot.nap511.bean.BaseReturnMessage {
             if (shouldThrowNetworkError) throw java.io.IOException("Network Timeout")
             return mockDeleteResult
@@ -58,6 +61,8 @@ class FileMutatorModuleTest {
 
         override suspend fun deleteMultiple(data: Map<String, String>): github.zerorooot.nap511.bean.BaseReturnMessage {
             if (shouldThrowNetworkError) throw java.io.IOException("Network Timeout")
+            deleteMultipleCallCount++
+            lastDeleteMultipleData = data
             return if (!mockDeleteResult.state) mockDeleteResult else mockDeleteMultipleResult
         }
 
@@ -109,6 +114,8 @@ class FileMutatorModuleTest {
         override fun getCachedUrl(key: String): String? = null
     }
 
+    private var skipProtectedSetting: Boolean = false
+
     @Before
     fun setUp() {
         try {
@@ -134,7 +141,10 @@ class FileMutatorModuleTest {
         fakeRepo.lastTopFid = null
         fakeRepo.lastTopBool = null
         fakeRepo.mockTopResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
+        fakeRepo.deleteMultipleCallCount = 0
+        fakeRepo.lastDeleteMultipleData = null
         fakeNavigator.refreshCallCount = 0
+        skipProtectedSetting = false
 
         module = FileMutatorModule(
             stateHolder = stateHolder,
@@ -143,7 +153,8 @@ class FileMutatorModuleTest {
             scrollPositionStore = scrollPositionStore,
             imageCacheStore = imageCacheStore,
             coilCacheCleaner = fakeCoilCleaner,
-            toastProvider = fakeToastProvider
+            toastProvider = fakeToastProvider,
+            isSkipProtectedEnabled = { skipProtectedSetting }
         )
     }
 
@@ -660,5 +671,112 @@ class FileMutatorModuleTest {
         assertTrue(fakeToastProvider.messages.contains("Network Timeout"))
         assertEquals(0, fakeNavigator.refreshCallCount)
         assertFalse(stateHolder.currentContentState.isRefreshing)
+    }
+
+    @Test
+    fun `test deleteMultiple when skip disabled deletes all selected items including pinned and starred`() = kotlinx.coroutines.test.runTest {
+        val item1 = createFileBean("normal", "normal.txt", isSelect = true).copy(parentId = "0")
+        val item2 = createFileBean("pinned", "pinned.txt", isSelect = true).copy(parentId = "0", isPinned = true)
+        val item3 = createFileBean("starred", "starred.txt", isSelect = true).copy(parentId = "0", isStar = true, star = 1)
+
+        stateHolder.updateContentState {
+            copy(
+                source = FileListSource.Folder("0", fakeStringProvider),
+                fileBeanList = listOf(item1, item2, item3),
+                totalCount = 3,
+                isLongClickState = true
+            )
+        }
+        skipProtectedSetting = false
+
+        module.deleteMultiple()
+
+        assertEquals(1, fakeRepo.deleteMultipleCallCount)
+        assertEquals(3, fakeRepo.lastDeleteMultipleData?.filterKeys { it.startsWith("fid[") }?.size)
+        assertTrue(stateHolder.currentContentState.fileBeanList.isEmpty())
+        assertFalse(stateHolder.currentContentState.isLongClickState)
+        assertTrue(fakeToastProvider.messages.contains("成功删除 3 个文件"))
+    }
+
+    @Test
+    fun `test deleteMultiple when skip enabled and all protected items aborts delete and toasts all skipped`() = kotlinx.coroutines.test.runTest {
+        val item1 = createFileBean("pinned", "pinned.txt", isSelect = true).copy(parentId = "0", isPinned = true)
+        val item2 = createFileBean("starred", "starred.txt", isSelect = true).copy(parentId = "0", isStar = true, star = 1)
+        val item3 = createFileBean("unselected", "unselected.txt", isSelect = false).copy(parentId = "0")
+
+        stateHolder.updateContentState {
+            copy(
+                source = FileListSource.Folder("0", fakeStringProvider),
+                fileBeanList = listOf(item1, item2, item3),
+                totalCount = 3,
+                isLongClickState = true
+            )
+        }
+        skipProtectedSetting = true
+
+        module.deleteMultiple()
+
+        // 未向远端发起删除请求
+        assertEquals(0, fakeRepo.deleteMultipleCallCount)
+        // 列表条目保留未删
+        assertEquals(3, stateHolder.currentContentState.fileBeanList.size)
+        // 多选模式已退出，所有条目的选中状态被安全清空
+        assertFalse(stateHolder.currentContentState.isLongClickState)
+        assertTrue(stateHolder.currentContentState.fileBeanList.none { it.isSelect })
+        // 正确提示全部跳过文案
+        assertTrue(fakeToastProvider.messages.contains("所选项目均为置顶/星标，已全部跳过"))
+    }
+
+    @Test
+    fun `test deleteMultiple when skip enabled and partially protected deletes unprotected items and toasts with skipped count`() = kotlinx.coroutines.test.runTest {
+        val item1 = createFileBean("normal", "normal.txt", isSelect = true).copy(parentId = "0")
+        val item2 = createFileBean("pinned", "pinned.txt", isSelect = true).copy(parentId = "0", isPinned = true)
+        val item3 = createFileBean("starred", "starred.txt", isSelect = true).copy(parentId = "0", isStar = true, star = 1)
+        val item4 = createFileBean("top1", "top1.txt", isSelect = true).copy(parentId = "0", isTop = 1)
+
+        stateHolder.updateContentState {
+            copy(
+                source = FileListSource.Folder("0", fakeStringProvider),
+                fileBeanList = listOf(item1, item2, item3, item4),
+                totalCount = 4,
+                isLongClickState = true
+            )
+        }
+        skipProtectedSetting = true
+
+        module.deleteMultiple()
+
+        // 仅将未受保护的 item1 提交到远端
+        assertEquals(1, fakeRepo.deleteMultipleCallCount)
+        assertEquals("normal", fakeRepo.lastDeleteMultipleData?.get("fid[0]"))
+        assertEquals(1, fakeRepo.lastDeleteMultipleData?.filterKeys { it.startsWith("fid[") }?.size)
+        // 剩余列表保留 3 个受保护条目，且选中状态全部被清空
+        assertEquals(3, stateHolder.currentContentState.fileBeanList.size)
+        assertFalse(stateHolder.currentContentState.isLongClickState)
+        assertTrue(stateHolder.currentContentState.fileBeanList.none { it.isSelect })
+        // 提示信息包含已跳过的数量
+        assertTrue(fakeToastProvider.messages.contains("成功删除 1 个文件（已跳过 3 个置顶/星标）"))
+    }
+
+    @Test
+    fun `test delete single item ignores skip protection and deletes directly`() = kotlinx.coroutines.test.runTest {
+        val pinnedItem = createFileBean("pinned_single", "pinned_single.txt").copy(parentId = "0", isPinned = true)
+
+        stateHolder.updateContentState {
+            copy(
+                source = FileListSource.Folder("0", fakeStringProvider),
+                fileBeanList = listOf(pinnedItem),
+                totalCount = 1
+            )
+        }
+        skipProtectedSetting = true
+
+        // 单项删除（模拟下拉菜单中的“删除”）
+        module.delete(pinnedItem)
+
+        // 验证单项删除绕过跳过保护逻辑，正常提交删除
+        assertEquals(1, fakeRepo.deleteMultipleCallCount)
+        assertEquals("pinned_single", fakeRepo.lastDeleteMultipleData?.get("fid[0]"))
+        assertTrue(fakeToastProvider.messages.contains("删除 pinned_single.txt 成功"))
     }
 }

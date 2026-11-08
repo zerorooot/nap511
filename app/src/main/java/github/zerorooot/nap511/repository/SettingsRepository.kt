@@ -119,7 +119,8 @@ class SettingsRepository {
                 autoImagePreviewCount = pref[stringPreferencesKey(ConfigKeyUtil.AUTO_IMAGE_PREVIEW_COUNT)] ?: default.autoImagePreviewCount,
                 hideBatteryBanner = pref[booleanPreferencesKey(ConfigKeyUtil.HIDE_BATTERY_BANNER)] ?: default.hideBatteryBanner,
                 automaticSubtitle = pref[booleanPreferencesKey(ConfigKeyUtil.AUTOMATIC_SUBTITLE)] ?: default.automaticSubtitle,
-                keepFoldersOnTop = pref[booleanPreferencesKey(ConfigKeyUtil.KEEP_FOLDERS_ON_TOP)] ?: default.keepFoldersOnTop
+                keepFoldersOnTop = pref[booleanPreferencesKey(ConfigKeyUtil.KEEP_FOLDERS_ON_TOP)] ?: default.keepFoldersOnTop,
+                skipPinnedOrStarredDelete = pref[booleanPreferencesKey(ConfigKeyUtil.SKIP_PINNED_OR_STARRED_DELETE)] ?: default.skipPinnedOrStarredDelete
             )
         }.stateIn(
             scope = repositoryScope,

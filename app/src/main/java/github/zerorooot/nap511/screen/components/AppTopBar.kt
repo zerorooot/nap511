@@ -15,25 +15,28 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCut
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Deselect
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.StarOutline
-import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.outlined.ArrowDownward
+import androidx.compose.material.icons.outlined.ArrowUpward
+import androidx.compose.material.icons.outlined.ContentCut
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DeleteForever
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.FolderZip
+import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.outlined.SelectAll
+import androidx.compose.material.icons.outlined.StarOutline
+import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.ButtonDefaults
@@ -50,6 +53,7 @@ import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -93,19 +97,19 @@ enum class TopBarAction(
     BACK("返回", Icons.AutoMirrored.Rounded.ArrowBack),
     DRAWER_MENU("抽屉菜单", Icons.Rounded.Menu),
     SEARCH("搜索", Icons.Rounded.Search),
-    TOP("文件置顶", Icons.Default.PushPin, shortLabel = "置顶"),
-    STAR("文件标星", Icons.Default.StarOutline, shortLabel = "标星"),
-    STAR_FILE_SCREEN("星标文件", Icons.Default.StarOutline),
-    SELECT_UP("向上全选", Icons.Default.ArrowUpward, shortLabel = "上选"),
-    SELECT_DOWN("向下全选", Icons.Default.ArrowDownward, shortLabel = "下选"),
-    SELECT_REVERSE("反向全选", Icons.Default.SwapVert, shortLabel = "反选"),
-    CUT("剪切文件", Icons.Default.ContentCut, shortLabel = "剪切"),
-    DELETE("删除文件", Icons.Default.Delete, shortLabel = "删除"),
-    UNZIP_ALL("解压文件", Icons.Default.FolderZip, shortLabel = "解压"),
-    BATCH_RENAME("重新命名", Icons.Default.Edit, shortLabel = "命名"),
-    TOGGLE_SELECT_ALL("全选/取消全选", Icons.Default.SelectAll, shortLabel = "全选"),
+    TOP("文件置顶", Icons.Outlined.PushPin, shortLabel = "置顶"),
+    STAR("文件标星", Icons.Outlined.StarOutline, shortLabel = "标星"),
+    STAR_FILE_SCREEN("星标文件", Icons.Outlined.StarOutline),
+    SELECT_UP("向上全选", Icons.Outlined.ArrowUpward, shortLabel = "上选"),
+    SELECT_DOWN("向下全选", Icons.Outlined.ArrowDownward, shortLabel = "下选"),
+    SELECT_REVERSE("反向全选", Icons.Outlined.SwapVert, shortLabel = "反选"),
+    CUT("剪切文件", Icons.Outlined.ContentCut, shortLabel = "剪切"),
+    DELETE("删除文件", Icons.Outlined.Delete, shortLabel = "删除"),
+    UNZIP_ALL("解压文件", Icons.Outlined.FolderZip, shortLabel = "解压"),
+    BATCH_RENAME("重新命名", Icons.Outlined.Edit, shortLabel = "命名"),
+    TOGGLE_SELECT_ALL("全选/取消全选", Icons.Outlined.SelectAll, shortLabel = "全选"),
 
-    CLEAR_ALL_RECYCLE("清空所有文件", Icons.Default.DeleteForever)
+    CLEAR_ALL_RECYCLE("清空所有文件", Icons.Outlined.DeleteForever)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -169,6 +173,14 @@ fun AppTopBarMultiple(
     onClick: (AppBarAction) -> Unit,
     scrollBehavior: TopAppBarScrollBehavior? = null
 ) {
+    val listOf = remember {
+        mutableListOf(
+            TopBarAction.SELECT_REVERSE,
+            TopBarAction.SELECT_UP,
+            TopBarAction.SELECT_DOWN
+        )
+    }
+
     BaseTopAppBar(
         title = {
             val displayText = if (selectedCount > 0) "已选择 $selectedCount 项" else "未选择"
@@ -217,12 +229,15 @@ fun AppTopBarMultiple(
                     description = if (isAllSelected) "取消全选" else "全选",
                     onClick = { onClick(TopBarAction.TOGGLE_SELECT_ALL) }
                 )
-                // 2. 选择助手（反选、上选、下选）下拉菜单
-                FileAppTopBarMultipleDropdownMenu(
-                    onClick = { itemValue, _ ->
-                        onClick.invoke(itemValue)
-                    }
-                )
+
+                //（反选、上选、下选）下拉菜单
+                listOf.forEach {
+                    TopAppBarActionButton(
+                        imageVector = it.icon,
+                        description = it.label,
+                        onClick = { onClick.invoke(it) }
+                    )
+                }
             }
         }
     )

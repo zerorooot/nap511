@@ -137,7 +137,8 @@ class FileViewModel(
         scrollPositionStore = scrollPositionStore,
         imageCacheStore = imageCacheStore,
         coilCacheCleaner = coilCacheCleaner,
-        toastProvider = toastProvider
+        toastProvider = toastProvider,
+        isSkipProtectedEnabled = { settingUiStateFlow.value.skipPinnedOrStarredDelete }
     )
 
     val mediaModule = FileMediaModule(

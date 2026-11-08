@@ -33,7 +33,8 @@ class FileMutatorModule(
     private val scrollPositionStore: ScrollPositionStore,
     private val imageCacheStore: ImageCacheStore,
     private val coilCacheCleaner: CoilCacheCleaner,
-    private val toastProvider: ToastProvider
+    private val toastProvider: ToastProvider,
+    private val isSkipProtectedEnabled: () -> Boolean
 ) {
 
     fun cut(index: Int = -1) {
@@ -353,7 +354,11 @@ class FileMutatorModule(
         stateHolder.setRefreshing(false)
     }
 
-    suspend fun deleteMultiple(targetCid: String, selectedFiles: List<FileBean>) {
+    suspend fun deleteMultiple(
+        targetCid: String,
+        selectedFiles: List<FileBean>,
+        skippedCount: Int = 0
+    ) {
         if (selectedFiles.isEmpty()) return
         val paginationKey = stateHolder.currentContentState.source.paginationKey
         val beforeList = stateHolder.currentContentState.fileBeanList
@@ -370,10 +375,10 @@ class FileMutatorModule(
         // 提前删除并获取批量回滚闭包
         val selectedIds = selectedFiles.map { it.fileId }.toSet()
         val beforeTotalCount = stateHolder.currentContentState.totalCount
-        // 瞬时乐观更新 UI 状态并重置选择状态
+        // 瞬时乐观更新 UI 状态并重置选择状态（同时清空可能被跳过未删条目的选中状态）
         stateHolder.updateContentState {
             copy(
-                fileBeanList = fileBeanList.filterNot { it.fileId in selectedIds },
+                fileBeanList = fileBeanList.filterNot { it.fileId in selectedIds }.map { it.copy(isSelect = false) },
                 totalCount = (totalCount - selectedFiles.size).coerceAtLeast(0),
                 isLongClickState = false,
                 appBarTitle = source.appName
@@ -394,7 +399,9 @@ class FileMutatorModule(
                     coilCacheCleaner.deleteCoilCache(fileBean.pickCode)
                 }
             }
-            val toastMsg = if (selectedFiles.size == 1) {
+            val toastMsg = if (skippedCount > 0) {
+                "成功删除 ${selectedFiles.size} 个文件（已跳过 ${skippedCount} 个置顶/星标）"
+            } else if (selectedFiles.size == 1) {
                 "删除 ${selectedFiles.first().name} 成功"
             } else {
                 "成功删除 ${selectedFiles.size} 个文件"
@@ -418,11 +425,38 @@ class FileMutatorModule(
 
     suspend fun deleteMultiple() {
         val filter = stateHolder.currentContentState.fileBeanList.filter { it.isSelect }
+        if (filter.isEmpty()) return
+
         val currentCid = stateHolder.currentContentState.currentCid
-        deleteMultiple(currentCid, filter)
+        val skipEnabled = isSkipProtectedEnabled()
+
+        // 仅在多选删除时生效：根据设置决定是否跳过置顶或星标项目
+        val (skipped, toDelete) = if (skipEnabled) {
+            filter.partition { it.isPinned || it.isTop == 1 || it.isStar || it.star == 1 }
+        } else {
+            emptyList<FileBean>() to filter
+        }
+
+        XLog.d("deleteMultiple: skipEnabled=$skipEnabled, totalSelected=${filter.size}, skipped=${skipped.size}, toDelete=${toDelete.size}")
+
+        if (toDelete.isEmpty()) {
+            XLog.d("deleteMultiple: all selected items are protected, aborting delete")
+            // 全部受保护，不向远端提交删除，仅退出多选状态并提示用户
+            stateHolder.updateContentState {
+                copy(
+                    fileBeanList = fileBeanList.map { it.copy(isSelect = false) },
+                    isLongClickState = false,
+                    appBarTitle = source.appName
+                )
+            }
+            toastProvider.showToast("所选项目均为置顶/星标，已全部跳过")
+            return
+        }
+
+        deleteMultiple(currentCid, toDelete, skippedCount = skipped.size)
         // 搜索/过滤模式中，因为被删除文件/文件夹的 cid 不是当前 cid，所以只会删除文件，而不会删除缓存，要手动删除
         if (stateHolder.currentContentState.source !is FileListSource.Folder) {
-            val groupBy = filter.groupBy { it.parentId }
+            val groupBy = toDelete.groupBy { it.parentId }
             groupBy.forEach { (pid, beans) ->
                 /**
                  * 在 [github.zerorooot.nap511.util.formatFileBeanList] 中已经把文件、文件夹的 cid、fid 统一做了转换，这里直接使用 fid
