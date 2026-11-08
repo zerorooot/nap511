@@ -78,4 +78,48 @@ class LanSyncCryptoTest {
         assertEquals("12345", parsedState.uid)
         assertEquals("浅色模式", parsedState.themeMode)
     }
+
+    @Test
+    fun testLanSyncServerSession() {
+        val key = LanSyncCrypto.generateRandomKey()
+        val token = "test_token_12345"
+        val payload = """{"hello":"world"}"""
+        var completed = false
+
+        val session = github.zerorooot.nap511.util.network.LanSyncServerSession(
+            hostIp = "127.0.0.1",
+            expectedToken = token,
+            keyBytes = key,
+            payloadProvider = { payload },
+            onCompleted = { completed = true },
+            onError = { org.junit.Assert.fail("Unexpected error: $it") }
+        )
+
+        val port = session.start(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO))
+        assertTrue(port > 0)
+
+        val client = okhttp3.OkHttpClient()
+
+        // 1. Invalid token -> 403
+        val reqForbidden = okhttp3.Request.Builder()
+            .url("http://127.0.0.1:$port/sync?t=wrong_token")
+            .build()
+        client.newCall(reqForbidden).execute().use { resp ->
+            assertEquals(403, resp.code)
+        }
+
+        // 2. Valid token -> 200 with encrypted payload
+        val reqSuccess = okhttp3.Request.Builder()
+            .url("http://127.0.0.1:$port/sync?t=$token")
+            .build()
+        client.newCall(reqSuccess).execute().use { resp ->
+            assertEquals(200, resp.code)
+            val bodyStr = resp.body.string()
+            val encryptedResponse = gson.fromJson(bodyStr, github.zerorooot.nap511.bean.sync.EncryptedResponse::class.java)
+            val decrypted = LanSyncCrypto.decryptAesGcm(encryptedResponse, key)
+            assertEquals(payload, decrypted)
+        }
+
+        session.stop()
+    }
 }

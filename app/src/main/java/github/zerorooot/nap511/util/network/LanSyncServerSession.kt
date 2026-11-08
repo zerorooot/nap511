@@ -6,10 +6,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import okhttp3.mockwebserver.Dispatcher
-import okhttp3.mockwebserver.MockResponse
-import okhttp3.mockwebserver.MockWebServer
-import okhttp3.mockwebserver.RecordedRequest
+import mockwebserver3.Dispatcher
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import mockwebserver3.RecordedRequest
 import java.net.InetAddress
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -46,8 +46,8 @@ class LanSyncServerSession(
     fun start(scope: CoroutineScope): Int {
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
-                val path = request.path ?: ""
-                val token = request.requestUrl?.queryParameter("t") ?: ""
+                val path = request.url.encodedPath
+                val token = request.url.queryParameter("t") ?: ""
 
                 // 接口路径必须为 /sync，且使用常量时间安全比较校验 Token
                 if (!path.startsWith("/sync") || !LanSyncCrypto.constantTimeEquals(token, expectedToken)) {
@@ -56,7 +56,7 @@ class LanSyncServerSession(
                         scope.launch(Dispatchers.IO) { stop() }
                         onError("安全防护触发：非法探测次数超限，服务已即时熔断销毁")
                     }
-                    return MockResponse().setResponseCode(403).setBody("Forbidden")
+                    return MockResponse.Builder().code(403).body("Forbidden").build()
                 }
 
                 // 鉴权通过：获取业务数据并执行 AES-GCM 加密返回
@@ -72,13 +72,14 @@ class LanSyncServerSession(
                         onCompleted()
                     }
 
-                    MockResponse()
-                        .setResponseCode(200)
+                    MockResponse.Builder()
+                        .code(200)
                         .setHeader("Content-Type", "application/json; charset=utf-8")
                         .setHeader("Connection", "close")
-                        .setBody(responseJson)
+                        .body(responseJson)
+                        .build()
                 } catch (e: Exception) {
-                    MockResponse().setResponseCode(500).setBody("Internal Server Error")
+                    MockResponse.Builder().code(500).body("Internal Server Error").build()
                 }
             }
         }
@@ -105,7 +106,7 @@ class LanSyncServerSession(
         if (isStopped.compareAndSet(false, true)) {
             timeoutJob?.cancel()
             try {
-                server.shutdown()
+                server.close()
             } catch (_: Exception) {}
         }
     }

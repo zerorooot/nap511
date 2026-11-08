@@ -5,12 +5,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.media.MediaMetadata
+import android.media.session.MediaSession
+import android.media.session.PlaybackState
 import android.os.IBinder
-import android.support.v4.media.MediaMetadataCompat
-import android.support.v4.media.session.MediaSessionCompat
-import android.support.v4.media.session.PlaybackStateCompat
-import androidx.core.app.NotificationCompat
-import androidx.media.app.NotificationCompat.MediaStyle
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.player.AudioGSYManager
 import github.zerorooot.nap511.util.AudioEvent
@@ -19,7 +17,7 @@ import github.zerorooot.nap511.util.AudioEventBus
 /**
  */
 class AudioService : Service() {
-    private lateinit var mediaSession: MediaSessionCompat
+    private lateinit var mediaSession: MediaSession
     private val videoManger: AudioGSYManager = AudioGSYManager.instance()
 
 
@@ -27,9 +25,9 @@ class AudioService : Service() {
         super.onCreate()
         createNotificationChannel()
 
-        mediaSession = MediaSessionCompat(this, "AudioService").apply {
+        mediaSession = MediaSession(this, "AudioService").apply {
             // 监听系统通知栏/锁屏界面的交互回调
-            setCallback(object : MediaSessionCompat.Callback() {
+            setCallback(object : MediaSession.Callback() {
                 override fun onPlay() {
                     videoManger.start()
                     updateMediaState(notifyUi = true)
@@ -117,20 +115,20 @@ class AudioService : Service() {
         val duration = videoManger.duration
 
         // 1. 设置 PlaybackState：显式声明支持 SEEK_TO、PLAY、PAUSE、REWIND、FAST_FORWARD
-        val stateBuilder = PlaybackStateCompat.Builder()
+        val stateBuilder = PlaybackState.Builder()
             .setActions(
-                PlaybackStateCompat.ACTION_PLAY or
-                        PlaybackStateCompat.ACTION_PAUSE or
-                        PlaybackStateCompat.ACTION_PLAY_PAUSE or
-                        PlaybackStateCompat.ACTION_SEEK_TO or          // 允许拖拽进度条
-                        PlaybackStateCompat.ACTION_REWIND or           // 允许快退
-                        PlaybackStateCompat.ACTION_FAST_FORWARD or     // 允许快进
+                PlaybackState.ACTION_PLAY or
+                        PlaybackState.ACTION_PAUSE or
+                        PlaybackState.ACTION_PLAY_PAUSE or
+                        PlaybackState.ACTION_SEEK_TO or          // 允许拖拽进度条
+                        PlaybackState.ACTION_REWIND or           // 允许快退
+                        PlaybackState.ACTION_FAST_FORWARD or     // 允许快进
                         // 显式开启上一首/下一首 Action，使系统播控控件按钮取消置灰
-                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
-                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT
+                        PlaybackState.ACTION_SKIP_TO_PREVIOUS or
+                        PlaybackState.ACTION_SKIP_TO_NEXT
             )
             .setState(
-                if (isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED,
+                if (isPlaying) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED,
                 currentPos,
                 1.0f // 系统利用此播放速率在通知栏平滑走进度
             )
@@ -138,12 +136,12 @@ class AudioService : Service() {
 
         // 2. 设置 Metadata：告知系统音频总时长，以便系统渲染进度条的最大范围
         if (duration > 0 || title != null) {
-            val metadataBuilder = MediaMetadataCompat.Builder()
+            val metadataBuilder = MediaMetadata.Builder()
             if (title != null) {
-                metadataBuilder.putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
+                metadataBuilder.putString(MediaMetadata.METADATA_KEY_TITLE, title)
             }
             if (duration > 0) {
-                metadataBuilder.putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration)
+                metadataBuilder.putLong(MediaMetadata.METADATA_KEY_DURATION, duration)
             }
             mediaSession.setMetadata(metadataBuilder.build())
         }
@@ -153,16 +151,16 @@ class AudioService : Service() {
     }
 
     private fun buildNotification(title: String): Notification {
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_splash_cloud_logo)
             .setContentTitle(title)
             .setContentText("nap511 音乐播放器")
             .setOngoing(true)
             .setStyle(
-                MediaStyle()
+                Notification.MediaStyle()
                     .setMediaSession(mediaSession.sessionToken)
             )
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
             .build()
     }
 

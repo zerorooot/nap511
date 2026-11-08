@@ -15,11 +15,12 @@
 # -------------------------------------------------------------------------
 # Logging Stripping (Release Build Optimization)
 # -------------------------------------------------------------------------
-# Safely eliminate debug and verbose Android Log calls & parameter string formatting in release builds
+# Safely eliminate debug, verbose, and info Android Log calls & parameter string formatting in release builds
 -assumenosideeffects class android.util.Log {
     public static boolean isLoggable(java.lang.String, int);
     public static int v(...);
     public static int d(...);
+    public static int i(...);
 }
 
 # -------------------------------------------------------------------------
@@ -112,8 +113,7 @@
 # -------------------------------------------------------------------------
 # Media & Video Player: GSYVideoPlayer, ijkplayer & Media3 / ExoPlayer
 # -------------------------------------------------------------------------
-# 1) ijkplayer: C/C++ native layer reflects Java player callbacks
--keep class tv.danmaku.ijk.media.player.** { *; }
+# 1) ijkplayer: 不再保留已废弃且未使用的 ijkplayer 原生桥接类
 -dontwarn tv.danmaku.ijk.media.player.**
 
 # 2) ExoPlayer bridge in GSYVideoPlayer

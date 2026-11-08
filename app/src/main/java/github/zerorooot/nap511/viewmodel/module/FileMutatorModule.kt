@@ -400,7 +400,7 @@ class FileMutatorModule(
                 }
             }
             val toastMsg = if (skippedCount > 0) {
-                "成功删除 ${selectedFiles.size} 个文件（已跳过 ${skippedCount} 个置顶/星标）"
+                "成功删除 ${selectedFiles.size} 个文件（已跳过 $skippedCount 个置顶/星标）"
             } else if (selectedFiles.size == 1) {
                 "删除 ${selectedFiles.first().name} 成功"
             } else {

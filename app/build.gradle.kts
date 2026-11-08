@@ -32,7 +32,24 @@ android {
         versionName = "1.8"
         buildConfigField("String", "GIT_SHA", "\"${getGitCommitHash()}\"")
 
+        val targetAbis = (project.findProperty("ABI_FILTERS") as? String)
+            ?.split(",")
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+        ndk {
+            if (!targetAbis.isNullOrEmpty()) {
+                abiFilters.addAll(targetAbis)
+            } else {
+                abiFilters.add("arm64-v8a")
+            }
+        }
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    androidResources {
+        //"en"
+        localeFilters += listOf("zh", "zh-rCN")
     }
 
     signingConfigs {
@@ -91,6 +108,17 @@ android {
         compose = true
         buildConfig = true
     }
+    packaging {
+        resources {
+            excludes += listOf(
+                "META-INF/*.version",
+                "META-INF/androidx/**/LICENSE.txt",
+                "play-services-*.properties",
+                "firebase-encoders*.properties",
+                "transport-*.properties"
+            )
+        }
+    }
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
@@ -137,7 +165,10 @@ dependencies {
     implementation(libs.android.request.inspector.webview)
     implementation(libs.compose.zoom)
     implementation(libs.gsyvideoplayer.java)
-    implementation(libs.gsyvideoplayer.exo2)
+    implementation(libs.gsyvideoplayer.exo2) {
+        exclude(group = "androidx.media3", module = "media3-cast")
+        exclude(group = "io.github.carguo", module = "gsyvideoplayer-rtmp")
+    }
 //    implementation(libs.gsyvideoplayer.arm64)
     implementation(libs.core.splashscreen)
     implementation(libs.coil.compose)
@@ -166,7 +197,7 @@ dependencies {
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.compose)
-    implementation(libs.okhttp.mockwebserver)
+    implementation(libs.okhttp.mockwebserver3)
 
 
     testImplementation(libs.junit)
