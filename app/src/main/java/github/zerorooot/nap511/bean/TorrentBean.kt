@@ -6,7 +6,7 @@ data class TorrentFileBean(
     var state: Boolean = false,
     var errno: Long = 0,
     @SerializedName("error_msg")
-    var errorMessage: String = "种子文件解析失败",
+    var errorMessage: String = "",
     var errtype: String = "suc",
     var errcode: Long = 0,
     @SerializedName("file_size")

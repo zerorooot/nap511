@@ -261,25 +261,24 @@ class FileMediaModule(
             val sign = fileRepository.getOfflineSign().sign
             fileRepository.getOfflineTorrentTaskList(sha1, sign, UserSessionManager.uid)
         }.onSuccess { torrentTask ->
-            XLog.d("getTorrentTask torrentTask $torrentTask")
             if (!torrentTask.state) {
                 toastProvider.showToast(torrentTask.errorMessage)
                 stateHolder.setRefreshing(false)
                 return@onSuccess
             }
-            torrentTask.fileSizeString = torrentTask.fileSize.formatFileSize() + " "
+            torrentTask.fileSizeString = torrentTask.fileSize.formatFileSize()
             torrentTask.torrentFileListWeb.forEach { b ->
-                b.sizeString = b.size.formatFileSize() + " "
+                b.sizeString = b.size.formatFileSize()
             }
             torrentCacheStore[sha1] = torrentTask
-            torrentTask.torrentFileListWeb.removeIf { f -> f.wanted == -1 }
-            torrentTask.fileCount = torrentTask.torrentFileListWeb.size
             stateHolder.updateDialogState {
                 copy(
                     torrentBean = torrentTask,
                     activeDialog = FileDialogState.CreateSelectTorrentFile
                 )
             }
+
+            XLog.d("getTorrentTask torrentTask fileSize=${torrentTask.fileSize}, fileSizeString=${torrentTask.fileSizeString}, torrentName=${torrentTask.torrentName}, fileCount=${torrentTask.fileCount}, infoHash=${torrentTask.infoHash}")
             stateHolder.setRefreshing(false)
         }.onFailure {
             stateHolder.setRefreshing(false)
@@ -295,6 +294,7 @@ class FileMediaModule(
             val addTorrentTask = fileRepository.addOfflineTorrentTask(
                 infoHash, wanted, savePath, UserSessionManager.uid, sign
             )
+            XLog.d("FileMediaModule addTorrentTask infoHash=$infoHash, wanted=$wanted, savePath=$savePath ,addTorrentTask=$addTorrentTask")
             if (addTorrentTask.state) {
                 navigator.refresh()
                 "任务添加成功，文件已保存至 /云下载/${savePath}"

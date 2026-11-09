@@ -63,7 +63,6 @@ import github.zerorooot.nap511.screen.components.TopBarAction
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileOpener
-import github.zerorooot.nap511.util.StartupProfiler
 import github.zerorooot.nap511.util.asScrollState
 import github.zerorooot.nap511.util.copy
 import github.zerorooot.nap511.util.isNotificationEnabled
@@ -87,7 +86,6 @@ fun FileScreen(
     drawerState: () -> Boolean,
     fileOpener: FileOpener
 ) {
-    StartupProfiler.step("FileScreen: composition start")
     val fabPosition = when (settingUiState.fabPosition) {
         "Start" -> FabPosition.Start
         "Center" -> FabPosition.Center
@@ -175,9 +173,7 @@ fun FileScreen(
 
     val scope = rememberCoroutineScope()
     val clipboardManager = LocalClipboard.current
-    StartupProfiler.step("FileScreen: before imageLoader")
     val imageLoader = context.imageLoader
-    StartupProfiler.step("FileScreen: after imageLoader")
 
     val density = LocalDensity.current
     // 1. 设置 35dp 的防抖阈值
@@ -297,10 +293,10 @@ fun FileScreen(
             ) {
                 fileViewModel.setRefreshingStatus(true)
                 when (it) {
-                    ForceOpenType.VIDEO -> clickHandler.handleVideoClick(bean)
+                    ForceOpenType.VIDEO -> clickHandler.handleVideoClick(bean, isForceOpen = true)
                     ForceOpenType.AUDIO -> clickHandler.handleAudioClick(bean)
-                    ForceOpenType.IMAGE -> clickHandler.handlePhotoClick(bean)
-                    ForceOpenType.TEXT -> clickHandler.handleTextClick(bean)
+                    ForceOpenType.IMAGE -> clickHandler.handlePhotoClick(bean, isForceOpen = true)
+                    ForceOpenType.TEXT -> clickHandler.handleTextClick(bean, isForceOpen = true)
                     ForceOpenType.WEB -> clickHandler.handleWebClick(bean)
                     ForceOpenType.ARCHIVE -> clickHandler.handleZipClick(bean)
                     ForceOpenType.TORRENT -> clickHandler.handleTorrentClick(bean)
@@ -625,7 +621,7 @@ fun FileScreen(
         listState = listState, gridState = gridState, staggeredGridState = staggeredGrid
     )
 
-    StartupProfiler.step("FileScreen: before FileScaffold")
+
     FileScaffold(
         state = scaffoldState, actions = scaffoldActions, audioViewModel = audioViewModel
     ) { innerPadding ->

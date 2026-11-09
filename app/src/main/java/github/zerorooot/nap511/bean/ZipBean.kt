@@ -34,6 +34,35 @@ class ExtractDataDeserializer : JsonDeserializer<ExtractData?> {
         }
     }
 }
+
+class EncryptionDataDeserializer : JsonDeserializer<EncryptionData?> {
+    override fun deserialize(
+        json: JsonElement,
+        typeOfT: Type,
+        context: JsonDeserializationContext
+    ): EncryptionData? {
+        return if (json.isJsonObject) {
+            context.deserialize(json, EncryptionData::class.java)
+        } else {
+            null // 如果服务端返回 [] 空数组，安全降级为 null
+        }
+    }
+}
+
+class ProcessDataDeserializer : JsonDeserializer<ProcessData?> {
+    override fun deserialize(
+        json: JsonElement,
+        typeOfT: Type,
+        context: JsonDeserializationContext
+    ): ProcessData? {
+        return if (json.isJsonObject) {
+            context.deserialize(json, ProcessData::class.java)
+        } else {
+            null // 如果服务端返回 [] 空数组，安全降级为 null
+        }
+    }
+}
+
 /**
  * 异常，正在进行云解压
  */
@@ -61,7 +90,8 @@ data class ExtractStatus(
 
 data class EncryptionDataResponse(
     @SerializedName("data")
-    val data: EncryptionData
+    @JsonAdapter(EncryptionDataDeserializer::class)
+    val data: EncryptionData? = null
 ) : BaseResponse()
 
 data class EncryptionData(
@@ -71,7 +101,8 @@ data class EncryptionData(
 
 data class ProcessDataResponse(
     @SerializedName("data")
-    val data: ProcessData
+    @JsonAdapter(ProcessDataDeserializer::class)
+    val data: ProcessData? = null
 ) : BaseResponse()
 
 data class ProcessData(

@@ -57,8 +57,6 @@ data class SettingUiState(
     /** 主题颜色模式（如跟随系统、浅色模式、深色模式） */
     @SerializedName(ConfigKeyUtil.THEME_MODE) val themeMode: String = "跟随系统",
 
-    /** 是否开启种子文件大小排序（解析种子文件列表时按文件体积从大到小排列） */
-    @SerializedName(ConfigKeyUtil.TORRENT_SORT) val torrentSort: Boolean = false,
 
     /** 是否启用调试日志（记录并输出应用核心运行日志，以便排查异常） */
     @SerializedName(ConfigKeyUtil.LOG) val logEnabled: Boolean = false,

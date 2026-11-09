@@ -44,9 +44,9 @@ class FileClickHandler(
         fileViewModel.getFiles(fileBean.categoryId)
     }
 
-    fun handleVideoClick(fileBean: FileBean) {
+    fun handleVideoClick(fileBean: FileBean, isForceOpen: Boolean = false) {
         coroutineScope.launch {
-            fileOpener.openVideo(fileBean, fileViewModel.fileBeanList)
+            fileOpener.openVideo(fileBean, fileViewModel.fileBeanList, isForceOpen)
             fileViewModel.setRefreshingStatus(false)
         }
     }
@@ -57,8 +57,8 @@ class FileClickHandler(
         fileViewModel.setRefreshingStatus(false)
     }
 
-    fun handlePhotoClick(fileBean: FileBean) {
-        fileOpener.openPhoto(fileBean, fileViewModel.fileBeanList)
+    fun handlePhotoClick(fileBean: FileBean, isForceOpen: Boolean = false) {
+        fileOpener.openPhoto(fileBean, fileViewModel.fileBeanList, isForceOpen)
         if (!isAutoImagePreview) {
             onTopBarShowChange(true)
             onBottomBarShowChange(true)
@@ -75,9 +75,9 @@ class FileClickHandler(
     }
 
 
-    fun handleTextClick(fileBean: FileBean) {
+    fun handleTextClick(fileBean: FileBean, isForceOpen: Boolean = false) {
         coroutineScope.launch {
-            fileOpener.openText(fileBean)
+            fileOpener.openText(fileBean, isForceOpen)
             fileViewModel.setRefreshingStatus(false)
         }
     }

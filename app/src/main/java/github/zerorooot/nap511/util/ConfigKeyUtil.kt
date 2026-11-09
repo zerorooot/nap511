@@ -134,19 +134,10 @@ class ConfigKeyUtil {
         const val MAX_TXT_SIZE = "MaxTxtSize"
 
         /**
-         * 种子文件按文件大小从大到小排序
-         */
-        const val TORRENT_SORT = "TorrentSort"
-
-        /**
          * 是否开启日志
          */
         const val LOG = "log"
 
-        /**
-         * 是否查看原视频
-         */
-        const val ORIGIN_VIDEO = "originVideo"
 
         /**
          * 解压失败存放文件夹

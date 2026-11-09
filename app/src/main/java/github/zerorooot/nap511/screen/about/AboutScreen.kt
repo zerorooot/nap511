@@ -74,6 +74,11 @@ import androidx.compose.ui.res.stringResource
  * 4. 法律合规与开源许可无缝联动 HtmlWebViewScreen 提供优雅美观的富文本排版；
  * 5. 底部版权与免责落款。
  */
+// 顶层持久状态（跟随应用进程生命周期，页面退出再次进入不会重复请求）
+private var hasCheckedUpdate = false
+private var latestReleaseVersion by mutableStateOf<String?>(null)
+private var hasNewVersion by mutableStateOf(false)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AboutScreen(
@@ -88,12 +93,10 @@ fun AboutScreen(
     val buildInfo =
         "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · git-${BuildConfig.GIT_SHA}"
 
-    // 检查更新状态
-    var latestReleaseVersion by remember { mutableStateOf<String?>(null) }
-    var hasNewVersion by remember { mutableStateOf(false) }
-
-    // 自动在进入页面时异步检查 GitHub 是否有新版本
+    // 自动在进入页面时异步检查 GitHub 是否有新版本（仅首次进入触发）
     LaunchedEffect(Unit) {
+        if (hasCheckedUpdate) return@LaunchedEffect
+        hasCheckedUpdate = true
         withContext(Dispatchers.IO) {
             try {
                 XLog.i("进入关于页面，开始后台检查 GitHub 最新版本...")

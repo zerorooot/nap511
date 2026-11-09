@@ -103,7 +103,6 @@ class SettingsRepository {
                 autoJumpRetry = pref[booleanPreferencesKey(ConfigKeyUtil.AUTO_JUMP_RETRY)] ?: default.autoJumpRetry,
                 dynamicColorEnabled = pref[booleanPreferencesKey(ConfigKeyUtil.DYNAMIC_COLOR)] ?: default.dynamicColorEnabled,
                 themeMode = pref[stringPreferencesKey(ConfigKeyUtil.THEME_MODE)] ?: default.themeMode,
-                torrentSort = pref[booleanPreferencesKey(ConfigKeyUtil.TORRENT_SORT)] ?: default.torrentSort,
                 logEnabled = pref[booleanPreferencesKey(ConfigKeyUtil.LOG)] ?: default.logEnabled,
                 currentOfflineTask = pref[stringPreferencesKey(ConfigKeyUtil.CURRENT_OFFLINE_TASK)] ?: default.currentOfflineTask,
                 requestLimitCount = pref[stringPreferencesKey(ConfigKeyUtil.REQUEST_LIMIT_COUNT)] ?: default.requestLimitCount,

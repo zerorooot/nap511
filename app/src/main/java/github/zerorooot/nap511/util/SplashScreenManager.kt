@@ -23,9 +23,6 @@ import kotlinx.coroutines.launch
  */
 object SplashScreenManager {
 
-    /** 启动屏退出时的淡出动画时长（毫秒）优化：缩短至 120ms 以加速首屏视觉感知 */
-    private const val EXIT_ANIMATION_DURATION = 120L
-
     @Volatile
     var isReady: Boolean = false
         private set
@@ -45,25 +42,16 @@ object SplashScreenManager {
         activity: ComponentActivity,
         scope: CoroutineScope,
     ): SplashScreen {
-        StartupProfiler.step("SplashScreenManager.setup start")
         // 1. 初始化并挂载系统 SplashScreen
         val splashScreen = activity.installSplashScreen()
-        StartupProfiler.step("SplashScreenManager installSplashScreen completed")
-
         scope.launch(Dispatchers.IO) {
-            StartupProfiler.step("SplashScreenManager preheat coroutine started")
             //【冷启动性能优化】磁盘文件缓存（如 0.json 等）在后台异步加载，不阻塞 SplashScreen 淡出退场
             launch {
-                StartupProfiler.step("SplashScreenManager FileCacheManager.loadAllCache start")
                 FileCacheManager.loadAllCache()
-                StartupProfiler.step("SplashScreenManager FileCacheManager.loadAllCache completed")
             }
-
             // 核心账号凭证就绪后，直接在 IO 线程置 isReady = true（无需切主线程排队），使首帧 onPreDraw 即可立即通过
             isReady = true
-            StartupProfiler.step("SplashScreenManager isReady set to true")
         }
-
         // 2. 挂起控制：在核心状态（如 DataStore 配置及预加载）加载完成前，保持动态 SplashScreen 显示
         // 返回 true 表示正在加载必要配置，继续保持动画展示；
         // 返回 false 表示就绪，系统自动以硬件加速平滑退场。
@@ -72,7 +60,6 @@ object SplashScreenManager {
             val keep = !isReady
             if (!keep && !conditionSatisfiedLogged) {
                 conditionSatisfiedLogged = true
-                StartupProfiler.step("SplashScreen keepOnScreenCondition satisfied (ready to exit)")
             }
             keep
         }

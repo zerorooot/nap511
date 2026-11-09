@@ -25,13 +25,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
@@ -40,10 +36,9 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.TorrentFileListWeb
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.screenitem.TorrentFileCellItem
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.formatFileSize
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 
@@ -55,39 +50,13 @@ fun CreateSelectTorrentFileDialog(
     if (!torrentBean.state) {
         return
     }
-
     val infoHash = torrentBean.infoHash
     val savePath = torrentBean.torrentName
 
-    var isSort by remember { mutableStateOf(false) }
-    val torrentFileListWeb = remember(torrentBean) {
-        mutableStateListOf<TorrentFileListWeb>().apply {
-            addAll(torrentBean.torrentFileListWeb)
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        isSort = SettingsRepository.getDataSuspend(ConfigKeyUtil.TORRENT_SORT, false)
-    }
-
-    if (isSort) {
-        torrentFileListWeb.sortByDescending { it.size }
-    }
-
     SelectTorrentFileDialog(
-        torrentFileListWeb.toList(), torrentBean.fileCount, torrentBean.fileSizeString
-    ) {
-        val map = if (isSort) {
-            val sortMap = hashMapOf<Int, TorrentFileListWeb>()
-            val torrentFileList = it.values.toMutableList()
-            torrentFileList.forEach { i ->
-                sortMap[torrentBean.torrentFileListWeb.indexOf(i)] = i
-            }
-            sortMap
-        } else {
-            it
-        }
-        val wanted = map.keys.joinToString(separator = ",")
+        torrentBean.torrentFileListWeb, torrentBean.fileCount, torrentBean.fileSizeString
+    ) { selectMap ->
+        val wanted = selectMap.keys.sorted().joinToString(separator = ",")
         enter.invoke(infoHash, savePath, wanted)
     }
 }
@@ -105,7 +74,7 @@ private fun SelectTorrentFileDialog(
     }
 
     // 已选文件的索引与内容映射状态
-    val selectMap = remember(torrentFileListWeb) {
+    val selectMap = remember {
         mutableStateMapOf<Int, TorrentFileListWeb>().apply {
             torrentFileListWeb.forEachIndexed { index, item ->
                 if (item.wanted == 1) {
@@ -139,14 +108,16 @@ private fun SelectTorrentFileDialog(
     }
 
     fun selectAll() {
-        val allItems = torrentFileListWeb.mapIndexed { index, item -> index to item }
+        val allItems = torrentFileListWeb.mapIndexedNotNull { index, item ->
+            if (item.wanted != -1) index to item else null
+        }
         selectMap.clear()
         selectMap.putAll(allItems)
     }
 
     fun reversal() {
         val reversedItems = torrentFileListWeb.mapIndexedNotNull { index, item ->
-            if (selectMap.containsKey(index)) null else index to item
+            if (item.wanted != -1 && !selectMap.containsKey(index)) index to item else null
         }
         selectMap.clear()
         selectMap.putAll(reversedItems)
@@ -187,7 +158,7 @@ private fun SelectTorrentFileDialog(
                 TorrentSummaryCard(
                     selectedCount = selectMap.size,
                     totalCount = fileCount,
-                    selectedSize = selectMap.values.sumOf { it.size },
+                    selectedSize = selectMap.values.sumOf { it.size }.formatFileSize(),
                     totalSizeString = fileSizeString
                 )
 
@@ -213,11 +184,13 @@ private fun SelectTorrentFileDialog(
                             items = torrentFileListWeb,
                             key = { _, item -> item.hashCode() }
                         ) { index, item ->
-                            TorrentFileCellItem(
-                                item = item,
-                                isSelected = isSelectedItem(index),
-                                onClick = { onChangeState(index, item) }
-                            )
+                            if (item.wanted != -1) {
+                                TorrentFileCellItem(
+                                    item = item,
+                                    isSelected = isSelectedItem(index),
+                                    onClick = { onChangeState(index, item) }
+                                )
+                            }
                         }
                     }
                 }
@@ -233,7 +206,7 @@ private fun SelectTorrentFileDialog(
 private fun TorrentSummaryCard(
     selectedCount: Int,
     totalCount: Int,
-    selectedSize: Long,
+    selectedSize: String,
     totalSizeString: String
 ) {
     Card(
@@ -259,7 +232,7 @@ private fun TorrentSummaryCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = Formatter.formatFileSize(App.instance, selectedSize),
+                    text = selectedSize,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary
                 )

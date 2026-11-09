@@ -296,14 +296,6 @@ fun LazyListScope.fileCachePreferenceItems(
     }
     item {
         SwitchPreferenceItem(
-            title = "种子文件大小排序",
-            summary = "解析种子文件列表时按文件体积从大到小排列",
-            checked = uiState.torrentSort,
-            onCheckedChange = { onSaveConfig(ConfigKeyUtil.TORRENT_SORT, it) }
-        )
-    }
-    item {
-        SwitchPreferenceItem(
             title = "下拉刷新缓存清空",
             summary = "下拉刷新时，强制清除当前目录下所有已缓存的文件数据",
             checked = uiState.forceLoadCache,

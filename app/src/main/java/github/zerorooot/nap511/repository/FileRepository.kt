@@ -446,7 +446,10 @@ open class FileRepository {
             return Pair(false, message)
         }
         //解压
-        val extractId = unzipFile.data.extractId.toLong()
+        val extractId = unzipFile.data?.extractId?.toLongOrNull() ?: return Pair(
+            false,
+            message.ifEmpty { "获取解压任务ID失败" }
+        )
 
         if (showToast) {
             App.instance.toast(message)
@@ -454,7 +457,7 @@ open class FileRepository {
 
         // {"state":true,"message":"","code":"","data":{"extract_id":"id","to_pid":"pid","percent":100}}
 
-        for (i in 1..100) {
+        for (i in 1..50) {
             val json = fileService.unzipFileProcess(extractId)
             XLog.v("unzipFile process $i $json")
             state = json.state
@@ -462,7 +465,7 @@ open class FileRepository {
                 message = json.message
                 break
             }
-            val process = json.data.percent
+            val process = json.data?.percent ?: 0
             if (process == 100) {
                 state = true
                 message = "${unzipFolderName}后台解压完成～"
@@ -547,9 +550,9 @@ open class FileRepository {
         //{"state":true,"message":"","code":"","data":{"unzip_status":4}}
         val json = fileService.decryptZip(pickCode, secret)
         XLog.v("Post files/push_extract decryptZip $json")
-        val asInt = json.data.unzipStatus
+        val asInt = json.data?.unzipStatus ?: -1
         //4 is success,6 is decrypt error,1 is having been done
-        return asInt != 6
+        return json.state && asInt != 6 && asInt != -1
     }
 
 
@@ -565,7 +568,8 @@ open class FileRepository {
             if (!response.state) {
                 ZipStatus.UnsupportedOrError(response.message)
             } else {
-                val status = response.data!!.extractStatus
+                val status = response.data?.extractStatus ?: return ZipStatus.UnsupportedOrError(
+                    response.message.ifEmpty { "获取压缩包状态失败" })
                 var unzipStatus = status.unzipStatus
 
                 // 2. 特殊状态码二次校验
@@ -576,7 +580,7 @@ open class FileRepository {
                     if (!encryptResponse.state) {
                         return ZipStatus.UnsupportedOrError(encryptResponse.message)
                     }
-                    unzipStatus = encryptResponse.data.unzipStatus
+                    unzipStatus = encryptResponse.data?.unzipStatus ?: -1
                 }
 
                 // 3. 映射到密封类

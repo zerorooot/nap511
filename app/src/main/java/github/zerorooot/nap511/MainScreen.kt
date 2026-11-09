@@ -35,7 +35,6 @@ import github.zerorooot.nap511.screenitem.AppDrawer
 import github.zerorooot.nap511.screenitem.DrawerMenuItems
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.StartupProfiler
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
@@ -48,13 +47,9 @@ fun MainScreen(
     settingUiState: SettingUiState,
     onMoveTaskToBack: (Boolean) -> Unit
 ) {
-    StartupProfiler.step("MainScreen: composition start")
     val fileViewModel: FileViewModel = viewModel()
-    StartupProfiler.step("MainScreen: FileViewModel acquired")
     val audioViewModel: AudioViewModel = viewModel()
-    StartupProfiler.step("MainScreen: AudioViewModel acquired")
     val offlineFileViewModel: OfflineFileViewModel = viewModel()
-    StartupProfiler.step("MainScreen: OfflineFileViewModel acquired")
 
     val context = LocalContext.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -82,7 +77,7 @@ fun MainScreen(
     // ==========================================
     // 1. 初始化 Nav3 返回栈，默认以 Route.MyFile（我的文件）为栈底起始路由
     val backStack: NavBackStack<NavKey> = rememberNavBackStack(Route.MyFile)
-    StartupProfiler.step("MainScreen: NavBackStack initialized")
+    
     val currentRoute = backStack.lastOrNull() as? Route ?: Route.MyFile
 
 
@@ -161,7 +156,6 @@ fun MainScreen(
     }
 
     LaunchedEffect(Unit) {
-        StartupProfiler.step("MainScreen LaunchedEffect: trigger loadCacheFile & tasks")
         fileViewModel.loadCacheFile()
         fileViewModel.handleOfflineTask()
         fileViewModel.getRemainingSpace()

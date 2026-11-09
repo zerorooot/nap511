@@ -68,7 +68,6 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
     private var isLogEnabled = false
 
     override fun onCreate() {
-        StartupProfiler.step("App.onCreate start")
         // 1.12.0 起新文字上下文菜单默认开启，但在 Dialog 内的 TextField
         // 长按/选中后剪切、复制、粘贴点击无效。回退到旧实现规避该回归。
         ComposeFoundationFlags.isNewContextMenuEnabled = false
@@ -90,13 +89,11 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
             )
 
             FileCacheManager.saveRequestCache = settings.saveRequestCache
-            StartupProfiler.step("App DataStore settings loaded & UserSessionManager initialized")
         }
 
 
         // 同步初始化 XLog 日志框架，确保在冷启动或独立 Activity 启动时 XLog 已就绪
         initLog()
-        StartupProfiler.step("App.onCreate initLog completed")
 
         // 启动时在后台线程清理过期 7 天的 Coil 图片缓存
         appScope.launch {
@@ -125,7 +122,6 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
                     }
                 }
         }
-        StartupProfiler.step("App.onCreate end")
     }
 
     fun initLog() {

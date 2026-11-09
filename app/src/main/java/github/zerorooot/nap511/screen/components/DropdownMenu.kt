@@ -173,14 +173,15 @@ private fun <T : AppBarAction> MyDropdownMenu(
 fun FileMoreMenu(
     isPinned: Boolean = false,
     isStar: Boolean = false,
+    isZip: Boolean = false,
     onClick: (MenuItemAction, Int) -> Unit
 ) {
-    val listOf = listOf(
+    val listOf = listOfNotNull(
         MenuItemAction.CUT_FILE,
         MenuItemAction.RENAME_FILE,
         MenuItemAction.FILE_INFO,
         MenuItemAction.FORCE_OPEN,
-        MenuItemAction.UNZIP_FILE,
+        if (isZip) MenuItemAction.UNZIP_FILE else null,
         if (isPinned) MenuItemAction.UN_TOP_FILE else MenuItemAction.TOP_FILE,
         if (isStar) MenuItemAction.UN_STAR_FILE else MenuItemAction.STAR_FILE,
         MenuItemAction.ARIA2_DOWNLOAD,

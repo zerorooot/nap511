@@ -147,9 +147,11 @@ class FileOpener(
     /**
      * 打开视频文件并启动 [VideoActivity]
      */
-    suspend fun openVideo(fileBean: FileBean, siblingFiles: List<FileBean> = emptyList()): Boolean {
+    suspend fun openVideo(fileBean: FileBean, siblingFiles: List<FileBean> = emptyList(), isForceOpen: Boolean = false): Boolean {
         audioPlayerController.pauseAudio()
-        val videoList = siblingFiles.filter { it.isVideo == 1 && it.playLong != 0.0 }.map {
+        val videoList = siblingFiles.filter {
+            (it.isVideo == 1 && it.playLong != 0.0) || (isForceOpen && it.pickCode == fileBean.pickCode)
+        }.map {
             VideoBean(
                 name = it.name,
                 pickCode = it.pickCode,
@@ -229,11 +231,17 @@ class FileOpener(
     /**
      * 打开图片并导航至图片全屏浏览器
      */
-    fun openPhoto(fileBean: FileBean, photoList: List<FileBean> = emptyList()): Boolean {
+    fun openPhoto(
+        fileBean: FileBean,
+        photoList: List<FileBean> = emptyList(),
+        isForceOpen: Boolean = false
+    ): Boolean {
         audioPlayerController.pauseAudio()
-        val validPhotoList =
-            photoList.filter { it.photoThumb.isNotEmpty() || it.fileIco == R.drawable.png }
-                .ifEmpty { listOf(fileBean) }
+        val validPhotoList = photoList.filter { it.photoThumb.isNotEmpty() || it.fileIco == R.drawable.png ||
+                    //只把用户明确要求强制打开的那一个文件精准加进图片列表
+                    // 而不要把同目录下的所有 .zip、.mp4 等杂七杂八的文件都强行加进图片画廊里。
+                    (isForceOpen && (it.pickCode == fileBean.pickCode || it.fileId == fileBean.fileId))
+        }.ifEmpty { listOf(fileBean) }
 
         val targetIndex =
             validPhotoList.indexOfFirst { it.pickCode == fileBean.pickCode || it.fileId == fileBean.fileId }
@@ -268,24 +276,28 @@ class FileOpener(
     /**
      * 校验大小、拉取/读取缓存字节流并导航至文本阅读器
      */
-    suspend fun openText(fileBean: FileBean): Boolean {
+    suspend fun openText(fileBean: FileBean, isForceOpen: Boolean = false): Boolean {
         val settings = settingUiState()
         val txtSize = settings.txtSize.toIntOrNull() ?: TextFileHelper.DEFAULT_TXT_SIZE_KB
-        when (val validation = TextFileHelper.validate(fileBean, txtSize)) {
+        when (val validation =
+            TextFileHelper.validate(fileBean, txtSize, checkType = !isForceOpen)) {
             is TextValidationResult.ExceedsSizeLimit -> {
                 App.instance.toast("仅支持打开${validation.limitKb}kb以下的文件")
                 return false
             }
+
             is TextValidationResult.NotTextFile -> {
                 App.instance.toast("非文本类型文件")
                 return false
             }
+
             is TextValidationResult.Valid -> {
                 // 校验通过，继续执行
             }
         }
 
-        val fetchResult = TextFileHelper.fetchBytes(fileRepository, fileBean, mediaViewerStateHolder)
+        val fetchResult =
+            TextFileHelper.fetchBytes(fileRepository, fileBean, mediaViewerStateHolder)
         val bytes = fetchResult.getOrNull()
 
         if (bytes != null) {

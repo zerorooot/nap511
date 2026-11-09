@@ -45,8 +45,20 @@
 -keepattributes AnnotationDefault,RuntimeVisibleAnnotations,RuntimeVisibleParameterAnnotations
 -keepclassmembers class * {
     @com.google.gson.annotations.SerializedName <fields>;
+    @com.google.gson.annotations.JsonAdapter <fields>;
 }
--keepclassmembers enum * { *; }
+-keep class * implements com.google.gson.JsonDeserializer {
+    public <init>();
+    <methods>;
+}
+-keep class * implements com.google.gson.JsonSerializer {
+    public <init>();
+    <methods>;
+}
+-keep class * extends com.google.gson.TypeAdapter {
+    public <init>();
+    <methods>;
+}
 -dontwarn com.google.gson.**
 -dontwarn sun.misc.**
 

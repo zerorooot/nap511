@@ -132,9 +132,11 @@ fun FileCellItem(
                     MenuItemAction.TOP_FILE, MenuItemAction.UN_TOP_FILE -> itemActions.onTop.invoke(
                         fileBean
                     )
+
                     MenuItemAction.STAR_FILE, MenuItemAction.UN_STAR_FILE -> itemActions.onStar.invoke(
                         fileBean
                     )
+
                     MenuItemAction.FORCE_OPEN -> itemActions.onForceOpen.invoke(index)
                     else -> {}
                 }
@@ -150,6 +152,7 @@ fun FileCellItem(
                 FileMoreMenu(
                     isPinned = pinned,
                     isStar = isStar,
+                    isZip = (fileBean.fileIco == R.drawable.zip),
                     dispatchMenuClick
                 )
             }

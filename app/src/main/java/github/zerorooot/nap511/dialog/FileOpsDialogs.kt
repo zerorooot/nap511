@@ -396,8 +396,8 @@ fun DiscardVideosDialog(
                         Text(
                             text = "• ${video.name}",
                             style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+//                            maxLines = 1,
+//                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(vertical = 2.dp)
                         )
                     }
