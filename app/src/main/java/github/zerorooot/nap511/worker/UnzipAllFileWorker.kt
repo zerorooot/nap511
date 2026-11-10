@@ -81,6 +81,83 @@ class UnzipAllFileWorker(
         )
     }
 
+    private data class TaskProgressState(
+        val item: UnzipTaskItem? = null,
+        val status: String = "准备解压任务"
+    )
+
+    // 统一维护当前正在处理的任务与状态短语（SST单一数据源，用于多线程通知动态渲染）
+    @Volatile
+    private var currentTaskState = TaskProgressState()
+
+    /**
+     * 线程安全的通知栏进度刷新函数 (State-Driven 状态驱动)
+     * 无论何时追加新任务，都会自动结合 currentTaskState 以及最新的 getProgress() 实时重绘通知栏
+     * @param item 可选的更新任务项，为 null 时在同步块内复用原有任务，彻底杜绝默认参数锁外求值的竞态
+     * @param status 可选的状态文案（如 "正在解压"、"云端解压中 50%"、"解压完成"），为 null 时复用当前最新状态
+     * @param force 是否绕过节流限制强制刷新
+     */
+    @Synchronized
+    private fun updateProgress(
+        item: UnzipTaskItem? = null,
+        status: String? = null,
+        force: Boolean = false
+    ) {
+        val state = synchronized(this) {
+            val newItem = item ?: currentTaskState.item
+            val newStatus = status ?: currentTaskState.status
+            TaskProgressState(newItem, newStatus).also { currentTaskState = it }
+        }
+
+        val currentTime = System.currentTimeMillis()
+        // 节流阀逻辑保持不变，这对于性能至关重要
+        if (!force && currentTime - lastUpdateTime <= UPDATE_INTERVAL) {
+            return
+        }
+        lastUpdateTime = currentTime
+
+        val (p, t) = UnzipQueueManager.getProgress()
+        val currentItem = state.item
+        val currentStatus = state.status
+
+        val (content, shortCritical, targetCid) = if (currentItem == null) {
+            // 解决初始化阶段加包：若任务尚未出队，即时刷新“准备解压”的最新队列总数
+            XLog.d("UnzipAllFileWorker 刷新初始化通知: $currentStatus ($p/$t)")
+            Triple("$currentStatus ($p/$t)...", "$p/$t", "0")
+        } else {
+            // 解决完成瞬间加包：若当前单文件已完成/失败则当前步数为 p，处理中则为 (p + 1)
+            val isDone = currentStatus.startsWith("解压完成") || currentStatus.startsWith("解压失败")
+            val step = if (isDone) p else (p + 1).coerceAtMost(t)
+            val text = "${currentItem.fileBean.name} $currentStatus ($step/$t)"
+            XLog.v("UnzipAllFileWorker 刷新通知: $text")
+            Triple(text, "$step/$t", currentItem.targetCid)
+        }
+
+        try {
+            val build = createNotification("解压中", content, shortCritical, p, t)
+                .setContentIntent(getJumpPendingIntent(targetCid))
+                .addAction(
+                    android.R.drawable.ic_menu_close_clear_cancel,
+                    "取消",
+                    cancelPendingIntent
+                )
+                .build()
+
+            val foregroundInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ForegroundInfo(
+                    NOTIFICATION_ID, build, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                )
+            } else {
+                ForegroundInfo(NOTIFICATION_ID, build)
+            }
+
+            setForegroundAsync(foregroundInfo)
+            notificationManager.notify(NOTIFICATION_ID, foregroundInfo.notification)
+        } catch (e: Exception) {
+            XLog.w("UnzipAllFileWorker updateProgress 刷新通知失败: ${e.message}", e)
+        }
+    }
+
     override suspend fun getForegroundInfo(): ForegroundInfo {
         createNotificationChannel()
         val (processed, total) = UnzipQueueManager.getProgress()
@@ -95,22 +172,27 @@ class UnzipAllFileWorker(
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         createNotificationChannel()
-        UnzipQueueManager.markWorkerRunning()
-
-        try {
-            setForeground(getForegroundInfo())
-        } catch (e: Exception) {
-            // Android 12+ 在后台无法启动前台服务，忽略异常继续在后台执行短任务
-            XLog.w("UnzipAllFileWorker setForeground 失败，将作为普通后台任务继续运行: ${e.message}")
-        }
 
         val resultSummary = StringJoiner("\n")
         val unzipFailList = arrayListOf<FileBean>()
-        var lastProcessedItem: UnzipTaskItem? = null
 
         return@withContext try {
+            // 挂载动态任务追加监听器：在 markWorkerRunning 之前挂载，杜绝初始化竞态窗口
+            UnzipQueueManager.onQueueChangeListener = { p, t ->
+                XLog.i("UnzipAllFileWorker 监听到队列追加新任务: 已处理 $p, 当前总数 $t，即时刷新通知栏")
+                updateProgress(force = true)
+            }
+            UnzipQueueManager.markWorkerRunning()
+
+            try {
+                setForeground(getForegroundInfo())
+            } catch (e: Exception) {
+                // Android 12+ 在后台无法启动前台服务，忽略异常继续在后台执行短任务
+                XLog.w("UnzipAllFileWorker setForeground 失败，将作为普通后台任务继续运行: ${e.message}")
+            }
+
             // === 核心 Drain Loop 动态排空消费循环 ===
-            var finalResult: Result? = null
+            var finalResult: Result
             while (true) {
                 while (true) {
                     val taskItem =
@@ -121,62 +203,29 @@ class UnzipAllFileWorker(
                             continue
                         }
 
-                    lastProcessedItem = taskItem
                     val fileBean = taskItem.fileBean
                     val targetCid = taskItem.targetCid
                     affectedCids.add(targetCid)
 
-                    val (currentProcessed, currentTotal) = UnzipQueueManager.getProgress()
-
-                    // 1. 【即时反馈】解压单文件前，立即强制刷新通知栏
-                    val startMsg =
-                        "正在解压：${fileBean.name} (${currentProcessed + 1}/$currentTotal)"
-                    updateNotification(
-                        "解压中",
-                        currentProcessed,
-                        currentTotal,
-                        startMsg,
-                        targetCid,
-                        force = true
-                    )
+                    // 1. 【即时反馈】解压单文件前，原子绑定新任务并立即强制刷新通知栏
+                    updateProgress(item = taskItem, status = "正在解压", force = true)
 
                     // 2. 【细粒度解压】执行解压并支持云端 Loading 状态机轮询
                     val (isSuccess, stateMessage) = processSingleZipFileWithPolling(taskItem) { phaseText ->
-                        val (p, t) = UnzipQueueManager.getProgress()
-                        updateNotification(
-                            "解压中",
-                            p,
-                            t,
-                            "${fileBean.name} $phaseText (${p + 1}/$t)",
-                            targetCid
-                        )
+                        updateProgress(status = phaseText)
                     }
 
                     // 3. 步进完成数并落盘移除该任务
                     UnzipQueueManager.onTaskCompleted(taskItem)
-                    val (updatedProcessed, updatedTotal) = UnzipQueueManager.getProgress()
-
-                    // 4. 单任务即时热更新
-                   // FileCacheManager.notifyRemoteRefresh(targetCid)
 
                     if (!isSuccess) {
                         resultSummary.add("${fileBean.name} 解压失败！原因：$stateMessage")
                         unzipFailList.add(fileBean)
                     }
 
-                    // 5. 单个文件结束后的进度刷新
-                    val progressMsg = if (isSuccess) {
-                        "${fileBean.name} 解压完成 (${updatedProcessed}/$updatedTotal)"
-                    } else {
-                        "${fileBean.name} 解压失败！(${updatedProcessed}/$updatedTotal) $stateMessage"
-                    }
-                    updateNotification(
-                        "解压中",
-                        updatedProcessed,
-                        updatedTotal,
-                        progressMsg,
-                        targetCid
-                    )
+                    // 4. 单个文件结束后的进度刷新
+                    val finishPhase = if (isSuccess) "解压完成" else "解压失败！$stateMessage"
+                    updateProgress(status = finishPhase)
                 }
 
                 // 检查在内层跳出后、准备汇总前是否有微秒级新任务追加
@@ -192,16 +241,20 @@ class UnzipAllFileWorker(
                     continue
                 }
 
-                // 确已全部处理完毕，发送统一汇总通知
+                // 确已全部处理完毕，卸载监听器后发送统一汇总通知
+                UnzipQueueManager.onQueueChangeListener = null
+                val lastItem = currentTaskState.item
+                currentTaskState = TaskProgressState()
+
                 val (finalProcessed, _) = UnzipQueueManager.getProgress()
                 finalResult = sentMessage(
                     unzipResult = resultSummary.toString(),
                     isCancel = false,
-                    name = lastProcessedItem?.fileBean?.name ?: "文件",
+                    name = lastItem?.fileBean?.name ?: "文件",
                     size = finalProcessed,
                     unzipFailList = unzipFailList,
-                    targetCid = lastProcessedItem?.targetCid ?: "0",
-                    explicitErrorCid = lastProcessedItem?.errorCid
+                    targetCid = lastItem?.targetCid ?: "0",
+                    explicitErrorCid = lastItem?.errorCid
                 )
                 break
             }
@@ -210,18 +263,25 @@ class UnzipAllFileWorker(
         } catch (e: CancellationException) {
             XLog.w("UnzipAllFileWorker 任务被取消: ${e.message}")
             withContext(NonCancellable) {
-                UnzipQueueManager.clear()
+                UnzipQueueManager.onQueueChangeListener = null
+                val lastItem = currentTaskState.item
+                currentTaskState = TaskProgressState()
                 val (finalProcessed, _) = UnzipQueueManager.getProgress()
+                UnzipQueueManager.clear()
                 sentMessage(
                     unzipResult = resultSummary.toString(),
                     isCancel = true,
-                    name = lastProcessedItem?.fileBean?.name ?: "文件",
+                    name = lastItem?.fileBean?.name ?: "文件",
                     size = finalProcessed,
                     unzipFailList = unzipFailList,
-                    targetCid = lastProcessedItem?.targetCid ?: "0",
-                    explicitErrorCid = lastProcessedItem?.errorCid
+                    targetCid = lastItem?.targetCid ?: "0",
+                    explicitErrorCid = lastItem?.errorCid
                 )
             }
+        } finally {
+            // 全局生命周期兜底清理
+            UnzipQueueManager.onQueueChangeListener = null
+            currentTaskState = TaskProgressState()
         }
     }
 
@@ -421,47 +481,6 @@ class UnzipAllFileWorker(
             return MoveFailResult("移动成功！", createFolderCid)
         } catch (e: Exception) {
             return MoveFailResult("移动失败！${e.message}", null)
-        }
-    }
-
-    @Synchronized
-    private fun updateNotification(
-        titleString: String,
-        progress: Int,
-        max: Int,
-        content: String,
-        targetCid: String,
-        force: Boolean = false
-    ) {
-        val currentTime = System.currentTimeMillis()
-        // 节流阀逻辑保持不变，这对于性能至关重要
-        if (force || currentTime - lastUpdateTime > UPDATE_INTERVAL) {
-            lastUpdateTime = currentTime
-            XLog.v("updateProgressNotification $content")
-            try {
-                val build =
-                    createNotification(titleString, content, "$progress/$max", progress, max)
-                        .setContentIntent(getJumpPendingIntent(targetCid))
-                        .addAction(
-                            android.R.drawable.ic_menu_close_clear_cancel,
-                            "取消",
-                            cancelPendingIntent
-                        )
-                        .build()
-
-                val foregroundInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    ForegroundInfo(
-                        NOTIFICATION_ID, build, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-                    )
-                } else {
-                    ForegroundInfo(NOTIFICATION_ID, build)
-                }
-
-                setForegroundAsync(foregroundInfo)
-                notificationManager.notify(NOTIFICATION_ID, foregroundInfo.notification)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
         }
     }
 

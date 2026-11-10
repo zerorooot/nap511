@@ -30,6 +30,7 @@ app/src/test/java/github/zerorooot/nap511/*
 !app/src/test/java/github/zerorooot/nap511/viewmodel/
 !app/src/test/java/github/zerorooot/nap511/adapter/
 !app/src/test/java/github/zerorooot/nap511/player/
+app/src/test/java/github/zerorooot/nap511/worker/
 app/release/
 .artifacts
 .proxyai
@@ -43,3 +44,6 @@ docs/
 *.p12
 *.pepk
 keystore.properties*
+
+# README 截图专属 Preview 代码（本地开发预览用，不提交远程）
+app/src/main/java/github/zerorooot/nap511/ScreenPreviews.kt

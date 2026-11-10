@@ -11,6 +11,10 @@ import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.util.App
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
@@ -27,6 +31,7 @@ object UnzipQueueManager {
     private val totalCount = AtomicInteger(0)
     private val processedCount = AtomicInteger(0)
     private val gson = Gson()
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     @Volatile
     private var currentRunningTask: UnzipTaskItem? = null
@@ -35,6 +40,10 @@ object UnzipQueueManager {
     @Volatile
     var isWorkerRunning: Boolean = false
         private set
+
+    // 队列更新回调监听器（当 Worker 运行时有新任务入队，即时通知外部）
+    @Volatile
+    var onQueueChangeListener: ((processed: Int, total: Int) -> Unit)? = null
 
     // 持久化备份文件 (捕获测试环境无 Android Context 异常以保证单测兼容性)
     private val queueBackupFile: File? by lazy {
@@ -80,7 +89,7 @@ object UnzipQueueManager {
      * 任务入队：追加到内存队列并同步落盘
      */
     fun enqueue(items: List<UnzipTaskItem>) {
-        synchronized(lock) {
+        val (p, t) = synchronized(lock) {
             if (queue.isEmpty() && currentRunningTask == null && !isWorkerRunning) {
                 // 前序批次全部处理完毕且无 Worker 运行时，重置计数器
                 totalCount.set(0)
@@ -90,6 +99,13 @@ object UnzipQueueManager {
             queue.addAll(items)
             persistToDisk()
             XLog.d("UnzipQueueManager: 入队 ${items.size} 项, 当前待办: ${queue.size}, 总计: ${totalCount.get()}")
+            getProgress()
+        }
+        if (isWorkerRunning) {
+            scope.launch {
+                XLog.d("UnzipQueueManager: 触发队列监听器回调通知 Worker (已处理: $p, 总计: $t)")
+                onQueueChangeListener?.invoke(p, t)
+            }
         }
     }
 
@@ -165,6 +181,7 @@ object UnzipQueueManager {
             totalCount.set(0)
             processedCount.set(0)
             isWorkerRunning = false
+            onQueueChangeListener = null
             queueBackupFile?.let {
                 if (it.exists()) it.delete()
             }

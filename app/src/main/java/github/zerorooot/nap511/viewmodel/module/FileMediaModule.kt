@@ -404,6 +404,13 @@ class FileMediaModule(
 
         // 统一通过门面回调入队并触发 Worker（KEEP 策略保证单 Worker 循环消费动态队列）
         onEnqueueUnzip(taskItems)
+
+        val toastMsg = if (fileBeansList.size == 1) {
+            "已提交解压任务：${fileBeansList.first().name}"
+        } else {
+            "已提交 ${fileBeansList.size} 个解压任务"
+        }
+        toastProvider.showToast(toastMsg)
     }
 
     suspend fun decryptZip(
