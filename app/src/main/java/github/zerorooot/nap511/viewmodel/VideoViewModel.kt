@@ -17,6 +17,7 @@ import github.zerorooot.nap511.bean.VideoUiState
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.util.FileCacheManager
+import github.zerorooot.nap511.util.findMatchingSubtitle
 import github.zerorooot.nap511.util.keyWord
 import github.zerorooot.nap511.util.network.parseOssErrorWithDom
 import github.zerorooot.nap511.util.subtitle.SubtitleDelegate
@@ -614,15 +615,7 @@ class VideoViewModel @JvmOverloads constructor(
      * @param searchedSubtitle 是否标识为已搜索过字幕，默认为 true
      */
     fun loadSubtitles(videoDurationMs: Long, searchedSubtitle: Boolean = true) {
-        val currentInfo = _uiState.value.videoInfo ?: return
-        subtitleDelegate.loadSubtitles(
-            scope = viewModelScope,
-            mediaName = currentInfo.fileName,
-            localSubtitles = launchVideoParams.localSubtitleItem,
-            mediaDurationMs = videoDurationMs,
-            searchedSubtitle = searchedSubtitle,
-            positionAfterAt = launchVideoParams.videoAttribute.positionAfterAt
-        )
+        fetchSubtitles(videoDurationMs = videoDurationMs, searchedSubtitle = searchedSubtitle)
     }
 
     /**
@@ -632,13 +625,35 @@ class VideoViewModel @JvmOverloads constructor(
      * @param videoDurationMs 视频总时长（毫秒）
      */
     fun searchSubtitlesByName(keyword: String, videoDurationMs: Long) {
+        fetchSubtitles(videoDurationMs = videoDurationMs, searchKeyword = keyword)
+    }
+
+
+    /**
+     * 私有通用字幕加载与检索辅助函数
+     *
+     * 负责统一组装视频信息、匹配同目录字幕并向 [subtitleDelegate] 发起字幕获取请求。
+     *
+     * @param videoDurationMs 视频总时长（毫秒）
+     * @param searchedSubtitle 是否标识为已搜索过字幕
+     * @param searchKeyword 搜索关键字，留空时默认取视频文件名进行模糊搜索
+     */
+    private fun fetchSubtitles(
+        videoDurationMs: Long,
+        searchedSubtitle: Boolean = true,
+        searchKeyword: String = ""
+    ) {
         val currentInfo = _uiState.value.videoInfo ?: return
+        val localSubtitleItem = launchVideoParams.localSubtitleItem
+        val findMatchingSubtitle =
+            listOfNotNull(findMatchingSubtitle(currentInfo.fileName, localSubtitleItem))
         subtitleDelegate.loadSubtitles(
             scope = viewModelScope,
             mediaName = currentInfo.fileName,
-            searchKeyword = keyword,
-            localSubtitles = launchVideoParams.localSubtitleItem,
+            searchKeyword = searchKeyword,
+            localSubtitles = findMatchingSubtitle,
             mediaDurationMs = videoDurationMs,
+            searchedSubtitle = searchedSubtitle,
             positionAfterAt = launchVideoParams.videoAttribute.positionAfterAt
         )
     }

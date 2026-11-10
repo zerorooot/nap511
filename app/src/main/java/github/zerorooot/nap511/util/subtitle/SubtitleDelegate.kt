@@ -156,6 +156,18 @@ class SubtitleDelegate(
     }
 
     /**
+     * 更新同目录/本地候选字幕列表，并清除上一首歌曲的候选字幕搜索结果
+     */
+    fun updateLocalSubtitles(localSubtitles: List<SubtitleItem>) {
+        updateState {
+            copy(
+                currentLocalSubtitles = localSubtitles,
+                subtitles = localSubtitles
+            )
+        }
+    }
+
+    /**
      * 设置时间偏移量 (ms)
      */
     fun setSubtitleOffset(offsetMs: Long, currentPositionMs: Long? = null) {

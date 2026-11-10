@@ -17,7 +17,6 @@ import github.zerorooot.nap511.player.AudioGSYManager
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.service.AudioService
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.AudioEvent
 import github.zerorooot.nap511.util.AudioEventBus
 import github.zerorooot.nap511.util.FileCacheManager
@@ -213,7 +212,6 @@ class AudioViewModel @JvmOverloads constructor(
     fun playAudio(fileBean: FileBean, localSubtitles: List<SubtitleItem>) {
         // 防止在同一个文件加载中重复点击
         if (isLoading || currentMusic?.fileId == fileBean.fileId) return
-
         removeSubtitle()
         updatePlayback {
             copy(
@@ -224,6 +222,15 @@ class AudioViewModel @JvmOverloads constructor(
                 currentPositionText = "00:00"
             )
         }
+        // 自动加载字幕候选
+        subtitleDelegate.updateLocalSubtitles(
+            listOfNotNull(
+                findMatchingSubtitle(
+                    fileBean.name,
+                    localSubtitles
+                )
+            )
+        )
 
         viewModelScope.launch {
             try {
@@ -238,8 +245,6 @@ class AudioViewModel @JvmOverloads constructor(
                         null,           // cachePath (缓存路径，传 null 为默认)
                         fileBean.name   // title
                     )
-                    // 自动加载/搜集字幕候选
-                    loadSubtitles(localSubtitles = localSubtitles)
 
                     // 自动匹配并加载同名本地字幕（与视频播放逻辑完全对齐）
                     if (automaticSubtitle && localSubtitles.isNotEmpty()) {
@@ -253,8 +258,6 @@ class AudioViewModel @JvmOverloads constructor(
                                     toastProvider.showToast("自动加载字幕: ${matched.simpleName}")
                                 }
                             }
-                        } else {
-                            XLog.d("AudioViewModel: 未匹配到同名字幕: ${fileBean.name}")
                         }
                     }
                 } else {
@@ -290,17 +293,17 @@ class AudioViewModel @JvmOverloads constructor(
     }
 
     private fun startAudioService(title: String) {
-        val intent = Intent(App.instance, AudioService::class.java).apply {
+        val intent = Intent(context, AudioService::class.java).apply {
             putExtra("title", title)
         }
-        App.instance.startForegroundService(intent)
+        context.startForegroundService(intent)
     }
 
     private fun stopAudioService() {
-        val intent = Intent(App.instance, AudioService::class.java).apply {
+        val intent = Intent(context, AudioService::class.java).apply {
             action = AudioService.ACTION_STOP
         }
-        App.instance.startService(intent)
+        context.startService(intent)
     }
 
     fun stopAudioAndService() {

@@ -13,8 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -30,7 +30,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,10 +41,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.bean.SubtitleItem
-import github.zerorooot.nap511.bean.SubtitleSourceType
 import github.zerorooot.nap511.viewmodel.AudioViewModel
+import my.nanihadesuka.compose.LazyColumnScrollbar
+import my.nanihadesuka.compose.ScrollbarSettings
 import java.util.Locale
-import kotlin.math.abs
 
 /**
  * 有状态字幕设置弹窗（ViewModel 容器层）
@@ -132,8 +131,9 @@ fun SubtitleSelectionSheet(
     onSaveAndUpload: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    // 默认清除后缀名后的歌曲标题作为搜索关键词
-    var searchInput by remember {
+    val rememberLazyListState = rememberLazyListState()
+    // 默认清除后缀名后的歌曲标题作为搜索关键词，加入musicName作为key，使搜索输入框里的文本自动同步为新歌曲的名称
+    var searchInput by remember(musicName) {
         mutableStateOf(if (musicName.contains(".")) musicName.substringBeforeLast(".") else musicName)
     }
 
@@ -247,61 +247,71 @@ fun SubtitleSelectionSheet(
                     Text("未检索到可用字幕", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
-                LazyColumn(
+                LazyColumnScrollbar(
+                    state = rememberLazyListState,
+                    settings = ScrollbarSettings.Default.copy(
+                        thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 300.dp)
                 ) {
-                    itemsIndexed(subtitles) { _, item ->
-                        val isSelected = item.id == selectedSubtitle?.id
-                        val containerColor = if (isSelected) {
-                            MaterialTheme.colorScheme.primaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.surfaceContainer
-                        }
+                    LazyColumn(
+                        state = rememberLazyListState,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        itemsIndexed(subtitles) { _, item ->
+                            val isSelected = item.id == selectedSubtitle?.id
+                            val containerColor = if (isSelected) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainer
+                            }
 
-                        val durationStr = if (item.durationMs > 0) {
-                            formatDurationMs(item.durationMs)
-                        } else {
-                            "未知"
-                        }
+                            val durationStr = if (item.durationMs > 0) {
+                                formatDurationMs(item.durationMs)
+                            } else {
+                                "未知"
+                            }
 
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .clickable { onSelectSubtitle(item) },
-                            colors = CardDefaults.cardColors(containerColor = containerColor)
-                        ) {
-                            Row(
+                            Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                    .padding(vertical = 4.dp)
+                                    .clickable { onSelectSubtitle(item) },
+                                colors = CardDefaults.cardColors(containerColor = containerColor)
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = item.simpleName,
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontWeight = FontWeight.Bold
-                                        ),
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "来源: ${item.sourceType.label} | 格式: ${item.ext.uppercase()} | 时长: $durationStr",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = item.simpleName,
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "来源: ${item.sourceType.label} | 格式: ${item.ext.uppercase()} | 时长: $durationStr",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
 
-                                if (isSelected && isSubtitleLoading) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(24.dp),
-                                        strokeWidth = 2.dp
-                                    )
+
+                                    if (isSelected && isSubtitleLoading) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(24.dp),
+                                            strokeWidth = 2.dp
+                                        )
+                                    }
                                 }
                             }
                         }

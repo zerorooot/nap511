@@ -61,7 +61,7 @@ fun extractSubtitles(files: List<FileBean>): List<SubtitleItem> {
  *
  * 匹配规则（音视频统一）：
  * 1. 完全同名（如 audio.mp3 <-> audio.srt 或 audio.lrc）
- * 2. 带语言扩展后缀（如 audio.mp3 <-> audio.zh.srt 或 audio.chs.lrc）
+ * 2. 字幕名的前面是媒体名字（如 audio.mp3 <-> audio.zh.srt 或 audio.chs.lrc）
  *
  * @param mediaFileName 媒体文件名（含后缀，如 "song.mp3"）
  * @param subtitles 同目录下的候选字幕列表
@@ -73,8 +73,12 @@ fun findMatchingSubtitle(mediaFileName: String, subtitles: List<SubtitleItem>): 
     if (mediaBaseName.isEmpty()) return null
     return subtitles.find { item ->
         val subtitleBaseName = item.name.substringBeforeLast('.').trim()
+        //可能造成误匹配，如播放 Track 1.mp3（baseName 为 Track 1），
+        //如果同目录下有 Track 10.lrc 或 Track 11.lrc，"Track 10".startsWith("Track 1") 为 true，导致第 1 首曲目被错误挂载了第 10 首的歌词
+        //或者播放 S01E01.mkv 时，会把 S01E010.srt、S01E01 Extra.srt 误判为完全匹配并自动挂载
+        //又或者Love.mp3 会错误匹配到同目录的 Lover.lrc、Lovely.lrc
         subtitleBaseName.equals(mediaBaseName, ignoreCase = true) ||
-                subtitleBaseName.startsWith("$mediaBaseName.", ignoreCase = true)
+                subtitleBaseName.startsWith(mediaBaseName, ignoreCase = true)
     }
 }
 

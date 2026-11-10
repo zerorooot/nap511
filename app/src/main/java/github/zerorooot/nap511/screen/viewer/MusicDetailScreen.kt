@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -27,8 +26,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -55,7 +52,6 @@ import github.zerorooot.nap511.screen.viewer.music.SpeedAndVolume
 import github.zerorooot.nap511.screen.viewer.music.SubtitleDisplay
 import github.zerorooot.nap511.screen.viewer.music.SubtitleSelectionSheet
 import github.zerorooot.nap511.ui.theme.Nap511Theme
-import github.zerorooot.nap511.util.keyWord
 import github.zerorooot.nap511.util.subtitle.SubtitleEntry
 import github.zerorooot.nap511.viewmodel.AudioPlaybackUiState
 import github.zerorooot.nap511.viewmodel.AudioViewModel
@@ -198,6 +194,17 @@ fun MusicDetailScreen(
     var showSubtitleSheet by remember { mutableStateOf(false) }
     // 控制是否在封面位置展开全屏歌词列表
     var showFullLyrics by rememberSaveable { mutableStateOf(false) }
+    // 记录已加载过字幕的歌曲标识，防止同一首歌曲重复自动请求加载字幕
+    var loadedSubtitleMusicKey by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val currentMusicKey = fileBean.fileId.ifEmpty { fileBean.name }
+
+    LaunchedEffect(showSubtitleSheet, currentMusicKey) {
+        if (showSubtitleSheet && loadedSubtitleMusicKey != currentMusicKey) {
+            loadedSubtitleMusicKey = currentMusicKey
+            audioViewModel.loadSubtitles()
+        }
+    }
 
     val actions = remember(audioViewModel, onBack) {
         MusicDetailActions(
@@ -216,9 +223,6 @@ fun MusicDetailScreen(
         )
     }
 
-    LaunchedEffect(Unit) {
-        audioViewModel.loadSubtitles()
-    }
 
     MusicDetailContent(
         playbackState = playbackState,
