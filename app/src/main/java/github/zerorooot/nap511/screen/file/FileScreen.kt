@@ -564,7 +564,11 @@ fun FileScreen(
 
     val scaffoldState = FileScaffoldState(
         isLongClickState = contentState.isLongClickState,
-        appBarTitle = contentState.appBarTitle,
+//        appBarTitle = contentState.appBarTitle,
+        appBarTitle = when (val s = contentState.source) {
+            is FileListSource.Folder -> contentState.pathList.lastOrNull()?.name ?: s.appName
+            else -> s.appName
+        },
         isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE,
         isGridScreen = isGridScreen,
         isBottomBarShow = isBottomBarShow,

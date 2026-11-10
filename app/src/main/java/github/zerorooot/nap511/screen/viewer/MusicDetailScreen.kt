@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,7 +43,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.bean.SettingUiState
+import github.zerorooot.nap511.bean.SubtitleSourceType
+import github.zerorooot.nap511.bean.SubtitleUiState
 import github.zerorooot.nap511.screen.components.BaseTopAppBar
 import github.zerorooot.nap511.screen.viewer.music.AlbumCover
 import github.zerorooot.nap511.screen.viewer.music.FullLyricsView
@@ -54,6 +56,8 @@ import github.zerorooot.nap511.screen.viewer.music.SubtitleDisplay
 import github.zerorooot.nap511.screen.viewer.music.SubtitleSelectionSheet
 import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.keyWord
+import github.zerorooot.nap511.util.subtitle.SubtitleEntry
+import github.zerorooot.nap511.viewmodel.AudioPlaybackUiState
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 
 /**
@@ -67,31 +71,62 @@ import github.zerorooot.nap511.viewmodel.AudioViewModel
  * @param audioViewModel 音频播放 ViewModel
  * @param onBack 点击返回上一页回调
  */
+/**
+ * 音乐详情界面交互动作集合 (MusicDetailActions)
+ *
+ * 聚合播放暂停、快进快退、进度滑动、倍速音量调节、歌词切换与跳转、字幕弹窗显隐与返回等操作。
+ */
+@Immutable
+data class MusicDetailActions(
+    val onTogglePlayPause: () -> Unit,
+    val onRewind: () -> Unit,
+    val onFastForward: () -> Unit,
+    val onSeekStart: () -> Unit,
+    val onSeekChange: (Float) -> Unit,
+    val onSeekEnd: () -> Unit,
+    val onChangeSpeed: (Float) -> Unit,
+    val onChangeVolume: (Float) -> Unit,
+    val onLyricClick: (SubtitleEntry) -> Unit,
+    val onToggleFullLyrics: (Boolean) -> Unit,
+    val onOpenSubtitleSheet: () -> Unit,
+    val onBack: () -> Unit
+)
+
+/**
+ * 纯无状态音乐详情 / 播放器内容组件 (MusicDetailContent)
+ *
+ * 100% 剥离 ViewModel 依赖，仅依赖不可变领域状态 [AudioPlaybackUiState]、[SubtitleUiState] 与 [MusicDetailActions]，
+ * 支持 Android Studio @Preview 与无桩 Compose UI 测试。
+ *
+ * @param playbackState 播放器状态（播放中、进度、音量、倍速等）
+ * @param subtitleState 字幕/歌词状态（当前行、行列表、已选字幕等）
+ * @param showFullLyrics 当前是否全屏展开歌词
+ * @param actions 用户交互动作集合
+ * @param modifier 外部修饰符
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MusicDetailScreen(
-    audioViewModel: AudioViewModel,
-    onBack: () -> Unit
+fun MusicDetailContent(
+    playbackState: AudioPlaybackUiState,
+    subtitleState: SubtitleUiState,
+    showFullLyrics: Boolean,
+    actions: MusicDetailActions,
+    modifier: Modifier = Modifier
 ) {
-    val fileBean = audioViewModel.uiState.playback.currentMusic ?: return
-    val hasSelectedSubtitle = audioViewModel.uiState.subtitle.selectedSubtitle != null
-
-    // 控制字幕选择 BottomSheet 显隐
-    var showSubtitleSheet by remember { mutableStateOf(false) }
-    // 控制是否在封面位置展开全屏歌词列表
-    var showFullLyrics by rememberSaveable { mutableStateOf(false) }
+    val fileBean = playbackState.currentMusic ?: return
+    val hasSelectedSubtitle = subtitleState.selectedSubtitle != null
 
     Scaffold(
         topBar = {
             BaseTopAppBar(
                 title = { Text("正在播放") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = actions.onBack) {
                         Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Back")
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showSubtitleSheet = true }) {
+                    IconButton(onClick = actions.onOpenSubtitleSheet) {
                         Icon(
                             Icons.Default.Subtitles,
                             contentDescription = "Subtitles",
@@ -105,7 +140,8 @@ fun MusicDetailScreen(
                 },
             )
         },
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = MaterialTheme.colorScheme.surface,
+        modifier = modifier
     ) { innerPadding ->
         BoxWithConstraints(
             modifier = Modifier
@@ -116,40 +152,91 @@ fun MusicDetailScreen(
                 )
         ) {
             val isLandscape = maxWidth > maxHeight
-            val onToggleLyrics: (Boolean) -> Unit = { showFullLyrics = it }
-            val openSubtitleSheet = { showSubtitleSheet = true }
 
             if (isLandscape) {
                 LandscapeMusicContent(
-                    audioViewModel = audioViewModel,
+                    playbackState = playbackState,
+                    subtitleState = subtitleState,
                     fileBean = fileBean,
                     showFullLyrics = showFullLyrics,
-                    onShowFullLyricsChange = onToggleLyrics,
-                    onOpenSubtitleSheet = openSubtitleSheet
+                    actions = actions
                 )
             } else {
                 PortraitMusicContent(
-                    audioViewModel = audioViewModel,
+                    playbackState = playbackState,
+                    subtitleState = subtitleState,
                     fileBean = fileBean,
                     showFullLyrics = showFullLyrics,
-                    onShowFullLyricsChange = onToggleLyrics,
-                    onOpenSubtitleSheet = openSubtitleSheet
+                    actions = actions
                 )
             }
         }
-        LaunchedEffect(Unit) {
-            audioViewModel.loadSubtitles()
-        }
-        // 字幕/歌词设置底部弹窗
-        if (showSubtitleSheet) {
-            SubtitleSelectionSheet(
-                audioViewModel = audioViewModel,
-                categoryId = fileBean.categoryId,
-                onDismiss = { showSubtitleSheet = false }
-            )
-        }
     }
 }
+
+/**
+ * 音乐详情 / 正在播放全屏界面 (Stateful Container)
+ *
+ * 负责组合音乐播放器的各大无状态 UI 组件（来自 `screen.viewer.music` 包）：
+ * 1. 响应式布局：通过 [BoxWithConstraints] 判断 `maxWidth > maxHeight` 自动切换横屏/竖屏布局；
+ * 2. 模式平滑切换：封面与全屏歌词之间使用 [Crossfade] 动画渐变过渡；
+ * 3. 状态管理：绑定 [AudioViewModel] 的播放进度、控制指令、字幕选择与偏置。
+ *
+ * @param audioViewModel 音频播放 ViewModel
+ * @param onBack 点击返回上一页回调
+ */
+@Composable
+fun MusicDetailScreen(
+    audioViewModel: AudioViewModel,
+    onBack: () -> Unit
+) {
+    val playbackState = audioViewModel.uiState.playback
+    val subtitleState = audioViewModel.uiState.subtitle
+    val fileBean = playbackState.currentMusic ?: return
+
+    // 控制字幕选择 BottomSheet 显隐
+    var showSubtitleSheet by remember { mutableStateOf(false) }
+    // 控制是否在封面位置展开全屏歌词列表
+    var showFullLyrics by rememberSaveable { mutableStateOf(false) }
+
+    val actions = remember(audioViewModel, onBack) {
+        MusicDetailActions(
+            onTogglePlayPause = { audioViewModel.togglePlayPause() },
+            onRewind = { audioViewModel.onRewind() },
+            onFastForward = { audioViewModel.onFastForward() },
+            onSeekStart = { audioViewModel.onSeekStart() },
+            onSeekChange = { audioViewModel.onSeekChange(it) },
+            onSeekEnd = { audioViewModel.onSeekEnd() },
+            onChangeSpeed = { audioViewModel.changeSpeed(it) },
+            onChangeVolume = { audioViewModel.changeVolume(it) },
+            onLyricClick = { audioViewModel.seekToSubtitleEntry(it) },
+            onToggleFullLyrics = { showFullLyrics = it },
+            onOpenSubtitleSheet = { showSubtitleSheet = true },
+            onBack = onBack
+        )
+    }
+
+    LaunchedEffect(Unit) {
+        audioViewModel.loadSubtitles()
+    }
+
+    MusicDetailContent(
+        playbackState = playbackState,
+        subtitleState = subtitleState,
+        showFullLyrics = showFullLyrics,
+        actions = actions
+    )
+
+    // 字幕/歌词设置底部弹窗
+    if (showSubtitleSheet) {
+        SubtitleSelectionSheet(
+            audioViewModel = audioViewModel,
+            categoryId = fileBean.categoryId,
+            onDismiss = { showSubtitleSheet = false }
+        )
+    }
+}
+
 /* -------------------------------------------------------------------------- */
 /*                              布局层：横屏 / 竖屏                             */
 /* -------------------------------------------------------------------------- */
@@ -159,11 +246,11 @@ fun MusicDetailScreen(
  */
 @Composable
 private fun LandscapeMusicContent(
-    audioViewModel: AudioViewModel,
+    playbackState: AudioPlaybackUiState,
+    subtitleState: SubtitleUiState,
     fileBean: FileBean,
     showFullLyrics: Boolean,
-    onShowFullLyricsChange: (Boolean) -> Unit,
-    onOpenSubtitleSheet: () -> Unit,
+    actions: MusicDetailActions,
 ) {
     Row(
         modifier = Modifier
@@ -178,11 +265,12 @@ private fun LandscapeMusicContent(
             contentAlignment = Alignment.Center
         ) {
             MusicCoverArea(
-                audioViewModel = audioViewModel,
+                subtitleState = subtitleState,
                 fileBean = fileBean,
                 showFullLyrics = showFullLyrics,
-                onShowFullLyricsChange = onShowFullLyricsChange,
-                onOpenSubtitleSheet = onOpenSubtitleSheet,
+                onShowFullLyricsChange = actions.onToggleFullLyrics,
+                onOpenSubtitleSheet = actions.onOpenSubtitleSheet,
+                onLyricClick = actions.onLyricClick,
                 contentModifier = Modifier
                     .aspectRatio(1f)
                     .fillMaxHeight(),
@@ -193,10 +281,11 @@ private fun LandscapeMusicContent(
         Spacer(modifier = Modifier.width(32.dp))
 
         MusicControlPanel(
-            audioViewModel = audioViewModel,
+            playbackState = playbackState,
+            subtitleState = subtitleState,
             fileBean = fileBean,
-            onOpenSubtitleSheet = onOpenSubtitleSheet,
-            onToggleFullLyrics = { onShowFullLyricsChange(!showFullLyrics) },
+            actions = actions,
+            showFullLyrics = showFullLyrics,
             modifier = Modifier
                 .weight(1.2f)
                 .fillMaxHeight()
@@ -212,11 +301,11 @@ private fun LandscapeMusicContent(
  */
 @Composable
 private fun PortraitMusicContent(
-    audioViewModel: AudioViewModel,
+    playbackState: AudioPlaybackUiState,
+    subtitleState: SubtitleUiState,
     fileBean: FileBean,
     showFullLyrics: Boolean,
-    onShowFullLyricsChange: (Boolean) -> Unit,
-    onOpenSubtitleSheet: () -> Unit,
+    actions: MusicDetailActions,
 ) {
     Column(
         modifier = Modifier
@@ -234,21 +323,23 @@ private fun PortraitMusicContent(
             contentAlignment = Alignment.Center
         ) {
             MusicCoverArea(
-                audioViewModel = audioViewModel,
+                subtitleState = subtitleState,
                 fileBean = fileBean,
                 showFullLyrics = showFullLyrics,
-                onShowFullLyricsChange = onShowFullLyricsChange,
-                onOpenSubtitleSheet = onOpenSubtitleSheet,
+                onShowFullLyricsChange = actions.onToggleFullLyrics,
+                onOpenSubtitleSheet = actions.onOpenSubtitleSheet,
+                onLyricClick = actions.onLyricClick,
                 contentModifier = Modifier.fillMaxSize(),
                 crossfadeLabel = "LyricsCrossfadePortrait"
             )
         }
 
         MusicControlPanel(
-            audioViewModel = audioViewModel,
+            playbackState = playbackState,
+            subtitleState = subtitleState,
             fileBean = fileBean,
-            onOpenSubtitleSheet = onOpenSubtitleSheet,
-            onToggleFullLyrics = { onShowFullLyricsChange(!showFullLyrics) },
+            actions = actions,
+            showFullLyrics = showFullLyrics,
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.Top,
             itemSpacing = 8.dp
@@ -267,16 +358,15 @@ private fun PortraitMusicContent(
  */
 @Composable
 private fun MusicCoverArea(
-    audioViewModel: AudioViewModel,
+    subtitleState: SubtitleUiState,
     fileBean: FileBean,
     showFullLyrics: Boolean,
     onShowFullLyricsChange: (Boolean) -> Unit,
     onOpenSubtitleSheet: () -> Unit,
+    onLyricClick: (SubtitleEntry) -> Unit,
     contentModifier: Modifier,
     crossfadeLabel: String,
 ) {
-    val subtitleState = audioViewModel.uiState.subtitle
-
     Crossfade(
         targetState = showFullLyrics,
         label = crossfadeLabel
@@ -285,7 +375,7 @@ private fun MusicCoverArea(
             FullLyricsView(
                 entries = subtitleState.entries,
                 currentIndex = subtitleState.currentIndex,
-                onEntryClick = { audioViewModel.seekToSubtitleEntry(it) },
+                onEntryClick = onLyricClick,
                 onClose = { onShowFullLyricsChange(false) },
                 modifier = contentModifier
             )
@@ -312,17 +402,15 @@ private fun MusicCoverArea(
  */
 @Composable
 private fun MusicControlPanel(
-    audioViewModel: AudioViewModel,
+    playbackState: AudioPlaybackUiState,
+    subtitleState: SubtitleUiState,
     fileBean: FileBean,
-    onOpenSubtitleSheet: () -> Unit,
-    onToggleFullLyrics: () -> Unit,
+    actions: MusicDetailActions,
+    showFullLyrics: Boolean,
     modifier: Modifier = Modifier,
     verticalArrangement: Arrangement.Vertical = Arrangement.Center,
     itemSpacing: Dp = 12.dp,
 ) {
-    val playbackState = audioViewModel.uiState.playback
-    val subtitleState = audioViewModel.uiState.subtitle
-
     Column(
         modifier = modifier,
         verticalArrangement = verticalArrangement
@@ -333,16 +421,16 @@ private fun MusicControlPanel(
         SubtitleDisplay(
             subtitleText = subtitleState.currentText,
             hasSelectedSubtitle = subtitleState.selectedSubtitle != null,
-            onOpenSubtitleSheet = onOpenSubtitleSheet,
-            onToggleFullLyrics = onToggleFullLyrics
+            onOpenSubtitleSheet = actions.onOpenSubtitleSheet,
+            onToggleFullLyrics = { actions.onToggleFullLyrics(!showFullLyrics) }
         )
         Spacer(Modifier.height(itemSpacing))
 
         SpeedAndVolume(
             speed = playbackState.playbackSpeed,
             volume = playbackState.volume,
-            onChangeSpeed = { audioViewModel.changeSpeed(it) },
-            onChangeVolume = { audioViewModel.changeVolume(it) }
+            onChangeSpeed = actions.onChangeSpeed,
+            onChangeVolume = actions.onChangeVolume
         )
         Spacer(Modifier.height(itemSpacing))
 
@@ -350,18 +438,18 @@ private fun MusicControlPanel(
             progress = playbackState.displayProgress,
             positionText = playbackState.currentPositionText,
             isUserSeeking = playbackState.isUserSeeking,
-            onSeekStart = { audioViewModel.onSeekStart() },
-            onSeekChange = { audioViewModel.onSeekChange(it) },
-            onSeekEnd = { audioViewModel.onSeekEnd() }
+            onSeekStart = actions.onSeekStart,
+            onSeekChange = actions.onSeekChange,
+            onSeekEnd = actions.onSeekEnd
         )
         Spacer(Modifier.height(itemSpacing))
 
         PlaybackControls(
             isPlaying = playbackState.isPlaying,
             isLoading = playbackState.isLoading,
-            onRewind = { audioViewModel.onRewind() },
-            onFastForward = { audioViewModel.onFastForward() },
-            onTogglePlayPause = { audioViewModel.togglePlayPause() }
+            onRewind = actions.onRewind,
+            onFastForward = actions.onFastForward,
+            onTogglePlayPause = actions.onTogglePlayPause
         )
     }
 }
@@ -379,123 +467,44 @@ fun MusicDetailScreenPreview() {
         sizeString = "10.5 MB",
         photoThumb = ""
     )
+    val mockPlayback = AudioPlaybackUiState(
+        currentMusic = mockFile,
+        isPlaying = true,
+        progress = 0.35f,
+        currentPositionText = "01:23 / 03:45",
+        playbackSpeed = 1.0f,
+        volume = 1.0f
+    )
+    val mockSubtitle = SubtitleUiState(
+        currentText = "这是一句正在高亮展示的歌词文本",
+        selectedSubtitle = github.zerorooot.nap511.bean.SubtitleItem(
+            id = "sub_001",
+            name = "测试歌曲.lrc",
+            simpleName = "测试歌曲.lrc",
+            sourceType = SubtitleSourceType.ONE_ONE_FIVE
+        )
+    )
+    val mockActions = MusicDetailActions(
+        onTogglePlayPause = {},
+        onRewind = {},
+        onFastForward = {},
+        onSeekStart = {},
+        onSeekChange = {},
+        onSeekEnd = {},
+        onChangeSpeed = {},
+        onChangeVolume = {},
+        onLyricClick = {},
+        onToggleFullLyrics = {},
+        onOpenSubtitleSheet = {},
+        onBack = {}
+    )
+
     Nap511Theme {
-        Scaffold(
-            topBar = {
-                @OptIn(ExperimentalMaterial3Api::class)
-                TopAppBar(
-                    windowInsets = TopAppBarDefaults.windowInsets.only(androidx.compose.foundation.layout.WindowInsetsSides.Top),
-                    title = { Text("正在播放") },
-                    navigationIcon = {
-                        IconButton(onClick = {}) {
-                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Back")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ),
-                )
-            }
-        ) { paddingValues ->
-            BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            ) {
-                val isLandscape = maxWidth > maxHeight
-                if (isLandscape) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 24.dp, vertical = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            AlbumCover(
-                                fileBean = mockFile,
-                                modifier = Modifier
-                                    .aspectRatio(1f)
-                                    .fillMaxHeight()
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(32.dp))
-                        Column(
-                            modifier = Modifier
-                                .weight(1.2f)
-                                .fillMaxHeight()
-                                .verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            MusicInfo(fileBean = mockFile)
-                            Spacer(modifier = Modifier.height(16.dp))
-                            SpeedAndVolume(
-                                speed = 1.0f,
-                                volume = 0.5f,
-                                onChangeSpeed = {},
-                                onChangeVolume = {})
-                            Spacer(modifier = Modifier.height(16.dp))
-                            PlaybackProgress(
-                                progress = 0.5f,
-                                positionText = "02:30/05:00",
-                                isUserSeeking = false,
-                                onSeekStart = {},
-                                onSeekChange = {},
-                                onSeekEnd = {})
-                            Spacer(modifier = Modifier.height(16.dp))
-                            PlaybackControls(
-                                isPlaying = true,
-                                isLoading = false,
-                                onRewind = {},
-                                onFastForward = {},
-                                onTogglePlayPause = {})
-                        }
-                    }
-                } else {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 24.dp)
-                            .verticalScroll(rememberScrollState()),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        AlbumCover(
-                            fileBean = mockFile,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(1f)
-                                .padding(24.dp)
-                        )
-                        MusicInfo(fileBean = mockFile)
-                        SpeedAndVolume(
-                            speed = 1.0f,
-                            volume = 0.5f,
-                            onChangeSpeed = {},
-                            onChangeVolume = {})
-                        PlaybackProgress(
-                            progress = 0.5f,
-                            positionText = "02:30/05:00",
-                            isUserSeeking = false,
-                            onSeekStart = {},
-                            onSeekChange = {},
-                            onSeekEnd = {})
-                        PlaybackControls(
-                            isPlaying = true,
-                            isLoading = false,
-                            onRewind = {},
-                            onFastForward = {},
-                            onTogglePlayPause = {})
-                    }
-                }
-            }
-        }
+        MusicDetailContent(
+            playbackState = mockPlayback,
+            subtitleState = mockSubtitle,
+            showFullLyrics = false,
+            actions = mockActions
+        )
     }
 }

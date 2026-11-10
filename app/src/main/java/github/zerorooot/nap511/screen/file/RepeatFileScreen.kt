@@ -30,6 +30,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -57,6 +58,7 @@ import github.zerorooot.nap511.screen.components.TopBarAction
 import github.zerorooot.nap511.screenitem.RepeatFileCardItem
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.viewmodel.RepeatFileViewModel
+import github.zerorooot.nap511.viewmodel.RepeatUiState
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.LazyVerticalGridScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
@@ -67,17 +69,43 @@ import kotlin.math.log10
 import kotlin.math.pow
 import androidx.compose.foundation.lazy.grid.items as gridItems
 
+/**
+ * 文件去重界面用户交互动作集合 (RepeatFileActions)
+ *
+ * 聚合顶部栏操作、下拉刷新、触底加载、路径面包屑点击等事件。
+ */
+@Immutable
+data class RepeatFileActions(
+    val onOneKeyDedupClick: () -> Unit,
+    val onStartScanClick: () -> Unit,
+    val onDeleteEmptyFilesClick: () -> Unit,
+    val onDrawerClick: () -> Unit,
+    val onRefresh: () -> Unit,
+    val onLoadMore: () -> Unit,
+    val onPathClick: (cid: String) -> Unit
+)
+
+/**
+ * 纯无状态文件去重内容组件 (RepeatFileContent)
+ *
+ * 100% 剥离 ViewModel 依赖，仅依赖不可变领域状态 [RepeatUiState] 与 [RepeatFileActions]，
+ * 支持 Android Studio @Preview 与独立的 Compose UI 自动化测试。
+ *
+ * @param uiState 文件查重与列表展示状态
+ * @param isGridScreen 是否以网格视图展示
+ * @param gridCellMinSize 网格单元格最小尺寸
+ * @param actions 界面操作回调集合
+ * @param modifier 外部修饰符
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RepeatFileScreen(
-    viewModel: RepeatFileViewModel,
+fun RepeatFileContent(
+    uiState: RepeatUiState,
     isGridScreen: Boolean,
     gridCellMinSize: Dp,
-    onClick: () -> Unit,
-    jumpClick: (String) -> Unit
+    actions: RepeatFileActions,
+    modifier: Modifier = Modifier
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var showDeleteDialog by remember { mutableStateOf(false) }
     val count = uiState.statusData?.fileCount ?: "0"
     val formattedSize = formatBytes(uiState.statusData?.fileSize?.toLongOrNull() ?: 0L)
 
@@ -85,17 +113,7 @@ fun RepeatFileScreen(
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
 
-    val onDeleteStrategySelect = { field: String, order: String ->
-        viewModel.executeDelete(
-            field,
-            order
-        )
-    }
-    val onPathClick = { cid: String ->
-        viewModel.fetchCategoryDetail(cid)
-    }
-
-    // 2. 校验触底逻辑：当滑动到倒数第 3 项以内且未在加载中时，触发 loadNextPage
+    // 2. 校验触底逻辑：当滑动到倒数第 3 项以内且未在加载中时，触发 onLoadMore
     val shouldLoadMore by remember(isGridScreen) {
         derivedStateOf {
             val totalItems: Int
@@ -116,35 +134,9 @@ fun RepeatFileScreen(
     // 3. 触底事件监听器
     LaunchedEffect(shouldLoadMore) {
         if (shouldLoadMore && !uiState.isLoadingList && !uiState.isListEndReached) {
-            viewModel.loadNextPage()
+            actions.onLoadMore()
         }
     }
-    val appBarOnClick = { action: AppBarAction ->
-        when (action) {
-            MenuItemAction.ONE_KEY_DEDUP -> {
-                if (uiState.hasStartedDedup) {
-                    showDeleteDialog = true
-                }else{
-                    App.instance.toast("请先点击右上角查重，完成后即可去重")
-                }
-            }
-
-            MenuItemAction.START_DEDUP -> {
-                viewModel.triggerForceRefresh()
-            }
-
-            MenuItemAction.DELETE_EMPTY_FILES -> {
-                viewModel.clearEmptyFile()
-            }
-
-            TopBarAction.DRAWER_MENU -> {
-                onClick.invoke()
-            }
-
-            else -> {}
-        }
-    }
-
 
     val emptyText = when {
         !uiState.hasStartedDedup -> "点击右上角开始查重"
@@ -153,10 +145,18 @@ fun RepeatFileScreen(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
+        modifier = modifier.fillMaxSize()
     ) {
-        AppTopBarRepeatFile("文件去重", appBarOnClick)
+        AppTopBarRepeatFile("文件去重", onClick = { action ->
+            when (action) {
+                MenuItemAction.ONE_KEY_DEDUP -> actions.onOneKeyDedupClick()
+                MenuItemAction.START_DEDUP -> actions.onStartScanClick()
+                MenuItemAction.DELETE_EMPTY_FILES -> actions.onDeleteEmptyFilesClick()
+                TopBarAction.DRAWER_MENU -> actions.onDrawerClick()
+                else -> {}
+            }
+        })
+
         MiddleEllipsisText(
             text = "共${count}个重复文件，占用空间${formattedSize}",
             modifier = Modifier.padding(8.dp, 4.dp)
@@ -164,7 +164,8 @@ fun RepeatFileScreen(
 
         PullToRefreshBox(
             isRefreshing = uiState.isRefreshing,
-            onRefresh = { viewModel.refreshList() }) {
+            onRefresh = actions.onRefresh
+        ) {
             if (emptyText != null) {
                 Box(
                     modifier = Modifier
@@ -192,14 +193,15 @@ fun RepeatFileScreen(
                         gridItems(uiState.fileList, key = { it.fileId }) { item ->
                             RepeatFileCardItem(
                                 item = item,
-                                onPathClick = { onPathClick(item.parentId) }
+                                onPathClick = { actions.onPathClick(item.parentId) }
                             )
                         }
                     }
                 }
             } else {
                 LazyColumnScrollbar(
-                    state = listState, settings = ScrollbarSettings.Default.copy(
+                    state = listState,
+                    settings = ScrollbarSettings.Default.copy(
                         thumbUnselectedColor = MaterialTheme.colorScheme.inversePrimary
                     )
                 ) {
@@ -212,15 +214,72 @@ fun RepeatFileScreen(
                         items(uiState.fileList, key = { it.fileId }) { item ->
                             RepeatFileCardItem(
                                 item = item,
-                                onPathClick = { onPathClick(item.parentId) }
+                                onPathClick = { actions.onPathClick(item.parentId) }
                             )
                         }
                     }
                 }
             }
-
         }
     }
+}
+
+/**
+ * 文件去重主界面 (Stateful Container)
+ *
+ * 绑定 [RepeatFileViewModel]，处理弹窗显隐、网络请求与业务调用。
+ *
+ * @param viewModel 去重业务 ViewModel
+ * @param isGridScreen 是否为网格展示
+ * @param gridCellMinSize 网格单元最小尺寸
+ * @param onClick 抽屉菜单开启回调
+ * @param jumpClick 路径目录跳转回调
+ */
+@Composable
+fun RepeatFileScreen(
+    viewModel: RepeatFileViewModel,
+    isGridScreen: Boolean,
+    gridCellMinSize: Dp,
+    onClick: () -> Unit,
+    jumpClick: (String) -> Unit
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    val actions = remember(viewModel, onClick) {
+        RepeatFileActions(
+            onOneKeyDedupClick = {
+                if (uiState.hasStartedDedup) {
+                    showDeleteDialog = true
+                } else {
+                    App.instance.toast("请先点击右上角查重，完成后即可去重")
+                }
+            },
+            onStartScanClick = {
+                viewModel.triggerForceRefresh()
+            },
+            onDeleteEmptyFilesClick = {
+                viewModel.clearEmptyFile()
+            },
+            onDrawerClick = onClick,
+            onRefresh = {
+                viewModel.refreshList()
+            },
+            onLoadMore = {
+                viewModel.loadNextPage()
+            },
+            onPathClick = { cid ->
+                viewModel.fetchCategoryDetail(cid)
+            }
+        )
+    }
+
+    RepeatFileContent(
+        uiState = uiState,
+        isGridScreen = isGridScreen,
+        gridCellMinSize = gridCellMinSize,
+        actions = actions
+    )
 
     // 3. 文件详情弹窗与去重策略弹窗绑定
     uiState.categoryDetail?.let { detail ->
@@ -239,7 +298,7 @@ fun RepeatFileScreen(
             onDismiss = { showDeleteDialog = false },
             onSelectStrategy = { field, order ->
                 showDeleteDialog = false
-                onDeleteStrategySelect(field, order)
+                viewModel.executeDelete(field, order)
             }
         )
     }

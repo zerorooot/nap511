@@ -107,8 +107,16 @@ suspend fun cleanExpiredCoilDiskCache(
 fun getCoilCacheUrl(imageLoader: ImageLoader, key: String): String? {
     if (key.isEmpty()) return null
 
-    val isInMemory = imageLoader.memoryCache?.get(MemoryCache.Key(key)) != null
-    val localFile = imageLoader.diskCache?.openSnapshot(key)?.use { it.data.toFile() }
+    val isInMemory = try {
+        imageLoader.memoryCache?.get(MemoryCache.Key(key)) != null
+    } catch (_: Throwable) {
+        false
+    }
+    val localFile = try {
+        imageLoader.diskCache?.openSnapshot(key)?.use { it.data.toFile() }
+    } catch (_: Throwable) {
+        null
+    }
     val isOnDisk = localFile != null && localFile.exists()
 
     // 无论是内存命中还是磁盘命中，只要本地存在物理文件，均返回该文件的绝对路径
@@ -131,8 +139,12 @@ fun getCoilCacheUrl(imageLoader: ImageLoader, key: String): String? {
  */
 @OptIn(ExperimentalCoilApi::class)
 fun ImageLoader.deleteCoilCache(key: String) {
-    this.memoryCache?.remove(MemoryCache.Key(key))
-    this.diskCache?.remove(key)
+    try {
+        this.memoryCache?.remove(MemoryCache.Key(key))
+    } catch (_: Throwable) {}
+    try {
+        this.diskCache?.remove(key)
+    } catch (_: Throwable) {}
     getCoilCacheUrl(
         this,
         key

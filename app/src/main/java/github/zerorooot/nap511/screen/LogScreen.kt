@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -54,10 +55,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import github.zerorooot.nap511.viewmodel.LogViewModel
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -204,6 +209,62 @@ data class LogEntry(
     val level: LogLevel = LogLevel.UNKNOWN,
     val message: String = raw,
     val uuid: String = UUID.randomUUID().toString()
+)
+
+/**
+ * 日志模块不可变 UI 状态载体 (LogUiState)
+ *
+ * @property logs 全量解析后的结构化日志条目
+ * @property filteredLogs 经过级别过滤后的展示日志条目
+ * @property levelCounts 各级别的统计数量映射
+ * @property selectedLevelFilter 当前选中的日志级别过滤条件，为 null 表示全部
+ * @property selectedLogForDetail 详情面板或弹窗当前选中的日志条目
+ * @property isAutoScrollEnabled 是否开启自动滚动到底部
+ * @property isSearchOpen 是否展开搜索顶栏
+ * @property searchQuery 当前搜索关键字
+ * @property searchMatches 搜索匹配项集合
+ * @property currentMatchIndex 当前选中的匹配项索引
+ * @property isLoading 是否正在异步加载/刷新
+ */
+@Immutable
+data class LogUiState(
+    val logs: List<LogEntry> = emptyList(),
+    val filteredLogs: List<LogEntry> = emptyList(),
+    val levelCounts: Map<LogLevel, Int> = emptyMap(),
+    val selectedLevelFilter: LogLevel? = null,
+    val selectedLogForDetail: LogEntry? = null,
+    val isAutoScrollEnabled: Boolean = true,
+    val isSearchOpen: Boolean = false,
+    val searchQuery: String = "",
+    val searchMatches: List<LogSearchMatch> = emptyList(),
+    val currentMatchIndex: Int = 0,
+    val isLoading: Boolean = false
+)
+
+/**
+ * 日志页面纯 UI 交互动作集合 (LogScreenActions)
+ *
+ * 聚合所有用户操作事件，避免 Composable 函数参数过度膨胀。
+ */
+@Immutable
+data class LogScreenActions(
+    val onSelectLevel: (LogLevel?) -> Unit,
+    val onSelectLog: (LogEntry) -> Unit,
+    val onCopyLog: (LogEntry) -> Unit,
+    val onClearFilter: () -> Unit,
+    val onSearchToggle: (Boolean) -> Unit,
+    val onSearchQueryChange: (String) -> Unit,
+    val onPrevMatch: () -> Unit,
+    val onNextMatch: () -> Unit,
+    val onNavigateMatch: (Int) -> Unit = {},
+    val onAutoScrollChange: (Boolean) -> Unit,
+    val onScrollToTop: () -> Unit,
+    val onScrollToBottom: () -> Unit,
+    val onExportLog: () -> Unit,
+    val onClearLog: () -> Unit,
+    val onRefreshLog: () -> Unit,
+    val onDismissDetail: () -> Unit,
+    val onDrawerClick: () -> Unit
 )
 
 // ============================================================================
@@ -1016,210 +1077,105 @@ private fun LogListView(
 }
 
 // ============================================================================
-// 九、页面主入口 (LogScreen)
+// 九、无状态 UI 组件 (LogScreenContent) 与页面主入口 (LogScreen)
 // ============================================================================
 
 /**
- * 日志查看页面主入口
+ * 纯无状态日志中心内容组件 (LogScreenContent)
  *
+ * 100% 剥离 ViewModel 与本地文件 I/O 依赖，支持 Android Studio @Preview 与纯 UI 自动化测试。
+ *
+ * @param uiState 当前日志展示与过滤状态
+ * @param actions 界面交互与事件回调集合
  * @param isDualPane 是否处于大屏双栏展示模式
- * @param onClick 抽屉菜单开启等外部点击回调
+ * @param lazyListState 日志列表滚动状态，默认自动记忆
+ * @param modifier 外部修饰符
  */
-@OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
-fun LogScreen(isDualPane: Boolean = false, onClick: () -> Unit) {
-    var rawLogText by remember { mutableStateOf(LogFileManager.readLogText()) }
-    val parsedLogs by remember(rawLogText) { derivedStateOf { LogParser.parse(rawLogText) } }
-    val clipboardManager = LocalClipboard.current
-
-    val lazyListState = rememberLazyListState()
-    val coroutine = rememberCoroutineScope()
-    val formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd/HH/mm/ss")
-
-    // 级别筛选状态与派生数据
-    var selectedLevelFilter by remember { mutableStateOf<LogLevel?>(null) }
-    val filteredLogs by remember(parsedLogs, selectedLevelFilter) {
-        derivedStateOf {
-            if (selectedLevelFilter == null) parsedLogs
-            else parsedLogs.filter { it.level == selectedLevelFilter }
-        }
-    }
-    val levelCounts = remember(parsedLogs) {
-        parsedLogs.groupingBy { it.level }.eachCount()
-    }
-
-    var selectedLogForDetail by remember { mutableStateOf<LogEntry?>(null) }
-    var isAutoScrollEnabled by remember { mutableStateOf(true) }
-
-    // 协程轮询检测日志文件变动
-    LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            val logFile = LogFileManager.getLogFile()
-            var lastModified = if (logFile.exists()) logFile.lastModified() else 0L
-            var lastLength = if (logFile.exists()) logFile.length() else 0L
-
-            while (isActive) {
-                delay(1000.milliseconds)
-                if (logFile.exists()) {
-                    val currentModified = logFile.lastModified()
-                    val currentLength = logFile.length()
-                    if (currentModified != lastModified || currentLength != lastLength) {
-                        lastModified = currentModified
-                        lastLength = currentLength
-                        val updatedContent = LogFileManager.readLogText()
-                        withContext(Dispatchers.Main) {
-                            rawLogText = updatedContent
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // 搜索状态管理
-    var isSearchOpen by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
-    var currentMatchIndex by remember { mutableIntStateOf(0) }
+fun LogScreenContent(
+    uiState: LogUiState,
+    actions: LogScreenActions,
+    modifier: Modifier = Modifier,
+    isDualPane: Boolean = false,
+    lazyListState: LazyListState = rememberLazyListState(),
+) {
     val focusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(isSearchOpen) {
-        if (isSearchOpen) {
+    LaunchedEffect(uiState.isSearchOpen) {
+        if (uiState.isSearchOpen) {
             focusRequester.requestFocus()
         }
     }
 
-    val searchMatches = remember(filteredLogs, searchQuery) {
-        findSearchMatches(filteredLogs, searchQuery) { it.raw }
-    }
-
-    LaunchedEffect(searchMatches) {
-        currentMatchIndex = 0
-    }
-
-    LaunchedEffect(currentMatchIndex, searchMatches) {
-        if (searchMatches.isNotEmpty() && currentMatchIndex in searchMatches.indices) {
-            val targetMatch = searchMatches[currentMatchIndex]
+    LaunchedEffect(uiState.currentMatchIndex, uiState.searchMatches) {
+        if (uiState.searchMatches.isNotEmpty() && uiState.currentMatchIndex in uiState.searchMatches.indices) {
+            val targetMatch = uiState.searchMatches[uiState.currentMatchIndex]
             lazyListState.animateScrollToItem(targetMatch.itemIndex)
         }
     }
 
-    // 顶部操作栏动作回调
-    val appBarOnClick: (AppBarAction) -> Unit = { name ->
-        when (name) {
-            TopBarAction.SEARCH -> isSearchOpen = true
-            MenuItemAction.SCROLL_TOP -> {
-                coroutine.launch {
-                    if (filteredLogs.isNotEmpty()) lazyListState.animateScrollToItem(0)
-                }
-            }
-
-            MenuItemAction.SCROLL_BOTTOM -> {
-                isAutoScrollEnabled = true
-                coroutine.launch {
-                    if (filteredLogs.isNotEmpty()) lazyListState.animateScrollToItem(filteredLogs.lastIndex)
-                }
-            }
-
-            MenuItemAction.CLEAR_LOG -> {
-                LogFileManager.clearLogFile()
-                rawLogText = ""
-                selectedLogForDetail = null
-            }
-
-            MenuItemAction.EXPORT_LOG -> {
-                LogFileManager.exportLogFile(
-                    App.instance,
-                    "${App.instance.getStringRes(R.string.app_name)}_${
-                        LocalDateTime.now().format(formatter)
-                    }_log.txt",
-                    rawLogText,
-                    coroutine
-                )
-            }
-
-            MenuItemAction.REFRESH_LOG -> {
-                rawLogText = LogFileManager.readLogText()
-                isAutoScrollEnabled = true
-                coroutine.launch {
-                    if (filteredLogs.isNotEmpty()) lazyListState.animateScrollToItem(filteredLogs.lastIndex)
-                }
-            }
-
-            TopBarAction.DRAWER_MENU -> onClick.invoke()
-            else -> {}
-        }
-    }
-
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        if (isSearchOpen) {
+        if (uiState.isSearchOpen) {
             TopAppBarSearch(
-                searchQuery = searchQuery,
-                onSearchQueryChange = { searchQuery = it },
-                onCloseSearch = {
-                    isSearchOpen = false
-                    searchQuery = ""
-                },
-                matchCount = searchMatches.size,
-                currentMatchIndex = currentMatchIndex,
-                onPrevMatch = {
-                    if (searchMatches.isNotEmpty()) {
-                        currentMatchIndex =
-                            if (currentMatchIndex > 0) currentMatchIndex - 1 else searchMatches.lastIndex
-                    }
-                },
-                onNextMatch = {
-                    if (searchMatches.isNotEmpty()) {
-                        currentMatchIndex =
-                            if (currentMatchIndex < searchMatches.lastIndex) currentMatchIndex + 1 else 0
-                    }
-                },
+                searchQuery = uiState.searchQuery,
+                onSearchQueryChange = actions.onSearchQueryChange,
+                onCloseSearch = { actions.onSearchToggle(false) },
+                matchCount = uiState.searchMatches.size,
+                currentMatchIndex = uiState.currentMatchIndex,
+                onPrevMatch = actions.onPrevMatch,
+                onNextMatch = actions.onNextMatch,
                 placeholderText = "搜索日志...",
                 focusRequester = focusRequester
             )
         } else {
-            AppTopBarLogScreen(ConfigKeyUtil.LOG_SCREEN, appBarOnClick)
+            AppTopBarLogScreen(
+                title = ConfigKeyUtil.LOG_SCREEN,
+                onClick = { name ->
+                    when (name) {
+                        TopBarAction.SEARCH -> actions.onSearchToggle(true)
+                        MenuItemAction.SCROLL_TOP -> actions.onScrollToTop()
+                        MenuItemAction.SCROLL_BOTTOM -> actions.onScrollToBottom()
+                        MenuItemAction.CLEAR_LOG -> actions.onClearLog()
+                        MenuItemAction.EXPORT_LOG -> actions.onExportLog()
+                        MenuItemAction.REFRESH_LOG -> actions.onRefreshLog()
+                        TopBarAction.DRAWER_MENU -> actions.onDrawerClick()
+                        else -> {}
+                    }
+                }
+            )
         }
 
-        if (parsedLogs.isNotEmpty()) {
+        if (uiState.logs.isNotEmpty()) {
             LogFilterChipBar(
-                totalCount = parsedLogs.size,
-                levelCounts = levelCounts,
-                selectedLevel = selectedLevelFilter,
-                onSelectLevel = { selectedLevelFilter = it }
+                totalCount = uiState.logs.size,
+                levelCounts = uiState.levelCounts,
+                selectedLevel = uiState.selectedLevelFilter,
+                onSelectLevel = actions.onSelectLevel
             )
         }
 
         // 统一的高内聚列表内容闭包，避免在双栏/单栏分支中重复编写
-        val listContent: @Composable (Modifier) -> Unit = { modifier ->
-            Box(modifier = modifier) {
+        val listContent: @Composable (Modifier) -> Unit = { listModifier ->
+            Box(modifier = listModifier) {
                 LogListView(
-                    filteredLogs = filteredLogs,
-                    selectedLevelFilter = selectedLevelFilter,
-                    onClearFilter = { selectedLevelFilter = null },
+                    filteredLogs = uiState.filteredLogs,
+                    selectedLevelFilter = uiState.selectedLevelFilter,
+                    onClearFilter = actions.onClearFilter,
                     lazyListState = lazyListState,
-                    searchQuery = searchQuery,
-                    searchMatches = searchMatches,
-                    currentMatchIndex = currentMatchIndex,
-                    selectedLogId = selectedLogForDetail?.uuid,
-                    isAutoScrollEnabled = isAutoScrollEnabled,
-                    isSearchOpen = isSearchOpen,
-                    onAutoScrollChange = { isAutoScrollEnabled = it },
-                    onRowClick = { selectedLogForDetail = it },
-                    onLongClick = { logEntry ->
-                        copyLogToClipboard(clipboardManager, logEntry)
-                    },
-                    onScrollToBottom = {
-                        isAutoScrollEnabled = true
-                        coroutine.launch {
-                            if (filteredLogs.isNotEmpty()) {
-                                lazyListState.animateScrollToItem(filteredLogs.lastIndex)
-                            }
-                        }
-                    }
+                    searchQuery = uiState.searchQuery,
+                    searchMatches = uiState.searchMatches,
+                    currentMatchIndex = uiState.currentMatchIndex,
+                    selectedLogId = uiState.selectedLogForDetail?.uuid,
+                    isAutoScrollEnabled = uiState.isAutoScrollEnabled,
+                    isSearchOpen = uiState.isSearchOpen,
+                    onAutoScrollChange = actions.onAutoScrollChange,
+                    onRowClick = actions.onSelectLog,
+                    onLongClick = actions.onCopyLog,
+                    onScrollToBottom = actions.onScrollToBottom
                 )
             }
         }
@@ -1241,7 +1197,7 @@ fun LogScreen(isDualPane: Boolean = false, onClick: () -> Unit) {
 
                 // 右侧栏：常驻详情面板
                 LogDetailPane(
-                    selectedLog = selectedLogForDetail,
+                    selectedLog = uiState.selectedLogForDetail,
                     modifier = Modifier
                         .weight(1.3f)
                         .fillMaxHeight()
@@ -1256,14 +1212,84 @@ fun LogScreen(isDualPane: Boolean = false, onClick: () -> Unit) {
                     .weight(1f)
             )
 
-            selectedLogForDetail?.let { detail ->
+            uiState.selectedLogForDetail?.let { detail ->
                 LogDetailDialog(
                     selectedLog = detail,
-                    onDismiss = { selectedLogForDetail = null }
+                    onDismiss = actions.onDismissDetail
                 )
             }
         }
     }
+}
+
+/**
+ * 日志查看页面主入口 (Stateful Container)
+ *
+ * 绑定 [LogViewModel]，负责日志文件监听轮询、后台解析、导出等生命周期与业务状态调度。
+ *
+ * @param isDualPane 是否处于大屏双栏展示模式
+ * @param viewModel 日志业务 ViewModel，默认自动从 Compose 上下文获取
+ * @param onClick 抽屉菜单开启等外部点击回调
+ */
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
+@Composable
+fun LogScreen(
+    isDualPane: Boolean = false,
+    viewModel: LogViewModel,
+    onClick: () -> Unit
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val clipboardManager = LocalClipboard.current
+    val lazyListState = rememberLazyListState()
+    val coroutine = rememberCoroutineScope()
+
+    val actions = remember(viewModel, onClick) {
+        LogScreenActions(
+            onSelectLevel = { viewModel.selectLevel(it) },
+            onSelectLog = { viewModel.selectLogForDetail(it) },
+            onCopyLog = { copyLogToClipboard(clipboardManager, it) },
+            onClearFilter = { viewModel.selectLevel(null) },
+            onSearchToggle = { viewModel.toggleSearch(it) },
+            onSearchQueryChange = { viewModel.setSearchQuery(it) },
+            onPrevMatch = { viewModel.prevMatch() },
+            onNextMatch = { viewModel.nextMatch() },
+            onNavigateMatch = { viewModel.navigateMatch(it) },
+            onAutoScrollChange = { viewModel.setAutoScrollEnabled(it) },
+            onScrollToTop = {
+                coroutine.launch {
+                    if (uiState.filteredLogs.isNotEmpty()) lazyListState.animateScrollToItem(0)
+                }
+            },
+            onScrollToBottom = {
+                viewModel.setAutoScrollEnabled(true)
+                coroutine.launch {
+                    if (uiState.filteredLogs.isNotEmpty()) {
+                        lazyListState.animateScrollToItem(uiState.filteredLogs.lastIndex)
+                    }
+                }
+            },
+            onExportLog = { viewModel.exportLog() },
+            onClearLog = { viewModel.clearLog() },
+            onRefreshLog = {
+                viewModel.refreshLogs()
+                viewModel.setAutoScrollEnabled(true)
+                coroutine.launch {
+                    if (uiState.filteredLogs.isNotEmpty()) {
+                        lazyListState.animateScrollToItem(uiState.filteredLogs.lastIndex)
+                    }
+                }
+            },
+            onDismissDetail = { viewModel.selectLogForDetail(null) },
+            onDrawerClick = onClick
+        )
+    }
+
+    LogScreenContent(
+        uiState = uiState,
+        actions = actions,
+        isDualPane = isDualPane,
+        lazyListState = lazyListState
+    )
 }
 
 // ============================================================================

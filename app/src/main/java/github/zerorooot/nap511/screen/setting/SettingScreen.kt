@@ -300,7 +300,7 @@ fun SettingScreen(
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
-private fun AdaptiveSettingContent(
+fun AdaptiveSettingContent(
     uiState: SettingUiState,
     selectedCategoryIndex: Int,
     onSelectCategory: (Int) -> Unit,

@@ -57,6 +57,7 @@ import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.LoginViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
+import github.zerorooot.nap511.viewmodel.LogViewModel
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import github.zerorooot.nap511.viewmodel.RepeatFileViewModel
 import github.zerorooot.nap511.viewmodel.SettingViewModel
@@ -373,7 +374,8 @@ fun AppNavHost(
             }
 
             entry<Route.LogScreen> {
-                LogScreen(isExpandedScreen) {
+                val logViewModel: LogViewModel = viewModel(factory = LogViewModel.Factory)
+                LogScreen(isDualPane = isExpandedScreen, viewModel = logViewModel) {
                     onOpenDrawer()
                 }
             }

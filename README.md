@@ -8,34 +8,64 @@
 # 截图
 
 <table style="text-align: center; vertical-align: middle; width: 1200px; table-layout: fixed;">
-  <tr><td colspan="2">
-      <a href="./assets/01.jpg"><img src="./assets/01.jpg?raw=true" width="300" alt="Screenshot 001"/></a>
+  <tr>
+    <th colspan="2">文件列表显示</th>
+    <th colspan="2">离线任务列表</th>
+    <th colspan="2">音乐播放页面</th>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <a href="./assets/01.png"><img src="./assets/01.png?raw=true" width="300" alt="文件批量多选管理"/></a>
     </td>
     <td colspan="2">
-      <a href="./assets/02.jpg"><img src="./assets/02.jpg?raw=true" width="300" alt="Screenshot 002"/></a>
+      <a href="./assets/02.png"><img src="./assets/02.png?raw=true" width="300" alt="离线任务极速监控"/></a>
     </td>
     <td colspan="2">
-      <a href="./assets/03.jpg"><img src="./assets/03.jpg?raw=true" width="300" alt="Screenshot 003"/></a>
+      <a href="./assets/03.png"><img src="./assets/03.png?raw=true" width="300" alt="音乐播放与黑胶唱片"/></a>
     </td>
   </tr>
-  <tr><td colspan="2">
-      <a href="./assets/04.jpg"><img src="./assets/04.jpg?raw=true" width="300" alt="Screenshot 004"/></a>
+  <tr>
+    <th colspan="2">重复文件清理</th>
+    <th colspan="2">应用设置中心</th>
+    <th colspan="2">运行日志监控</th>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <a href="./assets/04.png"><img src="./assets/04.png?raw=true" width="300" alt="全盘重复文件清理"/></a>
     </td>
     <td colspan="2">
-      <a href="./assets/05.jpg"><img src="./assets/05.jpg?raw=true" width="300" alt="Screenshot 005"/></a>
+      <a href="./assets/05.png"><img src="./assets/05.png?raw=true" width="300" alt="Material 3 设置中心"/></a>
     </td>
     <td colspan="2">
-      <a href="./assets/06.jpg"><img src="./assets/06.jpg?raw=true" width="300" alt="Screenshot 006"/></a>
+      <a href="./assets/06.png"><img src="./assets/06.png?raw=true" width="300" alt="实时运行日志监控"/></a>
     </td>
   </tr>
-  <tr><td colspan="3">
-      <a href="./assets/07.jpg"><img src="./assets/07.jpg?raw=true" width="600" alt="Screenshot 007"/></a>
+  <tr>
+    <th colspan="3">横屏高清图库瀑布流</th>
+    <th colspan="3">大屏沉浸双栏音乐播放</th>
+  </tr>
+  <tr>
+    <td colspan="3">
+      <a href="./assets/07.png"><img src="./assets/07.png?raw=true" width="600" alt="横屏高清图库瀑布流"/></a>
     </td>
     <td colspan="3">
-      <a href="./assets/08.jpg"><img src="./assets/08.jpg?raw=true" width="600" alt="Screenshot 008"/></a>
+      <a href="./assets/08.png"><img src="./assets/08.png?raw=true" width="600" alt="大屏沉浸双栏音乐播放"/></a>
+    </td>
+  </tr>
+  <tr>
+    <th colspan="3">大屏双栏自适应设置</th>
+    <th colspan="3">大屏双栏运行日志中心</th>
+  </tr>
+  <tr>
+    <td colspan="3">
+      <a href="./assets/09.png"><img src="./assets/09.png?raw=true" width="600" alt="大屏双栏自适应设置"/></a>
+    </td>
+    <td colspan="3">
+      <a href="./assets/10.png"><img src="./assets/10.png?raw=true" width="600" alt="大屏双栏运行日志中心"/></a>
     </td>
   </tr>
 </table>
+
 
 
 # 功能说明

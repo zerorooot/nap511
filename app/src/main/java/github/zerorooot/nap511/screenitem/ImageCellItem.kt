@@ -50,7 +50,7 @@ import github.zerorooot.nap511.util.getCoilCacheUrl
 
 // 全局内存缓存图片宽高比，避免快速滑动和 Item 离屏复用时高度重置引发瀑布流跳动闪烁
 // 限定最多保存 1150 张图片的宽高比，超过后自动淘汰最久未使用的条目
-private val aspectRatioCache = object : LruCache<String, Float>(1150) {}
+internal val aspectRatioCache = object : LruCache<String, Float>(1150) {}
 
 @Composable
 fun ImageCellItem(

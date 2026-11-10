@@ -60,6 +60,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -121,7 +122,7 @@ fun AppTopBarNormal(
     scrollBehavior: TopAppBarScrollBehavior? = null
 ) {
     BaseTopAppBar(
-        title = { Text(text = title) },
+        title = { Text(text = title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         scrollBehavior = scrollBehavior,
         navigationIcon = {
             TopAppBarActionButton(
