@@ -1,8 +1,6 @@
 package github.zerorooot.nap511.screenitem
 
 import androidx.compose.foundation.lazy.LazyListScope
-import github.zerorooot.nap511.bean.OrderBean
-import github.zerorooot.nap511.bean.OrderType
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.screen.setting.SettingActions
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -17,15 +15,15 @@ fun LazyListScope.accountSecurityPreferenceItems(
     onActionClick: (String) -> Unit
 ) {
     item { PreferenceCategoryHeader("账号与凭据") }
-    item {
-        EditTextPreferenceItem(
-            title = "用户 ID",
-            summary = uiState.uid,
-            value = uiState.uid,
-            enabled = false,
-            onValueSave = {}
-        )
-    }
+//    item {
+//        EditTextPreferenceItem(
+//            title = "用户 ID",
+//            summary = uiState.uid,
+//            value = uiState.uid,
+//            enabled = false,
+//            onValueSave = {}
+//        )
+//    }
     item {
         EditTextPreferenceItem(
             title = "账号 Cookie",
@@ -175,7 +173,7 @@ fun LazyListScope.mediaPlaybackPreferenceItems(
     item {
         SwitchPreferenceItem(
             title = "字幕自动加载",
-            summary = "自动加载与视频文件同名/同前缀的 SRT 字幕（如果字幕存在）",
+            summary = "播放视频或音频时自动加载同目录下的同名字幕（如果字幕存在）",
             checked = uiState.automaticSubtitle,
             onCheckedChange = { onSaveConfig(ConfigKeyUtil.AUTOMATIC_SUBTITLE, it) }
         )

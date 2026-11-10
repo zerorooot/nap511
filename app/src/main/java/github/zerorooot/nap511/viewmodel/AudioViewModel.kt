@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.elvishew.xlog.XLog
 import com.shuyu.gsyvideoplayer.listener.GSYMediaPlayerListener
 import com.shuyu.gsyvideoplayer.player.PlayerFactory
 import github.zerorooot.nap511.bean.FileBean
@@ -17,12 +18,13 @@ import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.service.AudioService
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.subtitle.SubtitleEntry
 import github.zerorooot.nap511.util.AudioEvent
 import github.zerorooot.nap511.util.AudioEventBus
 import github.zerorooot.nap511.util.FileCacheManager
+import github.zerorooot.nap511.util.findMatchingSubtitle
 import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.subtitle.SubtitleDelegate
+import github.zerorooot.nap511.util.subtitle.SubtitleEntry
 import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
 import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.Job
@@ -54,8 +56,12 @@ data class AudioUiState(
 
 class AudioViewModel @JvmOverloads constructor(
     application: Application,
-    private val toastProvider: ToastProvider = AndroidToastProvider(application)
+    private val toastProvider: ToastProvider = AndroidToastProvider(application),
 ) : AndroidViewModel(application) {
+    var positionAfterAt: Boolean = false
+    var automaticSubtitle: Boolean = false
+
+
     private val SEEK_STEP_MS = 15000L
     private val context = getApplication<Application>()
 
@@ -67,9 +73,10 @@ class AudioViewModel @JvmOverloads constructor(
         SubtitleRepository.getInstance()
     }
 
-    private val subtitleDelegate = SubtitleDelegate(subtitleRepository) { newSubtitleState ->
-        uiState = uiState.copy(subtitle = newSubtitleState)
-    }
+    private val subtitleDelegate =
+        SubtitleDelegate(subtitleRepository, toastProvider) { newSubtitleState ->
+            uiState = uiState.copy(subtitle = newSubtitleState)
+        }
 
     var uiState by mutableStateOf(AudioUiState())
         private set
@@ -233,6 +240,23 @@ class AudioViewModel @JvmOverloads constructor(
                     )
                     // 自动加载/搜集字幕候选
                     loadSubtitles(localSubtitles = localSubtitles)
+
+                    // 自动匹配并加载同名本地字幕（与视频播放逻辑完全对齐）
+                    if (automaticSubtitle && localSubtitles.isNotEmpty()) {
+                        val matched = findMatchingSubtitle(fileBean.name, localSubtitles)
+                        if (matched != null) {
+                            val targetFileId = fileBean.fileId
+                            XLog.i("AudioViewModel: 自动匹配到同名字幕: ${matched.name}，开始自动下载挂载")
+                            selectSubtitle(context.cacheDir, matched) { srtFile ->
+                                if (srtFile != null && currentMusic?.fileId == targetFileId) {
+                                    XLog.i("AudioViewModel: 自动加载字幕成功: ${matched.simpleName}")
+                                    toastProvider.showToast("自动加载字幕: ${matched.simpleName}")
+                                }
+                            }
+                        } else {
+                            XLog.d("AudioViewModel: 未匹配到同名字幕: ${fileBean.name}")
+                        }
+                    }
                 } else {
                     toastProvider.showToast("无法获取音频播放地址")
                     updatePlayback { copy(currentMusic = null) }
@@ -346,19 +370,25 @@ class AudioViewModel @JvmOverloads constructor(
             mediaName = currentMusic?.name ?: "",
             searchKeyword = searchKeyword,
             localSubtitles = localSubtitles,
-            mediaDurationMs = videoManger.duration
+            mediaDurationMs = videoManger.duration,
+            positionAfterAt = positionAfterAt
         )
     }
 
     /**
      * 选择并下载准备字幕
      */
-    fun selectSubtitle(cacheDirFile: File, item: SubtitleItem) {
+    fun selectSubtitle(
+        cacheDirFile: File,
+        item: SubtitleItem,
+        onSuccess: ((File?) -> Unit)? = null
+    ) {
         subtitleDelegate.selectSubtitle(
             scope = viewModelScope,
             cacheDirFile = cacheDirFile,
             item = item,
-            currentPositionMs = videoManger.currentPosition
+            currentPositionMs = videoManger.currentPosition,
+            onSuccess = onSuccess
         )
     }
 

@@ -11,6 +11,7 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.network.NetworkClient
 import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.subtitle.SubtitleConverter
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -23,7 +24,7 @@ import kotlin.math.abs
  * 字幕 Repository
  * 负责从迅雷 API 与 115 网盘同目录获取字幕列表、进行距离排序以及处理字幕文件下载与格式转换。
  */
-class SubtitleRepository(
+open class SubtitleRepository(
     private val fileRepository: FileRepository = FileRepository.getInstance()
 ) {
     companion object {
@@ -131,7 +132,7 @@ class SubtitleRepository(
      * 下载字幕并处理转换（若为 ASS/SSA/SUB 格式自动转换为 SRT 文本）
      * @return 转换或保存后的标准本地 SRT/VTT File，方便传给播放器 GSYSubtitleSource
      */
-    suspend fun downloadAndPrepareSubtitle(cacheDirFile: File, item: SubtitleItem): File? =
+    open suspend fun downloadAndPrepareSubtitle(cacheDirFile: File, item: SubtitleItem): File? =
         withContext(Dispatchers.IO) {
             try {
                 val cacheDir = File(cacheDirFile, "subtitles").apply { if (!exists()) mkdirs() }
@@ -177,6 +178,8 @@ class SubtitleRepository(
                 val finalFile =
                     SubtitleConverter.convertToSrtIfNeeded(rawFile, targetSrtFile, item.ext)
                 finalFile
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 XLog.e("SubtitleRepository: 下载准备字幕异常: ${item.name}", e)
                 null

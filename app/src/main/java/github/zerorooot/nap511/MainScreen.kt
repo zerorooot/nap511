@@ -49,6 +49,12 @@ fun MainScreen(
 ) {
     val fileViewModel: FileViewModel = viewModel()
     val audioViewModel: AudioViewModel = viewModel()
+
+    LaunchedEffect(settingUiState.positionAfterAt, settingUiState.automaticSubtitle) {
+        audioViewModel.positionAfterAt = settingUiState.positionAfterAt
+        audioViewModel.automaticSubtitle = settingUiState.automaticSubtitle
+    }
+
     val offlineFileViewModel: OfflineFileViewModel = viewModel()
 
     val context = LocalContext.current
@@ -77,7 +83,7 @@ fun MainScreen(
     // ==========================================
     // 1. 初始化 Nav3 返回栈，默认以 Route.MyFile（我的文件）为栈底起始路由
     val backStack: NavBackStack<NavKey> = rememberNavBackStack(Route.MyFile)
-    
+
     val currentRoute = backStack.lastOrNull() as? Route ?: Route.MyFile
 
 

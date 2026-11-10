@@ -5,16 +5,17 @@ import github.zerorooot.nap511.bean.SubtitleItem
 import github.zerorooot.nap511.bean.SubtitleSourceType
 import github.zerorooot.nap511.bean.SubtitleStyleBean
 import github.zerorooot.nap511.bean.SubtitleUiState
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.keyWord
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -30,7 +31,8 @@ import java.io.File
  * - 根据实时播放时刻定位字幕/歌词行
  */
 class SubtitleDelegate(
-    private val subtitleRepository: SubtitleRepository = SubtitleRepository.getInstance(),
+    private val subtitleRepository: SubtitleRepository,
+    private val toastProvider: ToastProvider,
     private val onStateChanged: ((SubtitleUiState) -> Unit)? = null
 ) {
     private val _uiState = MutableStateFlow(SubtitleUiState())
@@ -52,12 +54,11 @@ class SubtitleDelegate(
         searchKeyword: String = "",
         localSubtitles: List<SubtitleItem>,
         mediaDurationMs: Long = 0L,
-        searchedSubtitle: Boolean = true
+        searchedSubtitle: Boolean = true,
+        positionAfterAt: Boolean
     ) {
         updateState { copy(currentLocalSubtitles = localSubtitles) }
         scope.launch {
-            val positionAfterAt =
-                SettingsRepository.getDataSuspend(ConfigKeyUtil.POSITION_AFTER_AT, false)
             val keyword = searchKeyword.ifBlank {
                 mediaName.keyWord(positionAfterAt)
             }
@@ -90,6 +91,8 @@ class SubtitleDelegate(
         }
     }
 
+    private var selectSubtitleJob: Job? = null
+
     /**
      * 选择并下载准备字幕
      *
@@ -107,10 +110,13 @@ class SubtitleDelegate(
         onSuccess: ((File?) -> Unit)? = null
     ) {
 //        updateState { copy(isLoading = true) }
-        scope.launch {
+        selectSubtitleJob?.cancel()
+        selectSubtitleJob = scope.launch {
+            XLog.d("SubtitleDelegate: 开始下载并准备字幕: ${item.simpleName}")
             val srtFile = subtitleRepository.downloadAndPrepareSubtitle(cacheDirFile, item)
             if (srtFile != null) {
                 val parsedEntries = SrtParser.parse(srtFile)
+                XLog.i("SubtitleDelegate: 字幕解析完成: ${item.simpleName}, 解析到 ${parsedEntries.size} 条字幕")
                 updateState {
                     copy(
                         selectedSubtitle = item,
@@ -123,8 +129,10 @@ class SubtitleDelegate(
                 }
                 onSuccess?.invoke(srtFile)
             } else {
+                if (!isActive) return@launch
 //                updateState { copy(isLoading = false) }
-                App.instance.toast("加载字幕失败: ${item.simpleName}")
+                XLog.w("SubtitleDelegate: 下载字幕失败: ${item.simpleName}")
+                toastProvider.showToast("加载字幕失败: ${item.simpleName}")
                 onSuccess?.invoke(null)
             }
         }
@@ -134,12 +142,15 @@ class SubtitleDelegate(
      * 移除/清除当前绑定的字幕
      */
     fun removeSubtitle() {
+        selectSubtitleJob?.cancel()
+        selectSubtitleJob = null
         updateState {
             copy(
                 selectedSubtitle = null,
                 entries = emptyList(),
                 currentText = "",
-                currentIndex = -1
+                currentIndex = -1,
+                offsetMs = 0L
             )
         }
     }
@@ -195,7 +206,7 @@ class SubtitleDelegate(
         }
 
         val offsetMs = state.offsetMs
-        val baseName= videoFileName.substringBeforeLast('.').trim()
+        val baseName = videoFileName.substringBeforeLast('.').trim()
         // 构造上传至 115 的同名字幕文件名（例如 VideoName.srt）
         val subtitleCount = state.currentLocalSubtitles.filter {
             it.name.startsWith(baseName)

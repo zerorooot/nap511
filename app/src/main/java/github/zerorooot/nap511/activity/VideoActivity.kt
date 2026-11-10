@@ -53,6 +53,7 @@ import github.zerorooot.nap511.dialog.CaptchaVideoContent
 import github.zerorooot.nap511.player.MyGSYVideoPlayer
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.findMatchingSubtitle
 import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.network.VideoErrorMapper
 import github.zerorooot.nap511.util.network.isHandledException
@@ -397,17 +398,8 @@ class VideoActivity : AppCompatActivity() {
     ) {
         if (launchVideoParams.localSubtitleItem.isEmpty() || !launchVideoParams.videoAttribute.automaticSubtitle) return
 
-        // 提取视频主文件名（去除后缀，如 "b.mp4" -> "b"）
-        val videoBaseName = videoFileName.substringBeforeLast('.').trim()
-
-        // 匹配规则：
-        // 1. 完全同名（如 b.mp4 <-> b.srt）
-        // 2. 带语言扩展后缀（如 b.mp4 <-> b.zh.srt 或 b.chs.vtt）
-        val matchedSubtitle = launchVideoParams.localSubtitleItem.find { item ->
-            val subtitleBaseName = item.name.substringBeforeLast('.').trim()
-            subtitleBaseName.equals(videoBaseName, ignoreCase = true) ||
-                    subtitleBaseName.startsWith("$videoBaseName.", ignoreCase = true)
-        }
+        // 统一复用公共匹配算法（支持同名及语言扩展后缀）
+        val matchedSubtitle = findMatchingSubtitle(videoFileName, launchVideoParams.localSubtitleItem)
 
         // 清除上一集残留的字幕，并重置 ViewModel 状态
         videoPlayer.setSubtitleEnabled(false)

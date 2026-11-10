@@ -57,6 +57,28 @@ fun extractSubtitles(files: List<FileBean>): List<SubtitleItem> {
 }
 
 /**
+ * 根据媒体文件名自动寻找同级目录中匹配的本地字幕/歌词文件
+ *
+ * 匹配规则（音视频统一）：
+ * 1. 完全同名（如 audio.mp3 <-> audio.srt 或 audio.lrc）
+ * 2. 带语言扩展后缀（如 audio.mp3 <-> audio.zh.srt 或 audio.chs.lrc）
+ *
+ * @param mediaFileName 媒体文件名（含后缀，如 "song.mp3"）
+ * @param subtitles 同目录下的候选字幕列表
+ * @return 匹配到的首个字幕项，若无匹配则返回 null
+ */
+fun findMatchingSubtitle(mediaFileName: String, subtitles: List<SubtitleItem>): SubtitleItem? {
+    if (subtitles.isEmpty()) return null
+    val mediaBaseName = mediaFileName.substringBeforeLast('.').trim()
+    if (mediaBaseName.isEmpty()) return null
+    return subtitles.find { item ->
+        val subtitleBaseName = item.name.substringBeforeLast('.').trim()
+        subtitleBaseName.equals(mediaBaseName, ignoreCase = true) ||
+                subtitleBaseName.startsWith("$mediaBaseName.", ignoreCase = true)
+    }
+}
+
+/**
  * 公共文件打开器（纯领域类，无 ViewModel 依赖）
  *
  * 遵循高内聚、低耦合原则：

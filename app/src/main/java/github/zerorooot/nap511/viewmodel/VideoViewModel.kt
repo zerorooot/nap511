@@ -1,7 +1,8 @@
 package github.zerorooot.nap511.viewmodel
 
 import android.app.Activity
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
@@ -11,11 +12,10 @@ import github.zerorooot.nap511.bean.SubtitleItem
 import github.zerorooot.nap511.bean.SubtitleStyleBean
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoInfoBean
-import github.zerorooot.nap511.bean.VideoUiState
 import github.zerorooot.nap511.bean.VideoStarAction
+import github.zerorooot.nap511.bean.VideoUiState
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SubtitleRepository
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.keyWord
 import github.zerorooot.nap511.util.network.parseOssErrorWithDom
@@ -89,16 +89,18 @@ sealed class VideoUiEvent {
  *
  * 负责管理视频播放状态、切换视频、同步播放历史、处理请求拦截异常以及通过代理 [SubtitleDelegate] 管理字幕业务。
  */
-class VideoViewModel(
-    private val toastProvider: ToastProvider = AndroidToastProvider(App.instance)
-) : ViewModel() {
+class VideoViewModel @JvmOverloads constructor(
+    application: Application,
+    private val toastProvider: ToastProvider = AndroidToastProvider(application)
+) : AndroidViewModel(application) {
     internal val fileRepository: FileRepository = FileRepository.getInstance()
     internal val subtitleRepository: SubtitleRepository = SubtitleRepository.getInstance()
 
     /** 字幕业务逻辑代理类 */
-    private val subtitleDelegate = SubtitleDelegate(subtitleRepository) { newSubtitleState ->
-        _uiState.update { it.copy(subtitle = newSubtitleState) }
-    }
+    private val subtitleDelegate =
+        SubtitleDelegate(subtitleRepository, toastProvider) { newSubtitleState ->
+            _uiState.update { it.copy(subtitle = newSubtitleState) }
+        }
 
     /** 启动视频播放页面时的配置参数 */
     lateinit var launchVideoParams: LaunchVideoParams
@@ -383,8 +385,10 @@ class VideoViewModel(
         videoList.add(insertIndex, restoredVideo)
 
         // 查找当前正在播放视频在新列表中的最新索引（若 fileBeanIndex == -1 表示出于停播状态）
-        val currentPlayingPickCode = if (_uiState.value.fileBeanIndex == -1) null else _uiState.value.videoInfo?.pickCode
-        val newPlayingIndex = if (currentPlayingPickCode == null) -1 else videoList.indexOfFirst { it.pickCode == currentPlayingPickCode }
+        val currentPlayingPickCode =
+            if (_uiState.value.fileBeanIndex == -1) null else _uiState.value.videoInfo?.pickCode
+        val newPlayingIndex =
+            if (currentPlayingPickCode == null) -1 else videoList.indexOfFirst { it.pickCode == currentPlayingPickCode }
         val listSize = videoList.size
 
         if (newPlayingIndex >= 0) {
@@ -616,7 +620,8 @@ class VideoViewModel(
             mediaName = currentInfo.fileName,
             localSubtitles = launchVideoParams.localSubtitleItem,
             mediaDurationMs = videoDurationMs,
-            searchedSubtitle = searchedSubtitle
+            searchedSubtitle = searchedSubtitle,
+            positionAfterAt = launchVideoParams.videoAttribute.positionAfterAt
         )
     }
 
@@ -633,7 +638,8 @@ class VideoViewModel(
             mediaName = currentInfo.fileName,
             searchKeyword = keyword,
             localSubtitles = launchVideoParams.localSubtitleItem,
-            mediaDurationMs = videoDurationMs
+            mediaDurationMs = videoDurationMs,
+            positionAfterAt = launchVideoParams.videoAttribute.positionAfterAt
         )
     }
 

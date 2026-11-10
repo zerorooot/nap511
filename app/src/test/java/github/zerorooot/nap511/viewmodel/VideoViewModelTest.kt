@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.viewmodel
 
+import android.app.Application
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -11,7 +12,6 @@ import github.zerorooot.nap511.bean.VideoStarAction
 import github.zerorooot.nap511.viewmodel.platform.FakeToastProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -44,7 +44,7 @@ class VideoViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        viewModel = VideoViewModel(fakeToastProvider)
+        viewModel = VideoViewModel(Application(), fakeToastProvider)
     }
 
     @After

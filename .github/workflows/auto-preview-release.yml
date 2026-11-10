@@ -157,7 +157,7 @@ jobs:
           tag_name: "${{ steps.rename_apk.outputs.version_tag }}"
           target_commitish: ${{ github.sha }}
           body: |
-            ## 这是自动构建的最新测试版。
+            ## 这是自动构建的最新版。
             
             **更新日志（Changelog）:**
             ${{ steps.changelog.outputs.changelog_body }}${{ steps.changelog.outputs.changelog_full_link }}
