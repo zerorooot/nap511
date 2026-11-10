@@ -48,8 +48,12 @@ data class DiscardRecord(
  * 视频播放页面的一次性 UI 事件定义
  */
 sealed class VideoUiEvent {
-    /** 播放下一个视频事件，包含视频链接和标题 */
-    data class PlayNext(val videoUrl: String, val title: String) : VideoUiEvent()
+    /** 播放下一个视频事件，包含视频链接和标题，isEpisodeSwitch 区分是否为切集操作 */
+    data class PlayNext(
+        val videoUrl: String,
+        val title: String,
+        val isEpisodeSwitch: Boolean = true
+    ) : VideoUiEvent()
 
     /** 显示 Toast 提示消息事件 */
     data class Toast(val message: String) : VideoUiEvent()
@@ -178,6 +182,8 @@ class VideoViewModel @JvmOverloads constructor(
         val currentIndex = initialVideoInfo.index
         val listSize = videoList.size
         val initialIsStar = videoList.getOrNull(currentIndex)?.isStar ?: false
+        val initialKeyword = initialVideoInfo.fileName.keyWord(params.videoAttribute.positionAfterAt)
+        subtitleDelegate.resetForNewMedia(initialKeyword)
 
         _uiState.update { currentState ->
             currentState.copy(
@@ -266,6 +272,8 @@ class VideoViewModel @JvmOverloads constructor(
         }
         // 默认将视频文件名去除后缀作为初始搜索关键字
         val keyword = videoName.keyWord(launchVideoParams.videoAttribute.positionAfterAt)
+        // 切集前置：重置字幕代理状态（清空候选列表与选中项、任务取消、保留样式）
+        subtitleDelegate.resetForNewMedia(keyword)
 
         viewModelScope.launch {
             runCatching {
@@ -289,15 +297,9 @@ class VideoViewModel @JvmOverloads constructor(
                     )
                 }
                 _uiState.update {
-                    it.copy(
-                        videoInfo = video,
-                        subtitle = it.subtitle.copy(
-                            searchedSubtitle = false,
-                            defaultSearchKeyword = keyword
-                        )
-                    )
+                    it.copy(videoInfo = video)
                 }
-                _uiEvent.emit(VideoUiEvent.PlayNext(video.videoUrl, video.fileName))
+                _uiEvent.emit(VideoUiEvent.PlayNext(video.videoUrl, video.fileName, isEpisodeSwitch = true))
             }.onFailure { e ->
                 XLog.e("加载视频失败 pickCode: ${fileBean.pickCode}", e)
                 toastProvider.showToast("加载视频失败，请重试")
@@ -427,8 +429,10 @@ class VideoViewModel @JvmOverloads constructor(
                 val video = fileRepository.video(currentInfo.pickCode)
                 _uiEvent.emit(
                     VideoUiEvent.PlayNext(
-                        video.downloadUrl,
-                        video.fileName.ifBlank { "获取视频链接失败，视频可能被删除，请刷新重试" })
+                        videoUrl = video.downloadUrl,
+                        title = video.fileName.ifBlank { "获取视频链接失败，视频可能被删除，请刷新重试" },
+                        isEpisodeSwitch = false
+                    )
                 )
             } catch (_: Exception) {
             } finally {
@@ -663,22 +667,14 @@ class VideoViewModel @JvmOverloads constructor(
      *
      * @param cacheDirFile 字幕缓存目录文件
      * @param item 选中的字幕项
-     * @param onReady 下载并处理成功后的回调函数，参数为准备好的本地字幕 File
+     * @param onReady 下载并处理成功后的回调函数，参数为准备好的本地字幕 File（失败时为 null）
      */
-    fun selectSubtitle(cacheDirFile: File, item: SubtitleItem, onReady: (File) -> Unit) {
+    fun selectSubtitle(cacheDirFile: File, item: SubtitleItem, onReady: (File?) -> Unit) {
         subtitleDelegate.selectSubtitle(
             scope = viewModelScope,
             cacheDirFile = cacheDirFile,
             item = item,
-            onSuccess = { srtFile ->
-                if (srtFile != null) {
-                    onReady(srtFile)
-                } else {
-                    viewModelScope.launch {
-                        _uiEvent.emit(VideoUiEvent.Toast("下载或格式转换字幕失败: ${item.simpleName}"))
-                    }
-                }
-            }
+            onSuccess = onReady
         )
     }
 

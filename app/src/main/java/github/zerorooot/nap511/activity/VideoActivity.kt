@@ -247,6 +247,8 @@ class VideoActivity : AppCompatActivity() {
             }
             // 移除按钮 (胶囊按钮)
             findViewById<View>(R.id.btn_discard)?.setOnClickListener {
+                videoPlayer.hideAllDrawers()
+                videoPlayer.setSubtitleEnabled(false)
                 val isPort =
                     resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
                 viewModel.discardCurrentVideo(isPort, videoPlayer.currentPositionWhenPlaying)
@@ -274,7 +276,6 @@ class VideoActivity : AppCompatActivity() {
 
         // 若传入了本地字幕列表，默认加载并应用首条本地字幕
         if (launchVideoParams.localSubtitleItem.isNotEmpty()) {
-            viewModel.loadSubtitles(0L, false)
             // 为初次播放的视频匹配字幕（不显示 Toast）
             loadMatchingSubtitleForVideo(title)
         }
@@ -323,11 +324,14 @@ class VideoActivity : AppCompatActivity() {
                         when (event) {
                             // 切换播放下一集/上一集视频
                             is VideoUiEvent.PlayNext -> {
+                                if (event.isEpisodeSwitch) {
+                                    videoPlayer.hideAllDrawers()
+                                }
                                 videoPlayer.playNext(event.videoUrl, event.title)
                                 if (event.videoUrl.isEmpty()) {
                                     App.instance.toast("获取视频链接失败，视频可能被删除，请刷新重试！")
                                     viewModel.onEpisodeLoadError()
-                                } else {
+                                } else if (event.isEpisodeSwitch) {
                                     // 切换集数时的字幕联动：为新集数匹配并自动加载对应字幕
                                     loadMatchingSubtitleForVideo(event.title)
                                 }
@@ -396,15 +400,13 @@ class VideoActivity : AppCompatActivity() {
     private fun loadMatchingSubtitleForVideo(
         videoFileName: String
     ) {
+        // 先无条件关停播放器字幕，避免残留上一集字幕
+        videoPlayer.setSubtitleEnabled(false)
+
         if (launchVideoParams.localSubtitleItem.isEmpty() || !launchVideoParams.videoAttribute.automaticSubtitle) return
 
         // 统一复用公共匹配算法（支持同名及语言扩展后缀）
         val matchedSubtitle = findMatchingSubtitle(videoFileName, launchVideoParams.localSubtitleItem)
-
-        // 清除上一集残留的字幕，并重置 ViewModel 状态
-        videoPlayer.setSubtitleEnabled(false)
-        viewModel.removeSubtitle()
-        viewModel.loadSubtitles(0L, false)
         if (matchedSubtitle != null) {
             // 匹配到新集数对应的本地字幕：自动挂载应用
             subtitlePanelController.applySubtitle(matchedSubtitle, showToast = false)
@@ -511,6 +513,8 @@ class VideoActivity : AppCompatActivity() {
      * @param isNext true 表示下一集，false 表示上一集
      */
     private fun playNextVideo(isNext: Boolean) {
+        videoPlayer.hideAllDrawers()
+        videoPlayer.setSubtitleEnabled(false)
         val isPortrait =
             resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
         viewModel.playNextVideo(isNext, isPortrait, videoPlayer.currentPositionWhenPlaying)

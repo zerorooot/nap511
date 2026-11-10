@@ -10,6 +10,7 @@ import android.widget.EditText
 import android.widget.TextView
 import androidx.core.graphics.toColorInt
 import androidx.recyclerview.widget.RecyclerView
+import com.elvishew.xlog.XLog
 import com.shuyu.gsyvideoplayer.subtitle.GSYSubtitleMime
 import com.shuyu.gsyvideoplayer.subtitle.GSYSubtitleSource
 import github.zerorooot.nap511.R
@@ -64,6 +65,10 @@ class SubtitlePanelController(
 
     fun applySubtitle(subtitleItem: SubtitleItem, showToast: Boolean = true) {
         viewModel.selectSubtitle(context.cacheDir, subtitleItem) { srtFile ->
+            if (srtFile == null) {
+                XLog.w("SubtitlePanelController: srtFile 为空，取消应用字幕: ${subtitleItem.simpleName}")
+                return@selectSubtitle
+            }
             val source = GSYSubtitleSource.Builder(Uri.fromFile(srtFile).toString())
                 .setLabel(subtitleItem.simpleName)
                 .setId(subtitleItem.id)
@@ -186,7 +191,7 @@ class SubtitlePanelController(
         updateSubtitleStyleButtonVisuals(state.subtitleStyle)
 
         val etSearch = videoPlayer.findViewById<EditText>(R.id.et_subtitle_search)
-        if (etSearch != null) {
+        if (etSearch != null && !etSearch.hasFocus() && etSearch.text.toString() != state.defaultSearchKeyword) {
             etSearch.setText(state.defaultSearchKeyword)
             etSearch.setSelection(etSearch.text.length)
         }

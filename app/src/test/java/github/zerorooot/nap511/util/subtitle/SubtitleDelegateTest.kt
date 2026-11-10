@@ -3,6 +3,7 @@ package github.zerorooot.nap511.util.subtitle
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.SubtitleItem
 import github.zerorooot.nap511.bean.SubtitleSourceType
+import github.zerorooot.nap511.bean.SubtitleStyleBean
 import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.viewmodel.platform.FakeToastProvider
 import kotlinx.coroutines.CompletableDeferred
@@ -15,6 +16,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -157,5 +159,74 @@ class SubtitleDelegateTest {
         assertTrue(!successCallbackInvoked)
         assertNull(delegate.state.selectedSubtitle)
         assertEquals(0L, delegate.state.offsetMs)
+    }
+
+    @Test
+    fun `test resetForNewMedia clears state and keeps subtitleStyle`() {
+        val delegate = SubtitleDelegate(SubtitleRepository.getInstance(), fakeToastProvider)
+        // 预设用户自定义字幕样式与偏移
+        delegate.updateSubtitleStyle(SubtitleStyleBean(textSizeSp = 30f, isBold = true))
+        delegate.setSubtitleOffset(3000L)
+        delegate.updateLocalSubtitles(listOf(createSubtitleItem("sub_1", "Sub1.srt")))
+
+        // 切换媒体重置
+        delegate.resetForNewMedia("VideoEpisode2")
+
+        val state = delegate.state
+        assertTrue(state.subtitles.isEmpty())
+        assertNull(state.selectedSubtitle)
+        assertTrue(state.currentLocalSubtitles.isEmpty())
+        assertTrue(state.entries.isEmpty())
+        assertEquals("", state.currentText)
+        assertEquals(-1, state.currentIndex)
+        assertEquals(0L, state.offsetMs)
+        assertFalse(state.searchedSubtitle)
+        assertFalse(state.isLoading)
+        assertFalse(state.isSearchLoading)
+        assertEquals("VideoEpisode2", state.defaultSearchKeyword)
+
+        // 验证用户自定义样式保留
+        assertEquals(30f, state.subtitleStyle.textSizeSp)
+        assertTrue(state.subtitleStyle.isBold)
+    }
+
+    @Test
+    fun `test resetForNewMedia cancels in-flight loadSubtitlesJob`() = runTest {
+        val delayedRepo = object : SubtitleRepository() {
+            override suspend fun getSubtitles(
+                searchKeyword: String,
+                oneOneFiveSubtitles: List<SubtitleItem>,
+                videoDurationMs: Long
+            ): List<SubtitleItem> {
+                delay(5000)
+                return listOf(createSubtitleItem("slow_sub", "SlowSub.srt"))
+            }
+        }
+
+        val delegate = SubtitleDelegate(delayedRepo, fakeToastProvider)
+        // 发起首个视频的字幕加载
+        delegate.loadSubtitles(
+            scope = this,
+            mediaName = "VideoA.mp4",
+            searchKeyword = "VideoA",
+            localSubtitles = emptyList(),
+            mediaDurationMs = 10000L,
+            searchedSubtitle = true,
+            positionAfterAt = false
+        )
+
+        testDispatcher.scheduler.advanceTimeBy(1000)
+        assertTrue(delegate.state.isSearchLoading)
+
+        // 切集：重置新媒体
+        delegate.resetForNewMedia("VideoB")
+
+        // 推进到慢速搜索理论完成的时间
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // 验证：慢速搜索结果被取消，未覆盖新视频状态
+        assertTrue(delegate.state.subtitles.isEmpty())
+        assertFalse(delegate.state.isSearchLoading)
+        assertEquals("VideoB", delegate.state.defaultSearchKeyword)
     }
 }

@@ -46,7 +46,7 @@ open class SubtitleRepository(
      * @param oneOneFiveSubtitles 115 网盘视频下的字幕文件
      * @param videoDurationMs 视频播放总时长（毫秒）
      */
-    suspend fun getSubtitles(
+    open suspend fun getSubtitles(
         searchKeyword: String,
         oneOneFiveSubtitles: List<SubtitleItem>,
         videoDurationMs: Long

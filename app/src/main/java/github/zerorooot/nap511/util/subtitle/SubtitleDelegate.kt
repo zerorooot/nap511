@@ -45,6 +45,9 @@ class SubtitleDelegate(
         onStateChanged?.invoke(_uiState.value)
     }
 
+    private var loadSubtitlesJob: Job? = null
+    private var selectSubtitleJob: Job? = null
+
     /**
      * 搜集/检索字幕（结合迅雷 API 与 115 同目录字幕）
      */
@@ -58,7 +61,8 @@ class SubtitleDelegate(
         positionAfterAt: Boolean
     ) {
         updateState { copy(currentLocalSubtitles = localSubtitles) }
-        scope.launch {
+        loadSubtitlesJob?.cancel()
+        loadSubtitlesJob = scope.launch {
             val keyword = searchKeyword.ifBlank {
                 mediaName.keyWord(positionAfterAt)
             }
@@ -90,8 +94,6 @@ class SubtitleDelegate(
             }
         }
     }
-
-    private var selectSubtitleJob: Job? = null
 
     /**
      * 选择并下载准备字幕
@@ -151,6 +153,35 @@ class SubtitleDelegate(
                 currentText = "",
                 currentIndex = -1,
                 offsetMs = 0L
+            )
+        }
+    }
+
+    /**
+     * 为新切换的媒体重置字幕状态（清空候选与选中项、重置偏移量与任务，保留字幕样式）
+     *
+     * @param newKeyword 新媒体的默认搜索关键字
+     */
+    fun resetForNewMedia(newKeyword: String) {
+        XLog.d("SubtitleDelegate: 为新媒体重置字幕状态，新关键字: $newKeyword")
+        loadSubtitlesJob?.cancel()
+        loadSubtitlesJob = null
+        selectSubtitleJob?.cancel()
+        selectSubtitleJob = null
+        updateState {
+            copy(
+                subtitles = emptyList(),
+                selectedSubtitle = null,
+                currentLocalSubtitles = emptyList(),
+                entries = emptyList(),
+                currentText = "",
+                currentIndex = -1,
+                offsetMs = 0L,
+                searchedSubtitle = false,
+                isLoading = false,
+                isSearchLoading = false,
+                defaultSearchKeyword = newKeyword
+                // subtitleStyle 保持原样不重置
             )
         }
     }

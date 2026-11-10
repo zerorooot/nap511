@@ -36,6 +36,9 @@ class VideoDrawerController(
             options = episodeTitles,
             selectedIndex = viewModel.uiState.value.fileBeanIndex
         ) { index, _ ->
+            if (index != viewModel.uiState.value.fileBeanIndex) {
+                videoPlayer.setSubtitleEnabled(false)
+            }
             val isPortrait =
                 context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
             viewModel.playVideoAtIndex(
