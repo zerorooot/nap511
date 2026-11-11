@@ -77,7 +77,7 @@ import androidx.core.view.isVisible
 class VideoActivity : AppCompatActivity() {
 
     /** 视频播放业务逻辑与状态管理 ViewModel */
-    private val viewModel: VideoViewModel by viewModels()
+    private val viewModel: VideoViewModel by viewModels { VideoViewModel.Factory }
 
     /** 自定义 GSY 视频播放器控件 */
     private lateinit var videoPlayer: MyGSYVideoPlayer

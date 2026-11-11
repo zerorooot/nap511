@@ -7,20 +7,23 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import github.zerorooot.nap511.bean.LocationBean
 import github.zerorooot.nap511.bean.OfflineInfo
 import github.zerorooot.nap511.bean.OfflineListCount
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.OfflineTaskType
 import github.zerorooot.nap511.bean.QuotaBean
+import github.zerorooot.nap511.di.appContainer
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
-import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
 import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -47,8 +50,18 @@ data class OfflineFileUiState(
 )
 
 class OfflineFileViewModel(
-    private val toastProvider: ToastProvider = AndroidToastProvider(App.instance)
+    private val fileRepository: FileRepository,
+    private val toastProvider: ToastProvider,
 ) : ViewModel() {
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val container = appContainer
+                OfflineFileViewModel(container.fileRepository, container.toastProvider)
+            }
+        }
+    }
+
     private val _isRefreshing = MutableStateFlow(false)
     private var downloadingTask by mutableStateOf(OfflineInfo())
     private val _downloadingList = MutableStateFlow<List<OfflineTask>>(emptyList())
@@ -81,10 +94,6 @@ class OfflineFileViewModel(
 
     fun getListLocation(page: Int): LocationBean {
         return currentLocation[page] ?: LocationBean(0, 0)
-    }
-
-    private val fileRepository: FileRepository by lazy {
-        FileRepository.getInstance()
     }
 
     val uiState: StateFlow<OfflineFileUiState> = combine(

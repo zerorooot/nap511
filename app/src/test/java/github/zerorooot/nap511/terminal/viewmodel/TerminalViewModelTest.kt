@@ -9,6 +9,7 @@ import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.repository.FileRepository
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.terminal.engine.CompletionResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -22,17 +23,27 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import kotlin.jvm.java
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalViewModelTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var viewModel: TerminalViewModel
+    private lateinit var tempHistoryFile: java.io.File
 
     @Before
     fun setup() {
-        github.zerorooot.nap511.terminal.engine.TerminalHistoryManager().historyFile.delete()
-        java.io.File(System.getProperty("java.io.tmpdir"), "terminal_history.txt").delete()
+        try {
+            com.elvishew.xlog.XLog.init()
+        } catch (_: Throwable) {}
+        github.zerorooot.nap511.worker.UnzipQueueManager.clear()
+
+        val fakeSettingsRepo = github.zerorooot.nap511.viewmodel.platform.FakeSettingsRepository()
+        github.zerorooot.nap511.repository.SettingsRepository.setInstanceForTesting(fakeSettingsRepo)
+
+        tempHistoryFile = java.io.File.createTempFile("test_term_hist", ".txt").apply { deleteOnExit() }
         Dispatchers.setMain(testDispatcher)
         val avatar = AvatarBean(
             face = "",
@@ -40,14 +51,18 @@ class TerminalViewModelTest {
             userId = "1001"
         )
         viewModel = TerminalViewModel(
+            fileRepository = FileRepository.getInstance(),
             avatarBean = avatar,
-            mainDispatcher = testDispatcher
+            mainDispatcher = testDispatcher,
+            historyFile = tempHistoryFile
         )
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        tempHistoryFile.delete()
+        github.zerorooot.nap511.repository.SettingsRepository.setInstanceForTesting(null)
     }
 
     @Test
@@ -409,7 +424,9 @@ class TerminalViewModelTest {
         }
         val vm = TerminalViewModel(
             fileRepository = testRepo,
-            mainDispatcher = testDispatcher
+            mainDispatcher = testDispatcher,
+            historyFile = tempHistoryFile,
+            settingsRepository = SettingsRepository.getInstance()
         )
 
         // 输入 "trash -r doc" 并触发补全计算，光标位于末尾
@@ -453,7 +470,9 @@ class TerminalViewModelTest {
         val vm = TerminalViewModel(
             initialPathList = catPathList,
             fileRepository = testRepo,
-            mainDispatcher = testDispatcher
+            mainDispatcher = testDispatcher,
+            historyFile = tempHistoryFile,
+            settingsRepository = SettingsRepository.getInstance()
         )
 
         // 1. cat 补全：仅包含 folder 和 readme.txt
@@ -507,7 +526,9 @@ class TerminalViewModelTest {
         val vm = TerminalViewModel(
             initialPathList = ghostPathList,
             fileRepository = testRepo,
-            mainDispatcher = testDispatcher
+            mainDispatcher = testDispatcher,
+            historyFile = tempHistoryFile,
+            settingsRepository = SettingsRepository.getInstance()
         )
         vm.refreshCachedEntriesAsync(vm.currentCid)
 
@@ -582,7 +603,9 @@ class TerminalViewModelTest {
 
         val vm = TerminalViewModel(
             fileRepository = testRepo,
-            mainDispatcher = testDispatcher
+            mainDispatcher = testDispatcher,
+            historyFile = tempHistoryFile,
+            settingsRepository = SettingsRepository.getInstance()
         )
         vm.context.fileCacheManager.put(
             "0",
@@ -596,7 +619,7 @@ class TerminalViewModelTest {
         // 等待后台 IO 协程执行到达确认挂起点
         val start = System.currentTimeMillis()
         while (!vm.isWaitingConfirmation && System.currentTimeMillis() - start < 2000) {
-            kotlinx.coroutines.delay(20)
+            kotlinx.coroutines.delay(20.milliseconds)
         }
 
         // 第一次挂起交互确认 (针对 file1.zip)
@@ -616,7 +639,7 @@ class TerminalViewModelTest {
         // 等待后台 IO 协程执行到达第二次确认挂起点
         val start2 = System.currentTimeMillis()
         while (!vm.isWaitingConfirmation && System.currentTimeMillis() - start2 < 2000) {
-            kotlinx.coroutines.delay(20)
+            kotlinx.coroutines.delay(20.milliseconds)
         }
 
         // 第二次挂起交互确认 (针对 file2.zip)

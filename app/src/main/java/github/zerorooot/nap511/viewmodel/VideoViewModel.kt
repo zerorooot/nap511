@@ -3,7 +3,10 @@ package github.zerorooot.nap511.viewmodel
 import android.app.Activity
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.JsonObject
@@ -14,6 +17,8 @@ import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.bean.VideoStarAction
 import github.zerorooot.nap511.bean.VideoUiState
+import github.zerorooot.nap511.di.app
+import github.zerorooot.nap511.di.appContainer
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.util.FileCacheManager
@@ -21,7 +26,6 @@ import github.zerorooot.nap511.util.findMatchingSubtitle
 import github.zerorooot.nap511.util.keyWord
 import github.zerorooot.nap511.util.network.parseOssErrorWithDom
 import github.zerorooot.nap511.util.subtitle.SubtitleDelegate
-import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
 import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -94,12 +98,25 @@ sealed class VideoUiEvent {
  *
  * 负责管理视频播放状态、切换视频、同步播放历史、处理请求拦截异常以及通过代理 [SubtitleDelegate] 管理字幕业务。
  */
-class VideoViewModel @JvmOverloads constructor(
+class VideoViewModel(
     application: Application,
-    private val toastProvider: ToastProvider = AndroidToastProvider(application)
+    internal val fileRepository: FileRepository,
+    internal val subtitleRepository: SubtitleRepository,
+    private val toastProvider: ToastProvider,
 ) : AndroidViewModel(application) {
-    internal val fileRepository: FileRepository = FileRepository.getInstance()
-    internal val subtitleRepository: SubtitleRepository = SubtitleRepository.getInstance()
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val container = appContainer
+                VideoViewModel(
+                    application = app,
+                    fileRepository = container.fileRepository,
+                    subtitleRepository = container.subtitleRepository,
+                    toastProvider = container.toastProvider
+                )
+            }
+        }
+    }
 
     /** 字幕业务逻辑代理类 */
     private val subtitleDelegate =
@@ -182,7 +199,8 @@ class VideoViewModel @JvmOverloads constructor(
         val currentIndex = initialVideoInfo.index
         val listSize = videoList.size
         val initialIsStar = videoList.getOrNull(currentIndex)?.isStar ?: false
-        val initialKeyword = initialVideoInfo.fileName.keyWord(params.videoAttribute.positionAfterAt)
+        val initialKeyword =
+            initialVideoInfo.fileName.keyWord(params.videoAttribute.positionAfterAt)
         subtitleDelegate.resetForNewMedia(initialKeyword)
 
         _uiState.update { currentState ->
@@ -299,7 +317,13 @@ class VideoViewModel @JvmOverloads constructor(
                 _uiState.update {
                     it.copy(videoInfo = video)
                 }
-                _uiEvent.emit(VideoUiEvent.PlayNext(video.videoUrl, video.fileName, isEpisodeSwitch = true))
+                _uiEvent.emit(
+                    VideoUiEvent.PlayNext(
+                        video.videoUrl,
+                        video.fileName,
+                        isEpisodeSwitch = true
+                    )
+                )
             }.onFailure { e ->
                 XLog.e("加载视频失败 pickCode: ${fileBean.pickCode}", e)
                 toastProvider.showToast("加载视频失败，请重试")

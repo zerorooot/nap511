@@ -45,11 +45,11 @@ object UnzipQueueManager {
     @Volatile
     var onQueueChangeListener: ((processed: Int, total: Int) -> Unit)? = null
 
-    // 持久化备份文件 (捕获测试环境无 Android Context 异常以保证单测兼容性)
+    // 持久化备份文件
     private val queueBackupFile: File? by lazy {
         try {
             File(App.instance.filesDir, "unzip_task_queue_v2.json")
-        } catch (e: Throwable) {
+        } catch (_: Throwable) {
             null
         }
     }
@@ -79,10 +79,14 @@ object UnzipQueueManager {
             .addTag("UnzipAllFileWorkerOneTimeWorkRequest")
             .build()
 
-        val workManager = WorkManager.getInstance(context.applicationContext)
-        workManager.enqueueUniqueWork(
-            "unzipAllFileWorker", ExistingWorkPolicy.KEEP, request
-        )
+        try {
+            val workManager = WorkManager.getInstance(context.applicationContext)
+            workManager.enqueueUniqueWork(
+                "unzipAllFileWorker", ExistingWorkPolicy.KEEP, request
+            )
+        } catch (e: Throwable) {
+            XLog.w("UnzipQueueManager: WorkManager 调度失败: ${e.message}")
+        }
     }
 
     /**

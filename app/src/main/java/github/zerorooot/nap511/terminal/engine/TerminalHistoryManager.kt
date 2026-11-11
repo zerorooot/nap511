@@ -1,6 +1,5 @@
 package github.zerorooot.nap511.terminal.engine
 
-import github.zerorooot.nap511.util.App
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -17,13 +16,10 @@ import java.nio.charset.StandardCharsets
  * 遵循低耦合高内聚设计，负责将用户正确输入的命令以 Linux 风格持久化到文本文件中，
  * 并提供流式加载、按需截取和历史清理功能。
  *
- * @param historyFile 持久化存储的目标文件，默认为 App filesDir 下的 terminal_history.txt
+ * @param historyFile 持久化存储的目标文件
  */
 class TerminalHistoryManager(
-    val historyFile: File = File(
-        runCatching { App.instance.filesDir }.getOrNull() ?: File("."),
-        "terminal_history.txt"
-    )
+    val historyFile: File
 ) {
     // 内存中记录最后一条成功追加的命令，用于高效 O(1) 的连续去重判定 (ignoredups)
     private var lastRecordedCommand: String? = null

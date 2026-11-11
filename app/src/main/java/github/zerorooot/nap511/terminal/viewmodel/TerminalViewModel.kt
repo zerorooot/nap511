@@ -7,11 +7,17 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.PathBean
+import github.zerorooot.nap511.di.app
+import github.zerorooot.nap511.di.appContainer
 import github.zerorooot.nap511.repository.FileRepository
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.terminal.commands.CommandRegistryFactory
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.context.currentCid
@@ -26,11 +32,13 @@ import github.zerorooot.nap511.terminal.engine.TerminalHistoryManager
 import github.zerorooot.nap511.terminal.engine.TerminalLineEditor
 import github.zerorooot.nap511.terminal.engine.completion.FileFilters
 import github.zerorooot.nap511.terminal.engine.completion.StandardCompleter
+import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileOpener
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * 终端核心 ViewModel (TerminalViewModel)
@@ -46,14 +54,35 @@ import kotlinx.coroutines.withContext
  * 本 ViewModel 负责统筹以上子组件，对外保持 100% 的公开 API 与 Compose 状态观察兼容。
  */
 class TerminalViewModel(
+    private val fileRepository: FileRepository,
     initialPathList: List<PathBean> = emptyList(),
     avatarBean: AvatarBean = AvatarBean(),
     fileOpener: FileOpener? = null,
-    fileRepository: FileRepository = FileRepository.getInstance(),
-    private val mainDispatcher: CoroutineDispatcher? = null
+    private val mainDispatcher: CoroutineDispatcher? = null,
+    val historyFile: File,
+    settingsRepository: SettingsRepository = SettingsRepository.getInstance(),
 ) : ViewModel() {
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val container = appContainer
+                TerminalViewModel(
+                    fileRepository = container.fileRepository,
+                    historyFile = File(app.filesDir, "terminal_history.txt"),
+                    settingsRepository = appContainer.settingsRepository
+                )
+            }
+        }
+
+        /**
+         * 终端屏幕输出最大保留行数上限 (Scrollback Limit)
+         * 避免长时间运行或海量输出导致内存暴涨与掉帧
+         */
+        const val MAX_SCROLLBACK_LINES = TerminalScreenBuffer.DEFAULT_MAX_SCROLLBACK_LINES
+    }
+
     private val uiDispatcher: CoroutineDispatcher
-        get() = mainDispatcher ?: runCatching { Dispatchers.Main }.getOrDefault(Dispatchers.Default)
+        get() = mainDispatcher ?: Dispatchers.Main
 
     private val ioDispatcher: CoroutineDispatcher
         get() = mainDispatcher ?: Dispatchers.IO
@@ -170,10 +199,16 @@ class TerminalViewModel(
             currentPath = path
             refreshCachedEntries(cid)
         },
-        fileOpener = fileOpener
+        fileOpener = fileOpener,
+        getKeepFoldersOnTop = {
+            settingsRepository.settingUiStateFlow.value.keepFoldersOnTop
+        },
+        getMoveFailFile = {
+            settingsRepository.getDataSuspend(ConfigKeyUtil.MOVE_FAIL_FILE, "")
+        }
     )
 
-    val historyManager = TerminalHistoryManager()
+    val historyManager = TerminalHistoryManager(historyFile)
     private val registry = CommandRegistryFactory.createDefaultRegistry(
         historyManager = historyManager,
         onClearMemoryHistory = {
@@ -206,13 +241,6 @@ class TerminalViewModel(
         }
     }
 
-    companion object {
-        /**
-         * 终端屏幕输出最大保留行数上限 (Scrollback Limit)
-         * 避免长时间运行或海量输出导致内存暴涨与掉帧
-         */
-        const val MAX_SCROLLBACK_LINES = TerminalScreenBuffer.DEFAULT_MAX_SCROLLBACK_LINES
-    }
 
     /**
      * 安全向终端输出追加单行，带最大回滚行数截断保护，防止长期运行导致内存膨胀

@@ -240,11 +240,11 @@ class SubtitleDelegate(
         val selectedItem = state.selectedSubtitle
         val entries = state.entries
         if (selectedItem == null || entries.isEmpty()) {
-            App.instance.toast("当前未加载或选择任何字幕，无法保存")
+            toastProvider.showToast("当前未加载或选择任何字幕，无法保存")
             return
         }
         if (targetCid.isBlank() || targetCid == "0") {
-            App.instance.toast("无法获取当前视频所在目录 ID")
+            toastProvider.showToast("无法获取当前视频所在目录 ID")
             return
         }
 
@@ -259,12 +259,12 @@ class SubtitleDelegate(
         val uploadFileName = "$numberName.srt"
 
         scope.launch {
-            App.instance.toast("正在处理并保存字幕至 115 网盘...")
+            toastProvider.showToast("正在处理并保存字幕至 115 网盘...")
             runCatching {
                 // 1. 根据当前 entries 和 offsetMs 生成已修改偏移量的 SRT 文本内容
                 val srtContent = SrtParser.generateSrtText(entries, offsetMs)
                 if (srtContent.isBlank()) {
-                    App.instance.toast("字幕导出内容为空")
+                    toastProvider.showToast("字幕导出内容为空")
                     return@launch
                 }
 
@@ -280,7 +280,7 @@ class SubtitleDelegate(
                 if (result.state) {
                     // 5. 上传成功后，重置本地 offsetMs 归 0（因为偏移量已被应用并固化在上传的文件中）
                     //updateState { copy(offsetMs = 0L) }
-                    App.instance.toast("字幕已成功保存并上传至 115 网盘")
+                    toastProvider.showToast("字幕已成功保存并上传至 115 网盘")
                     if (result.data != null) {
                         val subtitleItem = SubtitleItem(
                             id = "115_${result.data.pickCode}",
@@ -294,11 +294,11 @@ class SubtitleDelegate(
                     }
                     onSuccess?.invoke()
                 } else {
-                    App.instance.toast("保存字幕失败: ${result.message}")
+                    toastProvider.showToast("保存字幕失败: ${result.message}")
                 }
             }.onFailure { e ->
                 XLog.e("SubtitleDelegate: 保存并上传字幕发生异常", e)
-                App.instance.toast("保存字幕发生异常: ${e.localizedMessage}")
+                toastProvider.showToast("保存字幕发生异常: ${e.localizedMessage}")
             }
         }
     }

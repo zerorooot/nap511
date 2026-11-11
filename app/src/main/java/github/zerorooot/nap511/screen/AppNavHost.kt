@@ -183,7 +183,7 @@ fun AppNavHost(
         onBack = onPopBack,
         entryProvider = entryProvider {
             entry<Route.Login> {
-                val loginViewModel: LoginViewModel = viewModel()
+                val loginViewModel: LoginViewModel = viewModel(factory = LoginViewModel.Factory)
                 onSetGesturesEnabled(false)
                 LoginScreen { credential ->
                     loginViewModel.performLogin(credential) {
@@ -286,7 +286,7 @@ fun AppNavHost(
             }
 
             entry<Route.AdvancedSettings> {
-                val settingViewModel: SettingViewModel = viewModel()
+                val settingViewModel: SettingViewModel = viewModel(factory = SettingViewModel.Factory)
                 SettingScreen(
                     viewModel = settingViewModel,
                     isExpandedScreen = isExpandedScreen,
@@ -327,7 +327,7 @@ fun AppNavHost(
             }
 
             entry<Route.Terminal> {
-                val terminalViewModel: TerminalViewModel = viewModel()
+                val terminalViewModel: TerminalViewModel = viewModel(factory = TerminalViewModel.Factory)
                 onSetGesturesEnabled(false)
                 terminalViewModel.initDirectoryIfNeeded(fileViewModel.pathList)
                 terminalViewModel.updateFileOpener(fileOpener)
@@ -343,7 +343,7 @@ fun AppNavHost(
             }
 
             entry<Route.RecycleBin> {
-                val recycleViewModel: RecycleViewModel = viewModel()
+                val recycleViewModel: RecycleViewModel = viewModel(factory = RecycleViewModel.Factory)
                 RecycleScreen(recycleViewModel, isGridScreen, gridCellMinSize) {
                     onOpenDrawer()
                 }
@@ -374,7 +374,7 @@ fun AppNavHost(
             }
 
             entry<Route.LogScreen> {
-                val logViewModel: LogViewModel = viewModel(factory = LogViewModel.Factory)
+                val logViewModel: LogViewModel = viewModel()
                 LogScreen(isDualPane = isExpandedScreen, viewModel = logViewModel) {
                     onOpenDrawer()
                 }
@@ -395,7 +395,7 @@ fun AppNavHost(
             }
 
             entry<Route.RepeatFile> {
-                val repeatViewModel: RepeatFileViewModel = viewModel()
+                val repeatViewModel: RepeatFileViewModel = viewModel(factory = RepeatFileViewModel.Factory)
                 RepeatFileScreen(
                     viewModel = repeatViewModel,
                     isGridScreen = isGridScreen,

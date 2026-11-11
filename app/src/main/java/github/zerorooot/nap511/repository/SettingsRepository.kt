@@ -27,7 +27,42 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
-class SettingsRepository {
+/**
+ * 设置仓储契约接口
+ */
+interface SettingsRepository {
+
+    /**
+     * 获取指定 Key 的 Flow 数据流（轻量读取单个 Key）
+     */
+    fun <T : Any> getDataFlow(key: String, defaultValue: T): Flow<T>
+
+    /**
+     * 挂起函数获取指定 Key 的当前值（轻量读取单个 Key）
+     */
+    suspend fun <T : Any> getDataSuspend(key: String, defaultValue: T): T
+
+    /**
+     * 统一暴露设置状态的 StateFlow (支持预热与状态复用)
+     * 【冷启动性能优化】：对 DataStore 磁盘流进行单次映射，
+     * 避免了原先 31 个独立 Flow 及多层 combine 产生的协同与微任务调度开销，显著加速冷启动首帧就绪速度。
+     */
+    val settingUiStateFlow: StateFlow<SettingUiState>
+
+    /**
+     * 保存单个配置项
+     */
+    suspend fun <T : Any> saveData(key: String, newValue: T)
+
+    /**
+     * 导入并解析 JsonObject 配置信息，存储至 DataStore
+     */
+    suspend fun importConfig(jsonObject: JsonObject)
+
+    /**
+     * 重置除登录凭证外的所有配置
+     */
+    suspend fun resetConfig()
 
     companion object {
         @Volatile
@@ -35,8 +70,15 @@ class SettingsRepository {
 
         fun getInstance(): SettingsRepository {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: SettingsRepository().also { INSTANCE = it }
+                INSTANCE ?: DataStoreSettingsRepository().also { INSTANCE = it }
             }
+        }
+
+        /**
+         * 供单元测试侧安全注入 Fake 实例，并在测试结束后复位
+         */
+        fun setInstanceForTesting(instance: SettingsRepository?) {
+            INSTANCE = instance
         }
 
         /**
@@ -57,6 +99,12 @@ class SettingsRepository {
         suspend fun <T : Any> saveData(key: String, newValue: T) =
             getInstance().saveData(key, newValue)
     }
+}
+
+/**
+ * 基于 Jetpack DataStore 的设置仓储默认生产实现
+ */
+class DataStoreSettingsRepository : SettingsRepository {
 
     // 独立的作用域，用于后台预热 DataStore
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -64,14 +112,14 @@ class SettingsRepository {
     /**
      * 获取指定 Key 的 Flow 数据流（轻量读取单个 Key）
      */
-    fun <T : Any> getDataFlow(key: String, defaultValue: T): Flow<T> {
+    override fun <T : Any> getDataFlow(key: String, defaultValue: T): Flow<T> {
         return DataStoreUtil.getDataFlow(key, defaultValue)
     }
 
     /**
      * 挂起函数获取指定 Key 的当前值（轻量读取单个 Key）
      */
-    suspend fun <T : Any> getDataSuspend(key: String, defaultValue: T): T {
+    override suspend fun <T : Any> getDataSuspend(key: String, defaultValue: T): T {
         return DataStoreUtil.getDataSuspend(key, defaultValue)
     }
 
@@ -82,7 +130,7 @@ class SettingsRepository {
      * 【冷启动性能优化】：对 DataStore 磁盘流进行单次映射，
      * 避免了原先 31 个独立 Flow 及多层 combine 产生的协同与微任务调度开销，显著加速冷启动首帧就绪速度。
      */
-    val settingUiStateFlow: StateFlow<SettingUiState> = DataStoreUtil.dataStoreFlow
+    override val settingUiStateFlow: StateFlow<SettingUiState> = DataStoreUtil.dataStoreFlow
         .map { pref ->
             val default = defaultSettingUiState
             SettingUiState(
@@ -130,14 +178,14 @@ class SettingsRepository {
     /**
      * 保存单个配置项
      */
-    suspend fun <T : Any> saveData(key: String, newValue: T) {
+    override suspend fun <T : Any> saveData(key: String, newValue: T) {
         DataStoreUtil.putDataSuspend(key, newValue)
     }
 
     /**
      * 导入并解析 JsonObject 配置信息，存储至 DataStore
      */
-    suspend fun importConfig(jsonObject: JsonObject) {
+    override suspend fun importConfig(jsonObject: JsonObject) {
         jsonObject.entrySet().forEach { (key, element) ->
             if (element.isJsonPrimitive) {
                 val primitive = element.asJsonPrimitive
@@ -162,7 +210,7 @@ class SettingsRepository {
     /**
      * 重置除登录凭证外的所有配置
      */
-    suspend fun resetConfig() {
+    override suspend fun resetConfig() {
         val currentUid = getDataSuspend(ConfigKeyUtil.UID, "")
         val currentCookie = getDataSuspend(ConfigKeyUtil.COOKIE, "")
         val currentAvatar = getDataSuspend(ConfigKeyUtil.AVATAR_BEAN, "")

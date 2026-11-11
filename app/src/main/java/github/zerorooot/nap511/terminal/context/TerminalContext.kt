@@ -5,7 +5,6 @@ import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinator
 import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinatorImpl
 import github.zerorooot.nap511.repository.paging.PagingOptions
@@ -65,12 +64,11 @@ class TerminalContext(
     val onConfirmRequest: (suspend (prompt: String) -> Boolean)? = null,
     val onDirectoryChanged: ((cid: String, path: String) -> Unit)? = null,
     var fileOpener: FileOpener? = null,
-    val getKeepFoldersOnTop: () -> Boolean = {
-        runCatching { SettingsRepository.getInstance().settingUiStateFlow.value.keepFoldersOnTop }.getOrDefault(true)
-    },
+    val getKeepFoldersOnTop: () -> Boolean = { true },
     val getCurrentOrder: () -> OrderBean = {
         OrderBean(type = OrderEnum.create, asc = 0)
-    }
+    },
+    val getMoveFailFile: suspend () -> String = { "" }
 ) {
     val fileRepository: FileRepository = fileRepository
     val pagingCoordinator: DirectoryPagingCoordinator =

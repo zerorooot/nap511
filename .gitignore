@@ -30,6 +30,7 @@ app/src/test/java/github/zerorooot/nap511/*
 !app/src/test/java/github/zerorooot/nap511/viewmodel/
 !app/src/test/java/github/zerorooot/nap511/adapter/
 !app/src/test/java/github/zerorooot/nap511/player/
+!app/src/test/java/github/zerorooot/nap511/di/
 app/src/test/java/github/zerorooot/nap511/worker/
 app/release/
 .artifacts

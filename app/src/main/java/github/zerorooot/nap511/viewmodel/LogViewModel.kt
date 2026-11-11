@@ -40,15 +40,14 @@ import kotlin.time.Duration.Companion.milliseconds
  * @param ioDispatcher IO 协程调度器，支持单测注入模拟
  * @param autoStartWatcher 是否在初始化时自动启动文件监听轮询
  */
-class LogViewModel(
+class LogViewModel @JvmOverloads constructor(
     application: Application,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    autoStartWatcher: Boolean = true
+    private val autoStartWatcher: Boolean = true
 ) : AndroidViewModel(application) {
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                // 从 CreationExtras 中自动提取 Application 实例
                 val application = checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY])
                 LogViewModel(
                     application = application,
@@ -61,6 +60,8 @@ class LogViewModel(
 
     private val _uiState = MutableStateFlow(LogUiState())
     val uiState: StateFlow<LogUiState> = _uiState.asStateFlow()
+    // 创建 LogViewModel 时传入 Application Context 初始化 LogFileManager
+    private val logFileManager = LogFileManager(application)
 
     init {
         if (autoStartWatcher) {
@@ -73,7 +74,7 @@ class LogViewModel(
      */
     fun startFileWatcher() {
         viewModelScope.launch(ioDispatcher) {
-            val logFile = LogFileManager.getLogFile()
+            val logFile = logFileManager.getLogFile()
             var lastModified = if (logFile.exists()) logFile.lastModified() else 0L
             var lastLength = if (logFile.exists()) logFile.length() else 0L
 
@@ -100,7 +101,7 @@ class LogViewModel(
      */
     suspend fun loadLogContent() {
         val raw = try {
-            LogFileManager.readLogText()
+            logFileManager.readLogText()
         } catch (e: Exception) {
             XLog.e("LogViewModel readLogText error", e)
             ""
@@ -144,7 +145,8 @@ class LogViewModel(
     fun selectLevel(level: LogLevel?) {
         XLog.d("LogViewModel selectLevel: ${level?.name ?: "ALL"}")
         _uiState.update { state ->
-            val filtered = if (level == null) state.logs else state.logs.filter { it.level == level }
+            val filtered =
+                if (level == null) state.logs else state.logs.filter { it.level == level }
             val matches = findSearchMatches(filtered, state.searchQuery) { it.raw }
             state.copy(
                 selectedLevelFilter = level,
@@ -180,7 +182,10 @@ class LogViewModel(
         XLog.d("LogViewModel toggleSearch: $isOpen")
         _uiState.update { state ->
             val query = if (!isOpen) "" else state.searchQuery
-            val matches = if (!isOpen) emptyList() else findSearchMatches(state.filteredLogs, query) { it.raw }
+            val matches = if (!isOpen) emptyList() else findSearchMatches(
+                state.filteredLogs,
+                query
+            ) { it.raw }
             state.copy(
                 isSearchOpen = isOpen,
                 searchQuery = query,
@@ -252,7 +257,7 @@ class LogViewModel(
         val fileName = "nap511_log_${LocalDateTime.now().format(formatter)}.txt"
         val content = _uiState.value.logs.joinToString("\n") { it.raw }
         XLog.i("LogViewModel exportLog: $fileName, total lines: ${_uiState.value.logs.size}")
-        LogFileManager.exportLogFile(getApplication(), fileName, content, viewModelScope)
+        logFileManager.exportLogFile(fileName, content, viewModelScope)
     }
 
     /**
@@ -260,7 +265,7 @@ class LogViewModel(
      */
     fun clearLog() {
         XLog.i("LogViewModel clearLog executed")
-        if (LogFileManager.clearLogFile()) {
+        if (logFileManager.clearLogFile()) {
             _uiState.update {
                 it.copy(
                     logs = emptyList(),

@@ -9,6 +9,8 @@ import github.zerorooot.nap511.bean.VideoAttributeBean
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.bean.VideoStarAction
+import github.zerorooot.nap511.repository.FileRepository
+import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.viewmodel.platform.FakeToastProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -44,7 +46,12 @@ class VideoViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        viewModel = VideoViewModel(Application(), fakeToastProvider)
+        viewModel = VideoViewModel(
+            application = Application(),
+            fileRepository = FileRepository.getInstance(),
+            subtitleRepository = SubtitleRepository.getInstance(),
+            toastProvider = fakeToastProvider
+        )
     }
 
     @After

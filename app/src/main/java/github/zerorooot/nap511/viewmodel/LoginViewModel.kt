@@ -1,24 +1,35 @@
 package github.zerorooot.nap511.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.elvishew.xlog.XLog
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
+import github.zerorooot.nap511.di.appContainer
 import github.zerorooot.nap511.repository.AuthRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.screen.auth.LoginCredential
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
 import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class LoginViewModel(
-    private val toastProvider: ToastProvider = AndroidToastProvider(App.instance)
+    private val settingsRepository: SettingsRepository,
+    private val toastProvider: ToastProvider,
 ) : ViewModel() {
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val container = appContainer
+                LoginViewModel(container.settingsRepository, container.toastProvider)
+            }
+        }
+    }
 
     fun performLogin(credential: LoginCredential, onLoginSuccess: () -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -46,17 +57,17 @@ class LoginViewModel(
                                     if (element.isJsonPrimitive) {
                                         val primitive = element.asJsonPrimitive
                                         when {
-                                            primitive.isBoolean -> SettingsRepository.saveData(
+                                            primitive.isBoolean -> settingsRepository.saveData(
                                                 key,
                                                 primitive.asBoolean
                                             )
 
-                                            primitive.isString -> SettingsRepository.saveData(
+                                            primitive.isString -> settingsRepository.saveData(
                                                 key,
                                                 primitive.asString
                                             )
 
-                                            primitive.isNumber -> SettingsRepository.saveData(
+                                            primitive.isNumber -> settingsRepository.saveData(
                                                 key,
                                                 primitive.asNumber
                                             )

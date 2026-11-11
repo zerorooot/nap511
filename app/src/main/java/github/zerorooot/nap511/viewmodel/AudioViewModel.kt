@@ -6,13 +6,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.elvishew.xlog.XLog
 import com.shuyu.gsyvideoplayer.listener.GSYMediaPlayerListener
 import com.shuyu.gsyvideoplayer.player.PlayerFactory
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.SubtitleItem
 import github.zerorooot.nap511.bean.SubtitleUiState
+import github.zerorooot.nap511.di.app
+import github.zerorooot.nap511.di.appContainer
 import github.zerorooot.nap511.player.AudioGSYManager
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SubtitleRepository
@@ -24,7 +29,6 @@ import github.zerorooot.nap511.util.findMatchingSubtitle
 import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.subtitle.SubtitleDelegate
 import github.zerorooot.nap511.util.subtitle.SubtitleEntry
-import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
 import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -53,24 +57,32 @@ data class AudioUiState(
     val subtitle: SubtitleUiState = SubtitleUiState()
 )
 
-class AudioViewModel @JvmOverloads constructor(
+class AudioViewModel(
     application: Application,
-    private val toastProvider: ToastProvider = AndroidToastProvider(application),
+    val fileRepository: FileRepository,
+    val subtitleRepository: SubtitleRepository,
+    private val toastProvider: ToastProvider,
 ) : AndroidViewModel(application) {
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val container = appContainer
+                AudioViewModel(
+                    application = app,
+                    fileRepository = container.fileRepository,
+                    subtitleRepository = container.subtitleRepository,
+                    toastProvider = container.toastProvider
+                )
+            }
+        }
+    }
+
     var positionAfterAt: Boolean = false
     var automaticSubtitle: Boolean = false
 
 
     private val SEEK_STEP_MS = 15000L
     private val context = getApplication<Application>()
-
-    val fileRepository: FileRepository by lazy {
-        FileRepository.getInstance()
-    }
-
-    val subtitleRepository: SubtitleRepository by lazy {
-        SubtitleRepository.getInstance()
-    }
 
     private val subtitleDelegate =
         SubtitleDelegate(subtitleRepository, toastProvider) { newSubtitleState ->

@@ -1,8 +1,8 @@
 package github.zerorooot.nap511.viewmodel
 
-import android.app.Application
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.screen.LogLevel
+import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -53,8 +53,10 @@ class LogViewModelTest {
         UnzipQueueManager.clear()
         Dispatchers.setMain(testDispatcher)
 
+        val testApp = App()
+        App.instance = testApp
         viewModel = LogViewModel(
-            application = Application(),
+            application = testApp,
             ioDispatcher = testDispatcher,
             autoStartWatcher = false
         )

@@ -2,13 +2,11 @@ package github.zerorooot.nap511.util
 
 import android.app.Application
 import android.os.Build
-import android.widget.Toast
 import androidx.compose.foundation.ComposeFoundationFlags
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.work.Configuration
 import coil.ImageLoader
 import coil.ImageLoaderFactory
-import github.zerorooot.nap511.BuildConfig
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import coil.disk.DiskCache
@@ -23,6 +21,9 @@ import com.elvishew.xlog.interceptor.Interceptor
 import com.elvishew.xlog.printer.AndroidPrinter
 import com.elvishew.xlog.printer.file.FilePrinter
 import com.elvishew.xlog.printer.file.clean.FileLastModifiedCleanStrategy
+import github.zerorooot.nap511.BuildConfig
+import github.zerorooot.nap511.di.AppContainer
+import github.zerorooot.nap511.di.DefaultAppContainer
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.network.NetworkClient
 import github.zerorooot.nap511.util.network.OneOneFiveImageExpirationInterceptor
@@ -55,11 +56,12 @@ class AutoTagInterceptor(
 @OptIn(ExperimentalFoundationApi::class)
 class App : Application(), ImageLoaderFactory, Configuration.Provider {
 
-    private var currentToast: Toast? = null
+    /** 应用级依赖注入容器，支持测试环境动态替换为 FakeAppContainer */
+    var container: AppContainer = DefaultAppContainer(this)
 
     companion object {
         lateinit var instance: App
-            private set
+            internal set
     }
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -142,13 +144,12 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
         XLog.init(build, AndroidPrinter(true), print);
     }
 
-    private val toastScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-
+    /**
+     * 全局兼容轻提示方法
+     * 统一委托给 AppContainer 中的 ToastProvider 单例，与全量 ViewModel 弹窗共享互斥与主线程生命周期。
+     */
     fun toast(text: String) {
-        toastScope.launch {
-            currentToast?.cancel()
-            currentToast = Toast.makeText(instance, text, Toast.LENGTH_SHORT).also { it.show() }
-        }
+        container.toastProvider.showToast(text)
     }
 
     fun getStringRes(id: Int): String {

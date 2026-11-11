@@ -1,18 +1,20 @@
 package github.zerorooot.nap511.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.CategoryDetailResponse
 import github.zerorooot.nap511.bean.RepeatFileItem
 import github.zerorooot.nap511.bean.RepeatListResponse
 import github.zerorooot.nap511.bean.RepeatStatusData
+import github.zerorooot.nap511.di.appContainer
 import github.zerorooot.nap511.screen.file.formatBytes
 import github.zerorooot.nap511.service.RepeatService
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.onFailureToastAndLog
-import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
 import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,10 +39,16 @@ data class RepeatUiState(
 )
 
 class RepeatFileViewModel(
-    private val toastProvider: ToastProvider = AndroidToastProvider(App.instance)
+    private val repeatService: RepeatService,
+    private val toastProvider: ToastProvider,
 ) : ViewModel() {
-    private val repeatService: RepeatService by lazy {
-        RepeatService.getInstance()
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val container = appContainer
+                RepeatFileViewModel(container.repeatService, container.toastProvider)
+            }
+        }
     }
 
     private val _uiState = MutableStateFlow(RepeatUiState())

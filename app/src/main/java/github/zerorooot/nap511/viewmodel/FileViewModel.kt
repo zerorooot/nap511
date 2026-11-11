@@ -4,7 +4,10 @@ import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileContentUiState
 import github.zerorooot.nap511.bean.FileDialogUiState
@@ -16,10 +19,11 @@ import github.zerorooot.nap511.bean.RemainingSpaceBean
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoStarAction
+import github.zerorooot.nap511.di.app
+import github.zerorooot.nap511.di.appContainer
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinator
-import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinatorImpl
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.LazyScrollState
 import github.zerorooot.nap511.util.copy
@@ -33,7 +37,7 @@ import github.zerorooot.nap511.viewmodel.platform.AndroidAppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.AndroidBackgroundScheduler
 import github.zerorooot.nap511.viewmodel.platform.AndroidCoilCacheCleaner
 import github.zerorooot.nap511.viewmodel.platform.AndroidServiceBridge
-import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
+import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.FileNavigator
 import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import github.zerorooot.nap511.viewmodel.platform.parseDeepLink
@@ -64,23 +68,39 @@ import java.util.concurrent.ConcurrentHashMap
 @SuppressLint("MutableCollectionMutableState")
 class FileViewModel(
     application: Application,
+    internal val fileRepository: FileRepository,
+    private val settingsRepository: SettingsRepository,
+    val pagingCoordinator: DirectoryPagingCoordinator,
+    private val toastProvider: ToastProvider,
+    val stringProvider: AppStringProvider,
 ) : AndroidViewModel(application), FileNavigator {
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val container = appContainer
+                FileViewModel(
+                    application = app,
+                    fileRepository = container.fileRepository,
+                    settingsRepository = container.settingsRepository,
+                    pagingCoordinator = container.pagingCoordinator,
+                    toastProvider = container.toastProvider,
+                    stringProvider = container.stringProvider
+                )
+            }
+        }
+    }
+
     internal val context = getApplication<Application>()
 
     val settingUiStateFlow: StateFlow<SettingUiState> =
-        SettingsRepository.getInstance().settingUiStateFlow
+        settingsRepository.settingUiStateFlow
 
     // ==================== 1. 独立状态容器与缓存 (Store 层) ====================
-    private val stringProvider = AndroidAppStringProvider(context)
     val stateHolder = FileUiStateHolder(stringProvider)
     val scrollPositionStore = ScrollPositionStore()
     val pagingStateStore = PagingStateStore()
     val imageCacheStore = ImageCacheStore()
     val torrentCacheStore = TorrentCacheStore()
-
-    // 统一目录分页与缓存协同器
-    val pagingCoordinator: DirectoryPagingCoordinator = DirectoryPagingCoordinatorImpl.getInstance()
-    internal val fileRepository: FileRepository by lazy { FileRepository.getInstance() }
 
     // ==================== 2. 状态流与事件流向外暴露 (100% 保持 UI 观察兼容) ====================
 
@@ -112,7 +132,6 @@ class FileViewModel(
 
     // ==================== 3. 构造平台适配器并装配 5 大 Module ====================
 
-    private val toastProvider: ToastProvider = AndroidToastProvider(context)
     private val coilCacheCleaner = AndroidCoilCacheCleaner(context)
     private val serviceBridge = AndroidServiceBridge(context)
     private val backgroundScheduler = AndroidBackgroundScheduler(context, toastProvider)
@@ -327,6 +346,7 @@ class FileViewModel(
     fun createFolder(name: String) = viewModelScope.launch { mutatorModule.createFolder(name) }
     fun rename(fileBean: FileBean? = null, name: String) =
         viewModelScope.launch { mutatorModule.rename(fileBean, name) }
+
     fun batchRename(renameMap: Map<String, String>) =
         viewModelScope.launch { mutatorModule.batchRename(renameMap) }
 

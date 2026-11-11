@@ -3,6 +3,7 @@ package github.zerorooot.nap511.screen
 import android.app.Application
 import android.content.ClipData
 import android.content.ContentValues
+import android.content.Context
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
@@ -360,9 +361,11 @@ object LogParser {
  *
  * 封装日志文件读取、变动检测、清空以及外部存储导出逻辑，与 UI 层解耦。
  */
-object LogFileManager {
+class LogFileManager(context: Context) {
+    // 统一使用 applicationContext，防止外部误传 Activity Context 导致内存泄漏
+    private val appContext: Context = context.applicationContext ?: context
     /** 获取本地日志文件对象 */
-    fun getLogFile(): File = File(App.instance.cacheDir, "log")
+    fun getLogFile(): File = File(appContext.cacheDir, "log")
 
     /** 读取本地日志全量文本 */
     fun readLogText(): String {
@@ -386,14 +389,13 @@ object LogFileManager {
 
     /** 将日志文本导出至系统 Downloads 目录 */
     fun exportLogFile(
-        applicationContext: Application,
         fileName: String,
         content: String,
         coroutine: CoroutineScope
     ) {
         coroutine.launch(Dispatchers.IO) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val resolver = applicationContext.contentResolver
+                val resolver = appContext.contentResolver
                 val values = ContentValues().apply {
                     put(MediaStore.Downloads.DISPLAY_NAME, fileName)
                     put(MediaStore.Downloads.MIME_TYPE, "text/plain")

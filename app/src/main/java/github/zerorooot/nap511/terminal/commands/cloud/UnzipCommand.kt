@@ -1,7 +1,6 @@
 package github.zerorooot.nap511.terminal.commands.cloud
 
 import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.terminal.commands.util.CommandMessages
 import github.zerorooot.nap511.terminal.commands.util.TableAlignment
 import github.zerorooot.nap511.terminal.commands.util.TableFormatter
@@ -17,7 +16,6 @@ import github.zerorooot.nap511.terminal.engine.completion.StandardCompleter
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
 import github.zerorooot.nap511.terminal.viewmodel.emitText
-import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.worker.UnzipQueueManager
 import github.zerorooot.nap511.worker.UnzipTaskItem
 import kotlinx.coroutines.CancellationException
@@ -168,10 +166,8 @@ class UnzipCommand : ActionDispatchCommand<UnzipAction>() {
                 try {
                     collector.emitText("正在提交 ${distinctArchives.size} 个解压任务至后台...")
 
-                    // 查找失败移动目录 CID（按 targetCid 缓存，避免重复网络请求，捕获测试环境无 Android Context 异常）
-                    val moveFailFile = runCatching {
-                        SettingsRepository.getDataSuspend(ConfigKeyUtil.MOVE_FAIL_FILE, "")
-                    }.getOrDefault("")
+                    // 查找失败移动目录 CID（从 TerminalContext 领域函数获取，切断对 DataStore 静态单例的直接耦合）
+                    val moveFailFile = ctx.getMoveFailFile()
                     val errorCidCache = mutableMapOf<String, String?>()
 
                     // 1. 构造独立任务项，每个任务项绑定自身准确的 targetCid

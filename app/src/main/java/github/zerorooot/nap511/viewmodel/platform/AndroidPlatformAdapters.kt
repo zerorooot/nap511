@@ -92,7 +92,7 @@ interface ToastProvider {
 class AndroidToastProvider(
     context: Context
 ) : ToastProvider {
-    private val appContext: Context = context.applicationContext
+    private val appContext: Context = context.applicationContext ?: context
     private var currentToast: Toast? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 

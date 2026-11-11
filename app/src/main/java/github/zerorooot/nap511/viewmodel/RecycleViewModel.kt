@@ -1,19 +1,22 @@
 package github.zerorooot.nap511.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
-import github.zerorooot.nap511.screen.file.RecycleUiState
+import github.zerorooot.nap511.di.appContainer
 import github.zerorooot.nap511.repository.SettingsRepository
+import github.zerorooot.nap511.screen.file.RecycleUiState
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
-import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
 import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,16 +29,22 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 
 class RecycleViewModel(
-    private val toastProvider: ToastProvider = AndroidToastProvider(App.instance)
+    private val fileService: FileService,
+    private val toastProvider: ToastProvider,
 ) : ViewModel() {
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val container = appContainer
+                RecycleViewModel(container.fileService, container.toastProvider)
+            }
+        }
+    }
+
     private val _isRefreshing = MutableStateFlow(false)
     private val _recycleInfo = MutableStateFlow(RecycleInfo())
     private val _recycleFileList = MutableStateFlow<List<RecycleBean>>(emptyList())
     private val _isOpenRecyclePasswordDialog = MutableStateFlow(false)
-
-    private val fileService: FileService by lazy {
-        FileService.getInstance()
-    }
 
     val uiState: StateFlow<RecycleUiState> = combine(
         _recycleFileList,
