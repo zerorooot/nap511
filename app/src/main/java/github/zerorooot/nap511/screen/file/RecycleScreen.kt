@@ -40,7 +40,6 @@ import github.zerorooot.nap511.screen.components.MiddleEllipsisText
 import github.zerorooot.nap511.screen.components.TopBarAction
 import github.zerorooot.nap511.dialog.RecyclePasswordDialog
 import github.zerorooot.nap511.screenitem.RecycleCellItem
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import kotlinx.coroutines.launch
@@ -73,7 +72,6 @@ fun RecycleScreen(
         recycleViewModel.getRecycleFileList()
     }
 
-    val scope = rememberCoroutineScope()
     var deleteIndex by remember {
         mutableIntStateOf(-1)
     }
@@ -93,9 +91,7 @@ fun RecycleScreen(
         onDeleteAll = { recycleViewModel.deleteAll() },
         onPasswordEntered = { password ->
             if (!password.isNullOrEmpty()) {
-                scope.launch {
-                    SettingsRepository.saveData(ConfigKeyUtil.PASSWORD, password)
-                }
+                recycleViewModel.savePassword(password)
 
                 if (deleteIndex == -1) {
                     recycleViewModel.deleteAll()

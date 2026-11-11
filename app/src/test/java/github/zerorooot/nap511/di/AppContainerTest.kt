@@ -1,8 +1,8 @@
 package github.zerorooot.nap511.di
 
 import android.app.Application
+import android.content.Context
 import com.elvishew.xlog.XLog
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.viewmodel.platform.FakeToastProvider
 import github.zerorooot.nap511.worker.UnzipQueueManager
@@ -17,14 +17,25 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppContainerTest {
 
+    @get:Rule
+    val tmpFolder = TemporaryFolder()
+
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var app: Application
     private lateinit var container: DefaultAppContainer
+
+    private class TestApplication(private val filesDirFile: File) : Application() {
+        override fun getApplicationContext(): Context = this
+        override fun getFilesDir(): File = filesDirFile
+    }
 
     @Before
     fun setUp() {
@@ -34,18 +45,15 @@ class AppContainerTest {
         UnzipQueueManager.clear()
         Dispatchers.setMain(testDispatcher)
 
-        SettingsRepository.setInstanceForTesting(github.zerorooot.nap511.viewmodel.platform.FakeSettingsRepository())
-
         val testApp = App()
         App.instance = testApp
-        app = testApp
+        app = TestApplication(tmpFolder.root)
         container = DefaultAppContainer(app)
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
-        SettingsRepository.setInstanceForTesting(null)
     }
 
     @Test
@@ -54,6 +62,7 @@ class AppContainerTest {
         assertNotNull("fileRepository should not be null", container.fileRepository)
         assertNotNull("subtitleRepository should not be null", container.subtitleRepository)
         assertNotNull("settingsRepository should not be null", container.settingsRepository)
+        assertNotNull("authRepository should not be null", container.authRepository)
         assertNotNull("fileService should not be null", container.fileService)
         assertNotNull("repeatService should not be null", container.repeatService)
         assertNotNull("pagingCoordinator should not be null", container.pagingCoordinator)
@@ -67,6 +76,7 @@ class AppContainerTest {
         assertSame(container.fileRepository, container.fileRepository)
         assertSame(container.subtitleRepository, container.subtitleRepository)
         assertSame(container.settingsRepository, container.settingsRepository)
+        assertSame(container.authRepository, container.authRepository)
         assertSame(container.fileService, container.fileService)
         assertSame(container.repeatService, container.repeatService)
         assertSame(container.pagingCoordinator, container.pagingCoordinator)

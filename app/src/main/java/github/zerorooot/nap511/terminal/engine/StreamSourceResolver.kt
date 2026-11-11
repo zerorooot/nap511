@@ -55,7 +55,7 @@ object StreamSourceResolver {
         ctx: TerminalContext,
         fileOperands: List<String>,
         stdin: Flow<String>,
-        maxKb: Int = TextFileHelper.getDefaultSizeLimitKb()
+        maxKb: Int = ctx.getTextSizeLimitKb()
     ): List<StreamSourceItem> {
         // 场景 1：无文件操作数或显式指定 "-"，回退为标准输入 stdin
         if (fileOperands.isEmpty() || (fileOperands.size == 1 && fileOperands[0] == "-")) {

@@ -21,7 +21,6 @@ import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileCacheManager
@@ -38,7 +37,8 @@ class UnzipAllFileWorker(
 ) : CoroutineWorker(appContext, workerParams) {
     private val NOTIFICATION_ID = 1001
     private val CHANNEL_ID = "unzip_completion_channel"
-   private val maxWaitMs = 20 * 1000L // 最大轮询等待 20 秒
+    private val maxWaitMs = 20 * 1000L // 最大轮询等待 20 秒
+
     @Volatile
     private var lastUpdateTime: Long = 0
     private val UPDATE_INTERVAL = 500L // 500毫秒更新一次，避免频繁刷新导致系统丢弃更新
@@ -126,7 +126,8 @@ class UnzipAllFileWorker(
             Triple("$currentStatus ($p/$t)...", "$p/$t", "0")
         } else {
             // 解决完成瞬间加包：若当前单文件已完成/失败则当前步数为 p，处理中则为 (p + 1)
-            val isDone = currentStatus.startsWith("解压完成") || currentStatus.startsWith("解压失败")
+            val isDone =
+                currentStatus.startsWith("解压完成") || currentStatus.startsWith("解压失败")
             val step = if (isDone) p else (p + 1).coerceAtMost(t)
             val text = "${currentItem.fileBean.name} $currentStatus ($step/$t)"
             XLog.v("UnzipAllFileWorker 刷新通知: $text")
@@ -438,7 +439,8 @@ class UnzipAllFileWorker(
         defaultCid: String,
         explicitErrorCid: String?
     ): MoveFailResult? {
-        val data = SettingsRepository.getDataSuspend(ConfigKeyUtil.MOVE_FAIL_FILE, "")
+        val data = (applicationContext as App).container.settingsRepository
+            .getDataSuspend(ConfigKeyUtil.MOVE_FAIL_FILE, "")
         if (data.isEmpty()) {
             XLog.d("handleFailedFiles 不移动解压失败的文件")
             return null

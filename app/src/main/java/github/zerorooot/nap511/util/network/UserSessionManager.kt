@@ -5,9 +5,14 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import github.zerorooot.nap511.bean.SettingUiState
-import github.zerorooot.nap511.repository.SettingsRepository
-import github.zerorooot.nap511.util.ConfigKeyUtil
 
+/**
+ * 全局用户会话内存状态管理器 (UserSessionManager)
+ *
+ * 遵循职责单一与纯内存状态原则：
+ * 仅负责应用运行期间会话凭证（Cookie、UID、请求阈值等）的快速存取与状态观察。
+ * 磁盘持久化完全解耦，由上层领域仓储（如 SettingsRepository / AuthRepository）统一负责。
+ */
 object UserSessionManager {
     var cookie: String by mutableStateOf("")
         private set
@@ -24,14 +29,12 @@ object UserSessionManager {
         this.requestLimitCount = requestLimitCount
     }
 
-    suspend fun updateSession(newCookie: String, newUid: String) {
+    fun updateSession(newCookie: String, newUid: String) {
         this.cookie = newCookie
         this.uid = newUid
-        SettingsRepository.saveData(ConfigKeyUtil.COOKIE, newCookie)
-        SettingsRepository.saveData(ConfigKeyUtil.UID, newUid)
     }
 
-    suspend fun clearSession() {
+    fun clearSession() {
         updateSession("", "")
     }
 
@@ -43,3 +46,4 @@ object UserSessionManager {
         this.requestLimitCount = count.toInt()
     }
 }
+

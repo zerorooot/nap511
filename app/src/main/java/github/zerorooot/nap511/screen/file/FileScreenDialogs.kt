@@ -5,7 +5,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elvishew.xlog.XLog
 import com.google.gson.JsonParser
@@ -25,11 +24,9 @@ import github.zerorooot.nap511.dialog.SearchDialog
 import github.zerorooot.nap511.dialog.UnzipAllFile
 import github.zerorooot.nap511.dialog.UnzipDialog
 import github.zerorooot.nap511.dialog.UnzipPassword
-import github.zerorooot.nap511.repository.AuthRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
-import kotlinx.coroutines.launch
 
 @ExperimentalMaterial3Api
 @Composable
@@ -38,7 +35,6 @@ fun CreateDialogs(
     settingUiState: SettingUiState,
     onNav: (Route) -> Unit
 ) {
-    val scope = rememberCoroutineScope()
     val dialogState by fileViewModel.dialogState.collectAsStateWithLifecycle()
     val targetBean = dialogState.targetFileBean
 
@@ -109,11 +105,7 @@ fun CreateDialogs(
                     val jsonObject = JsonParser.parseString(it).asJsonObject
                     val url = jsonObject.get(ConfigKeyUtil.ARIA2_URL).asString
                     val token = jsonObject.get(ConfigKeyUtil.ARIA2_TOKEN).asString
-                    scope.launch {
-                        AuthRepository.checkAndSaveAria2(url, token)
-                            .onSuccess { msg -> App.instance.toast(msg) }
-                            .onFailure { err -> App.instance.toast("aria2配置失败: ${err.localizedMessage}") }
-                    }
+                    fileViewModel.checkAndSaveAria2(url, token)
                 }
             }
         }

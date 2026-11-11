@@ -97,8 +97,9 @@ class Sha1Service : Service() {
     }
      */
     private suspend fun sendToAria2(fileBeanDownloadList: ArrayList<String>) {
-        val aria2Token = SettingsRepository.getDataSuspend(ConfigKeyUtil.ARIA2_TOKEN, "")
-        val aria2Url = SettingsRepository.getDataSuspend(
+        val settingsRepository = (application as App).container.settingsRepository
+        val aria2Token = settingsRepository.getDataSuspend(ConfigKeyUtil.ARIA2_TOKEN, "")
+        val aria2Url = settingsRepository.getDataSuspend(
             ConfigKeyUtil.ARIA2_URL,
             ""
         ) + "?tm=${System.currentTimeMillis()}"

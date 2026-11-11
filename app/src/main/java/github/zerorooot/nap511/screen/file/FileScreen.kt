@@ -56,7 +56,6 @@ import github.zerorooot.nap511.bean.ForceOpenType
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.dialog.ForceOpenDialog
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.screen.components.AppBarAction
 import github.zerorooot.nap511.screen.components.MenuItemAction
 import github.zerorooot.nap511.screen.components.TopBarAction
@@ -452,9 +451,7 @@ fun FileScreen(
                 batterySettingLauncher.launch(intent)
             },
             onDismissBatteryBanner = {
-                scope.launch {
-                    SettingsRepository.saveData(ConfigKeyUtil.HIDE_BATTERY_BANNER, true)
-                }
+                fileViewModel.hideBatteryBanner()
             }
         )
 
@@ -470,14 +467,10 @@ fun FileScreen(
                 }
             },
             onPathLongClick = { name, cid ->
-                scope.launch {
-                    SettingsRepository.saveData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, cid)
-                    val index = contentState.pathList.indexOfFirst { it.cid == cid }
-                    val pathString = contentState.pathList.take(index + 1)
-                        .joinToString(separator = "/") { it.name }
-                    SettingsRepository.saveData(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, pathString)
-                }
-                App.instance.toast("设置默认离线位置为: $name")
+                val index = contentState.pathList.indexOfFirst { it.cid == cid }
+                val pathString = contentState.pathList.take(index + 1)
+                    .joinToString(separator = "/") { it.name }
+                fileViewModel.setDefaultOfflinePath(name, cid, pathString)
             },
             onPathItemClick = {
                 if (it != contentState.currentCid) {
@@ -526,15 +519,9 @@ fun FileScreen(
                 fileViewModel.unzipFile(fileBean)
             },
             onSetOfflineCid = { fileBean ->
-                scope.launch {
-                    SettingsRepository.saveData(
-                        ConfigKeyUtil.DEFAULT_OFFLINE_CID, fileBean.categoryId
-                    )
-                    val pathString =
-                        contentState.pathList.joinToString(separator = "/") { it.name } + "/${fileBean.name}"
-                    SettingsRepository.saveData(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, pathString)
-                }
-                App.instance.toast("设置默认离线位置为: ${fileBean.name}")
+                val pathString =
+                    contentState.pathList.joinToString(separator = "/") { it.name } + "/${fileBean.name}"
+                fileViewModel.setDefaultOfflinePath(fileBean.name, fileBean.categoryId, pathString)
             },
             onAria2Download = ::onMenuAria2Download,
             onForceOpen = { showForceOpenDialog = it },

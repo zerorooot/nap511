@@ -14,20 +14,45 @@ import github.zerorooot.nap511.util.network.UserSessionManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-object AuthRepository {
-    private val gson = Gson()
-    private val okHttpClient get() = NetworkClient.sharedOkHttpClient
-    private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+/**
+ * 账号鉴权与远程 RPC 服务仓储契约
+ */
+interface AuthRepository {
     /**
      * 校验 115 登录凭证（Cookie）并同步 UserSession 与 Avatar 信息
      */
-    suspend fun checkLogin(cookie: String): Result<AvatarBean> = withContext(Dispatchers.IO) {
+    suspend fun checkLogin(cookie: String): Result<AvatarBean>
+
+    /**
+     * 校验 Aria2 连通性并保存配置
+     */
+    suspend fun checkAndSaveAria2(
+        aria2Url: String,
+        aria2Token: String
+    ): Result<String>
+}
+
+/**
+ * 默认生产环境鉴权与 RPC 服务仓储实现
+ */
+class DefaultAuthRepository(
+    private val settingsRepository: SettingsRepository,
+    private val okHttpClient: OkHttpClient = NetworkClient.sharedOkHttpClient
+) : AuthRepository {
+    private val gson = Gson()
+    private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+
+    /**
+     * 校验 115 登录凭证（Cookie）并同步 UserSession 与 Avatar 信息
+     */
+    override suspend fun checkLogin(cookie: String): Result<AvatarBean> = withContext(Dispatchers.IO) {
         val timestamp = System.currentTimeMillis() / 1000
         val avatarUrl = "https://my.115.com/?ct=ajax&ac=nav&_$timestamp"
         val ua = ConfigKeyUtil.USER_AGENT
@@ -57,19 +82,23 @@ object AuthRepository {
                     .atZone(ZoneId.systemDefault())
                     .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
 
+                // 纯内存态更新 UserSession
                 UserSessionManager.updateSession(cookie, avatarBean.userId)
-                SettingsRepository.saveData(ConfigKeyUtil.AVATAR_BEAN, gson.toJson(avatarBean))
+                // 链式顺序写 DataStore 进行持久化落盘
+                settingsRepository.saveData(ConfigKeyUtil.COOKIE, cookie)
+                settingsRepository.saveData(ConfigKeyUtil.UID, avatarBean.userId)
+                settingsRepository.saveData(ConfigKeyUtil.AVATAR_BEAN, gson.toJson(avatarBean))
+                XLog.d("DefaultAuthRepository: checkLogin successful for userId ${avatarBean.userId}")
 
                 avatarBean
             }
         }
     }
 
-
     /**
      * 校验 Aria2 连通性并保存配置
      */
-    suspend fun checkAndSaveAria2(
+    override suspend fun checkAndSaveAria2(
         aria2Url: String,
         aria2Token: String
     ): Result<String> = withContext(Dispatchers.IO) {
@@ -100,8 +129,9 @@ object AuthRepository {
                     val errorMsg = bodyJson.getAsJsonObject("error")?.get("message")?.asString
                     error("aria2配置失败, ${errorMsg ?: "未知错误"}")
                 } else {
-                    SettingsRepository.saveData(ConfigKeyUtil.ARIA2_URL, aria2Url)
-                    SettingsRepository.saveData(ConfigKeyUtil.ARIA2_TOKEN, aria2Token)
+                    settingsRepository.saveData(ConfigKeyUtil.ARIA2_URL, aria2Url)
+                    settingsRepository.saveData(ConfigKeyUtil.ARIA2_TOKEN, aria2Token)
+                    XLog.d("DefaultAuthRepository: aria2 configured successfully for $aria2Url")
                     "aria2配置成功，请重新下载文件"
                 }
             }

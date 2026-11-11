@@ -31,12 +31,17 @@ import java.util.Locale
 class RecycleViewModel(
     private val fileService: FileService,
     private val toastProvider: ToastProvider,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val container = appContainer
-                RecycleViewModel(container.fileService, container.toastProvider)
+                RecycleViewModel(
+                    container.fileService,
+                    container.toastProvider,
+                    container.settingsRepository
+                )
             }
         }
     }
@@ -89,7 +94,7 @@ class RecycleViewModel(
 
     fun delete(index: Int) {
         viewModelScope.launch {
-            val password = SettingsRepository.getDataSuspend(ConfigKeyUtil.PASSWORD, "")
+            val password = settingsRepository.getDataSuspend(ConfigKeyUtil.PASSWORD, "")
             if (password == "") {
                 _isOpenRecyclePasswordDialog.value = true
                 return@launch
@@ -109,11 +114,11 @@ class RecycleViewModel(
                 val message = if (revert.state) {
                     _recycleFileList.update { list -> list.filterIndexed { i, _ -> i != index } }
                     if (save) {
-                        SettingsRepository.saveData(ConfigKeyUtil.PASSWORD, password)
+                        settingsRepository.saveData(ConfigKeyUtil.PASSWORD, password)
                     }
                     "删除成功"
                 } else {
-                    SettingsRepository.saveData(ConfigKeyUtil.PASSWORD, "")
+                    settingsRepository.saveData(ConfigKeyUtil.PASSWORD, "")
                     "删除失败，${revert.errorMsg}"
                 }
                 toastProvider.showToast(message)
@@ -124,7 +129,7 @@ class RecycleViewModel(
     fun deleteAll() {
         viewModelScope.launch {
             runCatching {
-                val password = SettingsRepository.getDataSuspend(ConfigKeyUtil.PASSWORD, "")
+                val password = settingsRepository.getDataSuspend(ConfigKeyUtil.PASSWORD, "")
                 if (password == "") {
                     _isOpenRecyclePasswordDialog.value = true
                     return@launch
@@ -139,6 +144,12 @@ class RecycleViewModel(
                 }
                 toastProvider.showToast(message)
             }.onFailureToastAndLog(toastProvider)
+        }
+    }
+
+    fun savePassword(password: String) {
+        viewModelScope.launch {
+            settingsRepository.saveData(ConfigKeyUtil.PASSWORD, password)
         }
     }
 

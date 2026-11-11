@@ -23,7 +23,6 @@ import github.zerorooot.nap511.MainActivity
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.OfflineTaskActivity
 import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileCacheManager
@@ -66,9 +65,10 @@ class OfflineTaskWorker(
         }
 
 
-        val cid = SettingsRepository.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
+        val settingsRepository = (applicationContext as App).container.settingsRepository
+        val cid = settingsRepository.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
         val path =
-            SettingsRepository.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, "/根目录/云下载")
+            settingsRepository.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, "/根目录/云下载")
                 .substringAfterLast("/")
 
         val addTaskReturn = fileRepository.addOfflineTask(a, cid, path) {}
@@ -79,7 +79,7 @@ class OfflineTaskWorker(
         val message = addTaskReturn.second
         if (state) {
             //清空缓存
-            SettingsRepository.saveData(
+            settingsRepository.saveData(
                 ConfigKeyUtil.CURRENT_OFFLINE_TASK,
                 ""
             )

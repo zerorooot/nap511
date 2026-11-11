@@ -32,6 +32,7 @@ class TerminalViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var viewModel: TerminalViewModel
     private lateinit var tempHistoryFile: java.io.File
+    private val fakeSettingsRepo = github.zerorooot.nap511.viewmodel.platform.FakeSettingsRepository()
 
     @Before
     fun setup() {
@@ -39,9 +40,6 @@ class TerminalViewModelTest {
             com.elvishew.xlog.XLog.init()
         } catch (_: Throwable) {}
         github.zerorooot.nap511.worker.UnzipQueueManager.clear()
-
-        val fakeSettingsRepo = github.zerorooot.nap511.viewmodel.platform.FakeSettingsRepository()
-        github.zerorooot.nap511.repository.SettingsRepository.setInstanceForTesting(fakeSettingsRepo)
 
         tempHistoryFile = java.io.File.createTempFile("test_term_hist", ".txt").apply { deleteOnExit() }
         Dispatchers.setMain(testDispatcher)
@@ -54,15 +52,16 @@ class TerminalViewModelTest {
             fileRepository = FileRepository.getInstance(),
             avatarBean = avatar,
             mainDispatcher = testDispatcher,
-            historyFile = tempHistoryFile
+            historyFile = tempHistoryFile,
+            settingsRepository = fakeSettingsRepo
         )
     }
 
     @After
     fun tearDown() {
+        testDispatcher.scheduler.advanceUntilIdle()
         Dispatchers.resetMain()
         tempHistoryFile.delete()
-        github.zerorooot.nap511.repository.SettingsRepository.setInstanceForTesting(null)
     }
 
     @Test
@@ -426,7 +425,7 @@ class TerminalViewModelTest {
             fileRepository = testRepo,
             mainDispatcher = testDispatcher,
             historyFile = tempHistoryFile,
-            settingsRepository = SettingsRepository.getInstance()
+            settingsRepository = fakeSettingsRepo
         )
 
         // 输入 "trash -r doc" 并触发补全计算，光标位于末尾
@@ -472,7 +471,7 @@ class TerminalViewModelTest {
             fileRepository = testRepo,
             mainDispatcher = testDispatcher,
             historyFile = tempHistoryFile,
-            settingsRepository = SettingsRepository.getInstance()
+            settingsRepository = fakeSettingsRepo
         )
 
         // 1. cat 补全：仅包含 folder 和 readme.txt
@@ -528,7 +527,7 @@ class TerminalViewModelTest {
             fileRepository = testRepo,
             mainDispatcher = testDispatcher,
             historyFile = tempHistoryFile,
-            settingsRepository = SettingsRepository.getInstance()
+            settingsRepository = fakeSettingsRepo
         )
         vm.refreshCachedEntriesAsync(vm.currentCid)
 
@@ -605,7 +604,7 @@ class TerminalViewModelTest {
             fileRepository = testRepo,
             mainDispatcher = testDispatcher,
             historyFile = tempHistoryFile,
-            settingsRepository = SettingsRepository.getInstance()
+            settingsRepository = fakeSettingsRepo
         )
         vm.context.fileCacheManager.put(
             "0",

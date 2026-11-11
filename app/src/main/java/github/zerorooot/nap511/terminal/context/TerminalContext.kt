@@ -10,6 +10,7 @@ import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinatorImpl
 import github.zerorooot.nap511.repository.paging.PagingOptions
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.FileOpener
+import github.zerorooot.nap511.util.TextFileHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -68,7 +69,8 @@ class TerminalContext(
     val getCurrentOrder: () -> OrderBean = {
         OrderBean(type = OrderEnum.create, asc = 0)
     },
-    val getMoveFailFile: suspend () -> String = { "" }
+    val getMoveFailFile: suspend () -> String = { "" },
+    val getTextSizeLimitKb: () -> Int = { TextFileHelper.DEFAULT_TXT_SIZE_KB }
 ) {
     val fileRepository: FileRepository = fileRepository
     val pagingCoordinator: DirectoryPagingCoordinator =

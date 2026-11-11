@@ -48,15 +48,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.acsbendi.requestinspectorwebview.RequestInspectorWebViewClient
 import com.acsbendi.requestinspectorwebview.WebViewRequest
 import com.elvishew.xlog.XLog
-import github.zerorooot.nap511.repository.AuthRepository
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.network.NetworkClient
 import github.zerorooot.nap511.util.network.UserSessionManager
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
@@ -223,7 +218,10 @@ fun BaseWebViewScreen(
 
 @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
 @Composable
-fun WebViewScreen(onClick: () -> Unit) {
+fun WebViewScreen(
+    isLogEnabled: Boolean = false,
+    onClick: () -> Unit
+) {
     var isReady by remember { mutableStateOf(false) }
     val initialUrl = "https://115.com/storage/allfiles?cid=0&mode=wangpan"
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
@@ -245,14 +243,10 @@ fun WebViewScreen(onClick: () -> Unit) {
             }
         }
     }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(isLogEnabled) {
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
-        WebView.setWebContentsDebuggingEnabled(
-            SettingsRepository.getDataSuspend(
-                ConfigKeyUtil.LOG, false
-            )
-        )
+        WebView.setWebContentsDebuggingEnabled(isLogEnabled)
         setRawCookieString(UserSessionManager.cookie) {
             isReady = true
         }
@@ -293,10 +287,12 @@ fun setRawCookieString(rawCookieString: String, isReady: () -> Unit) {
         isReady.invoke()
     }
 }
+
 private val logKeywords = listOf(
     ".js", ".css", "/api/", "upload", "offline",
     "files", "task", "ajax", "dialog"
 )
+
 fun webViewClient(onUrl: (String) -> Unit): WebViewClient {
     return object : WebViewClient() {
         override fun shouldInterceptRequest(
@@ -1148,15 +1144,21 @@ fun webViewClient(onUrl: (String) -> Unit): WebViewClient {
 }
 
 @Composable
-fun LoginWebViewScreen(onClick: () -> Unit) {
+fun LoginWebViewScreen(
+    onCookieCaptured: ((String) -> Unit)? = null,
+    onClick: () -> Unit
+) {
     BaseWebViewScreen(
         topAppBarActionButtonOnClick = onClick,
-        webViewClient = { loginWebViewClient(it) },
+        webViewClient = { loginWebViewClient(it, onCookieCaptured) },
         loadUrl = "https://115.com/"
     )
 }
 
-fun loginWebViewClient(webView: WebView): WebViewClient {
+fun loginWebViewClient(
+    webView: WebView,
+    onCookieCaptured: ((String) -> Unit)? = null
+): WebViewClient {
     return object : RequestInspectorWebViewClient(webView) {
         override fun shouldInterceptRequest(
             view: WebView, webViewRequest: WebViewRequest
@@ -1184,11 +1186,7 @@ fun loginWebViewClient(webView: WebView): WebViewClient {
             }
 
             if (cookie != null) {
-                CoroutineScope(Dispatchers.IO).launch {
-                    AuthRepository.checkLogin(cookie)
-                        .onSuccess { App.instance.toast("登录成功～") }
-                        .onFailure { App.instance.toast("验证失败: ${it.localizedMessage}") }
-                }
+                onCookieCaptured?.invoke(cookie)
             }
             return super.shouldInterceptRequest(view, webViewRequest)
         }

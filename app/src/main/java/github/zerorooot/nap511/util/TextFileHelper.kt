@@ -3,7 +3,6 @@ package github.zerorooot.nap511.util
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.TextFileHelper.DEFAULT_TXT_SIZE_KB
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -60,27 +59,16 @@ object TextFileHelper {
     }
 
     /**
-     * 从全局设置中读取配置的文本大小上限（KB）
-     * 若未配置或解析失败，降级返回默认值 [DEFAULT_TXT_SIZE_KB]
-     */
-    fun getDefaultSizeLimitKb(): Int {
-        val configured = runCatching {
-            SettingsRepository.getInstance()
-                .settingUiStateFlow.value.txtSize.toIntOrNull()
-        }.getOrNull()
-        return configured ?: DEFAULT_TXT_SIZE_KB
-    }
-
-    /**
      * 校验文件是否满足文本类型与大小限制规范
      *
      * @param fileBean 要检验的文件元数据
-     * @param maxKb 允许的最大文件大小（单位：KB），默认为全局设置项
+     * @param maxKb 允许的最大文件大小（单位：KB），默认为兜底阈值 [DEFAULT_TXT_SIZE_KB]
+     * @param checkType 是否校验文件类型（默认 true）
      * @return 校验结果密封类 [TextValidationResult]
      */
     fun validate(
         fileBean: FileBean,
-        maxKb: Int = getDefaultSizeLimitKb(),
+        maxKb: Int = DEFAULT_TXT_SIZE_KB,
         checkType: Boolean = true // 新增参数，默认为 true 保持向下兼容
     ): TextValidationResult {
         // 仅在 checkType 为 true 时进行文件类型校验

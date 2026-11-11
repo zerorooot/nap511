@@ -21,9 +21,11 @@ import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoStarAction
 import github.zerorooot.nap511.di.app
 import github.zerorooot.nap511.di.appContainer
+import github.zerorooot.nap511.repository.AuthRepository
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinator
+import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.LazyScrollState
 import github.zerorooot.nap511.util.copy
@@ -33,7 +35,6 @@ import github.zerorooot.nap511.viewmodel.module.FileCacheSyncModule
 import github.zerorooot.nap511.viewmodel.module.FileIntegrationModule
 import github.zerorooot.nap511.viewmodel.module.FileMediaModule
 import github.zerorooot.nap511.viewmodel.module.FileMutatorModule
-import github.zerorooot.nap511.viewmodel.platform.AndroidAppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.AndroidBackgroundScheduler
 import github.zerorooot.nap511.viewmodel.platform.AndroidCoilCacheCleaner
 import github.zerorooot.nap511.viewmodel.platform.AndroidServiceBridge
@@ -47,6 +48,7 @@ import github.zerorooot.nap511.viewmodel.store.PagingStateStore
 import github.zerorooot.nap511.viewmodel.store.ScrollPositionStore
 import github.zerorooot.nap511.viewmodel.store.TorrentCacheStore
 import github.zerorooot.nap511.worker.UnzipQueueManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
@@ -70,6 +72,7 @@ class FileViewModel(
     application: Application,
     internal val fileRepository: FileRepository,
     private val settingsRepository: SettingsRepository,
+    private val authRepository: AuthRepository,
     val pagingCoordinator: DirectoryPagingCoordinator,
     private val toastProvider: ToastProvider,
     val stringProvider: AppStringProvider,
@@ -82,6 +85,7 @@ class FileViewModel(
                     application = app,
                     fileRepository = container.fileRepository,
                     settingsRepository = container.settingsRepository,
+                    authRepository = container.authRepository,
                     pagingCoordinator = container.pagingCoordinator,
                     toastProvider = container.toastProvider,
                     stringProvider = container.stringProvider
@@ -94,6 +98,31 @@ class FileViewModel(
 
     val settingUiStateFlow: StateFlow<SettingUiState> =
         settingsRepository.settingUiStateFlow
+
+    val avatarJsonFlow: Flow<String> =
+        settingsRepository.getDataFlow(ConfigKeyUtil.AVATAR_BEAN, "{}")
+
+    fun hideBatteryBanner() {
+        viewModelScope.launch {
+            settingsRepository.saveData(ConfigKeyUtil.HIDE_BATTERY_BANNER, true)
+        }
+    }
+
+    fun setDefaultOfflinePath(name: String, cid: String, path: String) {
+        viewModelScope.launch {
+            settingsRepository.saveData(ConfigKeyUtil.DEFAULT_OFFLINE_CID, cid)
+            settingsRepository.saveData(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, path)
+        }
+        toastProvider.showToast("设置默认离线位置为: $name")
+    }
+
+    fun checkAndSaveAria2(url: String, token: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = authRepository.checkAndSaveAria2(url, token)
+            result.onSuccess { msg -> toastProvider.showToast(msg) }
+                .onFailure { err -> toastProvider.showToast("aria2配置失败: ${err.localizedMessage}") }
+        }
+    }
 
     // ==================== 1. 独立状态容器与缓存 (Store 层) ====================
     val stateHolder = FileUiStateHolder(stringProvider)

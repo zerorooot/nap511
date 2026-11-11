@@ -1,18 +1,17 @@
 package github.zerorooot.nap511.di
 
 import android.app.Application
-import android.content.Context
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.CreationExtras
-import com.elvishew.xlog.XLog
+import github.zerorooot.nap511.repository.AuthRepository
+import github.zerorooot.nap511.repository.DataStoreSettingsRepository
+import github.zerorooot.nap511.repository.DefaultAuthRepository
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinator
 import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinatorImpl
+import github.zerorooot.nap511.repository.settingDataStore
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.RepeatService
 import github.zerorooot.nap511.util.App
@@ -31,6 +30,7 @@ interface AppContainer {
     val fileRepository: FileRepository
     val subtitleRepository: SubtitleRepository
     val settingsRepository: SettingsRepository
+    val authRepository: AuthRepository
     val fileService: FileService
     val repeatService: RepeatService
     val pagingCoordinator: DirectoryPagingCoordinator
@@ -40,39 +40,32 @@ interface AppContainer {
  * 生产环境默认依赖容器实现
  */
 class DefaultAppContainer(private val application: Application) : AppContainer {
-    // 在容器内部声明 DataStore，利用 Context 保证进程内唯一单例
-    private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "Setting")
 
     override val toastProvider: ToastProvider by lazy {
-        XLog.d("DefaultAppContainer: initializing AndroidToastProvider singleton")
         AndroidToastProvider(application)
     }
     override val stringProvider: AppStringProvider by lazy {
-        XLog.d("DefaultAppContainer: initializing AndroidAppStringProvider singleton")
         AndroidAppStringProvider(application)
     }
     override val fileRepository: FileRepository by lazy {
-        XLog.d("DefaultAppContainer: initializing FileRepository singleton")
         FileRepository.getInstance()
     }
     override val subtitleRepository: SubtitleRepository by lazy {
-        XLog.d("DefaultAppContainer: initializing SubtitleRepository singleton")
         SubtitleRepository.getInstance()
     }
     override val settingsRepository: SettingsRepository by lazy {
-        XLog.d("DefaultAppContainer: initializing SettingsRepository singleton")
-        SettingsRepository.getInstance()
+        DataStoreSettingsRepository(application.settingDataStore)
+    }
+    override val authRepository: AuthRepository by lazy {
+        DefaultAuthRepository(settingsRepository)
     }
     override val fileService: FileService by lazy {
-        XLog.d("DefaultAppContainer: initializing FileService singleton")
         FileService.getInstance()
     }
     override val repeatService: RepeatService by lazy {
-        XLog.d("DefaultAppContainer: initializing RepeatService singleton")
         RepeatService.getInstance()
     }
     override val pagingCoordinator: DirectoryPagingCoordinator by lazy {
-        XLog.d("DefaultAppContainer: initializing DirectoryPagingCoordinator singleton")
         DirectoryPagingCoordinatorImpl.getInstance()
     }
 }

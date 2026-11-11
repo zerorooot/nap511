@@ -52,12 +52,17 @@ data class OfflineFileUiState(
 class OfflineFileViewModel(
     private val fileRepository: FileRepository,
     private val toastProvider: ToastProvider,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val container = appContainer
-                OfflineFileViewModel(container.fileRepository, container.toastProvider)
+                OfflineFileViewModel(
+                    container.fileRepository,
+                    container.toastProvider,
+                    container.settingsRepository
+                )
             }
         }
     }
@@ -358,7 +363,7 @@ class OfflineFileViewModel(
                 toastProvider.showToast(addOfflineTask.second)
                 if (addOfflineTask.first) {
                     //清空缓存
-                    SettingsRepository.saveData(
+                    settingsRepository.saveData(
                         ConfigKeyUtil.CURRENT_OFFLINE_TASK,
                         ""
                     )
@@ -372,7 +377,7 @@ class OfflineFileViewModel(
         viewModelScope.launch {
             runCatching {
                 val map = hashMapOf("hash[0]" to offlineTask.infoHash)
-                map["uid"] = SettingsRepository.getDataSuspend(ConfigKeyUtil.UID, "")
+                map["uid"] = settingsRepository.getDataSuspend(ConfigKeyUtil.UID, "")
                 map["sign"] = fileRepository.getOfflineSign().sign
                 map["time"] = (System.currentTimeMillis() / 1000).toString()
                 val deleteTask = fileRepository.deleteOfflineTask(map)

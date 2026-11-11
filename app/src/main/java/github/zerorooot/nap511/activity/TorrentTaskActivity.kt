@@ -6,7 +6,6 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.lifecycle.lifecycleScope
 import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import kotlinx.coroutines.launch
@@ -24,7 +23,8 @@ class TorrentTaskActivity : androidx.activity.ComponentActivity() {
             val torrentFile = fileFromContentUri(this, intent.data!!)
             lifecycleScope.launch {
                 val defaultOfflineCid =
-                    SettingsRepository.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
+                    (application as App).container.settingsRepository
+                        .getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
                 val result = fileRepository.uploadFile(
                     file = torrentFile,
                     targetCid = defaultOfflineCid,

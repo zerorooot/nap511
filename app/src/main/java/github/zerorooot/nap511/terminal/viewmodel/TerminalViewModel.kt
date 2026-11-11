@@ -34,6 +34,7 @@ import github.zerorooot.nap511.terminal.engine.completion.FileFilters
 import github.zerorooot.nap511.terminal.engine.completion.StandardCompleter
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileOpener
+import github.zerorooot.nap511.util.TextFileHelper
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -60,7 +61,7 @@ class TerminalViewModel(
     fileOpener: FileOpener? = null,
     private val mainDispatcher: CoroutineDispatcher? = null,
     val historyFile: File,
-    settingsRepository: SettingsRepository = SettingsRepository.getInstance(),
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
@@ -205,6 +206,10 @@ class TerminalViewModel(
         },
         getMoveFailFile = {
             settingsRepository.getDataSuspend(ConfigKeyUtil.MOVE_FAIL_FILE, "")
+        },
+        getTextSizeLimitKb = {
+            settingsRepository.settingUiStateFlow.value.txtSize.toIntOrNull()
+                ?: TextFileHelper.DEFAULT_TXT_SIZE_KB
         }
     )
 

@@ -24,7 +24,6 @@ import com.elvishew.xlog.printer.file.clean.FileLastModifiedCleanStrategy
 import github.zerorooot.nap511.BuildConfig
 import github.zerorooot.nap511.di.AppContainer
 import github.zerorooot.nap511.di.DefaultAppContainer
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.network.NetworkClient
 import github.zerorooot.nap511.util.network.OneOneFiveImageExpirationInterceptor
 import github.zerorooot.nap511.util.network.UserSessionManager
@@ -76,7 +75,7 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
         super.onCreate()
         instance = this
         // 预热 SettingsRepository，在应用进程启动时即触发后台异步预读 DataStore
-        val settingsRepository = SettingsRepository.getInstance()
+        val settingsRepository = container.settingsRepository
         appScope.launch {
             // 初始化 FileCacheManager 单例目录
             FileCacheManager.init(File(this@App.cacheDir, "file_list_cache"))
@@ -114,7 +113,7 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
 
         // 实时监听 SettingUiState 中的 LOG 开关状态更新 isLogEnabled
         appScope.launch {
-            SettingsRepository.getDataFlow(ConfigKeyUtil.LOG, false)
+            settingsRepository.getDataFlow(ConfigKeyUtil.LOG, false)
                 .distinctUntilChanged()
                 .collect { enabled ->
                     val wasDisabled = !isLogEnabled

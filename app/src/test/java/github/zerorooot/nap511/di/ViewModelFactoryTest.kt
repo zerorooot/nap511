@@ -1,7 +1,9 @@
 package github.zerorooot.nap511.di
 
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.MutableCreationExtras
+import kotlinx.coroutines.cancel
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.terminal.viewmodel.TerminalViewModel
 import github.zerorooot.nap511.util.App
@@ -46,7 +48,7 @@ class ViewModelFactoryTest {
         Dispatchers.setMain(testDispatcher)
 
         val fakeSettingsRepo = github.zerorooot.nap511.viewmodel.platform.FakeSettingsRepository()
-        SettingsRepository.setInstanceForTesting(fakeSettingsRepo)
+        val fakeAuthRepo = github.zerorooot.nap511.viewmodel.platform.FakeAuthRepository()
 
         val testApp = App()
         App.instance = testApp
@@ -54,6 +56,7 @@ class ViewModelFactoryTest {
         testApp.container = object : AppContainer by defaultContainer {
             override val stringProvider: AppStringProvider = FakeAppStringProvider()
             override val settingsRepository: SettingsRepository = fakeSettingsRepo
+            override val authRepository = fakeAuthRepo
         }
         app = testApp
 
@@ -64,7 +67,6 @@ class ViewModelFactoryTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
-        SettingsRepository.setInstanceForTesting(null)
     }
 
     @Test
@@ -127,5 +129,6 @@ class ViewModelFactoryTest {
         val vm = TerminalViewModel.Factory.create(TerminalViewModel::class.java, extras)
         assertNotNull(vm)
         assertNotNull(vm.screenBuffer)
+        vm.viewModelScope.cancel()
     }
 }

@@ -20,13 +20,18 @@ import kotlinx.coroutines.withContext
 
 class LoginViewModel(
     private val settingsRepository: SettingsRepository,
+    private val authRepository: AuthRepository,
     private val toastProvider: ToastProvider,
 ) : ViewModel() {
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val container = appContainer
-                LoginViewModel(container.settingsRepository, container.toastProvider)
+                LoginViewModel(
+                    container.settingsRepository,
+                    container.authRepository,
+                    container.toastProvider
+                )
             }
         }
     }
@@ -37,7 +42,7 @@ class LoginViewModel(
                 is LoginCredential.Cookie -> {
                     val replace = credential.cookieString.replace(" ", "")
                         .replace("[\r\n]".toRegex(), "")
-                    AuthRepository.checkLogin(replace)
+                    authRepository.checkLogin(replace)
                         .onSuccess { toastProvider.showToast("登录成功～") }
                         .onFailure { toastProvider.showToast("验证失败: ${it.localizedMessage}") }
                         .isSuccess
@@ -49,7 +54,7 @@ class LoginViewModel(
                         val jsonString = credential.rawJson
                         val jsonObject = gson.fromJson(jsonString, JsonObject::class.java)
                         val cookie = jsonObject.get(ConfigKeyUtil.COOKIE).asString
-                        AuthRepository.checkLogin(cookie)
+                        authRepository.checkLogin(cookie)
                             .onSuccess {
                                 //因为checkLogin里已经设置了
                                 jsonObject.remove(ConfigKeyUtil.AVATAR_BEAN)

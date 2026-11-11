@@ -34,13 +34,18 @@ import kotlinx.coroutines.withContext
 
 class SettingViewModel(
     private val settingsRepository: SettingsRepository,
+    private val authRepository: AuthRepository,
     private val toastProvider: ToastProvider,
 ) : ViewModel() {
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val container = appContainer
-                SettingViewModel(container.settingsRepository, container.toastProvider)
+                SettingViewModel(
+                    container.settingsRepository,
+                    container.authRepository,
+                    container.toastProvider
+                )
             }
         }
     }
@@ -173,7 +178,7 @@ class SettingViewModel(
                 val cleanCookie = newCookie.replace(" ", "").replace("[\r\n]".toRegex(), "")
 
                 // 1. 调用官方接口检测 Cookie 有效性
-                val authResult = AuthRepository.checkLogin(cleanCookie)
+                val authResult = authRepository.checkLogin(cleanCookie)
 
                 authResult.onSuccess {
                     val targetUid =

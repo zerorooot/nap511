@@ -15,8 +15,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.ui.theme.Nap511Theme
+import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.SplashScreenManager
 
 class MainActivity : AppCompatActivity() {
@@ -31,7 +31,7 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
 
         setContent {
-            val settingsRepository = SettingsRepository.getInstance()
+            val settingsRepository = (application as App).container.settingsRepository
             val settingUiState by settingsRepository.settingUiStateFlow
                 .collectAsStateWithLifecycle()
 

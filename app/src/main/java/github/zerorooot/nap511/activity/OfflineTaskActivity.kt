@@ -23,7 +23,6 @@ import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.handleText
@@ -41,6 +40,7 @@ class OfflineTaskActivity : ComponentActivity() {
         const val PENDING_NOTIFICATION_ID = 1000
     }
 
+    private val settingsRepository by lazy { (application as App).container.settingsRepository }
 
     @SuppressLint("EnqueueWork")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -113,7 +113,7 @@ class OfflineTaskActivity : ComponentActivity() {
 
                     // 获取并过滤本地缓存任务
                     val currentOfflineTask =
-                        SettingsRepository.getDataSuspend(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
+                        settingsRepository.getDataSuspend(ConfigKeyUtil.CURRENT_OFFLINE_TASK, "")
                             .split("\n")
                             .filter { i -> i.isNotBlank() } // 简化过滤逻辑
                             .toSet()
@@ -163,7 +163,7 @@ class OfflineTaskActivity : ComponentActivity() {
                     //非空列表
                     if (urlList.isNotEmpty()) {
                         val currentOfflineTaskList =
-                            SettingsRepository.getDataSuspend(
+                            settingsRepository.getDataSuspend(
                                 ConfigKeyUtil.CURRENT_OFFLINE_TASK,
                                 ""
                             )
@@ -175,7 +175,7 @@ class OfflineTaskActivity : ComponentActivity() {
                         currentOfflineTaskList.addAll(urlList)
                         //检查离线任务时间
                         val offlineTime = try {
-                            SettingsRepository.getDataSuspend(
+                            settingsRepository.getDataSuspend(
                                 ConfigKeyUtil.DEFAULT_OFFLINE_TIME,
                                 "5"
                             )
@@ -185,11 +185,11 @@ class OfflineTaskActivity : ComponentActivity() {
                         }
                         val stringJoiner = currentOfflineTaskList.toSet().joinToString("\n")
                         //写入缓存
-                        SettingsRepository.saveData(
+                        settingsRepository.saveData(
                             ConfigKeyUtil.CURRENT_OFFLINE_TASK,
                             stringJoiner
                         )
-                        val allPath = SettingsRepository.getDataSuspend(
+                        val allPath = settingsRepository.getDataSuspend(
                             ConfigKeyUtil.DEFAULT_OFFLINE_PATH,
                             "/根目录/云下载"
                         )

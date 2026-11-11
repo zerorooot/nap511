@@ -280,7 +280,7 @@ fun AppNavHost(
 
             entry<Route.WebScreen> {
                 onSetGesturesEnabled(false)
-                WebViewScreen {
+                WebViewScreen(isLogEnabled = uiState.logEnabled) {
                     onOpenDrawer()
                 }
             }

@@ -28,13 +28,11 @@ import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
-import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.screen.AppNavHost
 import github.zerorooot.nap511.screen.file.CreateDialogs
 import github.zerorooot.nap511.screenitem.AppDrawer
 import github.zerorooot.nap511.screenitem.DrawerMenuItems
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
@@ -55,7 +53,8 @@ fun MainScreen(
         audioViewModel.automaticSubtitle = settingUiState.automaticSubtitle
     }
 
-    val offlineFileViewModel: OfflineFileViewModel = viewModel(factory = OfflineFileViewModel.Factory)
+    val offlineFileViewModel: OfflineFileViewModel =
+        viewModel(factory = OfflineFileViewModel.Factory)
 
     val context = LocalContext.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -66,7 +65,7 @@ fun MainScreen(
 
     // 使用 State 结合 Provider lambda 传递，防止数据更新时倒灌导致 MainScreen 顶级全量重组
     val remainingSpaceState = fileViewModel.remainingSpace.collectAsStateWithLifecycle()
-    val avatarJsonState = SettingsRepository.getDataFlow(ConfigKeyUtil.AVATAR_BEAN, "{}")
+    val avatarJsonState = fileViewModel.avatarJsonFlow
         .collectAsStateWithLifecycle(initialValue = "{}")
     val avatarBeanState = remember {
         derivedStateOf {

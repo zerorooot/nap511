@@ -63,7 +63,7 @@ class CatCommand : TerminalCommand {
 
         // 提取大小上限（优先使用命令行参数指定的 KB，未指定时读取全局设置）
         val customMaxKb = ast.getIntOption("--max-size")
-        val maxKb = customMaxKb ?: TextFileHelper.getDefaultSizeLimitKb()
+        val maxKb = customMaxKb ?: ctx.getTextSizeLimitKb()
 
         val files = ast.rawPositionalValues
         val formatter = CatOutputFormatter(

@@ -192,9 +192,12 @@ fun LoginScreen(
                             0 -> AccountPasswordForm(onLoginSuccess = onLoginSuccess)
 
                             1 -> {
-                                WebLoginCardSection {
-                                    selectedTab = 0
-                                }
+                                WebLoginCardSection(
+                                    onLoginSuccess = onLoginSuccess,
+                                    onClick = {
+                                        selectedTab = 0
+                                    }
+                                )
                             }
                         }
                     }
@@ -573,7 +576,10 @@ fun TwoFactorVerifyDialog(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WebLoginCardSection(onClick: () -> Unit) {
+fun WebLoginCardSection(
+    onLoginSuccess: (LoginCredential) -> Unit = {},
+    onClick: () -> Unit
+) {
     Dialog(
         onDismissRequest = { onClick.invoke() },
         properties = DialogProperties(
@@ -589,7 +595,11 @@ fun WebLoginCardSection(onClick: () -> Unit) {
             onDispose {}
         }
 
-        LoginWebViewScreen {
+        LoginWebViewScreen(
+            onCookieCaptured = { cookie ->
+                onLoginSuccess(LoginCredential.Cookie(cookie))
+            }
+        ) {
             onClick.invoke()
         }
     }
