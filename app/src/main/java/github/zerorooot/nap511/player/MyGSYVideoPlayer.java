@@ -58,6 +58,19 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         void onDrawerOpen(DrawerType type);
     }
 
+    /**
+     * 底层解码真实尺寸与旋转角度解析回调接口
+     */
+    public interface OnVideoDimensionResolvedListener {
+        void onDimensionResolved(int width, int height, int effectiveRotation);
+    }
+
+    private OnVideoDimensionResolvedListener mOnVideoDimensionResolvedListener;
+
+    public void setOnVideoDimensionResolvedListener(OnVideoDimensionResolvedListener listener) {
+        this.mOnVideoDimensionResolvedListener = listener;
+    }
+
     private int mType = 0;
 
     // 画面旋转控制：视频原生角度（元数据）与用户手动旋转偏移角度
@@ -297,12 +310,28 @@ public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
         new Handler(Objects.requireNonNull(Looper.myLooper())).postDelayed(this::dismissProgressDialog, 600);
     }
 
+    private void checkAndNotifyDimensions() {
+        int w = getCurrentVideoWidth();
+        int h = getCurrentVideoHeight();
+        if (w > 0 && h > 0 && mOnVideoDimensionResolvedListener != null) {
+            mOnVideoDimensionResolvedListener.onDimensionResolved(w, h, getEffectiveRotation());
+        }
+    }
+
+    @Override
+    public void onVideoSizeChanged() {
+        super.onVideoSizeChanged();
+        checkAndNotifyDimensions();
+    }
+
     @Override
     public void onInfo(int what, int extra) {
         if (getGSYVideoManager() != null && what == getGSYVideoManager().getRotateInfoFlag()) {
             XLog.d(TAG + " 收到视频原生旋转信息: " + extra);
             mIntrinsicRotation = extra;
             applyEffectiveRotation();
+            // 原生旋转角度更新后重新核验视觉宽高，确保 90° 旋转视频能够成功纠正为竖屏
+            checkAndNotifyDimensions();
             return;
         }
         super.onInfo(what, extra);

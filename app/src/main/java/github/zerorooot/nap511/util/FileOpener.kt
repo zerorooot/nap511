@@ -206,14 +206,10 @@ class FileOpener(
                 if (settings.videoLinkMode) {
                     fileRepository.video(fileBean.pickCode).copy(index = fileBeanIndex)
                 } else {
-                    val (width, height) = if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
-                        1080 to 1920
-                    } else {
-                        1920 to 1080
-                    }
+                    // 直链模式初始宽高统一置 0，由底层解码器解析真实物理尺寸与旋转角度后精准自适应
                     VideoInfoBean(
-                        width = width,
-                        height = height,
+                        width = 0,
+                        height = 0,
                         index = fileBeanIndex,
                         fileName = fileBean.name,
                         pickCode = fileBean.pickCode,

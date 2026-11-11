@@ -1,7 +1,6 @@
 package github.zerorooot.nap511.activity.helper
 
 import android.content.Context
-import android.content.res.Configuration
 import android.view.Gravity
 import android.view.View
 import android.widget.EditText
@@ -39,11 +38,8 @@ class VideoDrawerController(
             if (index != viewModel.uiState.value.fileBeanIndex) {
                 videoPlayer.setSubtitleEnabled(false)
             }
-            val isPortrait =
-                context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
             viewModel.playVideoAtIndex(
                 index,
-                isPortrait,
                 videoPlayer.currentPositionWhenPlaying
             )
             videoPlayer.hideAllDrawers()
@@ -80,14 +76,17 @@ class VideoDrawerController(
                     XLog.d("VideoDrawerController: 切换画面比例: $title (type=${scaleTypes[index]})")
                     videoPlayer.setAspectScale(scaleTypes[index])
                 }
+
                 5 -> {
                     XLog.d("VideoDrawerController: 顺时针旋转 90°")
                     videoPlayer.rotateVideo(90)
                 }
+
                 6 -> {
                     XLog.d("VideoDrawerController: 逆时针旋转 90°")
                     videoPlayer.rotateVideo(-90)
                 }
+
                 7 -> {
                     XLog.d("VideoDrawerController: 恢复默认画面角度")
                     videoPlayer.resetVideoRotation()

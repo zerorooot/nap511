@@ -17,6 +17,7 @@ import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.bean.VideoStarAction
 import github.zerorooot.nap511.bean.VideoUiState
+import github.zerorooot.nap511.bean.getVisualDimensions
 import github.zerorooot.nap511.di.app
 import github.zerorooot.nap511.di.appContainer
 import github.zerorooot.nap511.repository.FileRepository
@@ -27,16 +28,23 @@ import github.zerorooot.nap511.util.keyWord
 import github.zerorooot.nap511.util.network.parseOssErrorWithDom
 import github.zerorooot.nap511.util.subtitle.SubtitleDelegate
 import github.zerorooot.nap511.viewmodel.platform.ToastProvider
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.SendChannel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import okhttp3.MediaType
 import java.io.File
+
+// 单行扩展：平滑适配原有 12 处 _uiEvent.emit(...) 调用，保证兼容性
+private suspend fun SendChannel<VideoUiEvent>.emit(event: VideoUiEvent) = send(event)
 
 /**
  * 移除操作的历史记录单元（用于 LIFO 撤回栈）
@@ -61,6 +69,12 @@ sealed class VideoUiEvent {
 
     /** 显示 Toast 提示消息事件 */
     data class Toast(val message: String) : VideoUiEvent()
+
+    /**
+     * 请求调整屏幕朝向
+     * @param targetIsLandscape true 表示目标为横屏，false 表示目标为竖屏
+     */
+    data class RequestOrientation(val targetIsLandscape: Boolean) : VideoUiEvent()
 
     /** 触发屏幕旋转事件 */
     object RotateScreen : VideoUiEvent()
@@ -141,16 +155,42 @@ class VideoViewModel(
     val videoList: List<VideoBean>
         field = mutableListOf<VideoBean>()
 
-    private val _uiEvent = MutableSharedFlow<VideoUiEvent>()
+    // 采用带缓冲的 Channel 替代 SharedFlow，确保在 Activity 未完成订阅前发射的事件零丢失
+    private val _uiEvent = Channel<VideoUiEvent>(Channel.BUFFERED)
 
     /** 视频播放页面的一次性 UI 事件流 */
-    val uiEvent: SharedFlow<VideoUiEvent> = _uiEvent.asSharedFlow()
+    val uiEvent: Flow<VideoUiEvent> = _uiEvent.receiveAsFlow()
 
     /** 视频配置属性 */
     val videoAttribute by lazy { launchVideoParams.videoAttribute }
 
     /** 是否根据视频宽高比自动旋转屏幕 */
     val isAutoRotate by lazy { videoAttribute.isAutoRotate }
+
+    // 记录当前剧集已决断派发的朝向目标 (true:横屏, false:竖屏)，用于消除 90° 竞态纠偏
+    private var lastEmittedTargetLandscape: Boolean? = null
+
+    /**
+     * 根据视觉宽高计算推荐屏幕朝向
+     * @return true 横屏，false 竖屏，null 表示无效尺寸或 1:1 比例无需调整
+     */
+    private fun calculateTargetOrientation(visualWidth: Int, visualHeight: Int): Boolean? {
+        if (!isAutoRotate || visualWidth <= 0 || visualHeight <= 0) return null
+        // 1:1 正方形视频不强制扭转当前屏幕朝向
+        if (visualWidth == visualHeight) return null
+        return visualWidth > visualHeight
+    }
+
+    private fun emitOrientationRequestIfNeed(visualWidth: Int, visualHeight: Int) {
+        val targetIsLandscape = calculateTargetOrientation(visualWidth, visualHeight) ?: return
+        if (lastEmittedTargetLandscape != targetIsLandscape) {
+            XLog.i("VideoViewModel emitOrientationRequestIfNeed: visualWidth=$visualWidth, visualHeight=$visualHeight, targetIsLandscape=$targetIsLandscape (last=$lastEmittedTargetLandscape)")
+            lastEmittedTargetLandscape = targetIsLandscape
+            viewModelScope.launch {
+                _uiEvent.send(VideoUiEvent.RequestOrientation(targetIsLandscape))
+            }
+        }
+    }
 
     /** 视频链接模式（true 为解析模式，false 为直接拼接 m3u8 模式） */
     val videoLinkMode by lazy { videoAttribute.videoLinkMode }
@@ -178,9 +218,9 @@ class VideoViewModel(
      * 初始化视频播放参数及 UI 状态
      *
      * @param params 启动视频播放所需参数（包含视频信息、播放列表等）
-     * @param isPortrait 当前屏幕方向是否为竖屏，用于自动旋转屏幕逻辑判断
      */
-    fun initParams(params: LaunchVideoParams, isPortrait: Boolean) {
+    fun initParams(params: LaunchVideoParams) {
+        lastEmittedTargetLandscape = null
         launchVideoParams = params
         videoList.clear()
         videoList.addAll(params.videoList)
@@ -213,12 +253,10 @@ class VideoViewModel(
             )
         }
 
-        if (isAutoRotate) {
-            if (initialVideoInfo.width < initialVideoInfo.height && isPortrait) {
-                viewModelScope.launch {
-                    _uiEvent.emit(VideoUiEvent.RotateScreen)
-                }
-            }
+        // 首播自适应：若已有 API 先验有效尺寸，结合 userRotate 发送自适应请求
+        val (visualWidth, visualHeight) = initialVideoInfo.getVisualDimensions()
+        if (visualWidth > 0 && visualHeight > 0) {
+            emitOrientationRequestIfNeed(visualWidth, visualHeight)
         }
     }
 
@@ -226,24 +264,22 @@ class VideoViewModel(
      * 切换播放上一个或下一个视频
      *
      * @param isNext true 表示播放下一个视频，false 表示播放上一个视频
-     * @param isPortrait 当前屏幕方向是否为竖屏
      * @param currentPositionMs 当前视频已播放进度（毫秒），用于保存历史记录
      */
-    fun playNextVideo(isNext: Boolean, isPortrait: Boolean, currentPositionMs: Long) {
+    fun playNextVideo(isNext: Boolean, currentPositionMs: Long) {
         if (_uiState.value.isLoadingEpisode) return
         val currentIndex = _uiState.value.fileBeanIndex
         val nextIndex = if (isNext) currentIndex + 1 else currentIndex - 1
-        playVideoAtIndex(nextIndex, isPortrait, currentPositionMs)
+        playVideoAtIndex(nextIndex, currentPositionMs)
     }
 
     /**
      * 切换播放列表中指定索引位置的视频
      *
      * @param targetIndex 目标视频在列表中的索引
-     * @param isPortrait 当前屏幕方向是否为竖屏
      * @param currentPositionMs 当前视频已播放进度（毫秒），用于保存历史记录
      */
-    fun playVideoAtIndex(targetIndex: Int, isPortrait: Boolean, currentPositionMs: Long) {
+    fun playVideoAtIndex(targetIndex: Int, currentPositionMs: Long) {
         // 防抖与重复点击拦截：正在加载中或已处于目标集，直接忽略，避免死锁假死
         if (_uiState.value.isLoadingEpisode || targetIndex == _uiState.value.fileBeanIndex) return
 
@@ -261,16 +297,16 @@ class VideoViewModel(
         }
 
         _uiState.update { it.copy(isLoadingEpisode = true) }
-        loadVideoAt(targetIndex, isPortrait)
+        loadVideoAt(targetIndex)
     }
 
     /**
      * 核心加载并播放指定索引视频的内部实现
      *
      * @param targetIndex 目标视频在 currentVideoList 中的索引
-     * @param isPortrait 当前屏幕方向是否为竖屏
      */
-    private fun loadVideoAt(targetIndex: Int, isPortrait: Boolean) {
+    private fun loadVideoAt(targetIndex: Int) {
+        lastEmittedTargetLandscape = null // 切集加载重置朝向判定快照
         val fileBean = videoList.getOrNull(targetIndex)
         if (fileBean == null) {
             toastProvider.showToast("找不到视频")
@@ -300,14 +336,10 @@ class VideoViewModel(
                 val video = if (videoLinkMode) {
                     fileRepository.video(pickCode)
                 } else {
-                    val (width, height) = if (isPortrait) {
-                        1080 to 1920
-                    } else {
-                        1920 to 1080
-                    }
+                    // 直链模式初始宽高统一置 0，由底层解码器解析真实物理尺寸与旋转角度后精准自适应
                     VideoInfoBean(
-                        width = width,
-                        height = height,
+                        width = 0,
+                        height = 0,
                         index = targetIndex,
                         fileName = name,
                         pickCode = pickCode,
@@ -324,6 +356,12 @@ class VideoViewModel(
                         isEpisodeSwitch = true
                     )
                 )
+
+                // 切集自适应：若通过 API 获取到了有效先验尺寸，派发自适应事件
+                val (visualWidth, visualHeight) = video.getVisualDimensions()
+                if (visualWidth > 0 && visualHeight > 0) {
+                    emitOrientationRequestIfNeed(visualWidth, visualHeight)
+                }
             }.onFailure { e ->
                 XLog.e("加载视频失败 pickCode: ${fileBean.pickCode}", e)
                 toastProvider.showToast("加载视频失败，请重试")
@@ -334,6 +372,31 @@ class VideoViewModel(
     }
 
     /**
+     * 底层解码器解析出真实尺寸与旋转角后的回调
+     */
+    fun onRealVideoDimensionsLoaded(rawWidth: Int, rawHeight: Int, effectiveRotation: Int) {
+        if (rawWidth <= 0 || rawHeight <= 0) return
+
+        val isSwapped = (effectiveRotation % 180 != 0)
+        val visualWidth = if (isSwapped) rawHeight else rawWidth
+        val visualHeight = if (isSwapped) rawWidth else rawHeight
+
+        XLog.d("VideoViewModel onRealVideoDimensionsLoaded: rawWidth=$rawWidth, rawHeight=$rawHeight, rotation=$effectiveRotation, visualWidth=$visualWidth, visualHeight=$visualHeight")
+
+        // 同步最新的真实视觉宽高到 UIState
+        _uiState.update { state ->
+            state.videoInfo?.let { info ->
+                if (info.width != visualWidth || info.height != visualHeight) {
+                    state.copy(videoInfo = info.copy(width = visualWidth, height = visualHeight))
+                } else state
+            } ?: state
+        }
+
+        // 无论是直链模式无尺寸，还是 90° 旋转信息稍后到达，均触发朝向核验与自纠正
+        emitOrientationRequestIfNeed(visualWidth, visualHeight)
+    }
+
+    /**
      * 「移除」核心处理：
      * 1. 防重入保护；
      * 2. 赋予 VideoBean 精确 currentDuration；
@@ -341,7 +404,7 @@ class VideoViewModel(
      * 4. 上层防御（0秒防冲刷）：仅当时长 > 0 时才写入 videoHistoryMap，避免撤回后退出把原有历史进度清零；
      * 5. 自动切至下一集并开启防抖 loading 状态。
      */
-    fun discardCurrentVideo(isPortrait: Boolean, currentPositionMs: Long) {
+    fun discardCurrentVideo(currentPositionMs: Long) {
         if (_uiState.value.isLoadingEpisode) return
         if (videoList.isEmpty()) return
         val currentIndex = _uiState.value.fileBeanIndex
@@ -365,7 +428,7 @@ class VideoViewModel(
 
         if (currentIndex < videoList.size) {
             // 移除当前元素后，原本的“下一集”自动前移填补到 currentIndex 处，继续播放
-            loadVideoAt(currentIndex, isPortrait)
+            loadVideoAt(currentIndex)
             viewModelScope.launch {
                 _uiEvent.emit(VideoUiEvent.EpisodeListUpdated)
                 _uiEvent.emit(VideoUiEvent.SingleVideoDiscarded)
@@ -395,7 +458,7 @@ class VideoViewModel(
      * 3. 保持当前画面正常播放不中断；
      * 4. 若之前全部被弃导致暂停，撤回后自动恢复播放刚插回的视频。
      */
-    fun undoDiscard(isPortrait: Boolean) {
+    fun undoDiscard() {
         val lastRecord = discardRecords.removeLastOrNull() ?: return
         val (restoredVideo, originalIndex) = lastRecord
 
@@ -431,7 +494,7 @@ class VideoViewModel(
         } else {
             // 之前所有视频全被移除（停播），撤回后自动恢复播放刚插回的视频
             _uiState.update { it.copy(isLoadingEpisode = true) }
-            loadVideoAt(insertIndex, isPortrait)
+            loadVideoAt(insertIndex)
         }
 
         viewModelScope.launch {

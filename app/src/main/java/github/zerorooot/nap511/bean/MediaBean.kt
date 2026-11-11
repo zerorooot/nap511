@@ -81,6 +81,17 @@ data class VideoInfoBean(
         }
 }
 
+/**
+ * 结合 115 云端返回的 userRotate 计算视觉宽高
+ * 若旋转 90° 或 270°，交换物理宽高
+ */
+fun VideoInfoBean.getVisualDimensions(): Pair<Int, Int> {
+    val isSwapped = (userRotate % 180 != 0)
+    val visualWidth = if (isSwapped) height else width
+    val visualHeight = if (isSwapped) width else height
+    return visualWidth to visualHeight
+}
+
 data class ImageDate(
     @SerializedName("state") var state: Boolean = false,
     @SerializedName("data") var imageBean: ImageBean = ImageBean()

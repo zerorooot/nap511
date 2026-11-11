@@ -96,6 +96,28 @@ class VideoActivity : AppCompatActivity() {
     /** 移除 Snackbar 引用（用于复用原生生命周期与及时清理） */
     private var activeSnackbar: Snackbar? = null
 
+    private enum class OrientationState {
+        PENDING,        // 等待自适应决策（首播或切集初始态）
+        AUTO_APPLIED,   // 系统自适应已成功执行
+        USER_LOCKED     // 用户已手动介入（永久锁定当前集，杜绝异步回调覆写）
+    }
+
+    private var currentOrientationState = OrientationState.PENDING
+
+    /**
+     * 规范屏幕方向策略：
+     * - 横屏：SENSOR_LANDSCAPE (双向重力感应横屏)
+     * - 竖屏：PORTRAIT (严格正向竖屏，绝不颠倒)
+     */
+    private fun applyOrientation(targetIsLandscape: Boolean) {
+        XLog.d("VideoActivity applyOrientation: targetIsLandscape=$targetIsLandscape")
+        requestedOrientation = if (targetIsLandscape) {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+    }
+
     /**
      * 统一更新控制栏按钮（上一集、下一集、移除按钮）的启用状态与视觉透明度
      * 完全依赖响应式 state.isLoadingEpisode 与列表边界，彻底消除分散变量带来的竞态
@@ -164,9 +186,9 @@ class VideoActivity : AppCompatActivity() {
         val paramsJson = intent.getStringExtra("bean")
         launchVideoParams = Gson().fromJson(paramsJson, LaunchVideoParams::class.java)
 
-        // 判断当前屏幕方向是否为竖屏
-        val isPortrait = resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
-        viewModel.initParams(launchVideoParams, isPortrait)
+        // 初始化状态机为 PENDING
+        currentOrientationState = OrientationState.PENDING
+        viewModel.initParams(launchVideoParams)
 
         val videoInfo = launchVideoParams.videoInfo
         // 构建视频请求的网络 Http Header（携带 Cookie 和 User-Agent）
@@ -184,6 +206,11 @@ class VideoActivity : AppCompatActivity() {
         videoPlayer = findViewById(R.id.pre_video_player)
         // 根据 ViewModel 配置设置是否隐藏加载中的等待视图
         videoPlayer.setHideLoadingView(viewModel.hideLoading)
+
+        // 绑定播放器真实尺寸监听 (包含 onVideoSizeChanged 与 onInfo 旋转角更新)
+        videoPlayer.setOnVideoDimensionResolvedListener { width, height, rotation ->
+            viewModel.onRealVideoDimensionsLoaded(width, height, rotation)
+        }
 
         // 初始化 ExoPlayer 内核的 OkHttp 拦截器错误回调
         ExoPlayerInitializer.initGSYExoPlayerWithOkHttp { url, contentType, errorBody ->
@@ -249,9 +276,7 @@ class VideoActivity : AppCompatActivity() {
             findViewById<View>(R.id.btn_discard)?.setOnClickListener {
                 videoPlayer.hideAllDrawers()
                 videoPlayer.setSubtitleEnabled(false)
-                val isPort =
-                    resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
-                viewModel.discardCurrentVideo(isPort, videoPlayer.currentPositionWhenPlaying)
+                viewModel.discardCurrentVideo(videoPlayer.currentPositionWhenPlaying)
             }
             // 上一集按钮
             findViewById<View>(R.id.prev_episode)?.setOnClickListener {
@@ -322,9 +347,21 @@ class VideoActivity : AppCompatActivity() {
                 launch {
                     viewModel.uiEvent.collect { event ->
                         when (event) {
+                            // 屏幕自适应旋转请求
+                            is VideoUiEvent.RequestOrientation -> {
+                                XLog.d("VideoActivity receive RequestOrientation: targetIsLandscape=${event.targetIsLandscape}, currentState=$currentOrientationState")
+                                // 核心门禁：只要用户未手动介入锁定，允许自适应执行与毫秒级纠偏
+                                if (currentOrientationState != OrientationState.USER_LOCKED) {
+                                    applyOrientation(event.targetIsLandscape)
+                                    currentOrientationState = OrientationState.AUTO_APPLIED
+                                }
+                            }
+
                             // 切换播放下一集/上一集视频
                             is VideoUiEvent.PlayNext -> {
                                 if (event.isEpisodeSwitch) {
+                                    // 核心切集收拢点：新剧集统一复位为 PENDING，覆盖所有切集途径
+                                    currentOrientationState = OrientationState.PENDING
                                     videoPlayer.hideAllDrawers()
                                 }
                                 videoPlayer.playNext(event.videoUrl, event.title)
@@ -493,18 +530,14 @@ class VideoActivity : AppCompatActivity() {
 
     /**
      * 旋转切换屏幕方向：
-     * 若当前为竖屏，则强制切换为横屏；若当前为横屏，则强制切换为竖屏。
+     * 用户点击全屏/旋转按钮，立即进入 USER_LOCKED 锁定态，并取反当前朝向
      */
     @SuppressLint("SourceLockedOrientationActivity")
     fun rotateScreen() {
-        val orientation = resources.configuration.orientation
-        if (orientation == Configuration.ORIENTATION_PORTRAIT) {
-            // 当前是竖屏，强制转为横屏
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)
-        } else {
-            // 当前是横屏，强制转为竖屏，在平板中可能会触发 Letterbox
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
-        }
+        currentOrientationState = OrientationState.USER_LOCKED
+        val isCurrentlyLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        XLog.d("VideoActivity rotateScreen: user manual rotate, isCurrentlyLandscape=$isCurrentlyLandscape -> target=${!isCurrentlyLandscape}")
+        applyOrientation(targetIsLandscape = !isCurrentlyLandscape)
     }
 
     /**
@@ -515,9 +548,7 @@ class VideoActivity : AppCompatActivity() {
     private fun playNextVideo(isNext: Boolean) {
         videoPlayer.hideAllDrawers()
         videoPlayer.setSubtitleEnabled(false)
-        val isPortrait =
-            resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
-        viewModel.playNextVideo(isNext, isPortrait, videoPlayer.currentPositionWhenPlaying)
+        viewModel.playNextVideo(isNext, videoPlayer.currentPositionWhenPlaying)
     }
 
     /**
@@ -534,6 +565,11 @@ class VideoActivity : AppCompatActivity() {
         override fun onPrepared(url: String?, vararg objects: Any?) {
             super.onPrepared(url, *objects)
             viewModel.onEpisodeLoaded()
+            val rawW = videoPlayer.currentVideoWidth
+            val rawH = videoPlayer.currentVideoHeight
+            if (rawW > 0 && rawH > 0) {
+                viewModel.onRealVideoDimensionsLoaded(rawW, rawH, videoPlayer.effectiveRotation)
+            }
         }
 
         override fun onPlayError(url: String?, vararg objects: Any?) {
@@ -603,9 +639,7 @@ class VideoActivity : AppCompatActivity() {
         activeSnackbar?.dismiss()
         val snackbar = Snackbar.make(videoPlayer, "已移出列表", Snackbar.LENGTH_LONG)
             .setAction("撤回") {
-                val isPort =
-                    resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
-                viewModel.undoDiscard(isPort)
+                viewModel.undoDiscard()
             }
         // 锚定在底部控制栏 layout_bottom 之上（仅在可见时），避免遮挡播放按钮与进度条
         videoPlayer.findViewById<View>(R.id.layout_bottom)?.let { bottomView ->
@@ -631,9 +665,7 @@ class VideoActivity : AppCompatActivity() {
             "已全部移出列表，${delayMs / 1000}秒后自动退出",
             delayMs.toInt()
         ).setAction("撤回") {
-            val isPort =
-                resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
-            viewModel.undoDiscard(isPort)
+            viewModel.undoDiscard()
         }
         // 锚定在底部控制栏 layout_bottom 之上，避免遮挡播放按钮与进度条
         videoPlayer.findViewById<View>(R.id.layout_bottom)?.let { bottomView ->
