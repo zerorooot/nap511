@@ -1,5 +1,7 @@
 package github.zerorooot.nap511.terminal.commands
 
+import android.app.Application
+import android.content.Context
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.worker.UnzipQueueManager
@@ -8,19 +10,30 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import java.io.File
 
 /**
  * unzip 命令测试用例集合
  * 覆盖：解压校验与密码参数、转义与特殊字符路径、异常处理与管道组合场景
  */
 class UnzipCommandTest {
+
+    @get:Rule
+    val tmpFolder = TemporaryFolder()
+
+    private class TestApplication(private val filesDirFile: File) : Application() {
+        override fun getApplicationContext(): Context = this
+        override fun getFilesDir(): File = filesDirFile
+    }
+
     @Before
     fun setUp() {
         try {
             XLog.init()
         } catch (_: Throwable) {}
-        UnzipQueueManager.clear()
     }
     /**
      * 测试文件类型与存在性校验
@@ -327,10 +340,10 @@ class UnzipCommandTest {
      */
     @Test
     fun testUnzipCrossDirectoryTargetCidBinding() = runBlocking {
-        UnzipQueueManager.clear()
+        val queueManager = UnzipQueueManager(TestApplication(tmpFolder.root))
         val mockRepo = createTestMockRepository()
         val engine = createTestEngine()
-        val ctx = createTestContext(fileRepository = mockRepo)
+        val ctx = createTestContext(fileRepository = mockRepo, unzipQueueManager = queueManager)
 
         val folderA = createMockFolder("dirA", "10")
         val folderB = createMockFolder("dirB", "20")
@@ -348,13 +361,12 @@ class UnzipCommandTest {
         }
 
         // 验证队列中提取的两个任务项，其 targetCid 分别对应各自的所属目录（10 与 20），绝不发生覆盖
-        val task1 = github.zerorooot.nap511.worker.UnzipQueueManager.pollNext()
-        val task2 = github.zerorooot.nap511.worker.UnzipQueueManager.pollNext()
+        val task1 = ctx.unzipQueueManager?.pollNext()
+        val task2 = ctx.unzipQueueManager?.pollNext()
         assertNotNull(task1)
         assertNotNull(task2)
         assertEquals("10", task1?.targetCid)
         assertEquals("20", task2?.targetCid)
-        github.zerorooot.nap511.worker.UnzipQueueManager.clear()
     }
 }
 

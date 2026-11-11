@@ -63,7 +63,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import github.zerorooot.nap511.bean.sync.SyncPayload
-import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
 import github.zerorooot.nap511.util.network.LanSyncClient
 import github.zerorooot.nap511.util.network.LanSyncCrypto
 import github.zerorooot.nap511.util.qr.QrCodeAnalyzer
@@ -85,6 +85,7 @@ fun LanSyncReceiverDialog(
     onPayloadReceived: (SyncPayload) -> Unit
 ) {
     val context = LocalContext.current
+    val toastProvider = LocalToastProvider.current
     val coroutineScope = rememberCoroutineScope()
     val clipboardManager = LocalClipboard.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -103,7 +104,7 @@ fun LanSyncReceiverDialog(
     ) { granted ->
         hasCameraPermission = granted
         if (!granted) {
-            App.instance.toast("需要相机权限以进行扫码，您也可以使用相册选码或口令导入")
+            toastProvider.showToast("需要相机权限以进行扫码，您也可以使用相册选码或口令导入")
         }
     }
 
@@ -151,7 +152,7 @@ fun LanSyncReceiverDialog(
             }
 
             // 误扫 115 官方登录码或其他非 nap511 码时的明确拦截引导
-            App.instance.toast("检测到非 nap511 同步码。如需官方扫码登录，请使用 115 官方 App 扫码，或在登录页选择【网页登录】")
+            toastProvider.showToast("检测到非 nap511 同步码。如需官方扫码登录，请使用 115 官方 App 扫码，或在登录页选择【网页登录】")
             return
         }
 
@@ -170,7 +171,7 @@ fun LanSyncReceiverDialog(
                     onDismissRequest()
                 }.onFailure { err ->
                     hasProcessed = false
-                    App.instance.toast("同步失败: ${err.localizedMessage ?: err.message}")
+                    toastProvider.showToast("同步失败: ${err.localizedMessage ?: err.message}")
                 }
             }
         }
@@ -218,7 +219,7 @@ fun LanSyncReceiverDialog(
                     imageAnalysis
                 )
             } catch (e: Exception) {
-                App.instance.toast("启动相机失败: ${e.localizedMessage}")
+                toastProvider.showToast("启动相机失败: ${e.localizedMessage}")
             }
         }, ContextCompat.getMainExecutor(context))
     }
@@ -239,13 +240,13 @@ fun LanSyncReceiverDialog(
                         if (!qrText.isNullOrBlank()) {
                             handleRawUri(qrText)
                         } else {
-                            App.instance.toast("未能从选取的图片中识别到二维码")
+                            toastProvider.showToast("未能从选取的图片中识别到二维码")
                         }
                     } else {
-                        App.instance.toast("无法解码图片文件")
+                        toastProvider.showToast("无法解码图片文件")
                     }
                 } catch (e: Exception) {
-                    App.instance.toast("读取图片失败: ${e.localizedMessage}")
+                    toastProvider.showToast("读取图片失败: ${e.localizedMessage}")
                 }
             }
         }
@@ -382,7 +383,7 @@ fun LanSyncReceiverDialog(
                             if (!clipText.isNullOrBlank()) {
                                 handleRawUri(clipText)
                             } else {
-                                App.instance.toast("剪贴板内容为空")
+                                toastProvider.showToast("剪贴板内容为空")
                             }
                         },
                         modifier = Modifier

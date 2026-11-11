@@ -11,6 +11,7 @@ import github.zerorooot.nap511.repository.paging.PagingOptions
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.FileOpener
 import github.zerorooot.nap511.util.TextFileHelper
+import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -70,7 +71,8 @@ class TerminalContext(
         OrderBean(type = OrderEnum.create, asc = 0)
     },
     val getMoveFailFile: suspend () -> String = { "" },
-    val getTextSizeLimitKb: () -> Int = { TextFileHelper.DEFAULT_TXT_SIZE_KB }
+    val getTextSizeLimitKb: () -> Int = { TextFileHelper.DEFAULT_TXT_SIZE_KB },
+    val unzipQueueManager: UnzipQueueManager? = null
 ) {
     val fileRepository: FileRepository = fileRepository
     val pagingCoordinator: DirectoryPagingCoordinator =

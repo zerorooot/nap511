@@ -71,9 +71,9 @@ import github.zerorooot.nap511.screenitem.fileCachePreferenceItems
 import github.zerorooot.nap511.screenitem.maintenanceBackupPreferenceItems
 import github.zerorooot.nap511.screenitem.mediaPlaybackPreferenceItems
 import github.zerorooot.nap511.screenitem.uiExperiencePreferenceItems
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.rememberListDetailDirective
 import github.zerorooot.nap511.viewmodel.SettingViewModel
+import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
 import kotlinx.serialization.Serializable
 
 /**
@@ -144,6 +144,7 @@ fun SettingScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val currentLocation by viewModel.currentLocation.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val toastProvider = LocalToastProvider.current
     var lastClick by remember { mutableStateOf(false) }
 
     // 配置文件导出 Launcher
@@ -154,8 +155,8 @@ fun SettingScreen(
             viewModel.exportConfig(
                 context = context,
                 uri = it,
-                onSuccess = { App.instance.toast("配置导出成功！") },
-                onError = { err -> App.instance.toast("导出失败: $err") }
+                onSuccess = { toastProvider.showToast("配置导出成功！") },
+                onError = { err -> toastProvider.showToast("导出失败: $err") }
             )
         }
     }
@@ -168,8 +169,8 @@ fun SettingScreen(
             viewModel.importConfig(
                 context = context,
                 uri = it,
-                onSuccess = { App.instance.toast("配置导入成功！") },
-                onError = { err -> App.instance.toast("导入失败: $err") }
+                onSuccess = { toastProvider.showToast("配置导入成功！") },
+                onError = { err -> toastProvider.showToast("导入失败: $err") }
             )
         }
     }
@@ -208,8 +209,8 @@ fun SettingScreen(
                     onClick = {
                         showResetDialog = false
                         viewModel.resetConfig(
-                            onSuccess = { App.instance.toast("设置已恢复为默认值") },
-                            onError = { err -> App.instance.toast(err) }
+                            onSuccess = { toastProvider.showToast("设置已恢复为默认值") },
+                            onError = { err -> toastProvider.showToast(err) }
                         )
                     }
                 ) { Text("确认恢复") }
@@ -230,8 +231,8 @@ fun SettingScreen(
                     onClick = {
                         showClearCacheDialog = false
                         viewModel.clearFileCache(
-                            onSuccess = { App.instance.toast("已清空所有文件缓存") },
-                            onError = { err -> App.instance.toast("清空失败: $err") }
+                            onSuccess = { toastProvider.showToast("已清空所有文件缓存") },
+                            onError = { err -> toastProvider.showToast("清空失败: $err") }
                         )
                     }
                 ) { Text("确认清空") }
@@ -249,7 +250,8 @@ fun SettingScreen(
         onActionClick,
         exportLauncher,
         importLauncher,
-        context
+        context,
+        toastProvider
     ) {
         SettingActions(
             onSaveConfig = { key, value -> viewModel.saveData(key, value) },
@@ -275,7 +277,7 @@ fun SettingScreen(
                 if (!lastClick) {
                     lastClick = true
                     ProcessPhoenix.triggerRebirth(context)
-                    App.instance.toast("重启中...")
+                    toastProvider.showToast("重启中...")
                 }
             }
         )

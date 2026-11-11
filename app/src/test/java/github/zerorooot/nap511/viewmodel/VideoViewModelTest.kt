@@ -12,7 +12,6 @@ import github.zerorooot.nap511.bean.VideoStarAction
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.viewmodel.platform.FakeToastProvider
-import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -52,7 +51,6 @@ class VideoViewModelTest {
         try {
             XLog.init()
         } catch (_: Throwable) {}
-        UnzipQueueManager.clear()
         Dispatchers.setMain(testDispatcher)
         viewModel = VideoViewModel(
             application = Application(),

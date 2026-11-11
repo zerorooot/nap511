@@ -3,7 +3,6 @@ package github.zerorooot.nap511.viewmodel
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.screen.LogLevel
 import github.zerorooot.nap511.util.App
-import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -50,11 +49,9 @@ class LogViewModelTest {
         try {
             XLog.init()
         } catch (_: Throwable) {}
-        UnzipQueueManager.clear()
         Dispatchers.setMain(testDispatcher)
 
         val testApp = App()
-        App.instance = testApp
         viewModel = LogViewModel(
             application = testApp,
             ioDispatcher = testDispatcher,

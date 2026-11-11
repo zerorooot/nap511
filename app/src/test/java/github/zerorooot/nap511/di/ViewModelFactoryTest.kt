@@ -16,7 +16,6 @@ import github.zerorooot.nap511.viewmodel.RecycleViewModel
 import github.zerorooot.nap511.viewmodel.RepeatFileViewModel
 import github.zerorooot.nap511.viewmodel.SettingViewModel
 import github.zerorooot.nap511.viewmodel.VideoViewModel
-import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -44,14 +43,12 @@ class ViewModelFactoryTest {
         try {
             XLog.init()
         } catch (_: Throwable) {}
-        UnzipQueueManager.clear()
         Dispatchers.setMain(testDispatcher)
 
         val fakeSettingsRepo = github.zerorooot.nap511.viewmodel.platform.FakeSettingsRepository()
         val fakeAuthRepo = github.zerorooot.nap511.viewmodel.platform.FakeAuthRepository()
 
         val testApp = App()
-        App.instance = testApp
         val defaultContainer = DefaultAppContainer(testApp)
         testApp.container = object : AppContainer by defaultContainer {
             override val stringProvider: AppStringProvider = FakeAppStringProvider()

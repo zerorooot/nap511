@@ -47,7 +47,6 @@ import github.zerorooot.nap511.viewmodel.store.ImageCacheStore
 import github.zerorooot.nap511.viewmodel.store.PagingStateStore
 import github.zerorooot.nap511.viewmodel.store.ScrollPositionStore
 import github.zerorooot.nap511.viewmodel.store.TorrentCacheStore
-import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
@@ -199,7 +198,7 @@ class FileViewModel(
         serviceBridge = serviceBridge,
         navigator = this, // 统一注入门面自身
         onEnqueueUnzip = { taskItems ->
-            UnzipQueueManager.enqueueAndStartWorker(taskItems, context)
+            context.appContainer.unzipQueueManager.enqueueAndStartWorker(taskItems, context)
         },
         toastProvider = toastProvider
     )

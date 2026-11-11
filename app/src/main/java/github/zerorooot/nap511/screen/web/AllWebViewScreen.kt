@@ -48,7 +48,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.acsbendi.requestinspectorwebview.RequestInspectorWebViewClient
 import com.acsbendi.requestinspectorwebview.WebViewRequest
 import com.elvishew.xlog.XLog
-import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.di.toast
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.network.NetworkClient
 import github.zerorooot.nap511.util.network.UserSessionManager
@@ -1122,7 +1122,7 @@ fun webViewClient(onUrl: (String) -> Unit): WebViewClient {
             super.onReceivedError(view, request, error)
             XLog.e("WebView Error: ${error?.description} (code: ${error?.errorCode}) for URL: ${request?.url}")
             if (request?.isForMainFrame == true) {
-                App.instance.toast("网页加载错误: ${error?.description}")
+                view?.context?.toast("网页加载错误: ${error?.description}")
             }
         }
 
@@ -1283,13 +1283,13 @@ fun captchaWebViewClient(
             if ("https://webapi.115.com/user/captcha" == webViewRequest.url) {
                 if (check("https://webapi.115.com/user/captcha", webViewRequest, nav)) {
                     handleOfflineTask?.invoke()
-                    App.instance.toast("验证账号成功，重新添加链接中")
+                    view.context.toast("验证账号成功，重新添加链接中")
                 }
             }
             //视频验证
             if ("https://115vod.com/webapi/user/captcha" == webViewRequest.url) {
                 if (check("https://115vod.com/webapi/user/captcha", webViewRequest, nav)) {
-                    App.instance.toast("视频验证成功~")
+                    view.context.toast("视频验证成功~")
                 }
             }
             return super.shouldInterceptRequest(view, webViewRequest)

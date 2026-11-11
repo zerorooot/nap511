@@ -23,7 +23,9 @@ import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.di.appContainer
+import github.zerorooot.nap511.di.toast
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.handleText
 import github.zerorooot.nap511.worker.OfflineTaskWorker
@@ -40,7 +42,7 @@ class OfflineTaskActivity : ComponentActivity() {
         const val PENDING_NOTIFICATION_ID = 1000
     }
 
-    private val settingsRepository by lazy { (application as App).container.settingsRepository }
+    private val settingsRepository: SettingsRepository by lazy { appContainer.settingsRepository }
 
     @SuppressLint("EnqueueWork")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -144,7 +146,7 @@ class OfflineTaskActivity : ComponentActivity() {
                     val notificationManager =
                         getSystemService(NOTIFICATION_SERVICE) as NotificationManager
                     notificationManager.cancel(PENDING_NOTIFICATION_ID)
-                    App.instance.toast("开始离线下载")
+                    toast("开始离线下载")
                 }
             } finally {
                 finishAndRemoveTask()
@@ -196,11 +198,11 @@ class OfflineTaskActivity : ComponentActivity() {
                         val path = allPath.substringAfterLast("/")
                         val size = currentOfflineTaskList.size
 
-                        App.instance.toast("已添加到’$path‘，共${size}个链接，${offlineTime}分钟后开始离线下载")
+                        toast("已添加到’$path‘，共${size}个链接，${offlineTime}分钟后开始离线下载")
                         showPendingNotification(allPath, path, size)
                         addOfflineTaskByTime(currentOfflineTaskList.toList(), offlineTime)
                     } else {
-                        App.instance.toast("仅支持以http、ftp、magnet、ed2k开头的链接")
+                        toast("仅支持以http、ftp、magnet、ed2k开头的链接")
                     }
                 }
             } finally {

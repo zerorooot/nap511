@@ -11,8 +11,8 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.repository.SettingsRepository
-import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.di.appContainer
+import github.zerorooot.nap511.di.toast
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.network.NetworkClient
 import github.zerorooot.nap511.util.network.UserSessionManager
@@ -97,7 +97,7 @@ class Sha1Service : Service() {
     }
      */
     private suspend fun sendToAria2(fileBeanDownloadList: ArrayList<String>) {
-        val settingsRepository = (application as App).container.settingsRepository
+        val settingsRepository = appContainer.settingsRepository
         val aria2Token = settingsRepository.getDataSuspend(ConfigKeyUtil.ARIA2_TOKEN, "")
         val aria2Url = settingsRepository.getDataSuspend(
             ConfigKeyUtil.ARIA2_URL,
@@ -160,7 +160,7 @@ class Sha1Service : Service() {
             "下载失败！${e.message}"
         }
 
-        App.instance.toast(message)
+        toast(message)
 
     }
 

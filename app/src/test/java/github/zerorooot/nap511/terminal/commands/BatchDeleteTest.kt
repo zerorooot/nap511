@@ -6,7 +6,6 @@ import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.terminal.commands.file.BatchTargetItem
 import github.zerorooot.nap511.terminal.commands.file.TerminalBatchFileOps
 import github.zerorooot.nap511.terminal.commands.file.resolveEffectiveParentCid
-import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -33,7 +32,6 @@ class BatchDeleteTest {
         try {
             XLog.init()
         } catch (_: Throwable) {}
-        UnzipQueueManager.clear()
     }
 
     /**

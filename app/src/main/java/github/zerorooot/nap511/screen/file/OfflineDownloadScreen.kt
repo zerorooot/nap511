@@ -37,9 +37,9 @@ import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.screen.components.BaseTopAppBar
 import github.zerorooot.nap511.screen.components.TopAppBarActionButton
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.handleText
+import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,6 +51,7 @@ fun OfflineDownloadScreen(
     onClick: () -> Unit,
     onAddTask: (List<String>) -> Unit
 ) {
+    val toastProvider = LocalToastProvider.current
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
@@ -92,7 +93,7 @@ fun OfflineDownloadScreen(
     val onStartDownload = {
         val urlList = handleUrl(urlText)
         if (urlList.isEmpty()) {
-            App.instance.toast("请输入下载链接")
+            toastProvider.showToast("请输入下载链接")
         } else {
             onAddTask.invoke(urlList)
             urlText = ""

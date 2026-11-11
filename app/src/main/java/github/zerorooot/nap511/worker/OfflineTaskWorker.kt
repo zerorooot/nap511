@@ -23,7 +23,8 @@ import github.zerorooot.nap511.MainActivity
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.OfflineTaskActivity
 import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.di.appContainer
+import github.zerorooot.nap511.di.toast
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileCacheManager
 import java.util.StringJoiner
@@ -65,7 +66,7 @@ class OfflineTaskWorker(
         }
 
 
-        val settingsRepository = (applicationContext as App).container.settingsRepository
+        val settingsRepository = applicationContext.appContainer.settingsRepository
         val cid = settingsRepository.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
         val path =
             settingsRepository.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, "/根目录/云下载")
@@ -87,7 +88,7 @@ class OfflineTaskWorker(
         XLog.v("OfflineTaskWorker checkOfflineTask $message")
 
         if (state) {
-            App.instance.toast(message)
+            applicationContext.toast(message)
         } else {
             //只有失败才弹通知
             toast(message, a, cid)

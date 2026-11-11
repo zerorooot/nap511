@@ -60,7 +60,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.google.gson.Gson
 import github.zerorooot.nap511.bean.SettingUiState
-import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
 import github.zerorooot.nap511.util.copy
 import github.zerorooot.nap511.util.network.LanIpUtil
 import github.zerorooot.nap511.util.network.LanSyncCrypto
@@ -86,6 +86,7 @@ fun LanSyncSenderDialog(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
+    val toastProvider = LocalToastProvider.current
     val gson = remember { Gson() }
 
     // 1. 本机局域网 IP 列表采集与选中状态
@@ -130,14 +131,14 @@ fun LanSyncSenderDialog(
             },
             onCompleted = {
                 coroutineScope.launch(Dispatchers.Main) {
-                    App.instance.toast("同步成功！接收端已获取数据")
+                    toastProvider.showToast("同步成功！接收端已获取数据")
                     onDismissRequest()
                 }
             },
             onError = { errMsg ->
                 coroutineScope.launch(Dispatchers.Main) {
                     serverStatusMessage = errMsg
-                    App.instance.toast(errMsg)
+                    toastProvider.showToast(errMsg)
                 }
             }
         )
@@ -374,7 +375,7 @@ fun LanSyncSenderDialog(
                         onClick = {
                             if (currentUriString.isNotBlank()) {
                                 currentUriString.copy(context, "nap511-sync")
-                                App.instance.toast("同步口令已复制至剪贴板")
+                                toastProvider.showToast("同步口令已复制至剪贴板")
                             }
                         },
                         modifier = Modifier.weight(1f)

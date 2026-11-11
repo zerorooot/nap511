@@ -10,7 +10,6 @@ import androidx.work.WorkManager
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import github.zerorooot.nap511.util.App
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -25,7 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * 1. 内存高性能待办池 + 磁盘原子落盘，防止进程被杀 (LMK) 后解压任务丢失；
  * 2. 状态机互斥与 Double-Check 退出机制，彻底杜绝 Worker 退出临界点与新追加任务产生的假死竞态。
  */
-object UnzipQueueManager {
+class UnzipQueueManager(context: Context) {
     val lock = Any()
     private val queue = ConcurrentLinkedQueue<UnzipTaskItem>()
     private val totalCount = AtomicInteger(0)
@@ -45,30 +44,29 @@ object UnzipQueueManager {
     @Volatile
     var onQueueChangeListener: ((processed: Int, total: Int) -> Unit)? = null
 
-    // 持久化备份文件
-    private val queueBackupFile: File? by lazy {
-        try {
-            File(App.instance.filesDir, "unzip_task_queue_v2.json")
-        } catch (_: Throwable) {
-            null
-        }
-    }
+    // 采用标准 Elvis 降级策略：如果 applicationContext 为 null，退回使用 context 本身
+    private val appContext: Context = context.applicationContext ?: context
+    private val backupDir: File = appContext.filesDir ?: File(".")
 
     init {
         restoreFromDisk()
     }
+
+    // 持久化备份文件
+    internal val queueBackupFile: File
+        get() = File(backupDir, "unzip_task_queue_v2.json")
 
     /**
      * 任务入队并触发后台 Worker 调度（单 Worker 消费者模式，ExistingWorkPolicy.KEEP）
      */
     fun enqueueAndStartWorker(
         items: List<UnzipTaskItem>,
-        context: Context? = runCatching { App.instance.applicationContext }.getOrNull()
+        context: Context? = null
     ) {
         if (items.isEmpty()) return
         enqueue(items)
 
-        if (context == null) return
+        val targetContext = context?.applicationContext ?: appContext
 
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -80,7 +78,7 @@ object UnzipQueueManager {
             .build()
 
         try {
-            val workManager = WorkManager.getInstance(context.applicationContext)
+            val workManager = WorkManager.getInstance(targetContext)
             workManager.enqueueUniqueWork(
                 "unzipAllFileWorker", ExistingWorkPolicy.KEEP, request
             )
@@ -186,12 +184,11 @@ object UnzipQueueManager {
             processedCount.set(0)
             isWorkerRunning = false
             onQueueChangeListener = null
-            queueBackupFile?.let {
-                if (it.exists()) it.delete()
+            if (queueBackupFile.exists()) {
+                queueBackupFile.delete()
             }
         }
     }
-
 
     /**
      * 获取当前处理进度 (已处理数, 总数)
@@ -205,7 +202,7 @@ object UnzipQueueManager {
     // --- 持久化与恢复支持 ---
 
     private fun persistToDisk() {
-        val file = queueBackupFile ?: return
+        val file = queueBackupFile
         try {
             val list = listOfNotNull(currentRunningTask) + queue.toList()
             if (list.isEmpty()) {
@@ -222,7 +219,7 @@ object UnzipQueueManager {
 
     private fun restoreFromDisk() {
         synchronized(lock) {
-            val file = queueBackupFile ?: return
+            val file = queueBackupFile
             try {
                 if (file.exists()) {
                     val json = file.readText()

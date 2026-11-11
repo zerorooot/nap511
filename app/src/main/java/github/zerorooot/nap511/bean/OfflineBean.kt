@@ -42,7 +42,7 @@ data class OfflineTask(
     @SerializedName("info_hash") var infoHash: String = "",
     @SerializedName("add_time") var addTime: Long = -1,
     @SerializedName("percentDone") var percentDone: Double = 0.0,
-    @SerializedName("size") var size: Long = -1,
+    @SerializedName("size") var size: Long = 0,
     @SerializedName("name") var name: String = "",
     @SerializedName("file_id") var fileId: String = "",
     @SerializedName("delete_file_id") var deleteFileId: String = "",

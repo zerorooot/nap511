@@ -48,8 +48,8 @@ import androidx.core.view.WindowCompat
 import github.zerorooot.nap511.terminal.engine.CompletionCandidate
 import github.zerorooot.nap511.terminal.viewmodel.TerminalLine
 import github.zerorooot.nap511.terminal.viewmodel.TerminalViewModel
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.copy
+import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 import kotlinx.coroutines.CoroutineScope
@@ -77,6 +77,7 @@ fun TerminalScreen(
     openDrawer: () -> Unit
 ) {
     val context = LocalContext.current
+    val toastProvider = LocalToastProvider.current
     val view = LocalView.current
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -299,7 +300,7 @@ fun TerminalScreen(
             },
             onCopyAll = {
                 viewModel.getAllTerminalText().copy(context, "Terminal Output")
-                App.instance.toast("已复制终端输出内容")
+                toastProvider.showToast("已复制终端输出内容")
             },
             onOpenDrawer = openDrawer,
             onFocusChange = { isInputFocused = it },
@@ -316,7 +317,7 @@ fun TerminalScreen(
                 onClearScreen = { viewModel.clearScreen() },
                 onCopyAll = {
                     viewModel.getAllTerminalText().copy(context, "Terminal Output")
-                    App.instance.toast("已复制终端输出内容")
+                    toastProvider.showToast("已复制终端输出内容")
                 },
                 onOpenDrawer = openDrawer,
                 onCloseTerminal = exitAndReset

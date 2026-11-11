@@ -32,7 +32,7 @@ import github.zerorooot.nap511.screen.AppNavHost
 import github.zerorooot.nap511.screen.file.CreateDialogs
 import github.zerorooot.nap511.screenitem.AppDrawer
 import github.zerorooot.nap511.screenitem.DrawerMenuItems
-import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
 import github.zerorooot.nap511.viewmodel.AudioViewModel
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
@@ -57,6 +57,7 @@ fun MainScreen(
         viewModel(factory = OfflineFileViewModel.Factory)
 
     val context = LocalContext.current
+    val toastProvider = LocalToastProvider.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -156,7 +157,7 @@ fun MainScreen(
             onMoveTaskToBack(true)
         } else {
             lastBackPressTime = currentTime
-            App.instance.toast("再滑一次返回桌面")
+            toastProvider.showToast("再滑一次返回桌面")
         }
     }
 

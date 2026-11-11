@@ -39,7 +39,6 @@ class TerminalViewModelTest {
         try {
             com.elvishew.xlog.XLog.init()
         } catch (_: Throwable) {}
-        github.zerorooot.nap511.worker.UnzipQueueManager.clear()
 
         tempHistoryFile = java.io.File.createTempFile("test_term_hist", ".txt").apply { deleteOnExit() }
         Dispatchers.setMain(testDispatcher)

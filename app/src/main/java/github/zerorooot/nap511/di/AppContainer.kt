@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.di
 
+import android.content.Context
 import android.app.Application
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.CreationExtras
@@ -19,6 +20,7 @@ import github.zerorooot.nap511.viewmodel.platform.AndroidAppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
 import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.ToastProvider
+import github.zerorooot.nap511.worker.UnzipQueueManager
 
 /**
  * 应用级依赖注入容器抽象接口
@@ -34,6 +36,7 @@ interface AppContainer {
     val fileService: FileService
     val repeatService: RepeatService
     val pagingCoordinator: DirectoryPagingCoordinator
+    val unzipQueueManager: UnzipQueueManager
 }
 
 /**
@@ -68,6 +71,9 @@ class DefaultAppContainer(private val application: Application) : AppContainer {
     override val pagingCoordinator: DirectoryPagingCoordinator by lazy {
         DirectoryPagingCoordinatorImpl.getInstance()
     }
+    override val unzipQueueManager: UnzipQueueManager by lazy {
+        UnzipQueueManager(application)
+    }
 }
 
 /**
@@ -81,3 +87,29 @@ val CreationExtras.app: App
  */
 val CreationExtras.appContainer: AppContainer
     get() = app.container
+
+/**
+ * Context 扩展属性：便捷获取全局 AppContainer
+ * 采用多级安全探测链（优先匹配 this as? App，其次 applicationContext as? App），
+ * 确保即使在没有底层 BaseContext 的 JVM 单元测试环境中，也能准确命中预设的测试容器。
+ */
+val Context.appContainer: AppContainer
+    get() = (this as? App)?.container
+        ?: (applicationContext as? App)?.container
+        ?: (applicationContext as? Application ?: this as? Application)?.let { DefaultAppContainer(it) }
+        ?: error("Cannot obtain AppContainer: Current Context is not associated with an Application")
+
+/**
+ * Context 扩展属性：便捷获取全局 ToastProvider 单例
+ */
+val Context.toastProvider: ToastProvider
+    get() = appContainer.toastProvider
+
+/**
+ * Context 轻提示扩展函数：自动委托给全局 ToastProvider 单例，
+ * 具备主线程调度保障与重复提示取消防抖特性。
+ */
+fun Context.toast(message: String, isLong: Boolean = false) {
+    if (message.isBlank()) return
+    toastProvider.showToast(message, isLong)
+}

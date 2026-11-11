@@ -4,7 +4,6 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.PathBean
-import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -23,7 +22,6 @@ class RmCommandTest {
         try {
             XLog.init()
         } catch (_: Throwable) {}
-        UnzipQueueManager.clear()
     }
 
     /**

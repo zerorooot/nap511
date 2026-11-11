@@ -6,6 +6,7 @@ import android.content.res.Configuration
 import com.google.gson.Gson
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
+import github.zerorooot.nap511.di.toast
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.LaunchVideoParams
 import github.zerorooot.nap511.bean.Route
@@ -223,7 +224,7 @@ class FileOpener(
         }
 
         if (video == null) {
-            App.instance.toast("获取视频播放信息失败")
+            context.toast("获取视频播放信息失败")
             return false
         }
 
@@ -304,12 +305,12 @@ class FileOpener(
         when (val validation =
             TextFileHelper.validate(fileBean, txtSize, checkType = !isForceOpen)) {
             is TextValidationResult.ExceedsSizeLimit -> {
-                App.instance.toast("仅支持打开${validation.limitKb}kb以下的文件")
+                context.toast("仅支持打开${validation.limitKb}kb以下的文件")
                 return false
             }
 
             is TextValidationResult.NotTextFile -> {
-                App.instance.toast("非文本类型文件")
+                context.toast("非文本类型文件")
                 return false
             }
 
@@ -329,7 +330,7 @@ class FileOpener(
             }
             return true
         } else {
-            App.instance.toast("文件加载失败！")
+            context.toast("文件加载失败！")
             return false
         }
     }
@@ -341,7 +342,7 @@ class FileOpener(
         val settings = settingUiState()
         val txtSize = settings.txtSize.toIntOrNull() ?: 200
         if (fileBean.size.toLong() >= txtSize * 1024) {
-            App.instance.toast("仅支持打开${txtSize}kb以下的文件")
+            context.toast("仅支持打开${txtSize}kb以下的文件")
             return false
         }
 
@@ -367,7 +368,7 @@ class FileOpener(
             }
             return true
         } else {
-            App.instance.toast("文件加载失败！")
+            context.toast("文件加载失败！")
             return false
         }
     }

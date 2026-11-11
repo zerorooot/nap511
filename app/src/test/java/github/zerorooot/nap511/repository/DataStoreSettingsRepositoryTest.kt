@@ -5,7 +5,6 @@ import com.elvishew.xlog.XLog
 import com.google.gson.JsonObject
 import com.google.gson.JsonPrimitive
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,7 +33,6 @@ class DataStoreSettingsRepositoryTest {
         try {
             XLog.init()
         } catch (_: Throwable) {}
-        UnzipQueueManager.clear()
 
         testScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         val testDataStore = PreferenceDataStoreFactory.create(

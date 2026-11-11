@@ -58,11 +58,6 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
     /** 应用级依赖注入容器，支持测试环境动态替换为 FakeAppContainer */
     var container: AppContainer = DefaultAppContainer(this)
 
-    companion object {
-        lateinit var instance: App
-            internal set
-    }
-
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile
@@ -73,7 +68,7 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
         // 长按/选中后剪切、复制、粘贴点击无效。回退到旧实现规避该回归。
         ComposeFoundationFlags.isNewContextMenuEnabled = false
         super.onCreate()
-        instance = this
+
         // 预热 SettingsRepository，在应用进程启动时即触发后台异步预读 DataStore
         val settingsRepository = container.settingsRepository
         appScope.launch {
@@ -141,18 +136,6 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
             .flattener(ClassicFlattener())
             .build()
         XLog.init(build, AndroidPrinter(true), print);
-    }
-
-    /**
-     * 全局兼容轻提示方法
-     * 统一委托给 AppContainer 中的 ToastProvider 单例，与全量 ViewModel 弹窗共享互斥与主线程生命周期。
-     */
-    fun toast(text: String) {
-        container.toastProvider.showToast(text)
-    }
-
-    fun getStringRes(id: Int): String {
-        return getString(id)
     }
 
 

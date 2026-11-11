@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.lifecycle.lifecycleScope
+import github.zerorooot.nap511.di.toast
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -35,7 +36,7 @@ class TorrentTaskActivity : androidx.activity.ComponentActivity() {
                 } else {
                     "上传种子文件失败,${result.message}"
                 }
-                App.instance.toast(message)
+                toast(message)
                 moveTaskToBack(true)
                 finishAndRemoveTask()
             }

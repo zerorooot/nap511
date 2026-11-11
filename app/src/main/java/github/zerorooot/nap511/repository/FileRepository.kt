@@ -29,7 +29,6 @@ import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.service.OfflineService
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.crypto.Sha1Util
 import github.zerorooot.nap511.util.formatFileSize
@@ -426,8 +425,7 @@ open class FileRepository {
         zipFileCid: String,
         files: List<String>?,
         dirs: List<String>?,
-        unzipFolderName: String = "",
-        showToast: Boolean = true
+        unzipFolderName: String = ""
     ): Pair<Boolean, String> {
         var state: Boolean
         val unzipFile = fileService.unzipFile(pickCode, zipFileCid, files, dirs)
@@ -451,10 +449,6 @@ open class FileRepository {
             message.ifEmpty { "获取解压任务ID失败" }
         )
 
-        if (showToast) {
-            App.instance.toast(message)
-        }
-
         // {"state":true,"message":"","code":"","data":{"extract_id":"id","to_pid":"pid","percent":100}}
 
         for (i in 1..50) {
@@ -472,9 +466,6 @@ open class FileRepository {
                 break
             }
             delay(1000.milliseconds)
-        }
-        if (showToast) {
-            App.instance.toast(message)
         }
         return Pair(state, message)
     }

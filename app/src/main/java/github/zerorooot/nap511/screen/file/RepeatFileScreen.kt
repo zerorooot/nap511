@@ -56,9 +56,9 @@ import github.zerorooot.nap511.screen.components.MenuItemAction
 import github.zerorooot.nap511.screen.components.MiddleEllipsisText
 import github.zerorooot.nap511.screen.components.TopBarAction
 import github.zerorooot.nap511.screenitem.RepeatFileCardItem
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.viewmodel.RepeatFileViewModel
 import github.zerorooot.nap511.viewmodel.RepeatUiState
+import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.LazyVerticalGridScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
@@ -244,15 +244,16 @@ fun RepeatFileScreen(
     jumpClick: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val toastProvider = LocalToastProvider.current
     var showDeleteDialog by remember { mutableStateOf(false) }
 
-    val actions = remember(viewModel, onClick) {
+    val actions = remember(viewModel, onClick, toastProvider) {
         RepeatFileActions(
             onOneKeyDedupClick = {
                 if (uiState.hasStartedDedup) {
                     showDeleteDialog = true
                 } else {
-                    App.instance.toast("请先点击右上角查重，完成后即可去重")
+                    toastProvider.showToast("请先点击右上角查重，完成后即可去重")
                 }
             },
             onStartScanClick = {

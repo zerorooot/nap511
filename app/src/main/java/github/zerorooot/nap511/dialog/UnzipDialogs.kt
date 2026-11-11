@@ -55,7 +55,7 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ZipBean
 import github.zerorooot.nap511.bean.ZipBeanList
-import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
 import github.zerorooot.nap511.viewmodel.FileViewModel
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
@@ -80,6 +80,7 @@ fun UnzipPassword(fileBean: FileBean, enter: (String?) -> Unit) {
 fun UnzipAllFile(
     fileViewModel: FileViewModel
 ) {
+    val toastProvider = LocalToastProvider.current
     BaseDialog("请输入解压密码", "如无加密，为空即可") { pwd ->
         if (pwd == null) {
             fileViewModel.closeUnzipAllFileDialog()
@@ -98,7 +99,7 @@ fun UnzipAllFile(
                 } ?: run {
                 "请选中压缩包解压！"
             }
-        App.instance.toast(message)
+        toastProvider.showToast(message)
 
         fileViewModel.clearSelection()
     }

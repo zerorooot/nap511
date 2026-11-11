@@ -4,7 +4,6 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.PathBean
-import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -45,7 +44,6 @@ class TwoLevelCacheEngineTest {
         try {
             XLog.init()
         } catch (_: Throwable) {}
-        UnzipQueueManager.clear()
         tempDir = Files.createTempDirectory("tlce_test").toFile()
         engine = TwoLevelCacheEngine(
             cacheDir = tempDir,

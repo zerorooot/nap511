@@ -3,6 +3,7 @@ package github.zerorooot.nap511.viewmodel.platform
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.concurrent.futures.await
 import androidx.work.Constraints
 import androidx.work.Data
@@ -82,6 +83,18 @@ interface ToastProvider {
 
     /** 显示指定字符串资源 ID 的轻提示 */
     fun showToast(resId: Int)
+}
+
+/**
+ * Compose 静态轻提示 CompositionLocal 提供者
+ * 顶层由 MainActivity.setContent 注入应用级 ToastProvider 单例。
+ * 默认提供安全的 No-op 空实现，保障 @Preview 与隔离单测环境永不抛出异常。
+ */
+val LocalToastProvider = staticCompositionLocalOf<ToastProvider> {
+    object : ToastProvider {
+        override fun showToast(message: String, isLong: Boolean) {}
+        override fun showToast(resId: Int) {}
+    }
 }
 
 /**

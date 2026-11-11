@@ -59,9 +59,9 @@ import github.zerorooot.nap511.screen.components.AppTopBarOfflineFile
 import github.zerorooot.nap511.screen.components.MenuItemAction
 import github.zerorooot.nap511.screen.components.TopBarAction
 import github.zerorooot.nap511.screenitem.OfflineCellItem
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.copy
+import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
 import github.zerorooot.nap511.util.rememberListDetailDirective
 import github.zerorooot.nap511.viewmodel.OfflineFileUiState
 import github.zerorooot.nap511.viewmodel.OfflineFileViewModel
@@ -257,6 +257,7 @@ fun OfflineFileContent(
     onItemClick: ((OfflineTask) -> Unit),
 ) {
     val context = LocalContext.current
+    val toastProvider = LocalToastProvider.current
     val scope = rememberCoroutineScope()
 
     // Tab 页标题及数量提示
@@ -310,7 +311,7 @@ fun OfflineFileContent(
                     copyDownloadUrl(context, stringJoiner.toString(), allTasks.size)
 
                 } else {
-                    App.instance.toast("没有链接")
+                    toastProvider.showToast("没有链接")
                 }
             }
 

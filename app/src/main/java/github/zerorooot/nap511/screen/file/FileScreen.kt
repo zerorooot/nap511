@@ -59,7 +59,7 @@ import github.zerorooot.nap511.dialog.ForceOpenDialog
 import github.zerorooot.nap511.screen.components.AppBarAction
 import github.zerorooot.nap511.screen.components.MenuItemAction
 import github.zerorooot.nap511.screen.components.TopBarAction
-import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileOpener
 import github.zerorooot.nap511.util.asScrollState
@@ -97,6 +97,7 @@ fun FileScreen(
     val fileBeanList = contentState.fileBeanList
     val refreshing = contentState.isRefreshing
     val context = LocalContext.current
+    val toastProvider = LocalToastProvider.current
     var showForceOpenDialog by rememberSaveable { mutableIntStateOf(-1) }
 
     /**
@@ -283,7 +284,7 @@ fun FileScreen(
     if (showForceOpenDialog != -1) {
         val bean = fileViewModel.fileBeanList[showForceOpenDialog]
         if (bean.isFolder) {
-            App.instance.toast("此功能仅支持文件，不支持文件夹")
+            toastProvider.showToast("此功能仅支持文件，不支持文件夹")
             showForceOpenDialog = -1
         } else {
             ForceOpenDialog(
@@ -406,7 +407,7 @@ fun FileScreen(
 
             MenuItemAction.FILE_SORT -> {
                 if (contentState.source is FileListSource.Search) {
-                    App.instance.toast("搜索模式暂不支持排序")
+                    toastProvider.showToast("搜索模式暂不支持排序")
                 } else {
                     fileViewModel.openFileOrderDialog()
                 }
@@ -459,7 +460,7 @@ fun FileScreen(
             onPathClick = {
                 val pathString = contentState.pathList.joinToString("/") { it.name }
                 pathString.copy(context)
-                App.instance.toast("$pathString 已复制到剪切板")
+                toastProvider.showToast("$pathString 已复制到剪切板")
             },
             onPathDoubleClick = {
                 scope.launch {
@@ -509,11 +510,11 @@ fun FileScreen(
             },
             onUnzip = { fileBean ->
                 if (fileBean.isFolder) {
-                    App.instance.toast("不能解压文件夹！")
+                    toastProvider.showToast("不能解压文件夹！")
                     return@FileItemActions
                 }
                 if (fileBean.fileIco != R.drawable.zip) {
-                    App.instance.toast("非压缩文件！")
+                    toastProvider.showToast("非压缩文件！")
                     return@FileItemActions
                 }
                 fileViewModel.unzipFile(fileBean)

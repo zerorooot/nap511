@@ -5,7 +5,6 @@ import android.content.Context
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.viewmodel.platform.FakeToastProvider
-import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -42,11 +41,8 @@ class AppContainerTest {
         try {
             XLog.init()
         } catch (_: Throwable) {}
-        UnzipQueueManager.clear()
         Dispatchers.setMain(testDispatcher)
 
-        val testApp = App()
-        App.instance = testApp
         app = TestApplication(tmpFolder.root)
         container = DefaultAppContainer(app)
     }
@@ -67,6 +63,7 @@ class AppContainerTest {
         assertNotNull("repeatService should not be null", container.repeatService)
         assertNotNull("pagingCoordinator should not be null", container.pagingCoordinator)
         assertNotNull("stringProvider should not be null", container.stringProvider)
+        assertNotNull("unzipQueueManager should not be null", container.unzipQueueManager)
     }
 
     @Test
@@ -81,6 +78,7 @@ class AppContainerTest {
         assertSame(container.repeatService, container.repeatService)
         assertSame(container.pagingCoordinator, container.pagingCoordinator)
         assertSame(container.stringProvider, container.stringProvider)
+        assertSame(container.unzipQueueManager, container.unzipQueueManager)
     }
 
     @Test

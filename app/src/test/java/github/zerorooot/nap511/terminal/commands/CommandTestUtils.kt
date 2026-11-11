@@ -13,6 +13,7 @@ import github.zerorooot.nap511.terminal.engine.PipelineEngine
 import github.zerorooot.nap511.terminal.engine.TerminalHistoryManager
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.formatFileBeanList
+import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.flow.toList
 import okhttp3.RequestBody
 import java.io.InputStream
@@ -35,21 +36,25 @@ internal suspend fun PipelineEngine.executeStrings(cmd: String, ctx: TerminalCon
  * @param rootName 根目录名称，默认为 "根目录"
  * @param fileRepository 绑定的文件仓库，默认为 null
  * @param onConfirmRequest 确认交互回调
+ * @param unzipQueueManager 绑定的解压队列管理器，默认为 null
  */
 internal fun createTestContext(
     rootCid: String = "0",
     rootName: String = "根目录",
     fileRepository: FileRepository? = null,
-    onConfirmRequest: (suspend (String) -> Boolean)? = null
+    onConfirmRequest: (suspend (String) -> Boolean)? = null,
+    unzipQueueManager: UnzipQueueManager? = null
 ): TerminalContext {
     val ctx = if (fileRepository != null) {
         TerminalContext(
             fileRepository = fileRepository,
-            onConfirmRequest = onConfirmRequest
+            onConfirmRequest = onConfirmRequest,
+            unzipQueueManager = unzipQueueManager
         )
     } else {
         TerminalContext(
-            onConfirmRequest = onConfirmRequest
+            onConfirmRequest = onConfirmRequest,
+            unzipQueueManager = unzipQueueManager
         )
     }
     ctx.updateDirectory(listOf(PathBean(rootCid, rootName, "0")))

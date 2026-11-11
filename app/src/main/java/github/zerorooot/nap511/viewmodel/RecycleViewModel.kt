@@ -1,5 +1,7 @@
 package github.zerorooot.nap511.viewmodel
 
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -9,11 +11,11 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
+import github.zerorooot.nap511.di.app
 import github.zerorooot.nap511.di.appContainer
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.screen.file.RecycleUiState
 import github.zerorooot.nap511.service.FileService
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
@@ -29,18 +31,20 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 
 class RecycleViewModel(
+    application: Application,
     private val fileService: FileService,
     private val toastProvider: ToastProvider,
     private val settingsRepository: SettingsRepository,
-) : ViewModel() {
+) : AndroidViewModel(application) {
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val container = appContainer
                 RecycleViewModel(
-                    container.fileService,
-                    container.toastProvider,
-                    container.settingsRepository
+                    application = app,
+                    fileService = container.fileService,
+                    toastProvider = container.toastProvider,
+                    settingsRepository = container.settingsRepository
                 )
             }
         }
@@ -191,7 +195,7 @@ class RecycleViewModel(
                 )
 
             recycleBean.fileSizeString = android.text.format.Formatter.formatFileSize(
-                App.instance,
+                getApplication(),
                 if (recycleBean.fileSize == "") "0".toLong() else recycleBean.fileSize.toLong()
             ) + " "
             setIco(recycleBean)

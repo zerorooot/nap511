@@ -93,10 +93,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.network.LoginResult
 import github.zerorooot.nap511.util.network.OneOneFiveAuthManager
 import github.zerorooot.nap511.util.network.UserSessionManager
+import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
@@ -123,6 +124,7 @@ fun LoginScreen(
 ) {
     var selectedTab by remember { mutableIntStateOf(0) } // 0: 账号密码, 1: 网页登录
     var showAdvancedSheet by remember { mutableStateOf(false) }
+    val toastProvider = LocalToastProvider.current
     val uid = UserSessionManager.uid
 
     Scaffold { padding ->
@@ -231,6 +233,7 @@ fun LoginScreen(
             onPayloadReceived = { payload ->
                 handleLoginSyncPayload(
                     payload = payload,
+                    toastProvider = toastProvider,
                     onSuccessLogin = { credential ->
                         showAdvancedSheet = false
                         onLoginSuccess(credential)
@@ -267,6 +270,7 @@ fun LoginScreen(
  */
 fun handleLoginSyncPayload(
     payload: SyncPayload,
+    toastProvider: ToastProvider? = null,
     onSuccessLogin: (LoginCredential) -> Unit
 ) {
     val cookie = payload.cookie
@@ -276,7 +280,7 @@ fun handleLoginSyncPayload(
         // 模式 2（应用设置）：完整包含凭证与全部配置，以 ConfigFile 方式导入，一次性完成配置更新与登录鉴权
         !configJson.isNullOrBlank() -> {
             if (cookie.isNullOrBlank()) {
-                App.instance.toast("同步的配置中未包含登录凭据，请重新发起包含有效账号的同步")
+                toastProvider?.showToast("同步的配置中未包含登录凭据，请重新发起包含有效账号的同步")
             } else {
                 onSuccessLogin(LoginCredential.ConfigFile(configJson))
             }
@@ -286,7 +290,7 @@ fun handleLoginSyncPayload(
             onSuccessLogin(LoginCredential.Cookie(cookie))
         }
         else -> {
-            App.instance.toast("同步数据为空")
+            toastProvider?.showToast("同步数据为空")
         }
     }
 }
@@ -301,6 +305,7 @@ private fun AccountPasswordForm(
     authManager: OneOneFiveAuthManager = remember { OneOneFiveAuthManager() }
 ) {
     val context = LocalContext.current
+    val toastProvider = LocalToastProvider.current
     val autofillManager = remember { context.getSystemService(AutofillManager::class.java) }
     val coroutineScope = rememberCoroutineScope()
 
@@ -332,12 +337,12 @@ private fun AccountPasswordForm(
             }
 
             is LoginResult.NeedCaptcha -> {
-                App.instance.toast(res.message)
+                toastProvider.showToast(res.message)
                 showCaptchaDialog = true
             }
 
             is LoginResult.Failure -> {
-                App.instance.toast(res.message)
+                toastProvider.showToast(res.message)
             }
         }
     }
@@ -619,6 +624,7 @@ private fun AdvancedLoginSheetContent(
     var cookieInput by remember { mutableStateOf("") }
     val clipboardManager = LocalClipboard.current
     val context = LocalContext.current
+    val toastProvider = LocalToastProvider.current
 
     // 系统 SAF 文件选择器（支持 .json 或所有文件）
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -633,10 +639,10 @@ private fun AdvancedLoginSheetContent(
                 if (!content.isNullOrBlank()) {
                     onConfigImported(content)
                 } else {
-                    App.instance.toast("文件内容为空")
+                    toastProvider.showToast("文件内容为空")
                 }
             } catch (e: Exception) {
-                App.instance.toast("读取文件失败: ${e.message}")
+                toastProvider.showToast("读取文件失败: ${e.message}")
             }
         }
     }

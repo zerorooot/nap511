@@ -92,7 +92,9 @@ import github.zerorooot.nap511.screen.components.AppTopBarLogScreen
 import github.zerorooot.nap511.screen.components.MenuItemAction
 import github.zerorooot.nap511.screen.components.TopAppBarSearch
 import github.zerorooot.nap511.screen.components.TopBarAction
-import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.di.toast
+import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.LogSearchMatch
 import github.zerorooot.nap511.util.buildSearchHighlightedText
@@ -405,7 +407,7 @@ class LogFileManager(context: Context) {
                 uri?.let {
                     resolver.openOutputStream(it)?.use { outputStream ->
                         outputStream.write(content.toByteArray())
-                        App.instance.toast("导出成功，日志文件保存至Downloads目录，文件名为:$fileName")
+                        appContext.toast("导出成功，日志文件保存至Downloads目录，文件名为:$fileName")
                         XLog.i("FileWrite File written to Downloads: $uri")
                     }
                 }
@@ -575,6 +577,7 @@ fun LogDetailDialog(
     onDismiss: () -> Unit
 ) {
     val clipboardManager = LocalClipboard.current
+    val toastProvider = LocalToastProvider.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -585,7 +588,7 @@ fun LogDetailDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { copyLogToClipboard(clipboardManager, selectedLog) }
+                onClick = { copyLogToClipboard(clipboardManager, selectedLog, toastProvider) }
             ) {
                 Text("复制全部")
             }
@@ -1242,14 +1245,15 @@ fun LogScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val clipboardManager = LocalClipboard.current
+    val toastProvider = LocalToastProvider.current
     val lazyListState = rememberLazyListState()
     val coroutine = rememberCoroutineScope()
 
-    val actions = remember(viewModel, onClick) {
+    val actions = remember(viewModel, onClick, toastProvider) {
         LogScreenActions(
             onSelectLevel = { viewModel.selectLevel(it) },
             onSelectLog = { viewModel.selectLogForDetail(it) },
-            onCopyLog = { copyLogToClipboard(clipboardManager, it) },
+            onCopyLog = { copyLogToClipboard(clipboardManager, it, toastProvider) },
             onClearFilter = { viewModel.selectLevel(null) },
             onSearchToggle = { viewModel.toggleSearch(it) },
             onSearchQueryChange = { viewModel.setSearchQuery(it) },
@@ -1299,12 +1303,12 @@ fun LogScreen(
 // ============================================================================
 
 /** 将单条结构化日志格式化并复制到系统剪切板 */
-private fun copyLogToClipboard(clipboardManager: Clipboard, logEntry: LogEntry) {
+private fun copyLogToClipboard(clipboardManager: Clipboard, logEntry: LogEntry, toastProvider: ToastProvider) {
     val text = listOf(logEntry.tag, logEntry.timestamp, logEntry.message)
         .filter { it.isNotBlank() }
         .joinToString("\n")
     clipboardManager.nativeClipboardManager.setPrimaryClip(
         ClipData.newPlainText("logs", text)
     )
-    App.instance.toast("日志已复制到剪切板")
+    toastProvider.showToast("日志已复制到剪切板")
 }

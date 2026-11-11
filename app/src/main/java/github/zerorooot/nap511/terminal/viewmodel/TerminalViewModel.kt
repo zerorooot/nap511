@@ -35,6 +35,7 @@ import github.zerorooot.nap511.terminal.engine.completion.StandardCompleter
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileOpener
 import github.zerorooot.nap511.util.TextFileHelper
+import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -62,6 +63,7 @@ class TerminalViewModel(
     private val mainDispatcher: CoroutineDispatcher? = null,
     val historyFile: File,
     private val settingsRepository: SettingsRepository,
+    private val unzipQueueManager: UnzipQueueManager? = null,
 ) : ViewModel() {
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
@@ -70,7 +72,8 @@ class TerminalViewModel(
                 TerminalViewModel(
                     fileRepository = container.fileRepository,
                     historyFile = File(app.filesDir, "terminal_history.txt"),
-                    settingsRepository = appContainer.settingsRepository
+                    settingsRepository = appContainer.settingsRepository,
+                    unzipQueueManager = appContainer.unzipQueueManager
                 )
             }
         }
@@ -210,7 +213,8 @@ class TerminalViewModel(
         getTextSizeLimitKb = {
             settingsRepository.settingUiStateFlow.value.txtSize.toIntOrNull()
                 ?: TextFileHelper.DEFAULT_TXT_SIZE_KB
-        }
+        },
+        unzipQueueManager = unzipQueueManager
     )
 
     val historyManager = TerminalHistoryManager(historyFile)

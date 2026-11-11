@@ -48,7 +48,7 @@ import github.zerorooot.nap511.screen.web.HtmlWebViewScreen
 import github.zerorooot.nap511.screen.web.WebViewScreen
 import github.zerorooot.nap511.terminal.ui.TerminalScreen
 import github.zerorooot.nap511.terminal.viewmodel.TerminalViewModel
-import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
 import github.zerorooot.nap511.util.AudioPlayerController
 import github.zerorooot.nap511.util.FileDialogController
 import github.zerorooot.nap511.util.FileOpener
@@ -93,6 +93,7 @@ fun AppNavHost(
         (uiState.gridCellMinSize.toIntOrNull()?.takeIf { i -> i > 0 } ?: 340).dp
     val isGridScreen = uiState.gridScreenEnabled
     val context = LocalContext.current
+    val toastProvider = LocalToastProvider.current
     val mediaViewerStateHolder = remember { MediaViewerStateHolder() }
     val audioPlayerController = remember(audioViewModel) {
         object : AudioPlayerController {
@@ -124,7 +125,7 @@ fun AppNavHost(
         val data = result.data
         val message = data?.getStringExtra("toast") ?: ""
         if (message.isNotEmpty()) {
-            App.instance.toast(message)
+            toastProvider.showToast(message)
         }
         if (data != null) {
             val videoHistoryJson = data.getStringExtra("videoHistory") ?: "{}"

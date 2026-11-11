@@ -51,7 +51,7 @@ import github.zerorooot.nap511.bean.LaunchVideoParams
 import github.zerorooot.nap511.bean.VideoUiState
 import github.zerorooot.nap511.dialog.CaptchaVideoContent
 import github.zerorooot.nap511.player.MyGSYVideoPlayer
-import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.di.toast
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.findMatchingSubtitle
 import github.zerorooot.nap511.util.network.UserSessionManager
@@ -366,7 +366,7 @@ class VideoActivity : AppCompatActivity() {
                                 }
                                 videoPlayer.playNext(event.videoUrl, event.title)
                                 if (event.videoUrl.isEmpty()) {
-                                    App.instance.toast("获取视频链接失败，视频可能被删除，请刷新重试！")
+                                    toast("获取视频链接失败，视频可能被删除，请刷新重试！")
                                     viewModel.onEpisodeLoadError()
                                 } else if (event.isEpisodeSwitch) {
                                     // 切换集数时的字幕联动：为新集数匹配并自动加载对应字幕
@@ -376,7 +376,7 @@ class VideoActivity : AppCompatActivity() {
 
                             // 弹出 Toast 消息
                             is VideoUiEvent.Toast -> {
-                                App.instance.toast(event.message)
+                                toast(event.message)
                             }
 
                             // 旋转屏幕

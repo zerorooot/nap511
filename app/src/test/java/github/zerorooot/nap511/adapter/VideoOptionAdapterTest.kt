@@ -1,7 +1,6 @@
 package github.zerorooot.nap511.adapter
 
 import com.elvishew.xlog.XLog
-import github.zerorooot.nap511.worker.UnzipQueueManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -19,7 +18,6 @@ class VideoOptionAdapterTest {
         try {
             XLog.init()
         } catch (_: Throwable) {}
-        UnzipQueueManager.clear()
     }
 
     private fun initObservable(adapter: androidx.recyclerview.widget.RecyclerView.Adapter<*>) {

@@ -20,7 +20,7 @@ import github.zerorooot.nap511.bean.SubtitleItem
 import github.zerorooot.nap511.bean.SubtitleStyleBean
 import github.zerorooot.nap511.bean.VideoUiState
 import github.zerorooot.nap511.player.MyGSYVideoPlayer
-import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.di.toast
 import github.zerorooot.nap511.viewmodel.VideoViewModel
 
 class SubtitlePanelController(
@@ -81,9 +81,9 @@ class SubtitlePanelController(
             videoPlayer.setSubtitleSource(source)
             videoPlayer.setSubtitleEnabled(true)
             if (showToast) {
-                App.instance.toast("字幕切换成功")
+                context.toast("字幕切换成功")
             } else {
-                App.instance.toast("自动加载字幕: ${subtitleItem.simpleName}")
+                context.toast("自动加载字幕: ${subtitleItem.simpleName}")
             }
         }
     }

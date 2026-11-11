@@ -21,7 +21,8 @@ import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.di.appContainer
+import github.zerorooot.nap511.di.toast
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileCacheManager
 import kotlinx.coroutines.CancellationException
@@ -48,6 +49,10 @@ class UnzipAllFileWorker(
 
     private val fileRepository: FileRepository by lazy {
         FileRepository.getInstance()
+    }
+
+    private val unzipQueueManager by lazy {
+        applicationContext.appContainer.unzipQueueManager
     }
 
     private val cancelPendingIntent: PendingIntent =
@@ -116,7 +121,7 @@ class UnzipAllFileWorker(
         }
         lastUpdateTime = currentTime
 
-        val (p, t) = UnzipQueueManager.getProgress()
+        val (p, t) = unzipQueueManager.getProgress()
         val currentItem = state.item
         val currentStatus = state.status
 
@@ -161,7 +166,7 @@ class UnzipAllFileWorker(
 
     override suspend fun getForegroundInfo(): ForegroundInfo {
         createNotificationChannel()
-        val (processed, total) = UnzipQueueManager.getProgress()
+        val (processed, total) = unzipQueueManager.getProgress()
         return createForegroundInfo(
             "解压中",
             "准备解压任务 ($processed/$total)...",
@@ -179,11 +184,11 @@ class UnzipAllFileWorker(
 
         return@withContext try {
             // 挂载动态任务追加监听器：在 markWorkerRunning 之前挂载，杜绝初始化竞态窗口
-            UnzipQueueManager.onQueueChangeListener = { p, t ->
+            unzipQueueManager.onQueueChangeListener = { p, t ->
                 XLog.i("UnzipAllFileWorker 监听到队列追加新任务: 已处理 $p, 当前总数 $t，即时刷新通知栏")
                 updateProgress(force = true)
             }
-            UnzipQueueManager.markWorkerRunning()
+            unzipQueueManager.markWorkerRunning()
 
             try {
                 setForeground(getForegroundInfo())
@@ -197,8 +202,8 @@ class UnzipAllFileWorker(
             while (true) {
                 while (true) {
                     val taskItem =
-                        UnzipQueueManager.pollNext() ?: // 双重检查加锁：若队列真为空则跳出内层循环准备收尾；若此时有新追加，继续消费
-                        if (UnzipQueueManager.tryFinishWorker()) {
+                        unzipQueueManager.pollNext() ?: // 双重检查加锁：若队列真为空则跳出内层循环准备收尾；若此时有新追加，继续消费
+                        if (unzipQueueManager.tryFinishWorker()) {
                             break
                         } else {
                             continue
@@ -217,7 +222,7 @@ class UnzipAllFileWorker(
                     }
 
                     // 3. 步进完成数并落盘移除该任务
-                    UnzipQueueManager.onTaskCompleted(taskItem)
+                    unzipQueueManager.onTaskCompleted(taskItem)
 
                     if (!isSuccess) {
                         resultSummary.add("${fileBean.name} 解压失败！原因：$stateMessage")
@@ -230,9 +235,9 @@ class UnzipAllFileWorker(
                 }
 
                 // 检查在内层跳出后、准备汇总前是否有微秒级新任务追加
-                val hasExtraTasks = synchronized(UnzipQueueManager.lock) {
-                    if (UnzipQueueManager.hasMore()) {
-                        UnzipQueueManager.resumeWorkerRunning()
+                val hasExtraTasks = synchronized(unzipQueueManager.lock) {
+                    if (unzipQueueManager.hasMore()) {
+                        unzipQueueManager.resumeWorkerRunning()
                         true
                     } else {
                         false
@@ -243,11 +248,11 @@ class UnzipAllFileWorker(
                 }
 
                 // 确已全部处理完毕，卸载监听器后发送统一汇总通知
-                UnzipQueueManager.onQueueChangeListener = null
+                unzipQueueManager.onQueueChangeListener = null
                 val lastItem = currentTaskState.item
                 currentTaskState = TaskProgressState()
 
-                val (finalProcessed, _) = UnzipQueueManager.getProgress()
+                val (finalProcessed, _) = unzipQueueManager.getProgress()
                 finalResult = sentMessage(
                     unzipResult = resultSummary.toString(),
                     isCancel = false,
@@ -264,11 +269,11 @@ class UnzipAllFileWorker(
         } catch (e: CancellationException) {
             XLog.w("UnzipAllFileWorker 任务被取消: ${e.message}")
             withContext(NonCancellable) {
-                UnzipQueueManager.onQueueChangeListener = null
+                unzipQueueManager.onQueueChangeListener = null
                 val lastItem = currentTaskState.item
                 currentTaskState = TaskProgressState()
-                val (finalProcessed, _) = UnzipQueueManager.getProgress()
-                UnzipQueueManager.clear()
+                val (finalProcessed, _) = unzipQueueManager.getProgress()
+                unzipQueueManager.clear()
                 sentMessage(
                     unzipResult = resultSummary.toString(),
                     isCancel = true,
@@ -281,7 +286,7 @@ class UnzipAllFileWorker(
             }
         } finally {
             // 全局生命周期兜底清理
-            UnzipQueueManager.onQueueChangeListener = null
+            unzipQueueManager.onQueueChangeListener = null
             currentTaskState = TaskProgressState()
         }
     }
@@ -365,7 +370,7 @@ class UnzipAllFileWorker(
             val files = zipBeanList.list.filter { it.fileIco != R.drawable.folder }
                 .map { it.fileName }.takeIf { it.isNotEmpty() }
             val unzipFile =
-                fileRepository.unzipFile(pickCode, zipFileCid, files, dirs, fileName, false)
+                fileRepository.unzipFile(pickCode, zipFileCid, files, dirs, fileName)
             isExtracted = unzipFile.first
             return unzipFile
         } finally {
@@ -404,7 +409,7 @@ class UnzipAllFileWorker(
         // 2. 统一处理通知、日志和 Toast
         showCompletionNotification(isAllSuccess, message, unzipResult, targetCid)
         XLog.i("UnzipAllFileWorker 完成提示: $message $unzipResult")
-        App.instance.toast(message)
+        applicationContext.toast(message)
 
         // 3. 统一处理失败文件的移动（仅对明确判负的文件归类）
         val moveFailResult = handleFailedFiles(unzipFailList, targetCid, explicitErrorCid)
@@ -439,7 +444,7 @@ class UnzipAllFileWorker(
         defaultCid: String,
         explicitErrorCid: String?
     ): MoveFailResult? {
-        val data = (applicationContext as App).container.settingsRepository
+        val data = applicationContext.appContainer.settingsRepository
             .getDataSuspend(ConfigKeyUtil.MOVE_FAIL_FILE, "")
         if (data.isEmpty()) {
             XLog.d("handleFailedFiles 不移动解压失败的文件")

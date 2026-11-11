@@ -1,6 +1,7 @@
 package github.zerorooot.nap511
 
 import android.content.Intent
+import android.graphics.Color.TRANSPARENT
 import android.os.Bundle
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -10,14 +11,17 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import github.zerorooot.nap511.di.toastProvider
 import github.zerorooot.nap511.ui.theme.Nap511Theme
 import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.SplashScreenManager
+import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,19 +52,19 @@ class MainActivity : AppCompatActivity() {
             LaunchedEffect(darkTheme) {
                 enableEdgeToEdge(
                     statusBarStyle = if (darkTheme) {
-                        SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                        SystemBarStyle.dark(TRANSPARENT)
                     } else {
                         SystemBarStyle.light(
-                            android.graphics.Color.TRANSPARENT,
-                            android.graphics.Color.TRANSPARENT
+                            TRANSPARENT,
+                            TRANSPARENT
                         )
                     },
                     navigationBarStyle = if (darkTheme) {
-                        SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                        SystemBarStyle.dark(TRANSPARENT)
                     } else {
                         SystemBarStyle.light(
-                            android.graphics.Color.TRANSPARENT,
-                            android.graphics.Color.TRANSPARENT
+                            TRANSPARENT,
+                            TRANSPARENT
                         )
                     }
                 )
@@ -68,15 +72,19 @@ class MainActivity : AppCompatActivity() {
 
             // 5. 渲染应用核心内容
             Nap511Theme(dynamicColor = dynamicColor, darkTheme = darkTheme) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background,
+                CompositionLocalProvider(
+                    LocalToastProvider provides toastProvider
                 ) {
-                    MainScreen(
-                        intent = intent,
-                        settingUiState = settingUiState,
-                        onMoveTaskToBack = { moveTaskToBack(it) }
-                    )
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background,
+                    ) {
+                        MainScreen(
+                            intent = intent,
+                            settingUiState = settingUiState,
+                            onMoveTaskToBack = { moveTaskToBack(it) }
+                        )
+                    }
                 }
             }
         }

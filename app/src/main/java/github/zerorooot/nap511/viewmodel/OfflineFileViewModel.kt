@@ -20,8 +20,8 @@ import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.di.appContainer
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.formatFileSize
 import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.viewmodel.platform.ToastProvider
@@ -294,9 +294,7 @@ class OfflineFileViewModel(
                 SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
                     offlineTask.addTime * 1000
                 )
-            offlineTask.sizeString = android.text.format.Formatter.formatFileSize(
-                App.instance, if (offlineTask.size == -1L) 0L else offlineTask.size
-            )
+            offlineTask.sizeString = offlineTask.size.formatFileSize()
             offlineTask.percentString = when (offlineTask.status) {
                 2 -> {
                     //下载成功

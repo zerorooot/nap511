@@ -16,7 +16,6 @@ import github.zerorooot.nap511.terminal.engine.completion.StandardCompleter
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
 import github.zerorooot.nap511.terminal.viewmodel.emitText
-import github.zerorooot.nap511.worker.UnzipQueueManager
 import github.zerorooot.nap511.worker.UnzipTaskItem
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -188,7 +187,7 @@ class UnzipCommand : ActionDispatchCommand<UnzipAction>() {
                     }
 
                     // 2. 追加至全局解压队列并触发 Worker (KEEP 策略)
-                    UnzipQueueManager.enqueueAndStartWorker(taskItems)
+                    ctx.unzipQueueManager?.enqueueAndStartWorker(taskItems)
                     val fileNames = distinctArchives.joinToString { it.file.name }
                     collector.emitText(
                         "unzip: 已成功提交 ${distinctArchives.size} 个解压任务到后台 UnzipAllFileWorker 处理 ($fileNames)"

@@ -50,7 +50,7 @@ import androidx.navigation3.runtime.NavKey
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.screen.components.BaseTopAppBar
 import github.zerorooot.nap511.screen.components.TopAppBarActionButton
-import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
 import github.zerorooot.nap511.util.copy
 import kotlinx.serialization.Serializable
 
@@ -192,13 +192,14 @@ fun TaskDetailPane(
             TaskDetailInfoItem(icon = Icons.Default.Info, label = "任务哈希", value = task.infoHash)
             if (task.url.isNotEmpty()) {
                 val current = LocalContext.current
+                val toastProvider = LocalToastProvider.current
                 TaskDetailInfoItem(
                     icon = Icons.Default.Link,
                     label = "下载链接",
                     value = task.url
                 ) {
                     task.url.copy(current)
-                    App.instance.toast("下载链接复制成功")
+                    toastProvider.showToast("下载链接复制成功")
                 }
             }
 

@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import com.elvishew.xlog.XLog
-import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.di.toast
 import androidx.core.net.toUri
 
 /**
@@ -56,7 +56,7 @@ fun openExternalUrl(context: Context, url: String) {
         context.startActivity(intent)
     } catch (e: Exception) {
         XLog.e("打开外部链接失败: $url", e)
-        App.instance.toast("无法打开外部链接: ${e.message}")
+        context.toast("无法打开外部链接: ${e.message}")
     }
 }
 

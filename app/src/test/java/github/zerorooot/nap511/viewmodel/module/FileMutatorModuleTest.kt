@@ -121,7 +121,6 @@ class FileMutatorModuleTest {
         try {
             com.elvishew.xlog.XLog.init()
         } catch (_: Throwable) {}
-        github.zerorooot.nap511.worker.UnzipQueueManager.clear()
 
         tempDir = java.nio.file.Files.createTempDirectory("fmm_test").toFile()
         github.zerorooot.nap511.util.FileCacheManager.init(tempDir)

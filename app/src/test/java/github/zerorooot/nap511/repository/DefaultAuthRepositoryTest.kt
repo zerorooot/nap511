@@ -4,7 +4,6 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.viewmodel.platform.FakeSettingsRepository
-import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -27,7 +26,6 @@ class DefaultAuthRepositoryTest {
         try {
             XLog.init()
         } catch (_: Throwable) {}
-        UnzipQueueManager.clear()
         fakeSettingsRepo = FakeSettingsRepository()
         UserSessionManager.clearSession()
     }

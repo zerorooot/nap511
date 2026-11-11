@@ -1,7 +1,6 @@
 package github.zerorooot.nap511.player
 
 import com.elvishew.xlog.XLog
-import github.zerorooot.nap511.worker.UnzipQueueManager
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
@@ -17,7 +16,6 @@ class VideoRotationTest {
         try {
             XLog.init()
         } catch (_: Throwable) {}
-        UnzipQueueManager.clear()
     }
 
     /**

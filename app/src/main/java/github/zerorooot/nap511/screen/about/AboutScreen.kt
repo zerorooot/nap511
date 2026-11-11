@@ -56,7 +56,7 @@ import github.zerorooot.nap511.BuildConfig
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.screen.components.BaseTopAppBar
 import github.zerorooot.nap511.screen.components.TopAppBarActionButton
-import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
 import github.zerorooot.nap511.util.copy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -88,6 +88,7 @@ fun AboutScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val toastProvider = LocalToastProvider.current
     val scrollState = rememberScrollState()
 
     val buildInfo =
@@ -192,7 +193,7 @@ fun AboutScreen(
                 color = MaterialTheme.colorScheme.secondaryContainer,
                 modifier = Modifier.clickable {
                     buildInfo.copy(context)
-                    App.instance.toast("已复制版本与构建信息")
+                    toastProvider.showToast("已复制版本与构建信息")
                     XLog.i("已复制构建信息至剪贴板: $buildInfo")
                 }
             ) {
