@@ -27,6 +27,7 @@ import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.bean.SubtitleItem
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoStarAction
+import github.zerorooot.nap511.di.appContainer
 import github.zerorooot.nap511.dialog.ExitApp
 import github.zerorooot.nap511.screen.about.AboutScreen
 import github.zerorooot.nap511.screen.about.DisclaimerScreen
@@ -165,6 +166,7 @@ fun AppNavHost(
     ) {
         FileOpener(
             context = context,
+            fileRepository = context.appContainer.fileRepository,
             mediaViewerStateHolder = mediaViewerStateHolder,
             audioPlayerController = audioPlayerController,
             fileDialogController = fileDialogController,

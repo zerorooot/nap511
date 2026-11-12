@@ -33,7 +33,7 @@ class OfflineTaskWorker(
     appContext: Context, workerParams: WorkerParameters
 ) : CoroutineWorker(appContext, workerParams) {
     private val fileRepository: FileRepository by lazy {
-        FileRepository.getInstance()
+        applicationContext.appContainer.fileRepository
     }
 
     companion object {

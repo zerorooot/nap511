@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.terminal.engine
 
 import github.zerorooot.nap511.terminal.commands.CommandRegistryFactory
+import github.zerorooot.nap511.terminal.commands.createTestContext
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
@@ -120,7 +121,7 @@ class TerminalHistoryManagerTest {
             memoryCleared = true
         }
         val engine = PipelineEngine(registry)
-        val ctx = TerminalContext()
+        val ctx = createTestContext()
 
         historyManager.appendCommand("echo hello")
         historyManager.appendCommand("ls -l")

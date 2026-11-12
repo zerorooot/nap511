@@ -4,6 +4,7 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.SubtitleItem
 import github.zerorooot.nap511.bean.SubtitleSourceType
 import github.zerorooot.nap511.bean.SubtitleStyleBean
+import github.zerorooot.nap511.repository.FakeFileRepository
 import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.viewmodel.platform.FakeToastProvider
 import kotlinx.coroutines.CompletableDeferred
@@ -58,7 +59,7 @@ class SubtitleDelegateTest {
 
     @Test
     fun `test removeSubtitle resets offsetMs to zero and clears subtitle state`() {
-        val delegate = SubtitleDelegate(SubtitleRepository.getInstance(), fakeToastProvider)
+        val delegate = SubtitleDelegate(SubtitleRepository(FakeFileRepository()), fakeToastProvider)
         delegate.setSubtitleOffset(1500L)
         assertEquals(1500L, delegate.state.offsetMs)
 
@@ -79,7 +80,7 @@ class SubtitleDelegateTest {
             deleteOnExit()
         }
 
-        val delayedRepo = object : SubtitleRepository() {
+        val delayedRepo = object : SubtitleRepository(FakeFileRepository()) {
             override suspend fun downloadAndPrepareSubtitle(
                 cacheDirFile: File,
                 item: SubtitleItem
@@ -130,7 +131,7 @@ class SubtitleDelegateTest {
         val tempDir = File.createTempFile("test_sub2", "").parentFile ?: File(".")
         val repoEntered = CompletableDeferred<Unit>()
 
-        val delayedRepo = object : SubtitleRepository() {
+        val delayedRepo = object : SubtitleRepository(FakeFileRepository()) {
             override suspend fun downloadAndPrepareSubtitle(
                 cacheDirFile: File,
                 item: SubtitleItem
@@ -163,7 +164,7 @@ class SubtitleDelegateTest {
 
     @Test
     fun `test resetForNewMedia clears state and keeps subtitleStyle`() {
-        val delegate = SubtitleDelegate(SubtitleRepository.getInstance(), fakeToastProvider)
+        val delegate = SubtitleDelegate(SubtitleRepository(FakeFileRepository()), fakeToastProvider)
         // 预设用户自定义字幕样式与偏移
         delegate.updateSubtitleStyle(SubtitleStyleBean(textSizeSp = 30f, isBold = true))
         delegate.setSubtitleOffset(3000L)
@@ -192,7 +193,7 @@ class SubtitleDelegateTest {
 
     @Test
     fun `test resetForNewMedia cancels in-flight loadSubtitlesJob`() = runTest {
-        val delayedRepo = object : SubtitleRepository() {
+        val delayedRepo = object : SubtitleRepository(FakeFileRepository()) {
             override suspend fun getSubtitles(
                 searchKeyword: String,
                 oneOneFiveSubtitles: List<SubtitleItem>,

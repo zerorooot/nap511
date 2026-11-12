@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.terminal.engine
 
+import github.zerorooot.nap511.terminal.commands.createTestContext
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.ast.CommandAstParser
 import github.zerorooot.nap511.terminal.viewmodel.TerminalLineType
@@ -118,7 +119,7 @@ class EngineUnitTest {
 
         // 测试引擎级自动 -h
         val engine = PipelineEngine(registry)
-        val ctx = TerminalContext()
+        val ctx = createTestContext()
         val helpOutput = engine.execute("testcmd -h", ctx).toList()
         assertEquals(TerminalLineType.System.HELP, helpOutput.first().type)
         val fullHelpText = helpOutput.joinToString("\n") { it.text }
@@ -149,7 +150,7 @@ class EngineUnitTest {
         })
 
         val engine = PipelineEngine(registry)
-        val ctx = TerminalContext()
+        val ctx = createTestContext()
         val result = engine.execute("echo 'hello world' | grep world", ctx).toList()
         assertEquals(1, result.size)
         assertEquals("hello world", result[0].text)
@@ -324,7 +325,7 @@ class EngineUnitTest {
         })
 
         val engine = PipelineEngine(registry)
-        val ctx = TerminalContext()
+        val ctx = createTestContext()
 
         // 验证三级管道: echo -> grep -> wc 正常闭环输出，无死锁
         val result = engine.execute("echo 'apple\nbanana\napricot' | grep ap | wc", ctx).toList()
@@ -337,7 +338,7 @@ class EngineUnitTest {
     fun testPipelineUnknownCommandHandling() = runBlocking {
         val registry = CommandRegistry()
         val engine = PipelineEngine(registry)
-        val ctx = TerminalContext()
+        val ctx = createTestContext()
 
         val output = engine.execute("unknown_cmd -a", ctx).toList()
         assertEquals(2, output.size)
@@ -351,7 +352,7 @@ class EngineUnitTest {
     fun testPipelineEmptyInput() = runBlocking {
         val registry = CommandRegistry()
         val engine = PipelineEngine(registry)
-        val ctx = TerminalContext()
+        val ctx = createTestContext()
 
         assertTrue(engine.execute("", ctx).toList().isEmpty())
         assertTrue(engine.execute("    ", ctx).toList().isEmpty())

@@ -29,17 +29,9 @@ import kotlin.time.Duration.Companion.milliseconds
  * 统一目录分页与缓存协同器标准实现
  */
 class DirectoryPagingCoordinatorImpl(
-    private val fileRepository: FileRepository = FileRepository.getInstance(),
+    private val fileRepository: FileRepository,
     private val fileCacheManager: FileCacheManager = FileCacheManager
 ) : DirectoryPagingCoordinator {
-
-    private fun logD(msg: String) = runCatching { XLog.d(msg) }
-    private fun logI(msg: String) = runCatching { XLog.i(msg) }
-    private fun logW(msg: String) = runCatching { XLog.w(msg) }
-    private fun logE(msg: String, tr: Throwable? = null) = runCatching {
-        if (tr != null) XLog.e(msg, tr) else XLog.e(msg)
-    }
-
     private val flightMutex = Mutex()
     private val inFlightBatchTasks = ConcurrentHashMap<String, Deferred<List<FileBean>>>()
 
@@ -53,7 +45,7 @@ class DirectoryPagingCoordinatorImpl(
     ): PageAppendResult = withContext(Dispatchers.IO) {
         val limit = UserSessionManager.requestLimitCount
 
-        logD("DirectoryPagingCoordinator.fetchNextPage start: source=$source, offset=$currentPhysicalOffset, limit=$limit, order=$order, fcMix=$fcMix")
+        XLog.d("DirectoryPagingCoordinator.fetchNextPage start: source=$source, offset=$currentPhysicalOffset, limit=$limit, order=$order, fcMix=$fcMix")
 
         // 跨端消峰协同：若当前后台正在对该 Folder 进行全量批处理拉取，UI 步进直接等待其批处理完成并合并全集
         if (source is FileListSource.Folder) {
@@ -61,7 +53,7 @@ class DirectoryPagingCoordinatorImpl(
                 "batch:${source.cid}:${order.type}:${order.asc}:$fcMix:false:${PagingOptions.MAX_PAGES_LIMIT}"
             val runningBatch = inFlightBatchTasks[batchKey]
             if (runningBatch != null) {
-                logI("DirectoryPagingCoordinator: fetchNextPage detected in-flight batch task for cid=${source.cid}, joining...")
+                XLog.i("DirectoryPagingCoordinator: fetchNextPage detected in-flight batch task for cid=${source.cid}, joining...")
                 val allFiles = runningBatch.await()
                 return@withContext PageAppendResult(
                     rawNewItems = emptyList(),
@@ -136,10 +128,10 @@ class DirectoryPagingCoordinatorImpl(
                 fcMix = fcMix
             )
             fileCacheManager[source.cid] = updatedFilesBean
-            logD("DirectoryPagingCoordinator: Updated cache for cid=${source.cid}, cachedSize=${combinedList.size}, count=$latestTotalCount, isComplete=$isComplete")
+            XLog.d("DirectoryPagingCoordinator: Updated cache for cid=${source.cid}, cachedSize=${combinedList.size}, count=$latestTotalCount, isComplete=$isComplete")
         }
 
-        logD("DirectoryPagingCoordinator.fetchNextPage done: rawCount=${rawNewItems.size}, combinedCount=${combinedList.size}, nextOffset=$nextPhysicalOffset, isComplete=$isComplete")
+        XLog.d("DirectoryPagingCoordinator.fetchNextPage done: rawCount=${rawNewItems.size}, combinedCount=${combinedList.size}, nextOffset=$nextPhysicalOffset, isComplete=$isComplete")
 
         PageAppendResult(
             rawNewItems = formattedNewItems,
@@ -154,7 +146,7 @@ class DirectoryPagingCoordinatorImpl(
         val key = options.batchFlightKey
         val task = flightMutex.withLock {
             inFlightBatchTasks[key]?.let {
-                logI("DirectoryPagingCoordinator.fetchDirectory: Single-Flight hit for key=$key")
+                XLog.i("DirectoryPagingCoordinator.fetchDirectory: Single-Flight hit for key=$key")
                 return@withLock it
             }
             val deferred = async(Dispatchers.IO) {
@@ -180,7 +172,7 @@ class DirectoryPagingCoordinatorImpl(
                 options.fcMix
             )
         ) {
-            logD("DirectoryPagingCoordinator: Cache gate hit for cid=$cid, items=${oldCache.fileBeanList.size}")
+            XLog.d("DirectoryPagingCoordinator: Cache gate hit for cid=$cid, items=${oldCache.fileBeanList.size}")
             return oldCache.fileBeanList
         }
 
@@ -192,7 +184,7 @@ class DirectoryPagingCoordinatorImpl(
         var latestTotalCount = 0
         var lastPathList = oldCache?.path ?: emptyList()
 
-        logD("DirectoryPagingCoordinator: Starting paging loop for cid=$cid, maxPages=${options.maxPages}")
+        XLog.d("DirectoryPagingCoordinator: Starting paging loop for cid=$cid, maxPages=${options.maxPages}")
 
         try {
             while (true) {
@@ -217,10 +209,10 @@ class DirectoryPagingCoordinatorImpl(
                 stagedRawList.addAll(rawBatch)
                 currentOffset += rawBatch.size // 物理游标递增
 
-                logD("DirectoryPagingCoordinator: Page $pageCount loaded ${rawBatch.size} items (total staged: ${stagedRawList.size}/$latestTotalCount)")
+                XLog.d("DirectoryPagingCoordinator: Page $pageCount loaded ${rawBatch.size} items (total staged: ${stagedRawList.size}/$latestTotalCount)")
 
                 if (pageCount >= options.maxPages) {
-                    logD("DirectoryPagingCoordinator: Reached maxPages=${options.maxPages}, terminating loop")
+                    XLog.d("DirectoryPagingCoordinator: Reached maxPages=${options.maxPages}, terminating loop")
                     break
                 }
 
@@ -263,19 +255,19 @@ class DirectoryPagingCoordinatorImpl(
             // 若仅为快速短路单页模式（FAST_MODE_PAGES），仅写入缓存不向 UI 广播更新，避免干扰前台页面
             if (options.maxPages > PagingOptions.FAST_MODE_PAGES) {
                 fileCacheManager.putAndNotify(cid, finalFilesBean)
-                logI("DirectoryPagingCoordinator: Full directory paging completed and committed for cid=$cid (${deduplicatedList.size} items)")
+                XLog.i("DirectoryPagingCoordinator: Full directory paging completed and committed for cid=$cid (${deduplicatedList.size} items)")
             } else {
                 fileCacheManager.put(cid, finalFilesBean)
-                logD("DirectoryPagingCoordinator: Fast mode paging completed for cid=$cid (${deduplicatedList.size} items)")
+                XLog.d("DirectoryPagingCoordinator: Fast mode paging completed for cid=$cid (${deduplicatedList.size} items)")
             }
 
             return deduplicatedList
         } catch (e: Exception) {
             if (e is CancellationException) {
-                logW("DirectoryPagingCoordinator: Paging loop cancelled for cid=$cid")
+                XLog.w("DirectoryPagingCoordinator: Paging loop cancelled for cid=$cid")
                 throw e
             }
-            logE("DirectoryPagingCoordinator: Paging loop error for cid=$cid", e)
+            XLog.e("DirectoryPagingCoordinator: Paging loop error for cid=$cid", e)
             // 异常安全降级：若拉取中断，保留旧缓存兜底，绝不使用破损残卷冲毁旧数据
             return oldCache?.fileBeanList ?: emptyList()
         }
@@ -290,7 +282,7 @@ class DirectoryPagingCoordinatorImpl(
         var lastPath = emptyList<github.zerorooot.nap511.bean.PathBean>()
         var isFullyConsumed = false
 
-        logD("DirectoryPagingCoordinator.fetchDirectoryStream start: cid=${options.cid}")
+        XLog.d("DirectoryPagingCoordinator.fetchDirectoryStream start: cid=${options.cid}")
 
         try {
             while (pageCount < options.maxPages) {
@@ -338,18 +330,7 @@ class DirectoryPagingCoordinatorImpl(
                     path = lastPath
                 )
                 fileCacheManager.putAndNotify(options.cid, finalBean)
-                logI("DirectoryPagingCoordinator: Stream fully consumed, cached ${deduplicated.size} items for cid=${options.cid}")
-            }
-        }
-    }
-
-    companion object {
-        @Volatile
-        private var instance: DirectoryPagingCoordinator? = null
-
-        fun getInstance(): DirectoryPagingCoordinator {
-            return instance ?: synchronized(this) {
-                instance ?: DirectoryPagingCoordinatorImpl().also { instance = it }
+                XLog.i("DirectoryPagingCoordinator: Stream fully consumed, cached ${deduplicated.size} items for cid=${options.cid}")
             }
         }
     }

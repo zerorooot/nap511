@@ -57,7 +57,6 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
 
     /** 应用级依赖注入容器，支持测试环境动态替换为 FakeAppContainer */
     lateinit var container: AppContainer
-        private set
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 

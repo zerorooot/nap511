@@ -5,6 +5,7 @@ import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.VideoBean
+import github.zerorooot.nap511.repository.FakeFileRepository
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.CoilCacheCleaner
@@ -45,7 +46,7 @@ class FileMutatorModuleTest {
     private var renameCallCount = 0
     private var shouldThrowNetworkError = false
 
-    private val fakeRepo = object : FileRepository() {
+    private val fakeRepo = object : FakeFileRepository() {
         var topCallCount = 0
         var lastTopFid: String? = null
         var lastTopBool: Boolean? = null

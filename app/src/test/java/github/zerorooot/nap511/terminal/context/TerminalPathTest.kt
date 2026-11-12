@@ -3,6 +3,7 @@ package github.zerorooot.nap511.terminal.context
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.PathBean
+import github.zerorooot.nap511.terminal.commands.createTestContext
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -135,7 +136,7 @@ class TerminalPathTest {
 
     @Test
     fun testContextPathListTrackingThroughCd() = runBlocking {
-        val ctx = TerminalContext()
+        val ctx = createTestContext()
         val dir1 = FileBean(name = "docs", categoryId = "10", isFolder = true)
         val dir2 = FileBean(name = "work", categoryId = "20", isFolder = true)
 

@@ -1,11 +1,6 @@
 package github.zerorooot.nap511.repository
 
-import com.elvishew.xlog.XLog
-import com.google.gson.Gson
 import com.google.gson.JsonObject
-import com.google.gson.JsonParser
-import com.google.gson.reflect.TypeToken
-import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.Base115Response
 import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.CreateFolderMessage
@@ -13,90 +8,43 @@ import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileInfo
 import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.ImageDate
-import github.zerorooot.nap511.bean.InitUploadBean
 import github.zerorooot.nap511.bean.OfflineInfo
 import github.zerorooot.nap511.bean.OfflineListCount
 import github.zerorooot.nap511.bean.OfflineTaskType
 import github.zerorooot.nap511.bean.OrderBean
-import github.zerorooot.nap511.bean.OrderType
 import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.bean.SignBean
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.UploadBean
 import github.zerorooot.nap511.bean.VideoInfoBean
-import github.zerorooot.nap511.bean.ZipBean
 import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.bean.ZipStatus
-import github.zerorooot.nap511.service.FileService
-import github.zerorooot.nap511.service.OfflineService
-import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.crypto.Sha1Util
-import github.zerorooot.nap511.util.formatFileSize
-import github.zerorooot.nap511.util.network.NetworkClient
 import github.zerorooot.nap511.util.network.UserSessionManager
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
-import okhttp3.FormBody
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.MultipartBody
-import okhttp3.Request
 import okhttp3.RequestBody
-import okhttp3.RequestBody.Companion.asRequestBody
-import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.InputStream
-import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.StringJoiner
-import kotlin.time.Duration.Companion.milliseconds
 
-open class FileRepository {
-    companion object {
-        @Volatile
-        private var INSTANCE: FileRepository? = null
-        fun getInstance(): FileRepository {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: FileRepository().also { INSTANCE = it }
-            }
-        }
-    }
-
-    private val fileService: FileService by lazy {
-        FileService.getInstance()
-    }
-
-    private val offlineService: OfflineService by lazy {
-        OfflineService.getInstance()
-    }
-
+/**
+ * 文件与网盘数据仓库接口
+ * 统管网盘文件、目录、离线下载、压缩包及媒体历史等数据交互。
+ */
+interface FileRepository {
 
     //-----------------离线下载相关--------------------------------
-    suspend fun getOfflineSign(): SignBean {
-        return offlineService.getSign()
-    }
+    suspend fun getOfflineSign(): SignBean
 
-    suspend fun getOfflineTaskCount(): OfflineListCount {
-        return offlineService.taskCount()
-    }
+    suspend fun getOfflineTaskCount(): OfflineListCount
 
     suspend fun getOfflineTaskList(
         uid: String, sign: String, page: Int, offlineTaskType: OfflineTaskType
-    ): OfflineInfo {
-        return offlineService.taskList(uid, sign, page, offlineTaskType.stat)
-    }
-
+    ): OfflineInfo
 
     suspend fun getOfflineTorrentTaskList(
         sha1: String = "",
         sign: String = "",
         uid: String = "",
-    ): TorrentFileBean {
-        return offlineService.getTorrentTaskList(sha1, sign, uid)
-    }
+    ): TorrentFileBean
 
     suspend fun addOfflineTorrentTask(
         infoHash: String = "",
@@ -104,63 +52,23 @@ open class FileRepository {
         savePath: String = "",
         uid: String = "",
         sign: String,
-    ): BaseReturnMessage {
-        return offlineService.addTorrentTask(infoHash, wanted, savePath, uid, sign)
-    }
+    ): BaseReturnMessage
 
-    suspend fun quota(): QuotaBean {
-        return offlineService.quota()
-    }
+    suspend fun quota(): QuotaBean
 
     suspend fun addOfflineTask(
         list: List<String>, currentCid: String, offlinePath: String, handle: (Boolean) -> Unit
-    ): Pair<Boolean, String> {
-        val downloadPath = setDownloadPath(currentCid)
-        XLog.i("add task downloadPath $downloadPath")
-        if (!downloadPath.state) {
-            return Pair(false, downloadPath.error)
-        }
-        val quota = offlineService.quota()
-        val surplus = quota.surplus - list.size
+    ): Pair<Boolean, String>
 
-        val map = HashMap<String, String>()
-        map["savepath"] = ""
-        map["wp_path_id"] = currentCid
-        map["uid"] = UserSessionManager.uid
-        map["sign"] = getOfflineSign().sign
-        map["time"] = (System.currentTimeMillis() / 1000).toString()
-        list.forEachIndexed { index, s ->
-            map["url[$index]"] = s
-        }
-        val addTask = offlineService.addTask(map)
-        XLog.d("add task addTask $addTask")
-        val message = if (addTask.state) {
-            "成功将任务添加到‘${offlinePath}’目录，剩余配额${surplus}个"
-        } else {
-            if (addTask.errorMsg.contains("请验证账号")) {
-                handle.invoke(true)
-            }
-            "任务添加失败，${addTask.errorMsg}"
-        }
+    suspend fun deleteOfflineTask(body: HashMap<String, String>): BaseReturnMessage
 
-        return Pair(addTask.state, message)
-    }
+    suspend fun clearOfflineError(): BaseReturnMessage
 
-    suspend fun deleteOfflineTask(body: HashMap<String, String>): BaseReturnMessage {
-        return offlineService.deleteTask(body)
-    }
-
-    suspend fun clearOfflineError(): BaseReturnMessage {
-        return offlineService.clearError()
-    }
-
-    suspend fun clearOfflineFinish(): BaseReturnMessage {
-        return offlineService.clearFinish()
-    }
+    suspend fun clearOfflineFinish(): BaseReturnMessage
 
     //-----------------离线下载结束--------------------------------
 
-    open suspend fun getFiles(
+    suspend fun getFiles(
         cid: String,
         showDir: Int = 1,
         aid: Int = 1,
@@ -171,50 +79,23 @@ open class FileRepository {
         format: String = "json",
         offset: Int = 0,
         fcMix: Int,
-    ): FilesBean {
-        return fileService.getFiles(
-            cid,
-            showDir,
-            aid,
-            asc,
-            order,
-            limit,
-            naturalSort,
-            format,
-            offset,
-            fcMix
-        )
-    }
+    ): FilesBean
 
-    suspend fun remainingSpace(countSpaceNum: Int = 1): JsonObject {
-        return fileService.remainingSpace(countSpaceNum)
-    }
+    suspend fun remainingSpace(countSpaceNum: Int = 1): JsonObject
 
-    open suspend fun order(body: Map<String, String>): BaseReturnMessage {
-        return fileService.order(body)
-    }
+    suspend fun order(body: Map<String, String>): BaseReturnMessage
 
-    open suspend fun deleteMultiple(data: Map<String, String>): BaseReturnMessage {
-        return executeWithRetry { fileService.deleteMultiple(data) }
-    }
+    suspend fun deleteMultiple(data: Map<String, String>): BaseReturnMessage
 
-    open suspend fun search(
+    suspend fun search(
         cid: String,
         searchValue: String,
         aid: Int = 1,
         offset: Int = 0,
         limit: Int = UserSessionManager.requestLimitCount
-    ): FilesBean {
-        return fileService.search(
-            cid = cid,
-            searchValue = searchValue,
-            aid = aid,
-            offset = offset,
-            limit = limit
-        )
-    }
+    ): FilesBean
 
-    open suspend fun filterFile(
+    suspend fun filterFile(
         cid: String,
         type: Int,
         order: String,
@@ -222,63 +103,26 @@ open class FileRepository {
         offset: Int = 0,
         limit: Int = UserSessionManager.requestLimitCount,
         fcMix: Int = 0
-    ): FilesBean {
-        return fileService.filterFile(
-            cid = cid,
-            type = type,
-            order = order,
-            asc = asc,
-            offset = offset,
-            limit = limit,
-            fcMix = fcMix
-        )
-    }
+    ): FilesBean
 
-    open suspend fun starFile(
+    suspend fun starFile(
         offset: Int,
         order: OrderBean,
         fcMix: Int,
         limit: Int,
-    ): FilesBean {
-        return if (order.orderType == OrderType.STAR) {
-            fileService.starFile(
-                asc = order.asc,
-                offset = 0,
-                limit = limit,
-            )
-        } else {
-            fileService.starFile(
-                asc = order.asc,
-                offset = 0,
-                limit = limit,
-                order = order.type,
-                fcMix = fcMix,
-                //加了这个，文件夹置顶就无效了
-//                customOrder = 2
-            )
-        }
-    }
+    ): FilesBean
 
     /**
      * 文件加⭐，true 表示加上，false 表示取消
      */
-    open suspend fun star(fid: String, star: Boolean): BaseReturnMessage {
-        val starString = if (star) "1" else "0"
-        return fileService.star(fid, starString)
-    }
+    suspend fun star(fid: String, star: Boolean): BaseReturnMessage
 
     /**
      * 文件加⭐，true 表示加上，false 表示取消
      */
-    open suspend fun top(fid: String, top: Boolean): BaseReturnMessage {
-        val topString = if (top) "1" else "0"
-        return fileService.top(fid, topString)
-    }
+    suspend fun top(fid: String, top: Boolean): BaseReturnMessage
 
-    suspend fun image(pickCode: String, current: Long): ImageDate {
-        return fileService.image(pickCode, current)
-    }
-
+    suspend fun image(pickCode: String, current: Long): ImageDate
 
     /**
      * 更新并提交视频播放进度至 115 云端历史记录
@@ -298,66 +142,15 @@ open class FileRepository {
         pickCode: String,
         currentDuration: Int,
         name: String = ""
-    ): Boolean = withContext(Dispatchers.IO + NonCancellable) {
-        if (pickCode.isEmpty() || currentDuration <= 5) return@withContext false
-        val map = mapOf(
-            "op" to "update",
-            "pick_code" to pickCode,
-            "time" to currentDuration.toString(),
-            "category" to "1",
-            "format" to "json"
-        )
-        runCatching {
-            val videoHistory = fileService.videoHistory(map)
-            if (!videoHistory.state) {
-                XLog.e("更新视频时间失败！ name: $name, time: $currentDuration, pickCode: $pickCode, result: $videoHistory")
-                false
-            } else {
-                XLog.d("更新视频时间成功 name: $name, time: $currentDuration, pickCode: $pickCode, result: $videoHistory")
-                true
-            }
-        }.onFailure { e ->
-            XLog.e("更新视频时间异常 name: $name, time: $currentDuration, pickCode: $pickCode", e)
-        }.getOrDefault(false)
-    }
+    ): Boolean
 
-    suspend fun video(pickCode: String): VideoInfoBean {
-        return fileService.video(pickCode)
-    }
+    suspend fun video(pickCode: String): VideoInfoBean
 
-    suspend fun getFileInfo(cid: String): FileInfo {
-        return fileService.getFileInfo(cid)
-    }
+    suspend fun getFileInfo(cid: String): FileInfo
 
-    open suspend fun createFolder(
+    suspend fun createFolder(
         pid: String, folderName: String
-    ): CreateFolderMessage {
-        return fileService.createFolder(pid, folderName)
-    }
-
-    private suspend fun executeWithRetry(
-        maxRetries: Int = 20,
-        delayMs: Long = 1000L,
-        block: suspend () -> BaseReturnMessage
-    ): BaseReturnMessage {
-        var retries = 0
-        while (true) {
-            val res = block()
-            if (res.state) {
-                return res
-            }
-            val err = res.error + res.errorMsg + res.message
-            if ((err.contains("尚未执行完成") || err.contains("请稍后再试") || err.contains("尚未完成") || err.contains(
-                    "操作尚未完成"
-                )) && retries < maxRetries
-            ) {
-                retries++
-                delay(delayMs.milliseconds)
-                continue
-            }
-            return res
-        }
-    }
+    ): CreateFolderMessage
 
     /**
      *  @param currentCid 要移动到的目录
@@ -366,60 +159,31 @@ open class FileRepository {
     suspend fun removeAllFile(
         currentCid: String,
         removeAllFile: List<FileBean>
-    ): BaseReturnMessage {
-        val hashMapOf = hashMapOf<String, String>()
-        hashMapOf["pid"] = currentCid
-        removeAllFile.forEachIndexed { index, fileBean ->
-            hashMapOf["fid[$index]"] = fileBean.fileId
-        }
-        return move(hashMapOf)
-    }
+    ): BaseReturnMessage
 
-    suspend fun setDownloadPath(cid: String): BaseReturnMessage {
-        return fileService.setDownloadPath(cid)
-    }
+    suspend fun setDownloadPath(cid: String): BaseReturnMessage
 
-    open suspend fun move(body: Map<String, String>): BaseReturnMessage {
-        return executeWithRetry { fileService.move(body) }
-    }
+    suspend fun move(body: Map<String, String>): BaseReturnMessage
 
-    open suspend fun recycleList(
+    suspend fun recycleList(
         aid: String = "7",
         cid: String = "0",
         offset: String = "0",
         limit: String = "999"
-    ): RecycleInfo {
-        return fileService.recycleList(aid, cid, offset, limit)
-    }
+    ): RecycleInfo
 
-    open suspend fun revert(rid: String): BaseReturnMessage {
-        return fileService.revert(rid)
-    }
+    suspend fun revert(rid: String): BaseReturnMessage
 
-    open suspend fun recycleCleanAll(password: String = ""): BaseReturnMessage {
-        return fileService.recycleCleanAll(password)
-    }
+    suspend fun recycleCleanAll(password: String = ""): BaseReturnMessage
 
     /**
      * 根据文件名，创建一个去除后缀的文件夹，如果文件夹存在则返回当前cid,不存在则返回文件夹cid
      */
-    suspend fun createFolderAndReturnCid(cid: String, fileName: String): String {
-        val unzipFolderName = fileName.substringBeforeLast(".")
-        val createFolderMessage = createFolder(
-            cid, unzipFolderName
-        )
-        val returnCid = createFolderMessage.let { if (it.cid == "") cid else it.cid }
-        XLog.i("createFolderAndReturnCid $createFolderMessage  inputCid:$cid returnCid:$returnCid ")
-        return returnCid
-    }
+    suspend fun createFolderAndReturnCid(cid: String, fileName: String): String
 
-    open suspend fun delete(pid: String, fid: String): BaseReturnMessage {
-        return executeWithRetry { fileService.delete(pid, fid) }
-    }
+    suspend fun delete(pid: String, fid: String): BaseReturnMessage
 
-    open suspend fun rename(renameBean: RequestBody): BaseReturnMessage {
-        return executeWithRetry { fileService.rename(renameBean) }
-    }
+    suspend fun rename(renameBean: RequestBody): BaseReturnMessage
 
     suspend fun unzipFile(
         pickCode: String,
@@ -427,230 +191,30 @@ open class FileRepository {
         files: List<String>?,
         dirs: List<String>?,
         unzipFolderName: String = ""
-    ): Pair<Boolean, String> {
-        var state: Boolean
-        val unzipFile = fileService.unzipFile(pickCode, zipFileCid, files, dirs)
-        XLog.v("unzipFile JsonElement $unzipFile")
-        //解压失败时处理 unzipFile {"state":false,"message":"压缩包已损坏，无法解压","code":51005,"data":[]}
-        //{"state":false,"message":"参数错误。","code":990002,"data":[]}
-        state = unzipFile.state
-        var message = if (state) {
-            "后台解压中～"
-        } else {
-//            "解压失败～${jsonObject.get("message").asString}"
-            unzipFile.message
-        }
-        //当解压失败时，返回
-        if (!state) {
-            return Pair(false, message)
-        }
-        //解压
-        val extractId = unzipFile.data?.extractId?.toLongOrNull() ?: return Pair(
-            false,
-            message.ifEmpty { "获取解压任务ID失败" }
-        )
-
-        // {"state":true,"message":"","code":"","data":{"extract_id":"id","to_pid":"pid","percent":100}}
-
-        for (i in 1..50) {
-            val json = fileService.unzipFileProcess(extractId)
-            XLog.v("unzipFile process $i $json")
-            state = json.state
-            if (!state) {
-                message = json.message
-                break
-            }
-            val process = json.data?.percent ?: 0
-            if (process == 100) {
-                state = true
-                message = "${unzipFolderName}后台解压完成～"
-                break
-            }
-            delay(1000.milliseconds)
-        }
-        return Pair(state, message)
-    }
+    ): Pair<Boolean, String>
 
     /**
      * {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
      */
-    suspend fun tryToExtract(pickCode: String): Boolean {
-        //{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
-        val checkDecryptZip = fileService.getDecryptZipProcess(pickCode)
-        val asInt = checkDecryptZip.data?.extractStatus?.unzipStatus
-        XLog.v("Get files/push_extract tryToExtract.checkDecryptZip $checkDecryptZip")
-        //之前解压过，密码在115缓存中
-        if (asInt == 1) {
-            return true
-        }
-        //6为加密文件
-        if (asInt == 6) {
-            return false
-        }
-
-        //等待解压中
-        for (i in 1..100) {
-            val json = fileService.getDecryptZipProcess(pickCode)
-            val process = json.data?.extractStatus?.progress
-            XLog.v("tryToExtract zip $i $json")
-            if (process == 100) {
-                return true
-            }
-            delay(1000.milliseconds)
-        }
-        return false
-    }
-
-    private fun formatZipBean(bean: ZipBean): ZipBean {
-        if (bean.fileCategory == 0) {
-            return bean.copy(fileIco = R.drawable.folder)
-        }
-        val timeStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
-            bean.time.toLong() * 1000
-        )
-        val sizeStr = bean.size.formatFileSize()
-        val ico = when (bean.icoString) {
-            "apk" -> R.drawable.apk
-            "iso" -> R.drawable.iso
-            "zip", "7z", "rar" -> R.drawable.zip
-            "png", "jpg" -> R.drawable.png
-            "mp3" -> R.drawable.mp3
-            "txt" -> R.drawable.txt
-            "torrent" -> R.drawable.torrent
-            else -> R.drawable.other
-        }
-        return bean.copy(fileIco = ico, timeString = timeStr, sizeString = sizeStr)
-    }
+    suspend fun tryToExtract(pickCode: String): Boolean
 
     suspend fun getZipListFile(
         pickCode: String,
         fileName: String = "",
         paths: String = "文件"
-    ): ZipBeanList {
-        val zipListFile = fileService.getZipListFile(pickCode, fileName, paths)
-        val data = zipListFile.getAsJsonObject("data")
-        XLog.d("FileRepository.getZipListFile $zipListFile")
+    ): ZipBeanList
 
-        val rawZipBeanList = Gson().fromJson(data, ZipBeanList::class.java) ?: ZipBeanList()
-        val sj = StringJoiner("/")
-        data.getAsJsonArray("paths")?.forEach { sj.add(it.asJsonObject.get("file_name").asString) }
-        val pathStr = sj.toString()
-        val formattedItems = rawZipBeanList.list.map { formatZipBean(it) }
-        return rawZipBeanList.copy(pathString = pathStr, list = formattedItems)
-    }
+    suspend fun decryptZip(pickCode: String, secret: String): Boolean
 
+    suspend fun checkZipStatus(pickCode: String): ZipStatus
 
-    suspend fun decryptZip(pickCode: String, secret: String): Boolean {
-        //{"state":true,"message":"","code":"","data":{"unzip_status":4}}
-        val json = fileService.decryptZip(pickCode, secret)
-        XLog.v("Post files/push_extract decryptZip $json")
-        val asInt = json.data?.unzipStatus ?: -1
-        //4 is success,6 is decrypt error,1 is having been done
-        return json.state && asInt != 6 && asInt != -1
-    }
+    fun getDownloadUrl(pickCode: String, fileId: String): String?
 
-
-    suspend fun checkZipStatus(pickCode: String): ZipStatus {
-        return try {
-            val response = fileService.getDecryptZipProcess(pickCode)
-            //加密压缩包 {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":6,"progress":88}}}
-            //正常无加密压缩包 {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":4,"progress":100}}}
-            //官网显示正在服务器解压 {"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":1,"progress":5}}}
-            //官网显示正在服务器解压,意味着加密或者非加密文件{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":0,"progress":0}}}
-            //官网显示正在服务器解压,意味着加密或者非加密文件{"state":true,"message":"","code":"","data":{"extract_status":{"unzip_status":2,"progress":30}}}
-            XLog.v("Get files/push_extract checkZipStatus $response")
-            if (!response.state) {
-                ZipStatus.UnsupportedOrError(response.message)
-            } else {
-                val status = response.data?.extractStatus ?: return ZipStatus.UnsupportedOrError(
-                    response.message.ifEmpty { "获取压缩包状态失败" })
-                var unzipStatus = status.unzipStatus
-
-                // 2. 特殊状态码二次校验
-                if (unzipStatus == 0 || unzipStatus == 2) {
-                    val encryptResponse = fileService.checkEncryptionStatus(pickCode)
-                    XLog.v("checkEncryptionStatus: $encryptResponse")
-
-                    if (!encryptResponse.state) {
-                        return ZipStatus.UnsupportedOrError(encryptResponse.message)
-                    }
-                    unzipStatus = encryptResponse.data?.unzipStatus ?: -1
-                }
-
-                // 3. 映射到密封类
-                when (unzipStatus) {
-                    1 -> ZipStatus.Loading(status.progress)
-                    4 -> ZipStatus.Normal
-                    6 -> ZipStatus.Encrypted
-                    else -> ZipStatus.UnsupportedOrError("未知状态: $response")
-                }
-            }
-        } catch (e: CancellationException) {
-            XLog.w("checkZipStatus 任务被取消 $e")
-            ZipStatus.UnsupportedOrError("任务被取消")
-        } catch (e: Exception) {
-            // 4. 捕获网络异常、Json语法解析异常等，确保不崩溃
-            XLog.e("checkZipStatus 发生异常", e)
-            ZipStatus.UnsupportedOrError("网络或系统异常: ${e.localizedMessage}")
-        }
-    }
-
-    fun getDownloadUrl(pickCode: String, fileId: String): String? {
-        val sha1Util = Sha1Util()
-        val okHttpClient = NetworkClient.sharedOkHttpClient
-        val tm = System.currentTimeMillis() / 1000
-        val m115Encode = sha1Util.m115_encode(pickCode, tm)
-        val map = FormBody.Builder().add("data", m115Encode.data).build()
-
-        val request: Request =
-            Request.Builder().url("https://proapi.115.com/app/chrome/downurl?t=$tm")
-                .addHeader("cookie", UserSessionManager.cookie)
-                .addHeader("Content-Type", "application/x-www-form-urlencoded").addHeader(
-                    "User-Agent",
-                    ConfigKeyUtil.USER_AGENT
-                ).post(map).build()
-
-        val response = okHttpClient.newCall(request).execute()
-
-        val returnJson = JsonParser.parseString(response.body.string()).asJsonObject
-        XLog.v("FileRepository getDownloadUrl returnJson $returnJson")
-
-        val data = returnJson.get("data").asString
-        val m115Decode = sha1Util.m115_decode(data, m115Encode.key)
-        XLog.v("FileRepository getDownloadUrl m115Decode $m115Decode")
-
-        //{"fileId":{"file_name":"a","file_size":"0","pick_code":"pick_code","url":false}}
-        val downloadUrl = try {
-            JsonParser.parseString(m115Decode).asJsonObject.getAsJsonObject(fileId)
-                .getAsJsonObject("url").get("url").asString
-        } catch (e: Exception) {
-            XLog.e("FileRepository getDownloadUrl error ${JsonParser.parseString(m115Decode)}", e)
-            null
-        }
-        XLog.i("FileRepository getDownloadUrl downloadUrl $downloadUrl")
-        return downloadUrl;
-    }
-
-    open fun getDownloadInputStream(
+    fun getDownloadInputStream(
         pickCode: String, fileId: String
-    ): InputStream? {
-        val downloadUrl = getDownloadUrl(pickCode, fileId) ?: return null
-        val okHttpClient = NetworkClient.sharedOkHttpClient
-        val requestDownload: Request =
-            Request.Builder().url(downloadUrl).addHeader("cookie", UserSessionManager.cookie)
-                .addHeader("Content-Type", "application/x-www-form-urlencoded").addHeader(
-                    "User-Agent",
-                    ConfigKeyUtil.USER_AGENT
-                ).get().build()
-        val responseDownload = okHttpClient.newCall(requestDownload).execute();
-        val body = responseDownload.body.byteStream()
-        return body
-    }
+    ): InputStream?
 
-
-    suspend fun music(pickCode: String): String {
-        return fileService.music(pickCode, "weixin", "json").url
-    }
+    suspend fun music(pickCode: String): String
 
     /**
      * 上传本地文件到 115 目录
@@ -664,84 +228,5 @@ open class FileRepository {
         targetCid: String,
         uploadFileName: String = file.name,
         mimeType: String = "application/octet-stream"
-    ): Base115Response<UploadBean> = withContext(Dispatchers.IO) {
-        val uid = UserSessionManager.uid
-        val cookie = UserSessionManager.cookie
-        val gson = Gson()
-
-        val initUrl = "https://uplb.115.com/3.0/sampleinitupload.php"
-        val postBody =
-            "userid=$uid&filename=$uploadFileName&filesize=${file.length()}&target=U_1_$targetCid"
-                .toRequestBody("application/x-www-form-urlencoded; charset=UTF-8".toMediaType())
-
-        val initRequest = Request.Builder()
-            .url(initUrl)
-            .addHeader("cookie", cookie)
-            .addHeader("User-Agent", ConfigKeyUtil.USER_AGENT)
-            .post(postBody)
-            .build()
-
-        val response = NetworkClient.sharedOkHttpClient.newCall(initRequest).execute()
-        if (!response.isSuccessful) {
-            XLog.e("FileRepository.uploadFile: 初始化上传失败, Code: ${response.code}")
-            return@withContext Base115Response(
-                state = false,
-                message = "初始化上传失败 (HTTP ${response.code})"
-            )
-        }
-
-        val bodyString = response.body.string()
-        val initUploadBean = runCatching {
-            gson.fromJson(bodyString, InitUploadBean::class.java)
-        }.getOrNull()
-
-        if (initUploadBean == null || initUploadBean.host.isBlank()) {
-            XLog.e("FileRepository.uploadFile: 解析初始化上传响应失败: $bodyString")
-            return@withContext Base115Response(state = false, message = "解析初始化上传结果失败")
-        }
-
-        val requestBody: RequestBody = MultipartBody.Builder().setType(MultipartBody.FORM)
-            .addFormDataPart("name", uploadFileName)
-            .addFormDataPart("key", initUploadBean.key)
-            .addFormDataPart("policy", initUploadBean.policy)
-            .addFormDataPart("OSSAccessKeyId", initUploadBean.oSSAccessKeyId)
-            .addFormDataPart("success_action_status", "200")
-            .addFormDataPart("callback", initUploadBean.callback)
-            .addFormDataPart("signature", initUploadBean.signature)
-            .addFormDataPart(
-                "file",
-                uploadFileName,
-                file.asRequestBody(mimeType.toMediaType())
-            )
-            .build()
-
-        val uploadRequest = Request.Builder()
-            .url(initUploadBean.host)
-            .addHeader("origin", "https://115.com")
-            .addHeader("referer", "https://115.com")
-            .addHeader("cookie", cookie)
-            .addHeader("User-Agent", ConfigKeyUtil.USER_AGENT)
-            .post(requestBody)
-            .build()
-
-        val uploadResponse = NetworkClient.sharedOkHttpClient.newCall(uploadRequest).execute()
-        if (!uploadResponse.isSuccessful) {
-            XLog.e("FileRepository.uploadFile: 上传文件至 OSS 失败, Code: ${uploadResponse.code}")
-            return@withContext Base115Response(
-                state = false,
-                message = "上传文件失败 (HTTP ${uploadResponse.code})"
-            )
-        }
-
-        val uploadBody = uploadResponse.body.string()
-
-        val type = object : TypeToken<Base115Response<UploadBean>>() {}.type
-        val result = gson.fromJson<Base115Response<UploadBean>>(uploadBody, type)
-
-        runCatching {
-            result
-        }.getOrElse {
-            Base115Response(state = false, message = "解析上传响应失败")
-        }
-    }
+    ): Base115Response<UploadBean>
 }

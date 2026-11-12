@@ -28,7 +28,7 @@ class Sha1Service : Service() {
     private val okHttpClient = NetworkClient.sharedOkHttpClient
 
     private val fileRepository: FileRepository by lazy {
-        FileRepository.getInstance()
+        appContainer.fileRepository
     }
 
     override fun onBind(intent: Intent?): IBinder? {

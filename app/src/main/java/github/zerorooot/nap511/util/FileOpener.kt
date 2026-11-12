@@ -94,7 +94,7 @@ fun findMatchingSubtitle(mediaFileName: String, subtitles: List<SubtitleItem>): 
  */
 class FileOpener(
     private val context: Context,
-    private val fileRepository: FileRepository = FileRepository.getInstance(),
+    private val fileRepository: FileRepository,
     private val mediaViewerStateHolder: MediaViewerStateHolder,
     private val audioPlayerController: AudioPlayerController,
     private val fileDialogController: FileDialogController? = null,

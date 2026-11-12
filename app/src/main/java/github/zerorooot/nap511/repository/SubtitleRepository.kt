@@ -25,18 +25,8 @@ import kotlin.math.abs
  * 负责从迅雷 API 与 115 网盘同目录获取字幕列表、进行距离排序以及处理字幕文件下载与格式转换。
  */
 open class SubtitleRepository(
-    private val fileRepository: FileRepository = FileRepository.getInstance()
+    private val fileRepository: FileRepository
 ) {
-    companion object {
-        @Volatile
-        private var INSTANCE: SubtitleRepository? = null
-
-        fun getInstance(): SubtitleRepository {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: SubtitleRepository().also { INSTANCE = it }
-            }
-        }
-    }
 
     private val gson by lazy { Gson() }
 

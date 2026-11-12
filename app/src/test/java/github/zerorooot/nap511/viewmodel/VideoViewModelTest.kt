@@ -9,6 +9,7 @@ import github.zerorooot.nap511.bean.VideoAttributeBean
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.bean.VideoStarAction
+import github.zerorooot.nap511.repository.FakeFileRepository
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.viewmodel.platform.FakeToastProvider
@@ -52,10 +53,11 @@ class VideoViewModelTest {
             XLog.init()
         } catch (_: Throwable) {}
         Dispatchers.setMain(testDispatcher)
+        val fakeFileRepo = FakeFileRepository()
         viewModel = VideoViewModel(
             application = Application(),
-            fileRepository = FileRepository.getInstance(),
-            subtitleRepository = SubtitleRepository.getInstance(),
+            fileRepository = fakeFileRepo,
+            subtitleRepository = SubtitleRepository(fakeFileRepo),
             toastProvider = fakeToastProvider
         )
     }

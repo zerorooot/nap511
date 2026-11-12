@@ -4,11 +4,6 @@ import github.zerorooot.nap511.bean.BaseResponse
 import github.zerorooot.nap511.bean.CategoryDetailResponse
 import github.zerorooot.nap511.bean.RepeatListResponse
 import github.zerorooot.nap511.bean.RepeatStatusResponse
-import github.zerorooot.nap511.util.network.NetworkClient
-import github.zerorooot.nap511.util.network.UserSessionManager
-import okhttp3.Interceptor
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Field
 import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
@@ -16,30 +11,6 @@ import retrofit2.http.POST
 import retrofit2.http.Query
 
 interface RepeatService {
-    companion object {
-        private var repeatService: RepeatService? = null
-        fun getInstance(): RepeatService {
-            if (repeatService == null) {
-                val okHttpClient = NetworkClient.sharedOkHttpClient.newBuilder()
-                    .addInterceptor(Interceptor { chain ->
-                        chain.proceed(
-                            chain.request().newBuilder()
-                                .addHeader("Cookie", UserSessionManager.cookie).build()
-                        )
-                    })
-                    .build()
-
-                repeatService = Retrofit
-                    .Builder()
-                    .baseUrl("https://aps.115.com/repeat/")
-                    .addConverterFactory(GsonConverterFactory.create())
-                    .client(okHttpClient)
-                    .build()
-                    .create(RepeatService::class.java)
-            }
-            return repeatService!!
-        }
-    }
 
     //https://aps.115.com/repeat/repeat_status.php?_=123123
     //{"state":false,"msg":"","msg_code":0,"data":{"group_count":0,"file_count":0,"file_size":0}}

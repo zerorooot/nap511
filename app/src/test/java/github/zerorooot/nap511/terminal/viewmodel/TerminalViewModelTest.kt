@@ -8,6 +8,7 @@ import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
+import github.zerorooot.nap511.repository.FakeFileRepository
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.terminal.engine.CompletionResult
@@ -48,7 +49,7 @@ class TerminalViewModelTest {
             userId = "1001"
         )
         viewModel = TerminalViewModel(
-            fileRepository = FileRepository.getInstance(),
+            fileRepository = FakeFileRepository(),
             avatarBean = avatar,
             mainDispatcher = testDispatcher,
             historyFile = tempHistoryFile,
@@ -404,7 +405,7 @@ class TerminalViewModelTest {
 
     @Test
     fun testTrashCompletionPredictsRecycleBin() = runBlocking {
-        val testRepo = object : FileRepository() {
+        val testRepo = object : FakeFileRepository() {
             override suspend fun recycleList(
                 aid: String,
                 cid: String,
@@ -437,7 +438,7 @@ class TerminalViewModelTest {
 
     @Test
     fun testCatAndUnzipCompletionFilteringInViewModel() = runBlocking {
-        val testRepo = object : FileRepository() {
+        val testRepo = object : FakeFileRepository() {
             override suspend fun getFiles(
                 cid: String,
                 showDir: Int,
@@ -494,7 +495,7 @@ class TerminalViewModelTest {
 
     @Test
     fun testGhostTextFilteringByCommand() = runBlocking {
-        val testRepo = object : FileRepository() {
+        val testRepo = object : FakeFileRepository() {
             override suspend fun getFiles(
                 cid: String,
                 showDir: Int,
@@ -576,7 +577,7 @@ class TerminalViewModelTest {
         val f1 = FileBean(name = "file1.zip", fileId = "101", isFolder = false)
         val f2 = FileBean(name = "file2.zip", fileId = "102", isFolder = false)
 
-        val testRepo = object : FileRepository() {
+        val testRepo = object : FakeFileRepository() {
             override suspend fun getFiles(
                 cid: String,
                 showDir: Int,

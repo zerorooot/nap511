@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import github.zerorooot.nap511.repository.AuthRepository
 import github.zerorooot.nap511.repository.DataStoreSettingsRepository
 import github.zerorooot.nap511.repository.DefaultAuthRepository
+import github.zerorooot.nap511.repository.DefaultFileRepository
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.repository.SubtitleRepository
@@ -14,13 +15,20 @@ import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinator
 import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinatorImpl
 import github.zerorooot.nap511.repository.settingDataStore
 import github.zerorooot.nap511.service.FileService
+import github.zerorooot.nap511.service.OfflineService
 import github.zerorooot.nap511.service.RepeatService
 import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.network.NetworkClient
+import github.zerorooot.nap511.util.network.UserSessionManager
 import github.zerorooot.nap511.viewmodel.platform.AndroidAppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
 import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import github.zerorooot.nap511.worker.UnzipQueueManager
+import okhttp3.OkHttpClient
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
 /**
  * 应用级依赖注入容器抽象接口
@@ -35,6 +43,7 @@ interface AppContainer {
     val authRepository: AuthRepository
     val fileService: FileService
     val repeatService: RepeatService
+    val offlineService: OfflineService
     val pagingCoordinator: DirectoryPagingCoordinator
     val unzipQueueManager: UnzipQueueManager
 }
@@ -44,17 +53,50 @@ interface AppContainer {
  */
 class DefaultAppContainer(private val application: Application) : AppContainer {
 
+    private val serviceOkHttpClient: OkHttpClient by lazy {
+        NetworkClient.sharedOkHttpClient.newBuilder()
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .addHeader("Cookie", UserSessionManager.cookie)
+                    .addHeader("User-Agent", ConfigKeyUtil.USER_AGENT)
+                    .build()
+                chain.proceed(request)
+            }
+            .build()
+    }
+
+    private fun <T> createRetrofitService(baseUrl: String, serviceClass: Class<T>): T {
+        return Retrofit.Builder()
+            .baseUrl(baseUrl)
+            .addConverterFactory(GsonConverterFactory.create())
+            .client(serviceOkHttpClient)
+            .build()
+            .create(serviceClass)
+    }
+
     override val toastProvider: ToastProvider by lazy {
         AndroidToastProvider(application)
     }
     override val stringProvider: AppStringProvider by lazy {
         AndroidAppStringProvider(application)
     }
+    override val fileService: FileService by lazy {
+        createRetrofitService("https://webapi.115.com/", FileService::class.java)
+    }
+    override val repeatService: RepeatService by lazy {
+        createRetrofitService("https://aps.115.com/repeat/", RepeatService::class.java)
+    }
+    override val offlineService: OfflineService by lazy {
+        createRetrofitService("https://115.com/", OfflineService::class.java)
+    }
     override val fileRepository: FileRepository by lazy {
-        FileRepository.getInstance()
+        DefaultFileRepository(
+            fileService = fileService,
+            offlineService = offlineService
+        )
     }
     override val subtitleRepository: SubtitleRepository by lazy {
-        SubtitleRepository.getInstance()
+        SubtitleRepository(fileRepository = fileRepository)
     }
     override val settingsRepository: SettingsRepository by lazy {
         DataStoreSettingsRepository(application.settingDataStore)
@@ -62,14 +104,8 @@ class DefaultAppContainer(private val application: Application) : AppContainer {
     override val authRepository: AuthRepository by lazy {
         DefaultAuthRepository(settingsRepository)
     }
-    override val fileService: FileService by lazy {
-        FileService.getInstance()
-    }
-    override val repeatService: RepeatService by lazy {
-        RepeatService.getInstance()
-    }
     override val pagingCoordinator: DirectoryPagingCoordinator by lazy {
-        DirectoryPagingCoordinatorImpl.getInstance()
+        DirectoryPagingCoordinatorImpl(fileRepository = fileRepository)
     }
     override val unzipQueueManager: UnzipQueueManager by lazy {
         UnzipQueueManager(application)

@@ -9,6 +9,7 @@ import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.OrderEnum
 import github.zerorooot.nap511.bean.OrderType
 import github.zerorooot.nap511.bean.SettingUiState
+import github.zerorooot.nap511.repository.FakeFileRepository
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinator
 import github.zerorooot.nap511.repository.paging.PageAppendResult
@@ -57,7 +58,7 @@ class FileBrowserModuleTest {
     private val fakeToastProvider = FakeToastProvider()
     private val settingFlow = MutableStateFlow(SettingUiState())
 
-    private val fakeRepo = object : FileRepository() {
+    private val fakeRepo = object : FakeFileRepository() {
         var orderCallCount = 0
         var lastOrderBody: Map<String, String>? = null
 

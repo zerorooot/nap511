@@ -6,11 +6,6 @@ import github.zerorooot.nap511.bean.OfflineListCount
 import github.zerorooot.nap511.bean.QuotaBean
 import github.zerorooot.nap511.bean.SignBean
 import github.zerorooot.nap511.bean.TorrentFileBean
-import github.zerorooot.nap511.util.network.NetworkClient
-import github.zerorooot.nap511.util.network.UserSessionManager
-import okhttp3.Interceptor
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Field
 import retrofit2.http.FieldMap
 import retrofit2.http.FormUrlEncoded
@@ -19,33 +14,6 @@ import retrofit2.http.POST
 import retrofit2.http.Query
 
 interface OfflineService {
-    companion object {
-        private var offlineService: OfflineService? = null
-        fun getInstance(): OfflineService {
-            if (offlineService == null) {
-                val okHttpClient = NetworkClient.sharedOkHttpClient.newBuilder()
-                    .addInterceptor(Interceptor { chain ->
-                        chain.proceed(
-                            chain.request().newBuilder().addHeader(
-                                "Cookie",
-                                UserSessionManager.cookie
-                            ).build()
-                        )
-                    })
-                    .build()
-
-                offlineService = Retrofit
-                    .Builder()
-                    .baseUrl("https://115.com")
-                    .addConverterFactory(GsonConverterFactory.create())
-//                    .addConverterFactory(FileBeanConverterFactory.create())
-                    .client(okHttpClient)
-                    .build()
-                    .create(OfflineService::class.java)
-            }
-            return offlineService!!
-        }
-    }
 
     @FormUrlEncoded
     @POST("web/lixian/?ct=lixian&ac=add_task_urls")

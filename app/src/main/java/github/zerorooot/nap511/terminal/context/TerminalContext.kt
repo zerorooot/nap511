@@ -60,7 +60,7 @@ sealed class ResolvedTarget {
  */
 class TerminalContext(
     initialPathList: List<PathBean> = emptyList(),
-    fileRepository: FileRepository = FileRepository.getInstance(),
+    fileRepository: FileRepository,
     val fileCacheManager: FileCacheManager = FileCacheManager,
     pagingCoordinator: DirectoryPagingCoordinator? = null,
     val onConfirmRequest: (suspend (prompt: String) -> Boolean)? = null,

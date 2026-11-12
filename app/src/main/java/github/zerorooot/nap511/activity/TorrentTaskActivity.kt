@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.lifecycle.lifecycleScope
+import github.zerorooot.nap511.di.appContainer
 import github.zerorooot.nap511.di.toast
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.App
@@ -16,7 +17,7 @@ import java.io.InputStream
 import java.io.OutputStream
 
 class TorrentTaskActivity : androidx.activity.ComponentActivity() {
-    private val fileRepository by lazy { FileRepository.getInstance() }
+    private val fileRepository by lazy { appContainer.fileRepository }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

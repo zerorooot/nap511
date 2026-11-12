@@ -7,6 +7,7 @@ import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.VideoStarAction
 import github.zerorooot.nap511.bean.BaseReturnMessage
 import github.zerorooot.nap511.bean.FilesBean
+import github.zerorooot.nap511.repository.FakeFileRepository
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.util.FileCacheManager
 import github.zerorooot.nap511.viewmodel.platform.CoilCacheCleaner
@@ -73,7 +74,7 @@ class FileMediaModuleTest {
 
     private var shouldThrowStarError = false
     val starCalls = mutableListOf<Pair<String, Boolean>>()
-    private val fakeFileRepo = object : FileRepository() {
+    private val fakeFileRepo = object : FakeFileRepository() {
         override suspend fun star(fid: String, star: Boolean): BaseReturnMessage {
             if (shouldThrowStarError) throw java.io.IOException("Star network timeout")
             starCalls.add(fid to star)

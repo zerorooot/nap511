@@ -2,6 +2,7 @@ package github.zerorooot.nap511.viewmodel.module
 
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.OrderBean
+import github.zerorooot.nap511.repository.FakeFileRepository
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
 import github.zerorooot.nap511.viewmodel.platform.BackgroundScheduler
@@ -78,7 +79,7 @@ class FileIntegrationModuleTest {
         module = FileIntegrationModule(
             stateHolder = stateHolder,
             navigator = fakeNavigator,
-            fileRepository = FileRepository(),
+            fileRepository = FakeFileRepository(),
             backgroundScheduler = fakeScheduler,
             onCopyToClipboard = { lastCopiedText = it },
             toastProvider = fakeToastProvider

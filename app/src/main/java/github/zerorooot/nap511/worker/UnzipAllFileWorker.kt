@@ -48,7 +48,7 @@ class UnzipAllFileWorker(
         applicationContext.getSystemService(NotificationManager::class.java)
 
     private val fileRepository: FileRepository by lazy {
-        FileRepository.getInstance()
+        applicationContext.appContainer.fileRepository
     }
 
     private val unzipQueueManager by lazy {

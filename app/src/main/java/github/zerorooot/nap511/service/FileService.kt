@@ -12,13 +12,7 @@ import github.zerorooot.nap511.bean.MusicBean
 import github.zerorooot.nap511.bean.ProcessDataResponse
 import github.zerorooot.nap511.bean.RecycleInfo
 import github.zerorooot.nap511.bean.VideoInfoBean
-import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.network.NetworkClient
-import github.zerorooot.nap511.util.network.UserSessionManager
-import okhttp3.Interceptor
 import okhttp3.RequestBody
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.Field
 import retrofit2.http.FieldMap
@@ -28,40 +22,6 @@ import retrofit2.http.POST
 import retrofit2.http.Query
 
 interface FileService {
-    companion object {
-        @Volatile
-        private var fileService: FileService? = null
-        fun getInstance(): FileService {
-            if (fileService == null) {
-                fileService = Retrofit
-                    .Builder()
-                    .baseUrl("https://webapi.115.com/")
-                    .addConverterFactory(GsonConverterFactory.create())
-//                    .addConverterFactory(FileBeanConverterFactory.create())
-                    //add cookie
-                    .client(
-                        NetworkClient.sharedOkHttpClient.newBuilder()
-                            .addInterceptor(Interceptor { chain ->
-                                val request = chain.request().newBuilder()
-                                    .addHeader(
-                                        "Cookie",
-                                        UserSessionManager.cookie
-                                    )
-                                    .addHeader(
-                                        "User-Agent",
-                                        ConfigKeyUtil.USER_AGENT
-                                    )
-                                    .build()
-                                chain.proceed(request)
-                            })
-                            .build()
-                    )
-                    .build()
-                    .create(FileService::class.java)
-            }
-            return fileService!!
-        }
-    }
 
 //    @GET("files")
 //    suspend fun getFileList(

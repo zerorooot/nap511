@@ -7,6 +7,7 @@ import github.zerorooot.nap511.bean.FilesBean
 import github.zerorooot.nap511.bean.PathBean
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
+import github.zerorooot.nap511.repository.FakeFileRepository
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.engine.PipelineEngine
@@ -45,18 +46,12 @@ internal fun createTestContext(
     onConfirmRequest: (suspend (String) -> Boolean)? = null,
     unzipQueueManager: UnzipQueueManager? = null
 ): TerminalContext {
-    val ctx = if (fileRepository != null) {
-        TerminalContext(
-            fileRepository = fileRepository,
-            onConfirmRequest = onConfirmRequest,
-            unzipQueueManager = unzipQueueManager
-        )
-    } else {
-        TerminalContext(
-            onConfirmRequest = onConfirmRequest,
-            unzipQueueManager = unzipQueueManager
-        )
-    }
+    val repo = fileRepository ?: TestMockFileRepository()
+    val ctx = TerminalContext(
+        fileRepository = repo,
+        onConfirmRequest = onConfirmRequest,
+        unzipQueueManager = unzipQueueManager
+    )
     ctx.updateDirectory(listOf(PathBean(rootCid, rootName, "0")))
     return ctx
 }
@@ -169,7 +164,7 @@ internal open class TestMockFileRepository(
     private val onMove: ((Map<String, String>) -> Unit)? = null,
     private val onDelete: ((pid: String, fid: String) -> Unit)? = null,
     private val onRevert: ((rid: String) -> Unit)? = null
-) : FileRepository() {
+) : FakeFileRepository() {
 
     var counter: Int = initialFolderId
     val deletedItems = mutableListOf<Pair<String, String>>()
