@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.bean
 
+import androidx.compose.runtime.Immutable
 import com.google.gson.JsonDeserializationContext
 import com.google.gson.JsonDeserializer
 import com.google.gson.JsonElement
@@ -113,28 +114,30 @@ data class ProcessData(
     val percent: Int
 )
 
+@Immutable
 data class ZipBeanList(
-    var list: ArrayList<ZipBean> = arrayListOf(),
+    val list: List<ZipBean> = emptyList(),
     @SerializedName("has_file")
-    var hasFile: Boolean = false,
+    val hasFile: Boolean = false,
     @SerializedName("next_marker")
-    var nextMarker: String = "",
-    var pathString: String = ""
+    val nextMarker: String = "",
+    val pathString: String = ""
 )
 
+@Immutable
 data class ZipBean(
     @SerializedName("file_name")
-    var fileName: String = "",
+    val fileName: String = "",
     @SerializedName("ico")
-    var icoString: String = "",
-    var fileIco: Int = R.drawable.other,
-    var size: Long = 0,
-    var sizeString: String = "",
+    val icoString: String = "",
+    val fileIco: Int = R.drawable.other,
+    val size: Long = 0,
+    val sizeString: String = "",
     /**
      * 1 is file, 0 is folder
      */
     @SerializedName("file_category")
-    var fileCategory: Int = 1,
-    var time: String = "",
-    var timeString: String = ""
+    val fileCategory: Int = 1,
+    val time: String = "",
+    val timeString: String = ""
 )

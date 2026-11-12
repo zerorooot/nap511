@@ -165,23 +165,23 @@ class FileMutatorModuleTest {
         tempDir.deleteRecursively()
     }
 
-    private fun createFileBean(id: String, name: String, isSelect: Boolean = false): FileBean {
+    private fun createFileBean(id: String, name: String): FileBean {
         return FileBean(
             fileId = id,
             name = name,
-            isSelect = isSelect,
             pickCode = "pick_$id"
         )
     }
 
     @Test
     fun `test cut with index -1 cuts selected items and clears selection`() {
-        val item1 = createFileBean("1", "item1", isSelect = true)
-        val item2 = createFileBean("2", "item2", isSelect = false)
-        val item3 = createFileBean("3", "item3", isSelect = true)
+        val item1 = createFileBean("1", "item1")
+        val item2 = createFileBean("2", "item2")
+        val item3 = createFileBean("3", "item3")
         stateHolder.updateContentState {
             copy(
                 fileBeanList = listOf(item1, item2, item3),
+                selectedFileIds = setOf("1", "3"),
                 isLongClickState = true
             )
         }
@@ -195,7 +195,7 @@ class FileMutatorModuleTest {
         assertEquals("1", content.cutFileList[0].fileId)
         assertEquals("3", content.cutFileList[1].fileId)
         // 原始列表选中状态全部清空
-        assertTrue(content.fileBeanList.none { it.isSelect })
+        assertTrue(content.selectedFileIds.isEmpty())
         assertEquals("nap511", content.appBarTitle)
     }
 
@@ -270,15 +270,15 @@ class FileMutatorModuleTest {
                 fileBeanList = listOf(item)
             )
         }
-        scrollPositionStore.setClick(FileListSource.folderKey("0"), 5)
+        scrollPositionStore.setHighlight(FileListSource.folderKey("0"), "del_1")
         mockDeleteResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = false, errorMsg = "删除失败权限不足")
 
         module.delete(item)
 
-        // 验证失败后列表与点击位均已无死角回滚
+        // 验证失败后列表与点击高亮位均已无死角回滚
         assertEquals(1, stateHolder.currentContentState.fileBeanList.size)
         assertEquals("del_1", stateHolder.currentContentState.fileBeanList[0].fileId)
-        assertEquals(5, scrollPositionStore.getClick(FileListSource.folderKey("0")))
+        assertEquals("del_1", scrollPositionStore.getHighlight(FileListSource.folderKey("0")))
         // Coil 缓存决不能被删除
         assertTrue(deletedCoilKeys.isEmpty())
     }
@@ -292,38 +292,39 @@ class FileMutatorModuleTest {
                 fileBeanList = listOf(item)
             )
         }
-        scrollPositionStore.setClick(FileListSource.folderKey("0"), 3)
+        scrollPositionStore.setHighlight(FileListSource.folderKey("0"), "del_2")
         shouldThrowNetworkError = true
 
         module.delete(item)
 
         assertEquals(1, stateHolder.currentContentState.fileBeanList.size)
-        assertEquals(3, scrollPositionStore.getClick(FileListSource.folderKey("0")))
+        assertEquals("del_2", scrollPositionStore.getHighlight(FileListSource.folderKey("0")))
         assertTrue(deletedCoilKeys.isEmpty())
     }
 
     @Test
     fun `test deleteMultiple rolls back on network exception and preserves totalCount`() = kotlinx.coroutines.test.runTest {
-        val item1 = createFileBean("m1", "multi1").copy(parentId = "0", isSelect = true, photoThumb = "thumb1")
-        val item2 = createFileBean("m2", "multi2").copy(parentId = "0", isSelect = true, photoThumb = "thumb2")
-        val item3 = createFileBean("m3", "multi3").copy(parentId = "0", isSelect = false)
+        val item1 = createFileBean("m1", "multi1").copy(parentId = "0", photoThumb = "thumb1")
+        val item2 = createFileBean("m2", "multi2").copy(parentId = "0", photoThumb = "thumb2")
+        val item3 = createFileBean("m3", "multi3").copy(parentId = "0")
 
         stateHolder.updateContentState {
             copy(
                 source = FileListSource.Folder("0",fakeStringProvider),
                 fileBeanList = listOf(item1, item2, item3),
+                selectedFileIds = setOf("m1", "m2"),
                 totalCount = 3
             )
         }
-        scrollPositionStore.setClick(FileListSource.folderKey("0"), 10)
+        scrollPositionStore.setHighlight(FileListSource.folderKey("0"), "m1")
         shouldThrowNetworkError = true
 
         module.deleteMultiple("0", listOf(item1, item2))
 
-        // 验证列表、总量、点击索引均已完全恢复
+        // 验证列表、总量、高亮项均已完全恢复
         assertEquals(3, stateHolder.currentContentState.fileBeanList.size)
         assertEquals(3, stateHolder.currentContentState.totalCount)
-        assertEquals(10, scrollPositionStore.getClick(FileListSource.folderKey("0")))
+        assertEquals("m1", scrollPositionStore.getHighlight(FileListSource.folderKey("0")))
         assertTrue(deletedCoilKeys.isEmpty())
     }
 
@@ -336,10 +337,11 @@ class FileMutatorModuleTest {
             copy(
                 source = FileListSource.Folder("0",fakeStringProvider),
                 fileBeanList = listOf(item1, item2),
+                selectedFileIds = setOf("m1", "m2"),
                 totalCount = 2
             )
         }
-        scrollPositionStore.setClick(FileListSource.folderKey("0"), 8)
+        scrollPositionStore.setHighlight(FileListSource.folderKey("0"), "m1")
         mockDeleteMultipleResult = github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
 
         module.deleteMultiple("0", listOf(item1, item2))
@@ -347,7 +349,7 @@ class FileMutatorModuleTest {
         // 成功删除后列表被移除，Coil 缓存中仅有 photoThumb 的项被清理
         assertTrue(stateHolder.currentContentState.fileBeanList.isEmpty())
         assertEquals(0, stateHolder.currentContentState.totalCount)
-        assertEquals(6, scrollPositionStore.getClick(FileListSource.folderKey("0")))
+        assertEquals(null, scrollPositionStore.getHighlight(FileListSource.folderKey("0")))
         assertEquals(listOf("pick_m1"), deletedCoilKeys)
     }
 
@@ -408,7 +410,10 @@ class FileMutatorModuleTest {
     fun `test openBatchRenameDialog requires selected items`() {
         // 无选中项时拦截并 Toast
         stateHolder.updateContentState {
-            copy(fileBeanList = listOf(createFileBean("1", "old1.txt", isSelect = false)))
+            copy(
+                fileBeanList = listOf(createFileBean("1", "old1.txt")),
+                selectedFileIds = emptySet()
+            )
         }
         module.openBatchRenameDialog()
         assertEquals(FileDialogState.None, stateHolder.currentDialogState.activeDialog)
@@ -416,7 +421,10 @@ class FileMutatorModuleTest {
 
         // 有选中项时正常开启
         stateHolder.updateContentState {
-            copy(fileBeanList = listOf(createFileBean("1", "old1.txt", isSelect = true)))
+            copy(
+                fileBeanList = listOf(createFileBean("1", "old1.txt")),
+                selectedFileIds = setOf("1")
+            )
         }
         module.openBatchRenameDialog()
         assertEquals(FileDialogState.BatchRename, stateHolder.currentDialogState.activeDialog)
@@ -427,14 +435,15 @@ class FileMutatorModuleTest {
 
     @Test
     fun `test batchRename successfully updates UI, clears selection, and calls repository`() = kotlinx.coroutines.test.runTest {
-        val item1 = createFileBean("1", "old1.txt", isSelect = true)
-        val item2 = createFileBean("2", "old2.txt", isSelect = true)
-        val item3 = createFileBean("3", "old3.txt", isSelect = false)
+        val item1 = createFileBean("1", "old1.txt")
+        val item2 = createFileBean("2", "old2.txt")
+        val item3 = createFileBean("3", "old3.txt")
         stateHolder.updateContentState {
             copy(
                 source = FileListSource.Folder("0", fakeStringProvider),
                 currentCid = "0",
                 fileBeanList = listOf(item1, item2, item3),
+                selectedFileIds = setOf("1", "2"),
                 isLongClickState = true
             )
         }
@@ -450,7 +459,7 @@ class FileMutatorModuleTest {
         assertEquals("new2.txt", updatedList.find { it.fileId == "2" }?.name)
         assertEquals("old3.txt", updatedList.find { it.fileId == "3" }?.name)
         assertFalse("多选状态应被重置", stateHolder.currentContentState.isLongClickState)
-        assertTrue("所有条目的选中状态应被清除", updatedList.none { it.isSelect })
+        assertTrue("所有条目的选中状态应被清除", stateHolder.currentContentState.selectedFileIds.isEmpty())
         assertEquals(1, renameCallCount)
         assertTrue(fakeToastProvider.messages.contains("成功重命名 2 个文件"))
     }
@@ -458,13 +467,14 @@ class FileMutatorModuleTest {
     @Test
     fun `test batchRename chunks into batches of 100`() = kotlinx.coroutines.test.runTest {
         val items = (1..150).map { i ->
-            createFileBean("id_$i", "old_$i.txt", isSelect = true)
+            createFileBean("id_$i", "old_$i.txt")
         }
         stateHolder.updateContentState {
             copy(
                 source = FileListSource.Folder("0", fakeStringProvider),
                 currentCid = "0",
                 fileBeanList = items,
+                selectedFileIds = items.map { it.fileId }.toSet(),
                 isLongClickState = true
             )
         }
@@ -481,13 +491,14 @@ class FileMutatorModuleTest {
 
     @Test
     fun `test batchRename rolls back on network error`() = kotlinx.coroutines.test.runTest {
-        val item1 = createFileBean("1", "old1.txt", isSelect = true)
-        val item2 = createFileBean("2", "old2.txt", isSelect = true)
+        val item1 = createFileBean("1", "old1.txt")
+        val item2 = createFileBean("2", "old2.txt")
         stateHolder.updateContentState {
             copy(
                 source = FileListSource.Folder("0", fakeStringProvider),
                 currentCid = "0",
                 fileBeanList = listOf(item1, item2),
+                selectedFileIds = setOf("1", "2"),
                 isLongClickState = true
             )
         }
@@ -504,12 +515,13 @@ class FileMutatorModuleTest {
 
     @Test
     fun `test batchRename supports folders`() = kotlinx.coroutines.test.runTest {
-        val folder = FileBean(fileId = "c100", categoryId = "c100", name = "旧目录", isFolder = true, isSelect = true)
+        val folder = FileBean(fileId = "c100", categoryId = "c100", name = "旧目录", isFolder = true)
         stateHolder.updateContentState {
             copy(
                 source = FileListSource.Folder("0", fakeStringProvider),
                 currentCid = "0",
                 fileBeanList = listOf(folder),
+                selectedFileIds = setOf("c100"),
                 isLongClickState = true
             )
         }
@@ -519,20 +531,21 @@ class FileMutatorModuleTest {
 
         val updated = stateHolder.currentContentState.fileBeanList.first()
         assertEquals("新目录", updated.name)
-        assertFalse(updated.isSelect)
+        assertTrue(stateHolder.currentContentState.selectedFileIds.isEmpty())
         assertEquals(1, renameCallCount)
         assertTrue(fakeToastProvider.messages.contains("成功重命名 1 个文件"))
     }
 
     @Test
     fun `test batchRename across different parent directories`() = kotlinx.coroutines.test.runTest {
-        val itemP1 = FileBean(fileId = "f1", name = "item1.txt", parentId = "p1", isSelect = true)
-        val itemP2 = FileBean(fileId = "f2", name = "item2.txt", parentId = "p2", isSelect = true)
+        val itemP1 = FileBean(fileId = "f1", name = "item1.txt", parentId = "p1")
+        val itemP2 = FileBean(fileId = "f2", name = "item2.txt", parentId = "p2")
         stateHolder.updateContentState {
             copy(
                 source = FileListSource.Search("0", "query", fakeStringProvider),
                 currentCid = "0",
                 fileBeanList = listOf(itemP1, itemP2),
+                selectedFileIds = setOf("f1", "f2"),
                 isLongClickState = true
             )
         }
@@ -549,8 +562,8 @@ class FileMutatorModuleTest {
 
     @Test
     fun `test onMultiSelectRename smart dispatch with 0, 1, and multiple items`() {
-        val item1 = createFileBean("1", "item1.txt", isSelect = false)
-        val item2 = createFileBean("2", "item2.txt", isSelect = false)
+        val item1 = createFileBean("1", "item1.txt")
+        val item2 = createFileBean("2", "item2.txt")
         stateHolder.updateContentState {
             copy(fileBeanList = listOf(item1, item2))
         }
@@ -562,7 +575,10 @@ class FileMutatorModuleTest {
 
         // 2. 1 项选中：调起 RenameFile 弹窗并绑定目标 bean
         stateHolder.updateContentState {
-            copy(fileBeanList = listOf(item1.copy(isSelect = true), item2))
+            copy(
+                fileBeanList = listOf(item1, item2),
+                selectedFileIds = setOf("1")
+            )
         }
         module.onMultiSelectRename()
         assertEquals(FileDialogState.RenameFile, stateHolder.currentDialogState.activeDialog)
@@ -573,7 +589,10 @@ class FileMutatorModuleTest {
 
         // 3. 2 项选中：调起 BatchRename 批量重命名弹窗
         stateHolder.updateContentState {
-            copy(fileBeanList = listOf(item1.copy(isSelect = true), item2.copy(isSelect = true)))
+            copy(
+                fileBeanList = listOf(item1, item2),
+                selectedFileIds = setOf("1", "2")
+            )
         }
         module.onMultiSelectRename()
         assertEquals(FileDialogState.BatchRename, stateHolder.currentDialogState.activeDialog)
@@ -581,10 +600,11 @@ class FileMutatorModuleTest {
 
     @Test
     fun `test rename in multi-select mode updates name and exits multi-select`() = kotlinx.coroutines.test.runTest {
-        val item = createFileBean("1", "old.txt", isSelect = true)
+        val item = createFileBean("1", "old.txt")
         stateHolder.updateContentState {
             copy(
                 fileBeanList = listOf(item),
+                selectedFileIds = setOf("1"),
                 isLongClickState = true,
                 appBarTitle = "1"
             )
@@ -594,7 +614,7 @@ class FileMutatorModuleTest {
 
         val updated = stateHolder.currentContentState
         assertEquals("new.txt", updated.fileBeanList.first().name)
-        assertFalse("单文件重命名后应清除 isSelect", updated.fileBeanList.first().isSelect)
+        assertTrue("单文件重命名后应清除 selectedFileIds", updated.selectedFileIds.isEmpty())
         assertFalse("单文件重命名后应退出多选", updated.isLongClickState)
         assertEquals("nap511", updated.appBarTitle)
     }
@@ -625,11 +645,15 @@ class FileMutatorModuleTest {
 
     @Test
     fun `test topMultiple with selected items passes comma separated fids`() = kotlinx.coroutines.test.runTest {
-        val item1 = createFileBean("10", "file1.txt", isSelect = true).copy(isPinned = false, isTop = 0)
-        val item2 = createFileBean("20", "file2.txt", isSelect = true).copy(isPinned = false, isTop = 0)
-        val item3 = createFileBean("30", "file3.txt", isSelect = false)
+        val item1 = createFileBean("10", "file1.txt").copy(isPinned = false, isTop = 0)
+        val item2 = createFileBean("20", "file2.txt").copy(isPinned = false, isTop = 0)
+        val item3 = createFileBean("30", "file3.txt")
         stateHolder.updateContentState {
-            copy(fileBeanList = listOf(item1, item2, item3), isLongClickState = true)
+            copy(
+                fileBeanList = listOf(item1, item2, item3),
+                selectedFileIds = setOf("10", "20"),
+                isLongClickState = true
+            )
         }
 
         module.topMultiple()
@@ -674,14 +698,15 @@ class FileMutatorModuleTest {
 
     @Test
     fun `test deleteMultiple when skip disabled deletes all selected items including pinned and starred`() = kotlinx.coroutines.test.runTest {
-        val item1 = createFileBean("normal", "normal.txt", isSelect = true).copy(parentId = "0")
-        val item2 = createFileBean("pinned", "pinned.txt", isSelect = true).copy(parentId = "0", isPinned = true)
-        val item3 = createFileBean("starred", "starred.txt", isSelect = true).copy(parentId = "0", isStar = true, star = 1)
+        val item1 = createFileBean("normal", "normal.txt").copy(parentId = "0")
+        val item2 = createFileBean("pinned", "pinned.txt").copy(parentId = "0", isPinned = true)
+        val item3 = createFileBean("starred", "starred.txt").copy(parentId = "0", isStar = true, star = 1)
 
         stateHolder.updateContentState {
             copy(
                 source = FileListSource.Folder("0", fakeStringProvider),
                 fileBeanList = listOf(item1, item2, item3),
+                selectedFileIds = setOf("normal", "pinned", "starred"),
                 totalCount = 3,
                 isLongClickState = true
             )
@@ -699,14 +724,15 @@ class FileMutatorModuleTest {
 
     @Test
     fun `test deleteMultiple when skip enabled and all protected items aborts delete and toasts all skipped`() = kotlinx.coroutines.test.runTest {
-        val item1 = createFileBean("pinned", "pinned.txt", isSelect = true).copy(parentId = "0", isPinned = true)
-        val item2 = createFileBean("starred", "starred.txt", isSelect = true).copy(parentId = "0", isStar = true, star = 1)
-        val item3 = createFileBean("unselected", "unselected.txt", isSelect = false).copy(parentId = "0")
+        val item1 = createFileBean("pinned", "pinned.txt").copy(parentId = "0", isPinned = true)
+        val item2 = createFileBean("starred", "starred.txt").copy(parentId = "0", isStar = true, star = 1)
+        val item3 = createFileBean("unselected", "unselected.txt").copy(parentId = "0")
 
         stateHolder.updateContentState {
             copy(
                 source = FileListSource.Folder("0", fakeStringProvider),
                 fileBeanList = listOf(item1, item2, item3),
+                selectedFileIds = setOf("pinned", "starred"),
                 totalCount = 3,
                 isLongClickState = true
             )
@@ -721,22 +747,23 @@ class FileMutatorModuleTest {
         assertEquals(3, stateHolder.currentContentState.fileBeanList.size)
         // 多选模式已退出，所有条目的选中状态被安全清空
         assertFalse(stateHolder.currentContentState.isLongClickState)
-        assertTrue(stateHolder.currentContentState.fileBeanList.none { it.isSelect })
+        assertTrue(stateHolder.currentContentState.selectedFileIds.isEmpty())
         // 正确提示全部跳过文案
         assertTrue(fakeToastProvider.messages.contains("所选项目均为置顶/星标，已全部跳过"))
     }
 
     @Test
     fun `test deleteMultiple when skip enabled and partially protected deletes unprotected items and toasts with skipped count`() = kotlinx.coroutines.test.runTest {
-        val item1 = createFileBean("normal", "normal.txt", isSelect = true).copy(parentId = "0")
-        val item2 = createFileBean("pinned", "pinned.txt", isSelect = true).copy(parentId = "0", isPinned = true)
-        val item3 = createFileBean("starred", "starred.txt", isSelect = true).copy(parentId = "0", isStar = true, star = 1)
-        val item4 = createFileBean("top1", "top1.txt", isSelect = true).copy(parentId = "0", isTop = 1)
+        val item1 = createFileBean("normal", "normal.txt").copy(parentId = "0")
+        val item2 = createFileBean("pinned", "pinned.txt").copy(parentId = "0", isPinned = true)
+        val item3 = createFileBean("starred", "starred.txt").copy(parentId = "0", isStar = true, star = 1)
+        val item4 = createFileBean("top1", "top1.txt").copy(parentId = "0", isTop = 1)
 
         stateHolder.updateContentState {
             copy(
                 source = FileListSource.Folder("0", fakeStringProvider),
                 fileBeanList = listOf(item1, item2, item3, item4),
+                selectedFileIds = setOf("normal", "pinned", "starred", "top1"),
                 totalCount = 4,
                 isLongClickState = true
             )
@@ -752,7 +779,7 @@ class FileMutatorModuleTest {
         // 剩余列表保留 3 个受保护条目，且选中状态全部被清空
         assertEquals(3, stateHolder.currentContentState.fileBeanList.size)
         assertFalse(stateHolder.currentContentState.isLongClickState)
-        assertTrue(stateHolder.currentContentState.fileBeanList.none { it.isSelect })
+        assertTrue(stateHolder.currentContentState.selectedFileIds.isEmpty())
         // 提示信息包含已跳过的数量
         assertTrue(fakeToastProvider.messages.contains("成功删除 1 个文件（已跳过 3 个置顶/星标）"))
     }

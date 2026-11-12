@@ -2,6 +2,7 @@ package github.zerorooot.nap511.viewmodel.module
 
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.uniqueId
 import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.bean.FilesBean
@@ -22,6 +23,7 @@ import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import github.zerorooot.nap511.viewmodel.store.FileUiStateHolder
 import github.zerorooot.nap511.viewmodel.store.ImageCacheStore
 import github.zerorooot.nap511.viewmodel.store.PagingStateStore
+import github.zerorooot.nap511.viewmodel.store.ScrollPositionStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -51,7 +53,8 @@ class FileBrowserModule(
     private val stringProvider: AppStringProvider,
     private val coilCacheCleaner: CoilCacheCleaner,
     private val settingUiStateFlow: StateFlow<SettingUiState>,
-    private val toastProvider: ToastProvider
+    private val toastProvider: ToastProvider,
+    private val scrollPositionStore: ScrollPositionStore = ScrollPositionStore()
 ) {
     private val _navigationEvent = MutableSharedFlow<NavEvent>(extraBufferCapacity = 1)
     val navigationEvent: SharedFlow<NavEvent> = _navigationEvent.asSharedFlow()
@@ -159,8 +162,8 @@ class FileBrowserModule(
                 asc = serverOrderBean.asc,
                 fcMix = currentFcMix
             )
-            files.fileBeanList = formatFileBeanList(files.fileBeanList)
-            FileCacheManager[cid] = files
+            val formatted = files.copy(fileBeanList = formatFileBeanList(files.fileBeanList))
+            FileCacheManager[cid] = formatted
         }.onFailureToastAndLog(toastProvider)
     }
 
@@ -189,14 +192,14 @@ class FileBrowserModule(
             if (cid != "0" && files.cid == "0") {
                 toastProvider.showToast("当前文件夹被删除！")
             }
-            files.fileBeanList = formatFileBeanList(files.fileBeanList)
+            val formatted = files.copy(fileBeanList = formatFileBeanList(files.fileBeanList))
 
             // 网络请求返回最新文件列表后，同步清空该目录旧的高清图缓存，
             // 避免在等待网络期间提前清空导致屏幕上的旧列表条目闪烁或抢跑发起重复请求
             imageCacheStore.clear(cid)
             // 3. 网络请求成功后写入缓存
-            FileCacheManager[cid] = files
-            setFiles(files)
+            FileCacheManager[cid] = formatted
+            setFiles(formatted)
         }.onFailure {
             val expiredTip = when (it) {
                 is NullPointerException -> "获取文件列表失败，建议更新您的Cookie"
@@ -687,83 +690,94 @@ class FileBrowserModule(
 
     fun selectToUp() {
         stateHolder.updateContentState {
-            val firstSelectedIndex = fileBeanList.indexOfFirst { it.isSelect }
+            val firstSelectedIndex = fileBeanList.indexOfFirst { it.uniqueId in selectedFileIds }
             if (firstSelectedIndex == -1) return@updateContentState this
 
-            val list = fileBeanList.mapIndexed { idx, item ->
-                if (idx <= firstSelectedIndex) item.copy(isSelect = true) else item
-            }
-            copy(fileBeanList = list, appBarTitle = list.count { it.isSelect }.toString())
+            val newlySelected = fileBeanList.take(firstSelectedIndex + 1).map { it.uniqueId }
+            val newSelectedIds = selectedFileIds + newlySelected
+            copy(
+                selectedFileIds = newSelectedIds,
+                appBarTitle = newSelectedIds.size.toString()
+            )
         }
     }
 
     fun selectToDown() {
         stateHolder.updateContentState {
-            val firstSelectedIndex = fileBeanList.indexOfFirst { it.isSelect }
+            val firstSelectedIndex = fileBeanList.indexOfFirst { it.uniqueId in selectedFileIds }
             if (firstSelectedIndex == -1) return@updateContentState this
 
-            val list = fileBeanList.mapIndexed { idx, item ->
-                if (idx >= firstSelectedIndex) item.copy(isSelect = true) else item
-            }
-            copy(fileBeanList = list, appBarTitle = list.count { it.isSelect }.toString())
+            val newlySelected = fileBeanList.drop(firstSelectedIndex).map { it.uniqueId }
+            val newSelectedIds = selectedFileIds + newlySelected
+            copy(
+                selectedFileIds = newSelectedIds,
+                appBarTitle = newSelectedIds.size.toString()
+            )
         }
     }
 
     fun selectReverse() {
         stateHolder.updateContentState {
-            val updatedList = fileBeanList.map { it.copy(isSelect = !it.isSelect) }
-            val count = updatedList.count { it.isSelect }
+            val allIds = fileBeanList.map { it.uniqueId }.toSet()
+            val newSelectedIds = allIds - selectedFileIds
+            val count = newSelectedIds.size
             copy(
-                fileBeanList = updatedList,
+                selectedFileIds = newSelectedIds,
                 appBarTitle = if (count >= 0) count.toString() else source.appName
             )
         }
     }
 
+    fun select(fileBean: FileBean) {
+        toggleSelect(fileBean)
+    }
+
     fun select(index: Int) {
-        toggleSelect(index)
+        stateHolder.currentContentState.fileBeanList.getOrNull(index)?.let { select(it) }
     }
 
-    fun toggleSelect(index: Int) {
+    fun toggleSelect(fileBean: FileBean) {
         stateHolder.updateContentState {
-            val list = fileBeanList.toMutableList()
-            if (index in list.indices) {
-                val item = list[index]
-                list[index] = item.copy(isSelect = !item.isSelect)
-                val count = list.count { it.isSelect }
-                copy(
-                    fileBeanList = list,
-                    appBarTitle = if (count >= 0) count.toString() else source.appName
-                )
+            val uid = fileBean.uniqueId
+            val newSelectedIds = if (uid in selectedFileIds) {
+                selectedFileIds - uid
             } else {
-                this
+                selectedFileIds + uid
             }
-        }
-    }
-
-    fun startMultiSelect(index: Int) {
-        stateHolder.updateContentState {
-            val list = fileBeanList.toMutableList()
-            if (index in list.indices) {
-                list[index] = list[index].copy(isSelect = true)
-            }
+            val count = newSelectedIds.size
             copy(
-                isLongClickState = true,
-                fileBeanList = list,
-                appBarTitle = "1"
+                selectedFileIds = newSelectedIds,
+                appBarTitle = if (count >= 0) count.toString() else source.appName
             )
         }
     }
 
+    fun toggleSelect(index: Int) {
+        stateHolder.currentContentState.fileBeanList.getOrNull(index)?.let { toggleSelect(it) }
+    }
+
+    fun startMultiSelect(fileBean: FileBean) {
+        stateHolder.updateContentState {
+            val newSelectedIds = selectedFileIds + fileBean.uniqueId
+            copy(
+                isLongClickState = true,
+                selectedFileIds = newSelectedIds,
+                appBarTitle = newSelectedIds.size.toString()
+            )
+        }
+    }
+
+    fun startMultiSelect(index: Int) {
+        stateHolder.currentContentState.fileBeanList.getOrNull(index)?.let { startMultiSelect(it) }
+    }
 
     fun toggleSelectAll() {
         stateHolder.updateContentState {
-            val isAllSelected = fileBeanList.isNotEmpty() && fileBeanList.all { it.isSelect }
-            val targetSelect = !isAllSelected
-            val list = fileBeanList.map { it.copy(isSelect = targetSelect) }
-            val count = if (targetSelect) list.size else 0
+            val isAll = fileBeanList.isNotEmpty() && fileBeanList.all { it.uniqueId in selectedFileIds }
+            val newSelectedIds = if (isAll) emptySet() else fileBeanList.map { it.uniqueId }.toSet()
+            val count = newSelectedIds.size
             copy(
-                fileBeanList = list,
+                selectedFileIds = newSelectedIds,
                 appBarTitle = count.toString(),
                 isLongClickState = true // 保留多选状态机，便于继续点选
             )
@@ -773,9 +787,8 @@ class FileBrowserModule(
 
     fun clearSelection() {
         stateHolder.updateContentState {
-            val updatedList = fileBeanList.map { it.copy(isSelect = false) }
             copy(
-                fileBeanList = updatedList,
+                selectedFileIds = emptySet(),
                 isLongClickState = false,
                 appBarTitle = source.appName
             )
@@ -799,8 +812,8 @@ class FileBrowserModule(
             val currentCid = state.currentCid
             val cache = FileCacheManager.getDate(currentCid)
             if (cache != null) {
-                cache.fileBeanList = formatFileBeanList(cache.fileBeanList)
-                setFiles(cache)
+                val formattedCache = cache.copy(fileBeanList = formatFileBeanList(cache.fileBeanList))
+                setFiles(formattedCache)
                 stateHolder.updateContentState {
                     copy(
                         source = FileListSource.Folder(currentCid, stringProvider),
@@ -845,10 +858,13 @@ class FileBrowserModule(
         activeLocalOrder = null
         val currentOrder = OrderBean.from(files)
         val folderSource = FileListSource.Folder(files.cid, stringProvider)
+        val savedHighlight = scrollPositionStore.getHighlight(folderSource.paginationKey)
         stateHolder.updateContentState {
             copy(
                 source = folderSource,
                 fileBeanList = files.fileBeanList.toList(),
+                selectedFileIds = emptySet(),
+                highlightedFileId = savedHighlight,
                 currentCid = files.cid,
                 totalCount = files.count,
                 orderBean = currentOrder,

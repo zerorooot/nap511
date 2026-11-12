@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.SettingUiState
+import github.zerorooot.nap511.bean.uniqueId
 import github.zerorooot.nap511.util.FileOpener
 import github.zerorooot.nap511.util.asScrollState
 import github.zerorooot.nap511.viewmodel.FileViewModel
@@ -33,13 +34,16 @@ class FileClickHandler(
     private val onBottomBarShowChange: (Boolean) -> Unit,
     private val lastClickTime: LongArray
 ) {
-    fun handleFolderClick(i: Int, fileBean: FileBean) {
+    fun handleFolderClick(fileBean: FileBean) {
         onBottomBarShowChange(true)
         if (settingUiState.earlyLoading) {
-            listOf(i - 1, i + 1)
-                .mapNotNull { fileViewModel.fileBeanList.getOrNull(it) }
-                .filter { it.isFolder }
-                .forEach { fileViewModel.updateFileCache(it.categoryId) }
+            val i = fileViewModel.fileBeanList.indexOfFirst { it.uniqueId == fileBean.uniqueId }
+            if (i >= 0) {
+                listOf(i - 1, i + 1)
+                    .mapNotNull { fileViewModel.fileBeanList.getOrNull(it) }
+                    .filter { it.isFolder }
+                    .forEach { fileViewModel.updateFileCache(it.categoryId) }
+            }
         }
         fileViewModel.getFiles(fileBean.categoryId)
     }
@@ -89,9 +93,9 @@ class FileClickHandler(
         }
     }
 
-    fun myItemOnClick(i: Int) {
+    fun myItemOnClick(fileBean: FileBean) {
         if (fileViewModel.isLongClickState) {
-            fileViewModel.select(i)
+            fileViewModel.select(fileBean)
         } else {
             val currentTime = SystemClock.elapsedRealtime()
             if (currentTime - lastClickTime[0] < 200L) {
@@ -105,11 +109,10 @@ class FileClickHandler(
                 isExpandedScreen -> gridState.asScrollState
                 else -> listState.asScrollState
             }
-            fileViewModel.setListLocationAndClickCache(i, state)
-            val fileBean = fileViewModel.fileBeanList[i]
+            fileViewModel.setListLocationAndClickCache(fileBean, state)
 
             when {
-                fileBean.isFolder -> handleFolderClick(i, fileBean)
+                fileBean.isFolder -> handleFolderClick(fileBean)
                 fileBean.isVideo == 1 -> handleVideoClick(fileBean)
                 fileBean.fileIco == R.drawable.torrent -> handleTorrentClick(fileBean)
                 fileBean.fileIco == R.drawable.zip -> handleZipClick(fileBean)

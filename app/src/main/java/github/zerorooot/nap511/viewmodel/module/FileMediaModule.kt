@@ -6,6 +6,7 @@ import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.bean.ImageBean
 import github.zerorooot.nap511.bean.LocationBean
+import github.zerorooot.nap511.bean.uniqueId
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoStarAction
@@ -158,8 +159,11 @@ class FileMediaModule(
             val fileList = FileCacheManager.getDate(cid)?.fileBeanList
             val index = fileList?.indexOfFirst { it.pickCode == pickCode } ?: -1
             if (index >= 0) {
+                val foundBean = fileList?.get(index)
                 val paginationKey = FileListSource.folderKey(cid)
-                scrollPositionStore.setClick(paginationKey, index)
+                if (foundBean != null) {
+                    scrollPositionStore.setHighlight(paginationKey, foundBean.uniqueId)
+                }
                 scrollPositionStore.setLocation(
                     paginationKey,
                     LocationBean(firstVisibleItemIndex = index, firstVisibleItemScrollOffset = 0)
@@ -167,6 +171,9 @@ class FileMediaModule(
                 // 可能被终端页面影响。所以只有在当前目录才滚动。
                 // 无法更新非当前页的位置，未被布局，不知道非当前页面的 firstVisibleItemIndex 和 firstVisibleItemScrollOffset
                 if (cid == stateHolder.currentContentState.currentCid) {
+                    if (foundBean != null) {
+                        stateHolder.updateContentState { copy(highlightedFileId = foundBean.uniqueId) }
+                    }
                     _videoResultEvent.tryEmit(index)
                 }
             }
@@ -230,13 +237,17 @@ class FileMediaModule(
         }
     }
 
-    fun startSendAria2Service(index: Int) {
-        val fileBean = stateHolder.currentContentState.fileBeanList.getOrNull(index) ?: return
+    fun startSendAria2Service(fileBean: FileBean) {
         if (fileBean.isFolder) {
             toastProvider.showToast("暂时无法下载文件夹")
             return
         }
         serviceBridge.startSendAria2Service(fileBean)
+    }
+
+    fun startSendAria2Service(index: Int) {
+        val fileBean = stateHolder.currentContentState.fileBeanList.getOrNull(index) ?: return
+        startSendAria2Service(fileBean)
     }
 
     // ==================== 离线种子任务 ====================
@@ -266,19 +277,22 @@ class FileMediaModule(
                 stateHolder.setRefreshing(false)
                 return@onSuccess
             }
-            torrentTask.fileSizeString = torrentTask.fileSize.formatFileSize()
-            torrentTask.torrentFileListWeb.forEach { b ->
-                b.sizeString = b.size.formatFileSize()
+            val formattedList = torrentTask.torrentFileListWeb.map { b ->
+                b.copy(sizeString = b.size.formatFileSize())
             }
-            torrentCacheStore[sha1] = torrentTask
+            val formattedTask = torrentTask.copy(
+                fileSizeString = torrentTask.fileSize.formatFileSize(),
+                torrentFileListWeb = formattedList
+            )
+            torrentCacheStore[sha1] = formattedTask
             stateHolder.updateDialogState {
                 copy(
-                    torrentBean = torrentTask,
+                    torrentBean = formattedTask,
                     activeDialog = FileDialogState.CreateSelectTorrentFile
                 )
             }
 
-            XLog.d("getTorrentTask torrentTask fileSize=${torrentTask.fileSize}, fileSizeString=${torrentTask.fileSizeString}, torrentName=${torrentTask.torrentName}, fileCount=${torrentTask.fileCount}, infoHash=${torrentTask.infoHash}")
+            XLog.d("getTorrentTask torrentTask fileSize=${formattedTask.fileSize}, fileSizeString=${formattedTask.fileSizeString}, torrentName=${formattedTask.torrentName}, fileCount=${formattedTask.fileCount}, infoHash=${formattedTask.infoHash}")
             stateHolder.setRefreshing(false)
         }.onFailure {
             stateHolder.setRefreshing(false)

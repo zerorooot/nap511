@@ -2,6 +2,7 @@ package github.zerorooot.nap511.viewmodel.module
 
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.bean.uniqueId
 import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.bean.RenameBean
@@ -37,22 +38,29 @@ class FileMutatorModule(
     private val isSkipProtectedEnabled: () -> Boolean
 ) {
 
-    fun cut(index: Int = -1) {
-        val currentList = stateHolder.currentContentState.fileBeanList
-        val itemsToCut = if (index == -1) {
-            currentList.filter { it.isSelect }
+    fun cut(targetBean: FileBean? = null) {
+        val currentState = stateHolder.currentContentState
+        val itemsToCut = if (targetBean == null) {
+            currentState.fileBeanList.filter { it.uniqueId in currentState.selectedFileIds }
         } else {
-            currentList.getOrNull(index)?.let { listOf(it) } ?: emptyList()
+            listOf(targetBean)
         }
         stateHolder.updateContentState {
             copy(
                 isCutState = true,
                 cutFileList = itemsToCut,
                 isLongClickState = false,
-                fileBeanList = currentList.map { it.copy(isSelect = false) },
+                selectedFileIds = emptySet(),
                 appBarTitle = source.appName
             )
         }
+    }
+
+    fun cut(index: Int) {
+        val targetBean = if (index >= 0) {
+            stateHolder.currentContentState.fileBeanList.getOrNull(index)
+        } else null
+        cut(targetBean)
     }
 
     fun cancelCut() {
@@ -141,10 +149,10 @@ class FileMutatorModule(
                 fileBeanList = fileBeanList.map {
                     if (it.fileId in filterIds) it.copy(
                         isStar = targetStar,
-                        star = if (targetStar) 1 else 0,
-                        isSelect = false
+                        star = if (targetStar) 1 else 0
                     ) else it
                 },
+                selectedFileIds = emptySet(),
                 isLongClickState = false,
                 appBarTitle = source.appName
             )
@@ -169,7 +177,7 @@ class FileMutatorModule(
         }.onFailure { ex ->
             // UI 状态与持久化缓存同步双重回滚
             stateHolder.updateContentState {
-                copy(fileBeanList = beforeList.map { it.copy(isSelect = false) })
+                copy(fileBeanList = beforeList, selectedFileIds = emptySet())
             }
             rollbacks.forEach { it.rollback() }
             val errorMsg = ex.message ?: "${actionText}失败"
@@ -181,8 +189,8 @@ class FileMutatorModule(
     }
 
     suspend fun starMultiple() {
-        val filter =
-            stateHolder.currentContentState.fileBeanList.filter { it.isSelect }
+        val currentState = stateHolder.currentContentState
+        val filter = currentState.fileBeanList.filter { it.uniqueId in currentState.selectedFileIds }
         starMultiple(filter)
     }
 
@@ -223,8 +231,8 @@ class FileMutatorModule(
     }
 
     suspend fun topMultiple() {
-        val filter =
-            stateHolder.currentContentState.fileBeanList.filter { it.isSelect }
+        val currentState = stateHolder.currentContentState
+        val filter = currentState.fileBeanList.filter { it.uniqueId in currentState.selectedFileIds }
         topMultiple(filter)
     }
 
@@ -240,11 +248,9 @@ class FileMutatorModule(
         stateHolder.updateContentState {
             copy(
                 fileBeanList = fileBeanList.map {
-                    if (it.fileId == targetBean.fileId) it.copy(
-                        name = name,
-                        isSelect = false
-                    ) else it
+                    if (it.fileId == targetBean.fileId) it.copy(name = name) else it
                 },
+                selectedFileIds = emptySet(),
                 isLongClickState = false,
                 appBarTitle = source.appName
             )
@@ -260,7 +266,7 @@ class FileMutatorModule(
             toastProvider.showToast("重命名成功")
         }.onFailure { ex ->
             stateHolder.updateContentState {
-                copy(fileBeanList = beforeList.map { it.copy(isSelect = false) })
+                copy(fileBeanList = beforeList, selectedFileIds = emptySet())
             }
             rollback?.rollback()
             val errorMsg = ex.message ?: "重命名失败"
@@ -313,12 +319,13 @@ class FileMutatorModule(
             stateHolder.updateContentState {
                 copy(
                     isLongClickState = false,
+                    selectedFileIds = emptySet(),
                     fileBeanList = fileBeanList.map {
                         val newName = validMap[it.fileId]
                         if (newName != null) {
-                            it.copy(name = newName, isSelect = false)
+                            it.copy(name = newName)
                         } else {
-                            it.copy(isSelect = false)
+                            it
                         }
                     },
                     appBarTitle = source.appName
@@ -362,7 +369,7 @@ class FileMutatorModule(
         if (selectedFiles.isEmpty()) return
         val paginationKey = stateHolder.currentContentState.source.paginationKey
         val beforeList = stateHolder.currentContentState.fileBeanList
-        val beforeClick = scrollPositionStore.getClick(paginationKey)
+        val beforeHighlight = scrollPositionStore.getHighlight(paginationKey)
         val mapOf = hashMapOf<String, String>()
         mapOf["ignore_warn"] = "1"
         mapOf["pid"] = targetCid
@@ -375,16 +382,21 @@ class FileMutatorModule(
         // 提前删除并获取批量回滚闭包
         val selectedIds = selectedFiles.map { it.fileId }.toSet()
         val beforeTotalCount = stateHolder.currentContentState.totalCount
+        val willClearHighlight = beforeHighlight != null && beforeHighlight in selectedIds
         // 瞬时乐观更新 UI 状态并重置选择状态（同时清空可能被跳过未删条目的选中状态）
         stateHolder.updateContentState {
             copy(
-                fileBeanList = fileBeanList.filterNot { it.fileId in selectedIds }.map { it.copy(isSelect = false) },
+                fileBeanList = fileBeanList.filterNot { it.fileId in selectedIds },
                 totalCount = (totalCount - selectedFiles.size).coerceAtLeast(0),
+                selectedFileIds = emptySet(),
+                highlightedFileId = if (willClearHighlight) null else highlightedFileId,
                 isLongClickState = false,
                 appBarTitle = source.appName
             )
         }
-        scrollPositionStore.adjustClick(paginationKey, -selectedFiles.size)
+        if (willClearHighlight) {
+            scrollPositionStore.clearHighlight(paginationKey)
+        }
         // 先行更新内存与落盘，取得回滚句柄
         val rollback = FileCacheManager.removeItems(targetCid, selectedIds)
 
@@ -411,12 +423,16 @@ class FileMutatorModule(
             // 无论是接口业务返回 false 还是网络超时/断网/500，100% 触发回滚！
             stateHolder.updateContentState {
                 copy(
-                    fileBeanList = beforeList.map { it.copy(isSelect = false) },
-                    totalCount = beforeTotalCount
+                    fileBeanList = beforeList,
+                    totalCount = beforeTotalCount,
+                    selectedFileIds = emptySet(),
+                    highlightedFileId = beforeHighlight
                 )
             }
             rollback?.rollback()
-            scrollPositionStore.setClick(paginationKey, beforeClick)
+            if (beforeHighlight != null) {
+                scrollPositionStore.setHighlight(paginationKey, beforeHighlight)
+            }
             val errorMsg = ex.message ?: "网络异常，删除失败"
             toastProvider.showToast(errorMsg)
             XLog.e("deleteMultiple failed, rolled back", ex)
@@ -424,7 +440,8 @@ class FileMutatorModule(
     }
 
     suspend fun deleteMultiple() {
-        val filter = stateHolder.currentContentState.fileBeanList.filter { it.isSelect }
+        val currentState = stateHolder.currentContentState
+        val filter = currentState.fileBeanList.filter { it.uniqueId in currentState.selectedFileIds }
         if (filter.isEmpty()) return
 
         val currentCid = stateHolder.currentContentState.currentCid
@@ -444,7 +461,7 @@ class FileMutatorModule(
             // 全部受保护，不向远端提交删除，仅退出多选状态并提示用户
             stateHolder.updateContentState {
                 copy(
-                    fileBeanList = fileBeanList.map { it.copy(isSelect = false) },
+                    selectedFileIds = emptySet(),
                     isLongClickState = false,
                     appBarTitle = source.appName
                 )
@@ -546,7 +563,7 @@ class FileMutatorModule(
     }
 
     fun openBatchRenameDialog() {
-        val hasSelected = stateHolder.currentContentState.fileBeanList.any { it.isSelect }
+        val hasSelected = stateHolder.currentContentState.selectedFileIds.isNotEmpty()
         if (!hasSelected) {
             toastProvider.showToast("请先选择需要重命名的文件")
             return
@@ -565,7 +582,8 @@ class FileMutatorModule(
      * 3. selectedCount == 0 -> 提示请先选择。
      */
     fun onMultiSelectRename() {
-        val selectedItems = stateHolder.currentContentState.fileBeanList.filter { it.isSelect }
+        val currentState = stateHolder.currentContentState
+        val selectedItems = currentState.fileBeanList.filter { it.uniqueId in currentState.selectedFileIds }
         when (selectedItems.size) {
             0 -> toastProvider.showToast("请先选择需要重命名的文件")
             1 -> {

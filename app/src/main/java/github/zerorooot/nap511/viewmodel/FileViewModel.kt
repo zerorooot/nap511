@@ -12,6 +12,7 @@ import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileContentUiState
 import github.zerorooot.nap511.bean.FileDialogUiState
 import github.zerorooot.nap511.bean.LocationBean
+import github.zerorooot.nap511.bean.uniqueId
 import github.zerorooot.nap511.bean.NavEvent
 import github.zerorooot.nap511.bean.OrderBean
 import github.zerorooot.nap511.bean.PathBean
@@ -115,6 +116,13 @@ class FileViewModel(
         toastProvider.showToast("设置默认离线位置为: $name")
     }
 
+    fun setDefaultOfflinePath(fileBean: FileBean) {
+        val currentState = contentState.value
+        val pathString =
+            currentState.pathList.joinToString(separator = "/") { it.name } + "/${fileBean.name}"
+        setDefaultOfflinePath(fileBean.name, fileBean.categoryId, pathString)
+    }
+
     fun checkAndSaveAria2(url: String, token: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val result = authRepository.checkAndSaveAria2(url, token)
@@ -141,11 +149,15 @@ class FileViewModel(
     /** 二级 Compose SnapshotStateMap：外层按目录 cid 隔离，内层按文件 pickCode 触发列表单条目精准重组 */
     val imageBeanCache get() = imageCacheStore.imageBeanCache
 
-    /** 记录各目录最后点击项的索引位置 (供 FileScreen 观察维持滚动定位) */
-    val clickMap: ConcurrentHashMap<String, Int> get() = scrollPositionStore.clicks
+    /** 记录各目录最后点击项的唯一标识 (供 FileScreen 观察维持滚动定位) */
+    val clickMap: ConcurrentHashMap<String, String> get() = scrollPositionStore.clicks
 
     // 便捷只读属性访问器（对齐原有 UI/外部组件调用）
     val fileBeanList: List<FileBean> get() = contentState.value.fileBeanList
+    val selectedFiles: List<FileBean>
+        get() = contentState.value.let { state ->
+            state.fileBeanList.filter { it.uniqueId in state.selectedFileIds }
+        }
     val currentCid: String get() = contentState.value.currentCid
     val pathList: List<PathBean> get() = contentState.value.pathList
     val isLongClickState: Boolean get() = contentState.value.isLongClickState
@@ -174,7 +186,8 @@ class FileViewModel(
         stringProvider = stringProvider,
         coilCacheCleaner = coilCacheCleaner,
         settingUiStateFlow = settingUiStateFlow,
-        toastProvider = toastProvider
+        toastProvider = toastProvider,
+        scrollPositionStore = scrollPositionStore
     )
 
     val mutatorModule = FileMutatorModule(
@@ -283,13 +296,19 @@ class FileViewModel(
     fun getListLocation(key: String): LocationBean =
         scrollPositionStore.getLocation(key)
 
-    fun setListLocationAndClickCache(index: Int, state: LazyScrollState) {
+    fun setListLocationAndClickCache(fileBean: FileBean, state: LazyScrollState) {
         val paginationKey = contentState.value.source.paginationKey
-        scrollPositionStore.setClick(paginationKey, index)
+        scrollPositionStore.setHighlight(paginationKey, fileBean.uniqueId)
+        stateHolder.updateContentState { copy(highlightedFileId = fileBean.uniqueId) }
         scrollPositionStore.setLocation(
             paginationKey,
             LocationBean(state.firstVisibleItemIndex, state.firstVisibleItemScrollOffset)
         )
+    }
+
+    fun setListLocationAndClickCache(index: Int, state: LazyScrollState) {
+        val fileBean = fileBeanList.getOrNull(index) ?: return
+        setListLocationAndClickCache(fileBean, state)
     }
 
     // 状态与弹窗控制
@@ -360,12 +379,14 @@ class FileViewModel(
         mutatorModule.topFile(fileBean)
     }
 
+    fun select(fileBean: FileBean) = browserModule.select(fileBean)
     fun select(index: Int) = browserModule.select(index)
     fun selectToUp() = browserModule.selectToUp()
     fun selectToDown() = browserModule.selectToDown()
     fun selectReverse() = browserModule.selectReverse()
     fun toggleSelectAll() = browserModule.toggleSelectAll()
     fun clearSelection() = browserModule.clearSelection()
+    fun startMultiSelect(fileBean: FileBean) = browserModule.startMultiSelect(fileBean)
     fun startMultiSelect(index: Int) = browserModule.startMultiSelect(index)
     fun recoverFromLongPress() = browserModule.recoverFromLongPress()
 
@@ -387,7 +408,8 @@ class FileViewModel(
         syncModule.deleteOrphansAndExpiredFile()
     }
 
-    fun cut(index: Int = -1) = mutatorModule.cut(index)
+    fun cut(targetBean: FileBean? = null) = mutatorModule.cut(targetBean)
+    fun cut(index: Int) = mutatorModule.cut(index)
     fun cancelCut() = mutatorModule.cancelCut()
     fun removeFile() = viewModelScope.launch { mutatorModule.removeFile() }
     fun confirmDiscardVideos(discardList: List<VideoBean>, targetCid: String) =
@@ -410,6 +432,7 @@ class FileViewModel(
         mediaModule.onVideoActivityResult(pickCode, cid, map, starList)
     }
 
+    fun startSendAria2Service(fileBean: FileBean) = mediaModule.startSendAria2Service(fileBean)
     fun startSendAria2Service(index: Int) = mediaModule.startSendAria2Service(index)
     fun getTorrentTask(sha1: String) = viewModelScope.launch { mediaModule.getTorrentTask(sha1) }
     fun addTorrentTask(

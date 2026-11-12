@@ -105,6 +105,8 @@ data class FileContentUiState(
     val currentCid: String = "0",
     val pathList: List<PathBean> = emptyList(),
     val fileBeanList: List<FileBean> = emptyList(),
+    val selectedFileIds: Set<String> = emptySet(),
+    val highlightedFileId: String? = null,
     val isRefreshing: Boolean = false,
     val appBarTitle: String,
     val orderBean: OrderBean = OrderBean(OrderEnum.name, 1),
@@ -127,10 +129,10 @@ data class FileContentUiState(
         get() = source !is FileListSource.Folder
 
     val selectedCount: Int
-        get() = fileBeanList.count { it.isSelect }
+        get() = selectedFileIds.size
 
     val isAllSelected: Boolean
-        get() = fileBeanList.isNotEmpty() && fileBeanList.all { it.isSelect }
+        get() = fileBeanList.isNotEmpty() && fileBeanList.all { it.uniqueId in selectedFileIds }
 }
 
 /**
@@ -151,6 +153,7 @@ data class FileDialogUiState(
 /**
  * Scaffold 页面状态封装
  */
+@Immutable
 data class FileScaffoldState(
     val isLongClickState: Boolean,
     val appBarTitle: String,
@@ -171,6 +174,7 @@ data class FileScaffoldState(
 /**
  * Scaffold 页面交互事件封装
  */
+@Immutable
 data class FileScaffoldActions(
     val onAppBarClick: (AppBarAction) -> Unit,
     val onMusicDetailNav: () -> Unit,
@@ -182,12 +186,12 @@ data class FileScaffoldActions(
 /**
  * 文件列表/网格数据状态封装
  */
+@Immutable
 data class FileListDataState(
     val currentCid: String,
     val pathList: List<PathBean>,
-    val fileBeanList: List<FileBean>,
+    val fileItemList: List<FileItemUiModel>,
     val refreshing: Boolean,
-    val clickIndex: Int,
     val imageCache: Map<String, ImageBean>? = null,
     /**
      * 当前列表对应的数据源唯一分页键（如 folder:0, search:0:keyword, filter:0:1）
@@ -200,6 +204,7 @@ data class FileListDataState(
 /**
  * 权限与系统提示 Banner 状态封装
  */
+@Immutable
 data class FileBannerState(
     val isNotificationEnabled: Boolean,
     val isNotificationBannerDismissed: Boolean,
@@ -210,6 +215,7 @@ data class FileBannerState(
 /**
  * 文件列表布局与显示配置封装
  */
+@Immutable
 data class FileDisplayConfig(
     val isExpandedScreen: Boolean,
     val isPreviewActive: Boolean,
@@ -220,6 +226,7 @@ data class FileDisplayConfig(
 /**
  * 列表/网格滚动状态封装
  */
+@Immutable
 data class FileListScrollState(
     val listState: LazyListState,
     val gridState: LazyGridState,
@@ -229,6 +236,7 @@ data class FileListScrollState(
 /**
  * Banner 交互事件封装
  */
+@Immutable
 data class FileBannerActions(
     val onOpenNotificationSettings: () -> Unit,
     val onDismissNotificationBanner: () -> Unit,
@@ -239,6 +247,7 @@ data class FileBannerActions(
 /**
  * 路径栏交互事件封装
  */
+@Immutable
 data class FilePathActions(
     val onPathClick: () -> Unit,
     val onPathDoubleClick: () -> Unit,
@@ -249,26 +258,28 @@ data class FilePathActions(
 /**
  * 文件列表项交互事件封装
  */
+@Immutable
 data class FileItemActions(
     val onRefresh: () -> Unit,
-    val onItemClick: (Int) -> Unit,
-    val onItemLongClick: (Int) -> Unit,
-    val onCut: (Int) -> Unit,
+    val onItemClick: (FileBean) -> Unit,
+    val onItemLongClick: (FileBean) -> Unit,
+    val onCut: (FileBean) -> Unit,
     val onUnzip: (FileBean) -> Unit,
     val onDelete: (FileBean) -> Unit,
     val onStar: (FileBean) -> Unit,
     val onTop: (FileBean) -> Unit = {},
-    val onRename: (Int) -> Unit,
+    val onRename: (FileBean) -> Unit,
     val onFileInfo: (FileBean) -> Unit,
     val onSetOfflineCid: (FileBean) -> Unit,
-    val onAria2Download: (Int) -> Unit,
-    val onForceOpen: (Int) -> Unit,
+    val onAria2Download: (FileBean) -> Unit,
+    val onForceOpen: (FileBean) -> Unit,
     val onLoadImage: ((FileBean) -> Unit)? = null
 )
 
 /**
  * 文件内容区域 UI 交互事件总封装
  */
+@Immutable
 data class FileContentActions(
     val bannerActions: FileBannerActions,
     val pathActions: FilePathActions,

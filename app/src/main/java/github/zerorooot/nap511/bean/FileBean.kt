@@ -41,12 +41,13 @@ enum class ForceOpenType(
     TORRENT("种子", Icons.AutoMirrored.Filled.InsertDriveFile)
 }
 
+@Immutable
 data class FilesBean(
-    @SerializedName("data") var fileBeanList: ArrayList<FileBean>,
-    var cid: String,
-    var count: Int,
-    var order: String,
-    var path: List<PathBean>,
+    @SerializedName("data") val fileBeanList: List<FileBean> = emptyList(),
+    val cid: String = "",
+    val count: Int = 0,
+    val order: String = "",
+    val path: List<PathBean> = emptyList(),
     /**
      * is_asc = 1：升序（正序，从小到大 / A-Z / 从旧到新）。
      *
@@ -153,10 +154,10 @@ data class OrderBean(
     }
 }
 
-data class QuotaBean(var count: Int, var surplus: Int)
-data class PathBean(var cid: String, var name: String, var pid: String)
+data class QuotaBean(val count: Int, val surplus: Int)
+data class PathBean(val cid: String, val name: String, val pid: String)
 
-data class LocationBean(var firstVisibleItemIndex: Int, var firstVisibleItemScrollOffset: Int)
+data class LocationBean(val firstVisibleItemIndex: Int, val firstVisibleItemScrollOffset: Int)
 
 // 告诉 Compose 编译器此类是稳定的，无需重复绘制未变动的 Item
 @Immutable
@@ -219,25 +220,31 @@ data class FileBean(
     val playLongRatio: String = "",
     val isStar: Boolean = false,
     val sizeString: String = "",
-    val isSelect: Boolean = false,
     // 标记为 @Transient，避免 Gson 保存到磁盘 json 中
     @Transient val fileIco: Int = R.drawable.other
 ) : Parcelable
 
+/**
+ * 文件唯一业务标识（兼容常规文件、文件夹与离线预览条目）
+ */
+val FileBean.uniqueId: String
+    get() = fileId.ifEmpty { categoryId.ifEmpty { pickCode } }
+
+@Immutable
 data class FileInfo(
-    @SerializedName("count") var count: String = "",
-    @SerializedName("size") var size: String = "",
-    @SerializedName("folder_count") var folderCount: String = "",
-    @SerializedName("ptime") var createTime: String = "",
-    @SerializedName("utime") var changeTime: String = "",
-    @SerializedName("play_long") var playLong: Int = 0,
-    @SerializedName("file_name") var fileName: String = "",
-    @SerializedName("pick_code") var pickCode: String = "",
-    @SerializedName("sha1") var sha1: String = "",
-    @SerializedName("open_time") var openTime: Int = 0,
-    @SerializedName("desc") var desc: String = "",
-    @SerializedName("file_category") var fileCategory: String = "",
-    var paths: List<PathsBean> = emptyList()
+    @SerializedName("count") val count: String = "",
+    @SerializedName("size") val size: String = "",
+    @SerializedName("folder_count") val folderCount: String = "",
+    @SerializedName("ptime") val createTime: String = "",
+    @SerializedName("utime") val changeTime: String = "",
+    @SerializedName("play_long") val playLong: Int = 0,
+    @SerializedName("file_name") val fileName: String = "",
+    @SerializedName("pick_code") val pickCode: String = "",
+    @SerializedName("sha1") val sha1: String = "",
+    @SerializedName("open_time") val openTime: Int = 0,
+    @SerializedName("desc") val desc: String = "",
+    @SerializedName("file_category") val fileCategory: String = "",
+    val paths: List<PathsBean> = emptyList()
 )
 
 data class InfoSection(

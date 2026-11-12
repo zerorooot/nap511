@@ -76,11 +76,12 @@ class DefaultAuthRepository(
                 val type = object : TypeToken<Base115Response<AvatarBean>>() {}.type
                 val result = gson.fromJson<Base115Response<AvatarBean>>(bodyStr, type)
 
-                val avatarBean = result?.data ?: error("验证失败，请重试")
+                val rawAvatarBean = result?.data ?: error("验证失败，请重试")
 
-                avatarBean.expireString = Instant.ofEpochSecond(avatarBean.expire)
+                val expireString = Instant.ofEpochSecond(rawAvatarBean.expire)
                     .atZone(ZoneId.systemDefault())
                     .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                val avatarBean = rawAvatarBean.copy(expireString = expireString)
 
                 // 纯内存态更新 UserSession
                 UserSessionManager.updateSession(cookie, avatarBean.userId)

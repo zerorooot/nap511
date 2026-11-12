@@ -56,7 +56,8 @@ class AutoTagInterceptor(
 class App : Application(), ImageLoaderFactory, Configuration.Provider {
 
     /** 应用级依赖注入容器，支持测试环境动态替换为 FakeAppContainer */
-    var container: AppContainer = DefaultAppContainer(this)
+    lateinit var container: AppContainer
+        private set
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -68,6 +69,7 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
         // 长按/选中后剪切、复制、粘贴点击无效。回退到旧实现规避该回归。
         ComposeFoundationFlags.isNewContextMenuEnabled = false
         super.onCreate()
+        container = DefaultAppContainer(this)
 
         // 预热 SettingsRepository，在应用进程启动时即触发后台异步预读 DataStore
         val settingsRepository = container.settingsRepository

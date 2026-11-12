@@ -25,6 +25,7 @@ import github.zerorooot.nap511.bean.SignBean
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.UploadBean
 import github.zerorooot.nap511.bean.VideoInfoBean
+import github.zerorooot.nap511.bean.ZipBean
 import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.service.FileService
@@ -500,40 +501,42 @@ open class FileRepository {
         return false
     }
 
+    private fun formatZipBean(bean: ZipBean): ZipBean {
+        if (bean.fileCategory == 0) {
+            return bean.copy(fileIco = R.drawable.folder)
+        }
+        val timeStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
+            bean.time.toLong() * 1000
+        )
+        val sizeStr = bean.size.formatFileSize()
+        val ico = when (bean.icoString) {
+            "apk" -> R.drawable.apk
+            "iso" -> R.drawable.iso
+            "zip", "7z", "rar" -> R.drawable.zip
+            "png", "jpg" -> R.drawable.png
+            "mp3" -> R.drawable.mp3
+            "txt" -> R.drawable.txt
+            "torrent" -> R.drawable.torrent
+            else -> R.drawable.other
+        }
+        return bean.copy(fileIco = ico, timeString = timeStr, sizeString = sizeStr)
+    }
+
     suspend fun getZipListFile(
-        pickCode: String, fileName: String = "", paths: String = "文件"
+        pickCode: String,
+        fileName: String = "",
+        paths: String = "文件"
     ): ZipBeanList {
         val zipListFile = fileService.getZipListFile(pickCode, fileName, paths)
         val data = zipListFile.getAsJsonObject("data")
         XLog.d("FileRepository.getZipListFile $zipListFile")
 
-        val zipBeanList = Gson().fromJson(data, ZipBeanList::class.java)
+        val rawZipBeanList = Gson().fromJson(data, ZipBeanList::class.java) ?: ZipBeanList()
         val sj = StringJoiner("/")
-        data.getAsJsonArray("paths").forEach { sj.add(it.asJsonObject.get("file_name").asString) }
-        zipBeanList.pathString = sj.toString()
-        zipBeanList.list.forEach { i ->
-            if (i.fileCategory == 0) {
-                i.fileIco = R.drawable.folder
-            } else {
-                i.timeString = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
-                    i.time.toLong() * 1000
-                )
-                i.sizeString = i.size.formatFileSize() + "  "
-                when (i.icoString) {
-                    "apk" -> i.fileIco = R.drawable.apk
-                    "iso" -> i.fileIco = R.drawable.iso
-                    "zip" -> i.fileIco = R.drawable.zip
-                    "7z" -> i.fileIco = R.drawable.zip
-                    "rar" -> i.fileIco = R.drawable.zip
-                    "png" -> i.fileIco = R.drawable.png
-                    "jpg" -> i.fileIco = R.drawable.png
-                    "mp3" -> i.fileIco = R.drawable.mp3
-                    "txt" -> i.fileIco = R.drawable.txt
-                    "torrent" -> i.fileIco = R.drawable.torrent
-                }
-            }
-        }
-        return zipBeanList
+        data.getAsJsonArray("paths")?.forEach { sj.add(it.asJsonObject.get("file_name").asString) }
+        val pathStr = sj.toString()
+        val formattedItems = rawZipBeanList.list.map { formatZipBean(it) }
+        return rawZipBeanList.copy(pathString = pathStr, list = formattedItems)
     }
 
 

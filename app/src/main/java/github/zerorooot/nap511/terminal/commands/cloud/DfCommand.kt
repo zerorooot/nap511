@@ -14,7 +14,6 @@ import github.zerorooot.nap511.terminal.viewmodel.emitText
 import github.zerorooot.nap511.util.formatFileSize
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import java.util.Locale
 
 /**
  * 网盘空间配额查看命令（df）

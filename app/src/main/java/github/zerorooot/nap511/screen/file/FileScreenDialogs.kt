@@ -2,7 +2,6 @@ package github.zerorooot.nap511.screen.file
 
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -12,6 +11,7 @@ import github.zerorooot.nap511.bean.FileDialogState
 import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.bean.Route
 import github.zerorooot.nap511.bean.SettingUiState
+import github.zerorooot.nap511.bean.uniqueId
 import github.zerorooot.nap511.dialog.Aria2Dialog
 import github.zerorooot.nap511.dialog.BatchRenameDialog
 import github.zerorooot.nap511.dialog.CreateFolderDialog
@@ -24,7 +24,6 @@ import github.zerorooot.nap511.dialog.SearchDialog
 import github.zerorooot.nap511.dialog.UnzipAllFile
 import github.zerorooot.nap511.dialog.UnzipDialog
 import github.zerorooot.nap511.dialog.UnzipPassword
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.viewmodel.FileViewModel
 
@@ -82,7 +81,7 @@ fun CreateDialogs(
             val orderBean = fileViewModel.currentOrderBean
             val currentFcMix = fileViewModel.currentFilesBeanFcMix
             val showStarOrder =
-                fileViewModel.contentState.collectAsState().value.source is FileListSource.Star
+                fileViewModel.contentState.collectAsStateWithLifecycle().value.source is FileListSource.Star
             FileOrderDialog(
                 selectOrderBean = orderBean,
                 initialFcMix = currentFcMix,
@@ -175,8 +174,8 @@ fun CreateDialogs(
 
         is FileDialogState.BatchRename -> {
             val contentState by fileViewModel.contentState.collectAsStateWithLifecycle()
-            val selectedFiles = remember(contentState.fileBeanList) {
-                contentState.fileBeanList.filter { it.isSelect }
+            val selectedFiles = remember(contentState.fileBeanList, contentState.selectedFileIds) {
+                contentState.fileBeanList.filter { it.uniqueId in contentState.selectedFileIds }
             }
             if (selectedFiles.isNotEmpty()) {
                 BatchRenameDialog(

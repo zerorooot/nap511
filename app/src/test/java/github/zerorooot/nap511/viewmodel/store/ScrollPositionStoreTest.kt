@@ -16,11 +16,11 @@ class ScrollPositionStoreTest {
     }
 
     @Test
-    fun `test initial state returns default location and click`() {
+    fun `test initial state returns default location and empty highlight`() {
         val location = store.getLocation(FileListSource.folderKey("0"))
         assertEquals(0, location.firstVisibleItemIndex)
         assertEquals(0, location.firstVisibleItemScrollOffset)
-        assertEquals(0, store.getClick(FileListSource.folderKey("0")))
+        assertEquals(null, store.getHighlight(FileListSource.folderKey("0")))
     }
 
     @Test
@@ -39,20 +39,19 @@ class ScrollPositionStoreTest {
     }
 
     @Test
-    fun `test set and get click`() {
-        store.setClick(FileListSource.folderKey("1"), 8)
-        assertEquals(8, store.getClick(FileListSource.folderKey("1")))
-        assertEquals(0, store.getClick(FileListSource.folderKey("2")))
+    fun `test set and get highlight`() {
+        store.setHighlight(FileListSource.folderKey("1"), "fid_1001")
+        assertEquals("fid_1001", store.getHighlight(FileListSource.folderKey("1")))
+        assertEquals(null, store.getHighlight(FileListSource.folderKey("2")))
     }
 
     @Test
-    fun `test adjustClick delta calculation`() {
-        store.setClick(FileListSource.folderKey("1"), 5)
-        store.adjustClick(FileListSource.folderKey("1"), -1)
-        assertEquals(4, store.getClick(FileListSource.folderKey("1")))
+    fun `test clearHighlight removes specific highlight`() {
+        store.setHighlight(FileListSource.folderKey("1"), "fid_1001")
+        assertEquals("fid_1001", store.getHighlight(FileListSource.folderKey("1")))
 
-        store.adjustClick(FileListSource.folderKey("1"), 2)
-        assertEquals(6, store.getClick(FileListSource.folderKey("1")))
+        store.clearHighlight(FileListSource.folderKey("1"))
+        assertEquals(null, store.getHighlight(FileListSource.folderKey("1")))
     }
 
     @Test
@@ -63,21 +62,18 @@ class ScrollPositionStoreTest {
         assertEquals(20, retrieved.firstVisibleItemIndex)
         assertEquals(80, retrieved.firstVisibleItemScrollOffset)
 
-        store.setClick("category:video", 12)
-        assertEquals(12, store.getClick("category:video"))
-
-        store.adjustClick("category:video", -2)
-        assertEquals(10, store.getClick("category:video"))
+        store.setHighlight("category:video", "fid_video_99")
+        assertEquals("fid_video_99", store.getHighlight("category:video"))
     }
 
     @Test
     fun `test clear resets all data`() {
         store.setLocation(FileListSource.folderKey("1"), LocationBean(5, 50))
-        store.setClick(FileListSource.folderKey("1"), 3)
+        store.setHighlight(FileListSource.folderKey("1"), "fid_1001")
 
         store.clear()
 
         assertEquals(0, store.getLocation(FileListSource.folderKey("1")).firstVisibleItemIndex)
-        assertEquals(0, store.getClick(FileListSource.folderKey("1")))
+        assertEquals(null, store.getHighlight(FileListSource.folderKey("1")))
     }
 }

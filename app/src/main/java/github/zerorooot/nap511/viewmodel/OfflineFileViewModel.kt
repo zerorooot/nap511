@@ -198,8 +198,8 @@ class OfflineFileViewModel(
         type: OfflineTaskType
     ): OfflineInfo {
         val result = fileRepository.getOfflineTaskList(uid, sign, 1, type)
-        setTaskInfo(result.tasks)
-        return result
+        val formattedTasks = result.tasks.map { formatOfflineTask(it) }
+        return result.copy(tasks = formattedTasks)
     }
 
     /**
@@ -235,7 +235,11 @@ class OfflineFileViewModel(
         }
         if (currentPage == maxPage) {
             toastProvider.showToast("加载完毕")
-            offlineInfo.isLoadedComplete = true
+            when (type) {
+                OfflineTaskType.DownloadingList -> downloadingTask = downloadingTask.copy(isLoadedComplete = true)
+                OfflineTaskType.FailedList -> failedTask = failedTask.copy(isLoadedComplete = true)
+                OfflineTaskType.CompletedList -> completedTask = completedTask.copy(isLoadedComplete = true)
+            }
             return
         }
 
@@ -247,10 +251,9 @@ class OfflineFileViewModel(
                 val nextPage = currentPage + 1
                 val res = fileRepository.getOfflineTaskList(uid, sign, nextPage, type)
                 if (res.state) {
-                    // 仅处理新拉取的数据，降低重复格式化开销
-                    setTaskInfo(res.tasks)
+                    val formattedTasks = res.tasks.map { formatOfflineTask(it) }
                     // 5. 追加新数据并更新页码
-                    applyTaskResult(type, res)
+                    applyTaskResult(type, res.copy(tasks = formattedTasks))
                 }
             }.onFailureToastAndLog(toastProvider, customMsg = "加载下一页失败")
             _isRefreshing.value = false
@@ -288,28 +291,21 @@ class OfflineFileViewModel(
     fun loadMoreFailedTasks() = getMoreTaskList(failedTask, OfflineTaskType.FailedList)
     fun loadMoreCompletedTasks() = getMoreTaskList(completedTask, OfflineTaskType.CompletedList)
 
-    private fun setTaskInfo(tasks: List<OfflineTask>) {
-        tasks.forEach { offlineTask ->
-            offlineTask.timeString =
-                SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
-                    offlineTask.addTime * 1000
-                )
-            offlineTask.sizeString = offlineTask.size.formatFileSize()
-            offlineTask.percentString = when (offlineTask.status) {
-                2 -> {
-                    //下载成功
-                    "✅下载成功"
-                }
-
-                -1 -> {
-                    "❎下载失败"
-                }
-
-                else -> {
-                    "⬇${offlineTask.percentDone.toInt()}%"
-                }
-            }
+    private fun formatOfflineTask(task: OfflineTask): OfflineTask {
+        val timeString = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
+            task.addTime * 1000
+        )
+        val sizeString = task.size.formatFileSize()
+        val percentString = when (task.status) {
+            2 -> "✅下载成功"
+            -1 -> "❎下载失败"
+            else -> "⬇${task.percentDone.toInt()}%"
         }
+        return task.copy(
+            timeString = timeString,
+            sizeString = sizeString,
+            percentString = percentString
+        )
     }
 
     fun clearFinish() {

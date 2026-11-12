@@ -36,7 +36,7 @@ val VIDEO_EXTS = setOf(
 )
 
 // 2. 改造函数：入参和返回值均为 List，利用 .map() 生成全新的不可变列表
-fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
+fun formatFileBeanList(fileBeanList: List<FileBean>): List<FileBean> {
     // 复用同一个 SimpleDateFormat 实例
     val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
 
@@ -77,7 +77,7 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
             }
         } else {
             sizeString = fileBean.sizeString.ifBlank {
-                (fileBean.size.toLongOrNull() ?: 0L).formatFileSize() + " "
+                (fileBean.size.toLongOrNull() ?: 0L).formatFileSize()
             }
             timeString = fileBean.time
 
@@ -141,7 +141,7 @@ fun formatFileBeanList(fileBeanList: List<FileBean>): ArrayList<FileBean> {
             isStar = isStar,
             isPinned = isPinned
         )
-    }.toMutableList() as ArrayList<FileBean>
+    }
 }
 
 @SuppressLint("DefaultLocale")

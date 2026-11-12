@@ -162,7 +162,6 @@ class FileBrowserModuleTest {
         id: String,
         name: String,
         isFolder: Boolean = false,
-        isSelect: Boolean = false,
         star: Int = -1,
         playLong: Double = 0.0
     ): FileBean {
@@ -170,7 +169,6 @@ class FileBrowserModuleTest {
             fileId = id,
             name = name,
             isFolder = isFolder,
-            isSelect = isSelect,
             pickCode = "pick_$id",
             star = star,
             isStar = star == 1,
@@ -188,16 +186,16 @@ class FileBrowserModuleTest {
 
         // 切换第 0 项选中
         module.toggleSelect(0)
-        var list = stateHolder.currentContentState.fileBeanList
-        assertTrue(list[0].isSelect)
-        assertFalse(list[1].isSelect)
-        assertEquals("1", stateHolder.currentContentState.appBarTitle)
+        var content = stateHolder.currentContentState
+        assertTrue(content.selectedFileIds.contains("1"))
+        assertFalse(content.selectedFileIds.contains("2"))
+        assertEquals("1", content.appBarTitle)
 
         // 再次切换，取消选中
         module.toggleSelect(0)
-        list = stateHolder.currentContentState.fileBeanList
-        assertFalse(list[0].isSelect)
-        assertEquals("0", stateHolder.currentContentState.appBarTitle)
+        content = stateHolder.currentContentState
+        assertFalse(content.selectedFileIds.contains("1"))
+        assertEquals("0", content.appBarTitle)
     }
 
     @Test
@@ -211,31 +209,34 @@ class FileBrowserModuleTest {
         // 启动长按多选
         module.startMultiSelect(1)
         var content = stateHolder.currentContentState
-        assertTrue(content.fileBeanList[1].isSelect)
+        assertTrue(content.selectedFileIds.contains("2"))
         assertTrue(content.isLongClickState)
         assertEquals("1", content.appBarTitle)
 
         // 清空选择
         module.clearSelection()
         content = stateHolder.currentContentState
-        assertFalse(content.fileBeanList.any { it.isSelect })
+        assertTrue(content.selectedFileIds.isEmpty())
         assertFalse(content.isLongClickState)
         assertEquals("nap511", content.appBarTitle)
     }
 
     @Test
     fun `test selectReverse`() {
-        val item1 = createFileBean("1", "item1", isSelect = true)
-        val item2 = createFileBean("2", "item2", isSelect = false)
+        val item1 = createFileBean("1", "item1")
+        val item2 = createFileBean("2", "item2")
         stateHolder.updateContentState {
-            copy(fileBeanList = listOf(item1, item2))
+            copy(
+                fileBeanList = listOf(item1, item2),
+                selectedFileIds = setOf("1")
+            )
         }
 
         module.selectReverse()
-        val list = stateHolder.currentContentState.fileBeanList
-        assertFalse(list[0].isSelect)
-        assertTrue(list[1].isSelect)
-        assertEquals("1", stateHolder.currentContentState.appBarTitle)
+        val content = stateHolder.currentContentState
+        assertFalse(content.selectedFileIds.contains("1"))
+        assertTrue(content.selectedFileIds.contains("2"))
+        assertEquals("1", content.appBarTitle)
     }
 
 
@@ -251,14 +252,14 @@ class FileBrowserModuleTest {
         var content = stateHolder.currentContentState
         assertTrue(content.isLongClickState)
         assertEquals("3", content.appBarTitle)
-        assertTrue(content.fileBeanList.all { it.isSelect })
+        assertEquals(setOf("1", "2", "3"), content.selectedFileIds)
 
         // 第二次调用：已全选 -> 0 项选中（保持多选态，不自动退出）
         module.toggleSelectAll()
         content = stateHolder.currentContentState
         assertTrue(content.isLongClickState)
         assertEquals("0", content.appBarTitle)
-        assertTrue(content.fileBeanList.none { it.isSelect })
+        assertTrue(content.selectedFileIds.isEmpty())
 
         // 在 0 选状态下调用 back：应正确退出多选模式
         val backResult = module.back()
@@ -272,33 +273,35 @@ class FileBrowserModuleTest {
         val items = (0..4).map { createFileBean(it.toString(), "item$it") }
         stateHolder.updateContentState {
             // 将中间索引 2 选中
-            copy(fileBeanList = items.mapIndexed { idx, item ->
-                if (idx == 2) item.copy(isSelect = true) else item
-            })
+            copy(
+                fileBeanList = items,
+                selectedFileIds = setOf("2")
+            )
         }
 
         // 向下全选：索引 2 之后全选
         module.selectToDown()
-        var list = stateHolder.currentContentState.fileBeanList
-        assertFalse(list[0].isSelect)
-        assertFalse(list[1].isSelect)
-        assertTrue(list[2].isSelect)
-        assertTrue(list[3].isSelect)
-        assertTrue(list[4].isSelect)
+        var content = stateHolder.currentContentState
+        assertFalse(content.selectedFileIds.contains("0"))
+        assertFalse(content.selectedFileIds.contains("1"))
+        assertTrue(content.selectedFileIds.contains("2"))
+        assertTrue(content.selectedFileIds.contains("3"))
+        assertTrue(content.selectedFileIds.contains("4"))
 
         // 重新设置仅索引 2 选中并向上全选
         stateHolder.updateContentState {
-            copy(fileBeanList = items.mapIndexed { idx, item ->
-                if (idx == 2) item.copy(isSelect = true) else item
-            })
+            copy(
+                fileBeanList = items,
+                selectedFileIds = setOf("2")
+            )
         }
         module.selectToUp()
-        list = stateHolder.currentContentState.fileBeanList
-        assertTrue(list[0].isSelect)
-        assertTrue(list[1].isSelect)
-        assertTrue(list[2].isSelect)
-        assertFalse(list[3].isSelect)
-        assertFalse(list[4].isSelect)
+        content = stateHolder.currentContentState
+        assertTrue(content.selectedFileIds.contains("0"))
+        assertTrue(content.selectedFileIds.contains("1"))
+        assertTrue(content.selectedFileIds.contains("2"))
+        assertFalse(content.selectedFileIds.contains("3"))
+        assertFalse(content.selectedFileIds.contains("4"))
     }
 
     @Test

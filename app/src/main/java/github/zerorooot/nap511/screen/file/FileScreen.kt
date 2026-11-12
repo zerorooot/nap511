@@ -43,10 +43,13 @@ import coil.imageLoader
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBannerActions
 import github.zerorooot.nap511.bean.FileBannerState
+import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileContentActions
 import github.zerorooot.nap511.bean.FileDisplayConfig
 import github.zerorooot.nap511.bean.FileItemActions
+import github.zerorooot.nap511.bean.FileItemUiModel
 import github.zerorooot.nap511.bean.FileListDataState
+import github.zerorooot.nap511.bean.uniqueId
 import github.zerorooot.nap511.bean.FileListScrollState
 import github.zerorooot.nap511.bean.FileListSource
 import github.zerorooot.nap511.bean.FilePathActions
@@ -98,7 +101,7 @@ fun FileScreen(
     val refreshing = contentState.isRefreshing
     val context = LocalContext.current
     val toastProvider = LocalToastProvider.current
-    var showForceOpenDialog by rememberSaveable { mutableIntStateOf(-1) }
+    var showForceOpenDialogBean by remember { mutableStateOf<FileBean?>(null) }
 
     /**
      * 是否开启图片瀑布流模式
@@ -281,15 +284,14 @@ fun FileScreen(
         )
     }
 
-    if (showForceOpenDialog != -1) {
-        val bean = fileViewModel.fileBeanList[showForceOpenDialog]
+    showForceOpenDialogBean?.let { bean ->
         if (bean.isFolder) {
             toastProvider.showToast("此功能仅支持文件，不支持文件夹")
-            showForceOpenDialog = -1
+            showForceOpenDialogBean = null
         } else {
             ForceOpenDialog(
                 bean.name,
-                onDismissRequest = { showForceOpenDialog = -1 },
+                onDismissRequest = { showForceOpenDialogBean = null },
             ) {
                 fileViewModel.setRefreshingStatus(true)
                 when (it) {
@@ -305,20 +307,20 @@ fun FileScreen(
         }
     }
 
-    fun myItemOnClick(i: Int) {
-        if (fileViewModel.fileBeanList[i].isFolder) {
+    fun myItemOnClick(fileBean: FileBean) {
+        if (fileBean.isFolder) {
             isBottomBarShow = true
             isTopBarShow = true
         }
-        clickHandler.myItemOnClick(i)
+        clickHandler.myItemOnClick(fileBean)
     }
 
 
-    fun onMenuAria2Download(index: Int) {
+    fun onMenuAria2Download(fileBean: FileBean) {
         if (settingUiState.aria2Url.ifEmpty { ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE } == ConfigKeyUtil.ARIA2_URL_DEFAULT_VALUE) {
             fileViewModel.openAria2Dialog()
         } else {
-            fileViewModel.startSendAria2Service(index)
+            fileViewModel.startSendAria2Service(fileBean)
         }
     }
 
@@ -421,9 +423,9 @@ fun FileScreen(
         }
     }
 
-    fun itemOnLongClick(i: Int) {
-        if (!contentState.isLongClickState) {
-            fileViewModel.startMultiSelect(i)
+    fun itemOnLongClick(fileBean: FileBean) {
+        if (!fileViewModel.isLongClickState) {
+            fileViewModel.startMultiSelect(fileBean)
             if (!isTopBarShow) {
                 isTopBarShow = true
             }
@@ -458,7 +460,8 @@ fun FileScreen(
 
         val pathActions = FilePathActions(
             onPathClick = {
-                val pathString = contentState.pathList.joinToString("/") { it.name }
+                val state = fileViewModel.contentState.value
+                val pathString = state.pathList.joinToString("/") { it.name }
                 pathString.copy(context)
                 toastProvider.showToast("$pathString 已复制到剪切板")
             },
@@ -468,20 +471,22 @@ fun FileScreen(
                 }
             },
             onPathLongClick = { name, cid ->
-                val index = contentState.pathList.indexOfFirst { it.cid == cid }
-                val pathString = contentState.pathList.take(index + 1)
+                val state = fileViewModel.contentState.value
+                val index = state.pathList.indexOfFirst { it.cid == cid }
+                val pathString = state.pathList.take(index + 1)
                     .joinToString(separator = "/") { it.name }
                 fileViewModel.setDefaultOfflinePath(name, cid, pathString)
             },
-            onPathItemClick = {
-                if (it != contentState.currentCid) {
-                    if (contentState.currentCid != "0" && !contentState.isLongClickState && !contentState.isQueryState) {
+            onPathItemClick = { targetCid ->
+                val state = fileViewModel.contentState.value
+                if (targetCid != state.currentCid) {
+                    if (state.currentCid != "0" && !state.isLongClickState && !state.isQueryState) {
                         fileViewModel.setListLocation(
-                            contentState.source.paginationKey,
+                            state.source.paginationKey,
                             currentScrollState
                         )
                     }
-                    fileViewModel.getFiles(it)
+                    fileViewModel.getFiles(targetCid)
                 }
             }
         )
@@ -494,10 +499,8 @@ fun FileScreen(
             onItemLongClick = ::itemOnLongClick,
             onCut = { fileViewModel.cut(it) },
             onDelete = { fileViewModel.delete(it) },
-            onRename = { index ->
-                contentState.fileBeanList.getOrNull(index)?.let { fileBean ->
-                    fileViewModel.openRenameFileDialog(fileBean)
-                }
+            onRename = { fileBean ->
+                fileViewModel.openRenameFileDialog(fileBean)
             },
             onFileInfo = { fileBean ->
                 fileViewModel.getFileInfo(fileBean)
@@ -520,12 +523,10 @@ fun FileScreen(
                 fileViewModel.unzipFile(fileBean)
             },
             onSetOfflineCid = { fileBean ->
-                val pathString =
-                    contentState.pathList.joinToString(separator = "/") { it.name } + "/${fileBean.name}"
-                fileViewModel.setDefaultOfflinePath(fileBean.name, fileBean.categoryId, pathString)
+                fileViewModel.setDefaultOfflinePath(fileBean)
             },
             onAria2Download = ::onMenuAria2Download,
-            onForceOpen = { showForceOpenDialog = it },
+            onForceOpen = { showForceOpenDialogBean = it },
             onLoadImage = { fileBean ->
                 fileViewModel.getImage(fileBean)
             })
@@ -544,8 +545,7 @@ fun FileScreen(
         imageLoader,
         clipboardManager,
         scope,
-        context,
-        contentState
+        context
     ) {
         fileContentActions()
     }
@@ -585,14 +585,24 @@ fun FileScreen(
             onAddFolder = { fileViewModel.openCreateFolderDialog() })
     }
 
+    val fileItemList = remember(contentState.fileBeanList, contentState.selectedFileIds, contentState.highlightedFileId) {
+        contentState.fileBeanList.map { bean ->
+            val isSelected = bean.uniqueId in contentState.selectedFileIds
+            FileItemUiModel(
+                fileBean = bean,
+                isSelected = isSelected,
+                isHighlighted = (bean.uniqueId == contentState.highlightedFileId) && !isSelected
+            )
+        }
+    }
+
     val contentDataState = FileListDataState(
         currentCid = contentState.currentCid,
         pathList = contentState.pathList,
-        fileBeanList = fileBeanList,
+        fileItemList = fileItemList,
         refreshing = refreshing,
-        clickIndex = fileViewModel.clickMap.getOrDefault(contentState.source.paginationKey, -1),
         imageCache = fileViewModel.imageBeanCache[contentState.currentCid],
-        contentState.source.paginationKey
+        paginationKey = contentState.source.paginationKey
     )
 
     val bannerState = FileBannerState(

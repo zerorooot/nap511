@@ -1,5 +1,6 @@
 package github.zerorooot.nap511.bean
 
+import androidx.compose.runtime.Immutable
 import com.google.gson.annotations.SerializedName
 import github.zerorooot.nap511.R
 
@@ -20,6 +21,7 @@ data class RepeatListResponse(
     @SerializedName("count") val count: String = "0"
 ) : BaseResponse()
 
+@Immutable
 data class RepeatFileItem(
     @SerializedName("sha1") val sha1: String = "",
     @SerializedName("file_id") val fileId: String = "",
@@ -30,6 +32,6 @@ data class RepeatFileItem(
     @SerializedName("user_utime_str") val userUtimeStr: String = "",
     @SerializedName("parent_id") val parentId: String = "",
     @SerializedName("path") val path: String = "",
-    var fileIco: Int = R.drawable.other,
-    var fileSizeString: String = ""
+    val fileIco: Int = R.drawable.other,
+    val fileSizeString: String = ""
 )

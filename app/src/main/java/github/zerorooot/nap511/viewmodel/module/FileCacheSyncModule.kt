@@ -61,12 +61,11 @@ class FileCacheSyncModule(
                     val updatedCache = FileCacheManager.getDate(event.cid)
                     if (updatedCache != null) {
                         stateHolder.updateContentState {
-                            val unselectedList =
-                                updatedCache.fileBeanList.map { it.copy(isSelect = false) }
                             copy(
-                                fileBeanList = formatFileBeanList(unselectedList),
+                                fileBeanList = formatFileBeanList(updatedCache.fileBeanList),
                                 pathList = updatedCache.path,
                                 totalCount = updatedCache.count,
+                                selectedFileIds = emptySet(),
                                 isLongClickState = false,
                                 appBarTitle = source.appName
                             )

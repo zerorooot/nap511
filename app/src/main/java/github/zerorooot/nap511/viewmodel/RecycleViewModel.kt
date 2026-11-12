@@ -2,7 +2,6 @@ package github.zerorooot.nap511.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
@@ -18,6 +17,7 @@ import github.zerorooot.nap511.screen.file.RecycleUiState
 import github.zerorooot.nap511.service.FileService
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileCacheManager
+import github.zerorooot.nap511.util.formatFileSize
 import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -81,8 +81,7 @@ class RecycleViewModel(
                 _recycleInfo.value = fileService.recycleList()
                 val recycleBeanList = _recycleInfo.value.recycleBeanList
                 if (recycleBeanList.isNotEmpty()) {
-                    setRecycleBean(recycleBeanList)
-                    _recycleFileList.value = recycleBeanList
+                    _recycleFileList.value = recycleBeanList.map { formatRecycleBean(it) }
                 }
 
             } catch (e: NullPointerException) {
@@ -187,44 +186,35 @@ class RecycleViewModel(
     }
 
 
-    private fun setRecycleBean(recycleBeanList: ArrayList<RecycleBean>) {
-        recycleBeanList.forEach { recycleBean ->
-            recycleBean.modifiedTimeString =
-                SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
-                    recycleBean.modifiedTime.toLong() * 1000
-                )
-
-            recycleBean.fileSizeString = android.text.format.Formatter.formatFileSize(
-                getApplication(),
-                if (recycleBean.fileSize == "") "0".toLong() else recycleBean.fileSize.toLong()
-            ) + " "
-            setIco(recycleBean)
-        }
+    private fun formatRecycleBean(bean: RecycleBean): RecycleBean {
+        val modifiedTimeString = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(
+            bean.modifiedTime.toLong() * 1000
+        )
+        val fileSizeString = (bean.fileSize.toLongOrNull() ?: 0L).formatFileSize()
+        val ico = computeRecycleIcon(bean)
+        return bean.copy(
+            modifiedTimeString = modifiedTimeString,
+            fileSizeString = fileSizeString,
+            fileIco = ico
+        )
     }
 
-    private fun setIco(recycleBean: RecycleBean) {
+    private fun computeRecycleIcon(recycleBean: RecycleBean): Int {
         if (recycleBean.type == "2") {
-            recycleBean.fileIco = R.drawable.folder
-            return
+            return R.drawable.folder
         }
         if (recycleBean.iv == 1) {
-            recycleBean.fileIco = R.drawable.mp4
-            return
+            return R.drawable.mp4
         }
-        when (recycleBean.ico) {
-            "apk" -> recycleBean.fileIco = R.drawable.apk
-            "iso" -> recycleBean.fileIco = R.drawable.iso
-            "torrent" -> recycleBean.fileIco = R.drawable.torrent
-            "rar", "tar", "gz", "7z", "zip", "part", "jar" -> recycleBean.fileIco = R.drawable.zip
-            "gif", "jpg", "png", "jpeg", "bmp", "tif", "svg", "pic", "heic", "dng", "webp" -> recycleBean.fileIco =
-                R.drawable.png
-
-            "doc", "docx", "xls", "pdf", "ppt", "wps", "dps", "et", "mdb", "reg", "txt", "wri", "rtf", "lrc", "vob", "sub", "srt", "ass", "ssa", "idx", "umd", "xlsx", "xlsm", "xltx", "xltm", "xlam", "xlsb", "odt", "pptx", "ods", "odp", "chm", "pot", "pps", "ppsx", "smi", "vtt", "stl", "sbv", "ttml", "ksc", "snc", "krc", "c", "cpp", "h", "asm", "s", "java", "o", "asp", "aspx", "bat", "bas", "prg", "cmd", "log", "php", "js", "go", "sh", "css", "scss", "sass", "less", "class", "hpp", "cc", "hex", "hxx", "cxx", "c++", "cs", "py", "pl", "pm", "md", "cue", "utf", "dpt", "ofd", "eto", "ets", "mhtml", "mht", "uof", "dot", "wpt", "dotx", "docm", "dotm", "ett", "xlt", "pptm", "ppsm", "potx", "potm", "csv", "xml", "html", "htm" ->
-                recycleBean.fileIco = R.drawable.txt
-
-            "mp3", "wma", "wav", "midi", "flac", "ram", "ra", "mid", "aac", "m4a", "ape", "au", "ogg", "aif", "aiff", "snd", "voc", "mpa", "cda", "vqf", "wvx", "wmx", "m3u", "m3u8", "ttbl", "ttpl", "tta", "tak", "mpc", "mp+", "mp3pro", "mp1", "mp2", "mac", "xm", "umx", "stm", "s3m", "mtm", "mod", "it", "far", "rmi", "fla", "dts", "dtswav", "awb" -> {
-                recycleBean.fileIco = R.drawable.mp3
-            }
+        return when (recycleBean.ico) {
+            "apk" -> R.drawable.apk
+            "iso" -> R.drawable.iso
+            "torrent" -> R.drawable.torrent
+            "rar", "tar", "gz", "7z", "zip", "part", "jar" -> R.drawable.zip
+            "gif", "jpg", "png", "jpeg", "bmp", "tif", "svg", "pic", "heic", "dng", "webp" -> R.drawable.png
+            "doc", "docx", "xls", "pdf", "ppt", "wps", "dps", "et", "mdb", "reg", "txt", "wri", "rtf", "lrc", "vob", "sub", "srt", "ass", "ssa", "idx", "umd", "xlsx", "xlsm", "xltx", "xltm", "xlam", "xlsb", "odt", "pptx", "ods", "odp", "chm", "pot", "pps", "ppsx", "smi", "vtt", "stl", "sbv", "ttml", "ksc", "snc", "krc", "c", "cpp", "h", "asm", "s", "java", "o", "asp", "aspx", "bat", "bas", "prg", "cmd", "log", "php", "js", "go", "sh", "css", "scss", "sass", "less", "class", "hpp", "cc", "hex", "hxx", "cxx", "c++", "cs", "py", "pl", "pm", "md", "cue", "utf", "dpt", "ofd", "eto", "ets", "mhtml", "mht", "uof", "dot", "wpt", "dotx", "docm", "dotm", "ett", "xlt", "pptm", "ppsm", "potx", "potm", "csv", "xml", "html", "htm" -> R.drawable.txt
+            "mp3", "wma", "wav", "midi", "flac", "ram", "ra", "mid", "aac", "m4a", "ape", "au", "ogg", "aif", "aiff", "snd", "voc", "mpa", "cda", "vqf", "wvx", "wmx", "m3u", "m3u8", "ttbl", "ttpl", "tta", "tak", "mpc", "mp+", "mp3pro", "mp1", "mp2", "mac", "xm", "umx", "stm", "s3m", "mtm", "mod", "it", "far", "rmi", "fla", "dts", "dtswav", "awb" -> R.drawable.mp3
+            else -> R.drawable.other
         }
     }
 }

@@ -157,7 +157,7 @@ class RepeatFileViewModel(
                 XLog.i("forceRefresh: ${result.state}, message: ${result.message}")
 
                 val success = result.state
-                toastProvider.showToast(if (success) "已提交全盘排重请求" else result.message)
+                toastProvider.showToast(if (success) "排重任务已提交，请刷新页面查看进度" else result.message)
 
                 if (success) {
                     _uiState.update { it.copy(hasStartedDedup = true) }
@@ -220,21 +220,25 @@ class RepeatFileViewModel(
         }
     }
 
+    private fun formatRepeatItem(item: RepeatFileItem): RepeatFileItem {
+        val ico = when (item.ico) {
+            "mp3" -> R.drawable.mp3
+            "mp4" -> R.drawable.mp4
+            "apk" -> R.drawable.apk
+            "iso" -> R.drawable.iso
+            "zip", "7z", "rar" -> R.drawable.zip
+            "png", "gif", "jpg" -> R.drawable.png
+            "txt" -> R.drawable.txt
+            "torrent" -> R.drawable.torrent
+            else -> R.drawable.other
+        }
+        val sizeStr = formatBytes(item.fileSize.toLongOrNull() ?: 0L) + " "
+        return item.copy(fileIco = ico, fileSizeString = sizeStr)
+    }
+
     private suspend fun getRepeatList(offset: Int): RepeatListResponse {
         val repeatList = repeatService.getRepeatList(offset)
-        repeatList.data.forEach { i ->
-            when (i.ico) {
-                "mp3" -> i.fileIco = R.drawable.mp3
-                "mp4" -> i.fileIco = R.drawable.mp4
-                "apk" -> i.fileIco = R.drawable.apk
-                "iso" -> i.fileIco = R.drawable.iso
-                "zip", "7z", "rar" -> i.fileIco = R.drawable.zip
-                "png", "gif", "jpg" -> i.fileIco = R.drawable.png
-                "txt" -> i.fileIco = R.drawable.txt
-                "torrent" -> i.fileIco = R.drawable.torrent
-            }
-            i.fileSizeString = formatBytes(i.fileSize.toLongOrNull() ?: 0L) + " "
-        }
-        return repeatList
+        val formattedData = repeatList.data.map { formatRepeatItem(it) }
+        return repeatList.copy(data = formattedData)
     }
 }

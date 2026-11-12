@@ -92,7 +92,7 @@ fun UnzipAllFile(
         fileViewModel.closeUnzipAllFileDialog()
 
         val message =
-            fileViewModel.fileBeanList.filter { i -> i.isSelect && i.fileIco == R.drawable.zip }
+            fileViewModel.selectedFiles.filter { i -> i.fileIco == R.drawable.zip }
                 .takeIf { it.isNotEmpty() }?.let {
                     fileViewModel.unzipFile(it, currentCid, pwd)
                     "后台解压中......"

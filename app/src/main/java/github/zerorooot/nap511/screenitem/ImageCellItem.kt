@@ -45,6 +45,7 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileItemActions
+import github.zerorooot.nap511.bean.FileItemUiModel
 import github.zerorooot.nap511.bean.ImageBean
 import github.zerorooot.nap511.util.getCoilCacheUrl
 
@@ -54,15 +55,14 @@ internal val aspectRatioCache = object : LruCache<String, Float>(1150) {}
 
 @Composable
 fun ImageCellItem(
-    fileBean: FileBean,
-    index: Int,
+    uiModel: FileItemUiModel,
     //删除会有动画
     modifier: Modifier = Modifier,
-    clickIndex: Int = -1,
     imageBean: ImageBean? = null,
     isImageHdPreview: Boolean = false,
     itemActions: FileItemActions,
 ) {
+    val fileBean = uiModel.fileBean
     val image = fileBean.fileIco
     var name by rememberFileDisplayName(fileBean)
     val hdUrl = imageBean?.url
@@ -79,7 +79,7 @@ fun ImageCellItem(
     // 开启高清模式且 photoThumb 非空且未缓存过 ImageBean 时发起请求；
     // 将 fileBean.photoThumb 纳入 Key，确保此前请求失败（imageBean 仍为 null）并在下拉刷新获取新缩略图后能重新触发请求
     if (isImageHdPreview && fileBean.photoThumb.isNotEmpty() && imageBean == null) {
-        LaunchedEffect(fileBean.pickCode, index, fileBean.photoThumb) {
+        LaunchedEffect(fileBean.pickCode, fileBean.photoThumb) {
             itemActions.onLoadImage?.invoke(fileBean)
         }
     }
@@ -91,15 +91,15 @@ fun ImageCellItem(
 
     BaseVerticalCellCard(
         modifier = modifier,
-        isSelected = fileBean.isSelect,
-        isHighlighted = (clickIndex == index) && !fileBean.isSelect,
+        isSelected = uiModel.isSelected,
+        isHighlighted = uiModel.isHighlighted,
         onClick = {
-            XLog.d("ImageCellItem [点击] index=$index, name=${fileBean.name}")
-            itemActions.onItemClick.invoke(index)
+            XLog.d("ImageCellItem [点击] name=${fileBean.name}")
+            itemActions.onItemClick.invoke(fileBean)
         },
         onLongClick = {
-            XLog.d("ImageCellItem [长按] index=$index, name=${fileBean.name}")
-            itemActions.onItemLongClick.invoke(index)
+            XLog.d("ImageCellItem [长按] name=${fileBean.name}")
+            itemActions.onItemLongClick.invoke(fileBean)
         },
         mediaContent = {
             // 顶部贴边大图预览区域
@@ -148,7 +148,7 @@ fun ImageCellItem(
                             if (name != fileBean.name) {
                                 name = fileBean.name
                             }
-                            XLog.d("ImageCellItem [图片加载成功] index=$index, name=${fileBean.name}, isLoaded=$isHdLoaded, imageData=$imageData, source=${successState.result.dataSource}")
+                            XLog.d("ImageCellItem [图片加载成功] name=${fileBean.name}, isLoaded=$isHdLoaded, imageData=$imageData, source=${successState.result.dataSource}")
                             val drawable = successState.result.drawable
                             if (drawable.intrinsicWidth > 0 && drawable.intrinsicHeight > 0) {
                                 val newRatio =
@@ -162,7 +162,7 @@ fun ImageCellItem(
                         onError = { errorState ->
                             name = EXPIRED_IMAGE_TIP
                             XLog.e(
-                                "ImageCellItem [图片加载失败] index=$index, name=${fileBean.name}, isLoaded=$isHdLoaded, url=$imageData, error=${errorState.result.throwable.message}"
+                                "ImageCellItem [图片加载失败] name=${fileBean.name}, isLoaded=$isHdLoaded, url=$imageData, error=${errorState.result.throwable.message}"
                             )
                         },
                         modifier = Modifier.fillMaxSize(),

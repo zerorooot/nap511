@@ -1,6 +1,5 @@
 package github.zerorooot.nap511.dialog
 
-import android.text.format.Formatter
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,7 +36,6 @@ import androidx.compose.ui.unit.dp
 import github.zerorooot.nap511.bean.TorrentFileBean
 import github.zerorooot.nap511.bean.TorrentFileListWeb
 import github.zerorooot.nap511.screenitem.TorrentFileCellItem
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.formatFileSize
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings

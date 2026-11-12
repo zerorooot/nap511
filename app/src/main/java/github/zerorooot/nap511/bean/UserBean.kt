@@ -1,16 +1,18 @@
 package github.zerorooot.nap511.bean
 
+import androidx.compose.runtime.Immutable
 import com.google.gson.annotations.SerializedName
 import github.zerorooot.nap511.R
 
+@Immutable
 data class AvatarBean(
-    var expire: Long = 1L,
-    var expireString: String = "1970-01-01 08:00:00",
+    val expire: Long = 1L,
+    val expireString: String = "1970-01-01 08:00:00",
     @SerializedName("user_name")
-    var userName: String = "Test",
-    var face: String = "https://my.115.com/static/2014v1.0/personal/head/80/male/male034.png",
+    val userName: String = "Test",
+    val face: String = "https://my.115.com/static/2014v1.0/personal/head/80/male/male034.png",
     @SerializedName("user_id")
-    var userId: String = ""
+    val userId: String = ""
 )
 
 data class RemainingSpaceBean(
@@ -24,13 +26,14 @@ data class RemainingSpaceBean(
     )
 }
 
+@Immutable
 data class SignBean(
-    @SerializedName("state") var state: Boolean = false,
-    @SerializedName("size") var size: String = "",
-    @SerializedName("url") var url: String = "",
-    @SerializedName("bt_url") var btUrl: String = "",
-    @SerializedName("sign") var sign: String = "",
-    @SerializedName("time") var time: Int = -1
+    @SerializedName("state") val state: Boolean = false,
+    @SerializedName("size") val size: String = "",
+    @SerializedName("url") val url: String = "",
+    @SerializedName("bt_url") val btUrl: String = "",
+    @SerializedName("sign") val sign: String = "",
+    @SerializedName("time") val time: Int = -1
 )
 
 data class InitUploadBean(
@@ -44,31 +47,33 @@ data class InitUploadBean(
     val callback: String
 )
 
+@Immutable
 data class RecycleInfo(
-    @SerializedName("count") var count: String = "",
-    @SerializedName("state") var state: Boolean = false,
-    @SerializedName("error") var error: String = "",
-    @SerializedName("offset") var offset: Int = -1,
-    @SerializedName("page_size") var pageSize: Int = -1,
-    @SerializedName("data") var recycleBeanList: ArrayList<RecycleBean> = arrayListOf()
+    @SerializedName("count") val count: String = "",
+    @SerializedName("state") val state: Boolean = false,
+    @SerializedName("error") val error: String = "",
+    @SerializedName("offset") val offset: Int = -1,
+    @SerializedName("page_size") val pageSize: Int = -1,
+    @SerializedName("data") val recycleBeanList: List<RecycleBean> = emptyList()
 )
 
+@Immutable
 data class RecycleBean(
-    @SerializedName("id") var id: String = "",
-    @SerializedName("file_name") var fileName: String = "",
-    @SerializedName("type") var type: String = "",
-    @SerializedName("file_size") var fileSize: String = "",
-    @SerializedName("dtime") var modifiedTime: String = "",
-    @SerializedName("status") var status: String = "",
-    @SerializedName("cid") var cid: String = "",
-    @SerializedName("parent_name") var parentName: String = "",
-    @SerializedName("iv") var iv: Int = -1,
-    @SerializedName("vdi") var vdi: Int = -1,
-    @SerializedName("ico") var ico: String = "",
-    @SerializedName("u") var photoThumb: String = "",
-    @SerializedName("play_long") var playLong: Float = -1f,
-    var isFolder: Boolean = false,
-    var modifiedTimeString: String = "",
-    var fileSizeString: String = "",
-    var fileIco: Int = R.drawable.other
+    @SerializedName("id") val id: String = "",
+    @SerializedName("file_name") val fileName: String = "",
+    @SerializedName("type") val type: String = "",
+    @SerializedName("file_size") val fileSize: String = "",
+    @SerializedName("dtime") val modifiedTime: String = "",
+    @SerializedName("status") val status: String = "",
+    @SerializedName("cid") val cid: String = "",
+    @SerializedName("parent_name") val parentName: String = "",
+    @SerializedName("iv") val iv: Int = -1,
+    @SerializedName("vdi") val vdi: Int = -1,
+    @SerializedName("ico") val ico: String = "",
+    @SerializedName("u") val photoThumb: String = "",
+    @SerializedName("play_long") val playLong: Float = -1f,
+    val isFolder: Boolean = false,
+    val modifiedTimeString: String = "",
+    val fileSizeString: String = "",
+    val fileIco: Int = R.drawable.other
 )

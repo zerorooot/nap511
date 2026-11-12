@@ -19,6 +19,11 @@ fun getGitCommitHash(): String {
     }
 }
 
+//composeCompiler {
+//    metricsDestination = layout.buildDirectory.dir("compose_metrics")
+//    reportsDestination = layout.buildDirectory.dir("compose_reports")
+//}
+
 android {
     namespace = "github.zerorooot.nap511"
     compileSdk = 37

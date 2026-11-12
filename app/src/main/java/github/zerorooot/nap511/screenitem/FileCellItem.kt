@@ -15,6 +15,7 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.FileItemActions
+import github.zerorooot.nap511.bean.FileItemUiModel
 import github.zerorooot.nap511.screen.components.FileMoreMenu
 import github.zerorooot.nap511.screen.components.FolderMoreMenu
 import github.zerorooot.nap511.screen.components.MenuItemAction
@@ -34,13 +35,12 @@ internal fun rememberFileDisplayName(fileBean: FileBean): MutableState<String> =
 
 @Composable
 fun FileCellItem(
-    fileBean: FileBean,
-    index: Int,
-    clickIndex: Int = -1,
+    uiModel: FileItemUiModel,
     //删除会有动画
     modifier: Modifier,
     itemActions: FileItemActions,
 ) {
+    val fileBean = uiModel.fileBean
     val image = fileBean.fileIco
     var name by rememberFileDisplayName(fileBean)
     val size = fileBean.sizeString
@@ -56,15 +56,15 @@ fun FileCellItem(
 
     BaseCellCard(
         modifier = modifier,
-        isSelected = fileBean.isSelect,
-        isHighlighted = (clickIndex == index) && !fileBean.isSelect,
+        isSelected = uiModel.isSelected,
+        isHighlighted = uiModel.isHighlighted,
         onClick = {
-            XLog.d("FileCellItem [点击] index=$index, name=${fileBean.name}, isSelect=${fileBean.isSelect}")
-            itemActions.onItemClick.invoke(index)
+            XLog.d("FileCellItem [点击] name=${fileBean.name}, isSelect=${uiModel.isSelected}")
+            itemActions.onItemClick.invoke(fileBean)
         },
         onLongClick = {
-            XLog.d("FileCellItem [长按] index=$index, name=${fileBean.name}")
-            itemActions.onItemLongClick.invoke(index)
+            XLog.d("FileCellItem [长按] name=${fileBean.name}")
+            itemActions.onItemLongClick.invoke(fileBean)
         },
         leadingContent = {
             FileThumbnail(
@@ -81,11 +81,11 @@ fun FileCellItem(
                     if (name != fileBean.name) {
                         name = fileBean.name
                     }
-                    XLog.d("FileCellItem [图片加载成功] index=$index, name=${fileBean.name}")
+                    XLog.d("FileCellItem [图片加载成功] name=${fileBean.name}")
                 },
                 onLoadError = {
                     name = EXPIRED_IMAGE_TIP
-                    XLog.w("FileCellItem [图片加载失败/过期] index=$index, name=${fileBean.name}")
+                    XLog.w("FileCellItem [图片加载失败/过期] name=${fileBean.name}")
                 }
             )
         },
@@ -120,15 +120,15 @@ fun FileCellItem(
         },
         trailingContent = {
             val dispatchMenuClick: (MenuItemAction, Int) -> Unit = { action, _ ->
-                XLog.d("FileCellItem [菜单点击] index=$index, action=$action, name=${fileBean.name}")
+                XLog.d("FileCellItem [菜单点击] action=$action, name=${fileBean.name}")
                 when (action) {
-                    MenuItemAction.CUT_FILE -> itemActions.onCut.invoke(index)
+                    MenuItemAction.CUT_FILE -> itemActions.onCut.invoke(fileBean)
                     MenuItemAction.DELETE_FILE -> itemActions.onDelete.invoke(fileBean)
                     MenuItemAction.UNZIP_FILE -> itemActions.onUnzip.invoke(fileBean)
-                    MenuItemAction.RENAME_FILE -> itemActions.onRename.invoke(index)
+                    MenuItemAction.RENAME_FILE -> itemActions.onRename.invoke(fileBean)
                     MenuItemAction.OFFLINE_CID -> itemActions.onSetOfflineCid.invoke(fileBean)
                     MenuItemAction.FILE_INFO -> itemActions.onFileInfo.invoke(fileBean)
-                    MenuItemAction.ARIA2_DOWNLOAD -> itemActions.onAria2Download.invoke(index)
+                    MenuItemAction.ARIA2_DOWNLOAD -> itemActions.onAria2Download.invoke(fileBean)
                     MenuItemAction.TOP_FILE, MenuItemAction.UN_TOP_FILE -> itemActions.onTop.invoke(
                         fileBean
                     )
@@ -137,7 +137,7 @@ fun FileCellItem(
                         fileBean
                     )
 
-                    MenuItemAction.FORCE_OPEN -> itemActions.onForceOpen.invoke(index)
+                    MenuItemAction.FORCE_OPEN -> itemActions.onForceOpen.invoke(fileBean)
                     else -> {}
                 }
             }

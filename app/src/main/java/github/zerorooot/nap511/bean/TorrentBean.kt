@@ -1,30 +1,33 @@
 package github.zerorooot.nap511.bean
 
+import androidx.compose.runtime.Immutable
 import com.google.gson.annotations.SerializedName
 
+@Immutable
 data class TorrentFileBean(
-    var state: Boolean = false,
-    var errno: Long = 0,
+    val state: Boolean = false,
+    val errno: Long = 0,
     @SerializedName("error_msg")
-    var errorMessage: String = "",
-    var errtype: String = "suc",
-    var errcode: Long = 0,
+    val errorMessage: String = "",
+    val errtype: String = "suc",
+    val errcode: Long = 0,
     @SerializedName("file_size")
-    var fileSize: Long = 0,
-    var fileSizeString: String = "",
+    val fileSize: Long = 0,
+    val fileSizeString: String = "",
     @SerializedName("torrent_name")
-    var torrentName: String = "",
+    val torrentName: String = "",
     @SerializedName("file_count")
-    var fileCount: Int = 0,
+    val fileCount: Int = 0,
     @SerializedName("info_hash")
-    var infoHash: String = "",
+    val infoHash: String = "",
     @SerializedName("torrent_filelist_web")
-    var torrentFileListWeb: ArrayList<TorrentFileListWeb> = arrayListOf(),
+    val torrentFileListWeb: List<TorrentFileListWeb> = emptyList(),
 )
 
+@Immutable
 data class TorrentFileListWeb(
-    var size: Long = 0,
-    var sizeString: String = "",
-    var path: String = "",
+    val size: Long = 0,
+    val sizeString: String = "",
+    val path: String = "",
     val wanted: Int = -1,
 )
