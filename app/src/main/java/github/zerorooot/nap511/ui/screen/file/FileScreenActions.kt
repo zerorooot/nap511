@@ -12,7 +12,10 @@ import github.zerorooot.nap511.ui.navigation.FileOpener
 import github.zerorooot.nap511.util.asScrollState
 import github.zerorooot.nap511.ui.viewmodel.FileViewModel
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 文件列表点击与手势事件协调器
@@ -36,16 +39,30 @@ class FileClickHandler(
 ) {
     fun handleFolderClick(fileBean: FileBean) {
         onBottomBarShowChange(true)
-        if (settingUiState.earlyLoading) {
-            val i = fileViewModel.fileBeanList.indexOfFirst { it.uniqueId == fileBean.uniqueId }
+        // 关键对齐：清空旧列表前同步提取相邻文件夹 CID
+        val neighborFolderCids = if (settingUiState.earlyLoading) {
+            val currentList = fileViewModel.fileBeanList
+            val i = currentList.indexOfFirst { it.uniqueId == fileBean.uniqueId }
             if (i >= 0) {
                 listOf(i - 1, i + 1)
-                    .mapNotNull { fileViewModel.fileBeanList.getOrNull(it) }
+                    .mapNotNull { currentList.getOrNull(it) }
                     .filter { it.isFolder }
-                    .forEach { fileViewModel.updateFileCache(it.categoryId) }
+                    .map { it.categoryId }
+            } else emptyList()
+        } else emptyList()
+
+        // 发起乐观导航（立刻更新面包屑、清空旧列表、呈现骨架屏）
+        fileViewModel.navigateTo(cid = fileBean.categoryId, targetName = fileBean.name)
+
+        // 关键对齐：轻量延时 400ms 避开骨架屏首波网络高峰，再在后台预热
+        if (neighborFolderCids.isNotEmpty()) {
+            coroutineScope.launch(Dispatchers.IO) {
+                delay(400L.milliseconds)
+                neighborFolderCids.forEach { cid ->
+                    fileViewModel.updateFileCache(cid)
+                }
             }
         }
-        fileViewModel.getFiles(fileBean.categoryId)
     }
 
     fun handleVideoClick(fileBean: FileBean, isForceOpen: Boolean = false) {
@@ -101,9 +118,10 @@ class FileClickHandler(
             if (currentTime - lastClickTime[0] < 200L) {
                 return
             }
-            lastClickTime[0] = currentTime
-
-            fileViewModel.setRefreshingStatus(true)
+            // 关键对齐：文件夹点击绝不提前开启 setRefreshingStatus(true)，由骨架屏独立承载加载态
+            if (!fileBean.isFolder) {
+                fileViewModel.setRefreshingStatus(true)
+            }
             val state = when {
                 isPreviewActive -> staggeredGrid.asScrollState
                 isExpandedScreen -> gridState.asScrollState

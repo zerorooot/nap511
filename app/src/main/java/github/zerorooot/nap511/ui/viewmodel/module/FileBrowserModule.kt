@@ -24,12 +24,27 @@ import github.zerorooot.nap511.ui.viewmodel.store.FileUiStateHolder
 import github.zerorooot.nap511.ui.viewmodel.store.ImageCacheStore
 import github.zerorooot.nap511.ui.viewmodel.store.PagingStateStore
 import github.zerorooot.nap511.ui.viewmodel.store.ScrollPositionStore
+import github.zerorooot.nap511.data.model.PathBean
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
+
+/**
+ * 导航快照：记录进入乐观导航前的稳定状态，供网络/数据异常时瞬时平滑回滚
+ */
+data class NavigationSnapshot(
+    val previousCid: String,
+    val previousPathList: List<PathBean>,
+    val previousSource: FileListSource,
+    val previousFileBeans: List<FileBean>,
+    val previousTotalCount: Int
+)
 
 /**
  * 返回键层级导航判定结果
@@ -72,6 +87,9 @@ class FileBrowserModule(
 
     /** 当前生效的本地自定义排序（仅在内存中针对当前视图生效，用于弹窗回显；刷新/切目录/分页时失效） */
     private var activeLocalOrder: OrderBean? = null
+
+    /** 乐观导航历史快照：记录进入乐观导航前的稳定状态，供网络/数据异常时瞬时平滑回滚 */
+    internal var currentSnapshot: NavigationSnapshot? = null
 
     /**
      * 服务端真实的云端排序（供网络请求及分页严格使用，绝不包含本地排序字段）
@@ -168,11 +186,101 @@ class FileBrowserModule(
     }
 
     /**
+     * 准备进入乐观导航状态
+     * 1. 优先进行本地缓存短路检查，若命中则 0ms 瞬间直出，避免出现闪烁骨架屏；
+     * 2. 仅在稳定态（!isLoadingFolder）记录前序快照，连续点击不被空列表污染；
+     * 3. 瞬间清空列表、更新乐观路径并呈现全屏微光骨架屏。
+     *
+     * @return true 表示需要发起网络拉取；false 表示已瞬时命中缓存
+     */
+    fun prepareOptimisticNavigation(targetCid: String, targetName: String): Boolean {
+        // 1. 缓存即时短路检查（0ms 直出）
+        val cached = FileCacheManager.getDate(targetCid)
+        if (cached != null) {
+            XLog.d("prepareOptimisticNavigation: targetCid=$targetCid hit cache, instant rendering without skeleton")
+            val files = cached.copy(fileBeanList = formatFileBeanList(cached.fileBeanList))
+            setFiles(files)
+            return false
+        }
+
+        val currentState = stateHolder.currentContentState
+
+        // 2. 关键守卫：仅在当前处于非加载稳定态时才记录快照，防止骨架屏期间连续点击污染快照
+        if (!currentState.isLoadingFolder) {
+            currentSnapshot = NavigationSnapshot(
+                previousCid = currentState.currentCid,
+                previousPathList = currentState.pathList,
+                previousSource = currentState.source,
+                previousFileBeans = currentState.fileBeanList,
+                previousTotalCount = currentState.totalCount
+            )
+            XLog.d("prepareOptimisticNavigation: recorded stable snapshot for previousCid=${currentState.currentCid}")
+        }
+
+        // 3. 构建乐观路径（即时在面包屑与顶栏回显）
+        val optimisticPath = if (currentState.pathList.any { it.cid == targetCid }) {
+            val index = currentState.pathList.indexOfFirst { it.cid == targetCid }
+            currentState.pathList.take(index + 1)
+        } else {
+            val displayName = targetName.ifEmpty {
+                if (targetCid == "0") "根目录" else "加载中..."
+            }
+            currentState.pathList + PathBean(name = displayName, cid = targetCid, pid = currentState.currentCid)
+        }
+
+        val targetSource = FileListSource.Folder(targetCid, stringProvider)
+        pagingStateStore.reset(targetSource.paginationKey)
+
+        // 4. 0ms 即刻更新 UI 状态为骨架屏态
+        stateHolder.updateContentState {
+            copy(
+                source = targetSource,
+                currentCid = targetCid,
+                pathList = optimisticPath,
+                fileBeanList = emptyList(),
+                selectedFileIds = emptySet(),
+                isLongClickState = false,
+                isLoadingFolder = true,
+                isRefreshing = false,
+                appBarTitle = targetSource.appName
+            )
+        }
+        XLog.d("prepareOptimisticNavigation: switched to optimistic skeleton state for targetCid=$targetCid")
+        return true
+    }
+
+    /**
+     * 撤销乐观进场，瞬间平滑恢复上级快照（明确负责复位 isLoadingFolder = false）
+     */
+    fun rollbackSnapshot() {
+        val snapshot = currentSnapshot ?: run {
+            XLog.d("rollbackSnapshot: snapshot is null, simply resetting loading states")
+            stateHolder.updateContentState { copy(isLoadingFolder = false, isRefreshing = false) }
+            return
+        }
+        XLog.d("rollbackSnapshot: rolling back to previousCid=${snapshot.previousCid}")
+        stateHolder.updateContentState {
+            copy(
+                source = snapshot.previousSource,
+                currentCid = snapshot.previousCid,
+                pathList = snapshot.previousPathList,
+                fileBeanList = snapshot.previousFileBeans,
+                totalCount = snapshot.previousTotalCount,
+                isLoadingFolder = false,
+                isRefreshing = false,
+                appBarTitle = snapshot.previousSource.appName
+            )
+        }
+        currentSnapshot = null
+    }
+
+    /**
      * 获取文件列表
+     * 保持挂起函数公开签名不变，双重守卫保留缓存兜底，被取消的任务绝不修改 UI 状态
      */
     suspend fun getFiles(cid: String, fcMix: Int = currentFcMix) {
         stateHolder.setRefreshing(true)
-        // 1. 尝试读取缓存（内存与磁盘双级读取，支持冷启动及 LRU 淘汰后从磁盘恢复）
+        // 1. 尝试读取缓存（内存与磁盘双级读取，支持冷启动、测试及 LRU 淘汰后从磁盘恢复）
         val cached = FileCacheManager[cid]
         if (cached != null) {
             val files = cached.copy(fileBeanList = formatFileBeanList(cached.fileBeanList))
@@ -181,7 +289,7 @@ class FileBrowserModule(
             return
         }
 
-        runCatching {
+        try {
             val files = fileRepository.getFiles(
                 cid = cid,
                 order = serverOrderBean.type,
@@ -190,7 +298,7 @@ class FileBrowserModule(
             )
             // 请求的 cid 不是 0, 但返回的 cid 是 0。证明请求的 cid 不存在
             if (cid != "0" && files.cid == "0") {
-                toastProvider.showToast("当前文件夹被删除！")
+                throw IllegalStateException("当前文件夹已被删除！")
             }
             val formatted = files.copy(fileBeanList = formatFileBeanList(files.fileBeanList))
 
@@ -199,24 +307,38 @@ class FileBrowserModule(
             imageCacheStore.clear(cid)
             // 3. 网络请求成功后写入缓存
             FileCacheManager[cid] = formatted
-            setFiles(formatted)
-        }.onFailure {
-            val expiredTip = when (it) {
-                is NullPointerException -> "获取文件列表失败，建议更新您的Cookie"
-                else -> null
+            setFiles(formatted) // 成功出口：在 setFiles 内部负责复位 isLoadingFolder = false
+        } catch (ex: Throwable) {
+            // 取消异常：静默退出，绝不执行回滚快照与 Toast
+            if (ex is CancellationException) {
+                XLog.d("getFiles: job cancelled for cid=$cid")
+                return
             }
-            val message = if (expiredTip != null) {
+            XLog.e("getFiles error for cid=$cid", ex)
+
+            val expiredTip = if (ex is NullPointerException) "获取文件列表失败，建议更新您的Cookie" else null
+            if (expiredTip != null) {
                 FileCacheManager.clearAll()
                 UserSessionManager.clearSession()
                 _navigationEvent.emit(NavEvent.NavigateToScreen(Route.Login))
-                expiredTip
-            } else {
-                XLog.e("getFiles Exception ", it)
-                "${it.message}，请重试～"
+                toastProvider.showToast(expiredTip)
+                rollbackSnapshot()
+                return
             }
-            toastProvider.showToast(message)
+
+            rollbackSnapshot()
+            val errorMsg = when (ex) {
+                is IllegalStateException -> ex.message ?: "文件夹不存在"
+                else -> "网络连接异常，已返回上一层"
+            }
+            toastProvider.showToast(errorMsg)
+        } finally {
+            // 仅自然结束（非取消）且 CID 仍匹配当前活跃界面的协程，才收尾下拉刷新状态
+            // 彻底解除 finally 对 isLoadingFolder 的越权篡改，从根源上消灭状态踩踏
+            if (currentCoroutineContext().isActive && stateHolder.currentContentState.currentCid == cid) {
+                stateHolder.setRefreshing(false)
+            }
         }
-        stateHolder.setRefreshing(false)
     }
 
     /**
@@ -856,6 +978,7 @@ class FileBrowserModule(
 
     private fun setFiles(files: FilesBean) {
         activeLocalOrder = null
+        currentSnapshot = null // 数据正式就绪，安全释放快照
         val currentOrder = OrderBean.from(files)
         val folderSource = FileListSource.Folder(files.cid, stringProvider)
         val savedHighlight = scrollPositionStore.getHighlight(folderSource.paginationKey)
@@ -870,6 +993,7 @@ class FileBrowserModule(
                 orderBean = currentOrder,
                 fcMix = files.fcMix, // 从网络/缓存返回的真实值同步至 UI 状态
                 pathList = files.path,
+                isLoadingFolder = false, // 成功出口：数据就绪平滑切出骨架屏
                 isRefreshing = false,
                 isLongClickState = false,
                 appBarTitle = folderSource.appName

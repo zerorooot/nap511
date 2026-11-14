@@ -118,6 +118,8 @@ data class FileContentUiState(
     val selectedFileIds: Set<String> = emptySet(),
     val highlightedFileId: String? = null,
     val isRefreshing: Boolean = false,
+    /** 文件夹乐观进场加载中标记（驱动全屏骨架屏展示） */
+    val isLoadingFolder: Boolean = false,
     val appBarTitle: String,
     val orderBean: OrderBean = OrderBean(OrderEnum.name, 1),
     /**
@@ -202,6 +204,8 @@ data class FileListDataState(
     val pathList: List<PathBean>,
     val fileItemList: List<FileItemUiModel>,
     val refreshing: Boolean,
+    /** 驱动骨架屏与下拉刷新手势分流 */
+    val isLoadingFolder: Boolean = false,
     val imageCache: Map<String, ImageBean>? = null,
     /**
      * 当前列表对应的数据源唯一分页键（如 folder:0, search:0:keyword, filter:0:1）

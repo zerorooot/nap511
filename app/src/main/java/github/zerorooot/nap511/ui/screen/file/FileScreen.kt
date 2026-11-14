@@ -486,7 +486,8 @@ fun FileScreen(
                             currentScrollState
                         )
                     }
-                    fileViewModel.getFiles(targetCid)
+                    val targetName = state.pathList.firstOrNull { it.cid == targetCid }?.name ?: ""
+                    fileViewModel.navigateTo(cid = targetCid, targetName = targetName)
                 }
             }
         )
@@ -601,6 +602,7 @@ fun FileScreen(
         pathList = contentState.pathList,
         fileItemList = fileItemList,
         refreshing = refreshing,
+        isLoadingFolder = contentState.isLoadingFolder,
         imageCache = fileViewModel.imageBeanCache[contentState.currentCid],
         paginationKey = contentState.source.paginationKey
     )

@@ -136,8 +136,6 @@ class FileViewModel @Inject constructor(
     /** 二级 Compose SnapshotStateMap：外层按目录 cid 隔离，内层按文件 pickCode 触发列表单条目精准重组 */
     val imageBeanCache get() = imageCacheStore.imageBeanCache
 
-    /** 记录各目录最后点击项的唯一标识 (供 FileScreen 观察维持滚动定位) */
-    val clickMap: ConcurrentHashMap<String, String> get() = scrollPositionStore.clicks
 
     // 便捷只读属性访问器（对齐原有 UI/外部组件调用）
     val fileBeanList: List<FileBean> get() = contentState.value.fileBeanList
@@ -309,8 +307,25 @@ class FileViewModel @Inject constructor(
     // ==================== 统一导航调度实现 (实现 FileNavigator) ====================
 
     override fun navigateTo(cid: String) {
+        navigateTo(cid, targetName = "")
+    }
+
+    /**
+     * 统揽全场景的唯一导航调度入口（支持参数默认值向后兼容）
+     */
+    fun navigateTo(cid: String, targetName: String = "") {
+        val current = stateHolder.currentContentState
+        // 幂等守卫：若当前已处于该目录骨架屏加载中，直接忽略重复触发，杜绝任务抖动
+        if (current.isLoadingFolder && current.currentCid == cid) {
+            return
+        }
+
         queryJob?.cancel() // 1. 斩断搜索 Job，防止搜索结果迟到覆盖
         getFilesJob?.cancel() // 2. 取消前序目录慢请求，彻底根除覆盖竞态
+
+        val needsFetch = browserModule.prepareOptimisticNavigation(cid, targetName)
+        if (!needsFetch) return
+
         getFilesJob = viewModelScope.launch {
             browserModule.getFiles(cid)
         }
@@ -321,6 +336,13 @@ class FileViewModel @Inject constructor(
 
     fun back() = viewModelScope.launch {
         queryJob?.cancel()
+        // 骨架屏加载中点按返回：立即取消网络请求并瞬间回滚快照
+        if (stateHolder.currentContentState.isLoadingFolder) {
+            getFilesJob?.cancel()
+            browserModule.rollbackSnapshot()
+            return@launch
+        }
+
         when (val result = browserModule.back()) {
             is BackResult.NavigateTo -> navigateTo(result.targetCid)
             else -> {}
@@ -344,17 +366,29 @@ class FileViewModel @Inject constructor(
     }
 
     fun search(searchKey: String) {
+        getFilesJob?.cancel()
         queryJob?.cancel()
+        if (stateHolder.currentContentState.isLoadingFolder) {
+            stateHolder.updateContentState { copy(isLoadingFolder = false) }
+        }
         queryJob = viewModelScope.launch { browserModule.search(searchKey) }
     }
 
     fun filterFile(type: Int, name: String, order: OrderBean = orderBean) {
+        getFilesJob?.cancel()
         queryJob?.cancel()
+        if (stateHolder.currentContentState.isLoadingFolder) {
+            stateHolder.updateContentState { copy(isLoadingFolder = false) }
+        }
         queryJob = viewModelScope.launch { browserModule.filterFile(type, name, order) }
     }
 
     fun starFileScreen() {
+        getFilesJob?.cancel()
         queryJob?.cancel()
+        if (stateHolder.currentContentState.isLoadingFolder) {
+            stateHolder.updateContentState { copy(isLoadingFolder = false) }
+        }
         queryJob = viewModelScope.launch { browserModule.starFileScreen(orderBean) }
     }
 
@@ -420,7 +454,6 @@ class FileViewModel @Inject constructor(
     }
 
     fun startSendAria2Service(fileBean: FileBean) = mediaModule.startSendAria2Service(fileBean)
-    fun startSendAria2Service(index: Int) = mediaModule.startSendAria2Service(index)
     fun getTorrentTask(sha1: String) = viewModelScope.launch { mediaModule.getTorrentTask(sha1) }
     fun addTorrentTask(
         infoHash: String,
@@ -454,7 +487,6 @@ class FileViewModel @Inject constructor(
     // 弹窗快捷开启与关闭方法透传
     fun openCreateFolderDialog() = mutatorModule.openCreateFolderDialog()
     fun openRenameFileDialog(fileBean: FileBean) = mutatorModule.openRenameFileDialog(fileBean)
-    fun openBatchRenameDialog() = mutatorModule.openBatchRenameDialog()
     fun openDiscardVideosDialog(discardList: List<VideoBean>, targetCid: String) =
         mutatorModule.openDiscardVideosDialog(discardList, targetCid)
 

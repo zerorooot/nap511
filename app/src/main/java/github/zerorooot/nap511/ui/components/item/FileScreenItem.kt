@@ -176,37 +176,46 @@ fun FileListContent(
     itemActions: FileItemActions,
     modifier: Modifier = Modifier
 ) {
-    PullToRefreshBox(
-        isRefreshing = dataState.refreshing,
-        onRefresh = itemActions.onRefresh,
-        modifier = modifier
-    ) {
-        if (dataState.fileItemList.isEmpty()) {
-            FileEmptyContent()
-        } else {
-            // 当从普通目录切换至搜索/过滤（或退出恢复）时，强制重新初始化 LazyColumnScrollbar，
-            // 确保其内部的 LazyListStateController 紧密绑定当前活跃的 LazyListState 实例。
-            key(dataState.paginationKey, displayConfig.isPreviewActive) {
-                if (displayConfig.isPreviewActive) {
-                    FileStaggeredGridList(
-                        dataState = dataState,
-                        displayConfig = displayConfig,
-                        staggeredGridState = scrollState.staggeredGridState,
-                        itemActions = itemActions
-                    )
-                } else if (displayConfig.isExpandedScreen) {
-                    FileGridList(
-                        dataState = dataState,
-                        displayConfig = displayConfig,
-                        gridState = scrollState.gridState,
-                        itemActions = itemActions
-                    )
-                } else {
-                    FileColumnList(
-                        dataState = dataState,
-                        listState = scrollState.listState,
-                        itemActions = itemActions
-                    )
+    // 关键对齐：结构性解耦分流。
+    // 骨架屏态直接独立挂载，完全不包裹 PullToRefreshBox，杜绝手势竞争与下拉转圈
+    if (dataState.isLoadingFolder) {
+        FileSkeletonContent(
+            displayConfig = displayConfig,
+            modifier = modifier
+        )
+    } else {
+        PullToRefreshBox(
+            isRefreshing = dataState.refreshing,
+            onRefresh = itemActions.onRefresh,
+            modifier = modifier
+        ) {
+            if (dataState.fileItemList.isEmpty()) {
+                FileEmptyContent()
+            } else {
+                // 当从普通目录切换至搜索/过滤（或退出恢复）时，强制重新初始化 LazyColumnScrollbar，
+                // 确保其内部的 LazyListStateController 紧密绑定当前活跃的 LazyListState 实例。
+                key(dataState.paginationKey, displayConfig.isPreviewActive) {
+                    if (displayConfig.isPreviewActive) {
+                        FileStaggeredGridList(
+                            dataState = dataState,
+                            displayConfig = displayConfig,
+                            staggeredGridState = scrollState.staggeredGridState,
+                            itemActions = itemActions
+                        )
+                    } else if (displayConfig.isExpandedScreen) {
+                        FileGridList(
+                            dataState = dataState,
+                            displayConfig = displayConfig,
+                            gridState = scrollState.gridState,
+                            itemActions = itemActions
+                        )
+                    } else {
+                        FileColumnList(
+                            dataState = dataState,
+                            listState = scrollState.listState,
+                            itemActions = itemActions
+                        )
+                    }
                 }
             }
         }
