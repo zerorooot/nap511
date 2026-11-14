@@ -25,13 +25,21 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.milliseconds
 
+import javax.inject.Inject
+import javax.inject.Singleton
+
 /**
  * 统一目录分页与缓存协同器标准实现
  */
+@Singleton
 class DirectoryPagingCoordinatorImpl(
     private val fileRepository: FileRepository,
     private val fileCacheManager: FileCacheManager = FileCacheManager
 ) : DirectoryPagingCoordinator {
+
+    @Inject
+    constructor(fileRepository: FileRepository) : this(fileRepository, FileCacheManager)
+
     private val flightMutex = Mutex()
     private val inFlightBatchTasks = ConcurrentHashMap<String, Deferred<List<FileBean>>>()
 

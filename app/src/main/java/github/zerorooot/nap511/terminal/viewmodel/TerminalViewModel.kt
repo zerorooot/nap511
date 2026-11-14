@@ -11,11 +11,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import android.content.Context
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
 import github.zerorooot.nap511.bean.AvatarBean
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.PathBean
-import github.zerorooot.nap511.di.app
-import github.zerorooot.nap511.di.appContainer
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.terminal.commands.CommandRegistryFactory
@@ -55,6 +57,7 @@ import java.io.File
  *
  * 本 ViewModel 负责统筹以上子组件，对外保持 100% 的公开 API 与 Compose 状态观察兼容。
  */
+@HiltViewModel
 class TerminalViewModel(
     private val fileRepository: FileRepository,
     initialPathList: List<PathBean> = emptyList(),
@@ -65,19 +68,20 @@ class TerminalViewModel(
     private val settingsRepository: SettingsRepository,
     private val unzipQueueManager: UnzipQueueManager? = null,
 ) : ViewModel() {
-    companion object {
-        val Factory: ViewModelProvider.Factory = viewModelFactory {
-            initializer {
-                val container = appContainer
-                TerminalViewModel(
-                    fileRepository = container.fileRepository,
-                    historyFile = File(app.filesDir, "terminal_history.txt"),
-                    settingsRepository = appContainer.settingsRepository,
-                    unzipQueueManager = appContainer.unzipQueueManager
-                )
-            }
-        }
+    @Inject
+    constructor(
+        fileRepository: FileRepository,
+        @ApplicationContext context: Context,
+        settingsRepository: SettingsRepository,
+        unzipQueueManager: UnzipQueueManager,
+    ) : this(
+        fileRepository = fileRepository,
+        historyFile = File(context.filesDir, "terminal_history.txt"),
+        settingsRepository = settingsRepository,
+        unzipQueueManager = unzipQueueManager,
+    )
 
+    companion object {
         /**
          * 终端屏幕输出最大保留行数上限 (Scrollback Limit)
          * 避免长时间运行或海量输出导致内存暴涨与掉帧

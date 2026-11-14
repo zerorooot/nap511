@@ -18,8 +18,8 @@ import github.zerorooot.nap511.bean.VideoInfoBean
 import github.zerorooot.nap511.bean.VideoStarAction
 import github.zerorooot.nap511.bean.VideoUiState
 import github.zerorooot.nap511.bean.getVisualDimensions
-import github.zerorooot.nap511.di.app
-import github.zerorooot.nap511.di.appContainer
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SubtitleRepository
 import github.zerorooot.nap511.util.FileCacheManager
@@ -112,25 +112,13 @@ sealed class VideoUiEvent {
  *
  * 负责管理视频播放状态、切换视频、同步播放历史、处理请求拦截异常以及通过代理 [SubtitleDelegate] 管理字幕业务。
  */
-class VideoViewModel(
+@HiltViewModel
+class VideoViewModel @Inject constructor(
     application: Application,
     internal val fileRepository: FileRepository,
     internal val subtitleRepository: SubtitleRepository,
     private val toastProvider: ToastProvider,
 ) : AndroidViewModel(application) {
-    companion object {
-        val Factory: ViewModelProvider.Factory = viewModelFactory {
-            initializer {
-                val container = appContainer
-                VideoViewModel(
-                    application = app,
-                    fileRepository = container.fileRepository,
-                    subtitleRepository = container.subtitleRepository,
-                    toastProvider = container.toastProvider
-                )
-            }
-        }
-    }
 
     /** 字幕业务逻辑代理类 */
     private val subtitleDelegate =

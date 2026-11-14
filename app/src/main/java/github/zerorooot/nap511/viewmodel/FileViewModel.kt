@@ -20,8 +20,9 @@ import github.zerorooot.nap511.bean.RemainingSpaceBean
 import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoStarAction
-import github.zerorooot.nap511.di.app
-import github.zerorooot.nap511.di.appContainer
+import dagger.hilt.android.lifecycle.HiltViewModel
+import github.zerorooot.nap511.worker.UnzipQueueManager
+import javax.inject.Inject
 import github.zerorooot.nap511.repository.AuthRepository
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
@@ -67,8 +68,9 @@ import java.util.concurrent.ConcurrentHashMap
  * - 业务逻辑由 5 大领域模块（浏览/变更/媒体/缓存同步/外部集成）协同承载；
  * - 门面负责协程作用域调度、Job 竞态取消以及向后兼容的公开方法透传。
  */
+@HiltViewModel
 @SuppressLint("MutableCollectionMutableState")
-class FileViewModel(
+class FileViewModel @Inject constructor(
     application: Application,
     internal val fileRepository: FileRepository,
     private val settingsRepository: SettingsRepository,
@@ -76,23 +78,8 @@ class FileViewModel(
     val pagingCoordinator: DirectoryPagingCoordinator,
     private val toastProvider: ToastProvider,
     val stringProvider: AppStringProvider,
+    private val unzipQueueManager: UnzipQueueManager,
 ) : AndroidViewModel(application), FileNavigator {
-    companion object {
-        val Factory: ViewModelProvider.Factory = viewModelFactory {
-            initializer {
-                val container = appContainer
-                FileViewModel(
-                    application = app,
-                    fileRepository = container.fileRepository,
-                    settingsRepository = container.settingsRepository,
-                    authRepository = container.authRepository,
-                    pagingCoordinator = container.pagingCoordinator,
-                    toastProvider = container.toastProvider,
-                    stringProvider = container.stringProvider
-                )
-            }
-        }
-    }
 
     internal val context = getApplication<Application>()
 
@@ -211,7 +198,7 @@ class FileViewModel(
         serviceBridge = serviceBridge,
         navigator = this, // 统一注入门面自身
         onEnqueueUnzip = { taskItems ->
-            context.appContainer.unzipQueueManager.enqueueAndStartWorker(taskItems, context)
+            unzipQueueManager.enqueueAndStartWorker(taskItems, context)
         },
         toastProvider = toastProvider
     )

@@ -7,15 +7,17 @@ import android.os.IBinder
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.JsonArray
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.di.appContainer
-import github.zerorooot.nap511.di.toast
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.network.NetworkClient
 import github.zerorooot.nap511.util.network.UserSessionManager
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -23,13 +25,18 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
-
+@AndroidEntryPoint
 class Sha1Service : Service() {
     private val okHttpClient = NetworkClient.sharedOkHttpClient
 
-    private val fileRepository: FileRepository by lazy {
-        appContainer.fileRepository
-    }
+    @Inject
+    lateinit var fileRepository: FileRepository
+
+    @Inject
+    lateinit var settingsRepository: SettingsRepository
+
+    @Inject
+    lateinit var toastProvider: ToastProvider
 
     override fun onBind(intent: Intent?): IBinder? {
         TODO("Not yet implemented")
@@ -97,7 +104,6 @@ class Sha1Service : Service() {
     }
      */
     private suspend fun sendToAria2(fileBeanDownloadList: ArrayList<String>) {
-        val settingsRepository = appContainer.settingsRepository
         val aria2Token = settingsRepository.getDataSuspend(ConfigKeyUtil.ARIA2_TOKEN, "")
         val aria2Url = settingsRepository.getDataSuspend(
             ConfigKeyUtil.ARIA2_URL,
@@ -160,7 +166,7 @@ class Sha1Service : Service() {
             "下载失败！${e.message}"
         }
 
-        toast(message)
+        toastProvider.showToast(message)
 
     }
 

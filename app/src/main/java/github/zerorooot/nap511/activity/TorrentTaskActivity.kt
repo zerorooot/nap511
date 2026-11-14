@@ -5,19 +5,29 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.lifecycle.lifecycleScope
-import github.zerorooot.nap511.di.appContainer
-import github.zerorooot.nap511.di.toast
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 
+@AndroidEntryPoint
 class TorrentTaskActivity : androidx.activity.ComponentActivity() {
-    private val fileRepository by lazy { appContainer.fileRepository }
+
+    @Inject
+    lateinit var fileRepository: FileRepository
+
+    @Inject
+    lateinit var settingsRepository: SettingsRepository
+
+    @Inject
+    lateinit var toastProvider: ToastProvider
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -25,8 +35,7 @@ class TorrentTaskActivity : androidx.activity.ComponentActivity() {
             val torrentFile = fileFromContentUri(this, intent.data!!)
             lifecycleScope.launch {
                 val defaultOfflineCid =
-                    (application as App).container.settingsRepository
-                        .getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
+                    settingsRepository.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
                 val result = fileRepository.uploadFile(
                     file = torrentFile,
                     targetCid = defaultOfflineCid,
@@ -37,7 +46,7 @@ class TorrentTaskActivity : androidx.activity.ComponentActivity() {
                 } else {
                     "上传种子文件失败,${result.message}"
                 }
-                toast(message)
+                toastProvider.showToast(message)
                 moveTaskToBack(true)
                 finishAndRemoveTask()
             }

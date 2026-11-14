@@ -1,5 +1,7 @@
 package github.zerorooot.nap511.repository
 
+import javax.inject.Inject
+import javax.inject.Singleton
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.JsonArray
@@ -42,10 +44,17 @@ interface AuthRepository {
 /**
  * 默认生产环境鉴权与 RPC 服务仓储实现
  */
+@Singleton
 class DefaultAuthRepository(
     private val settingsRepository: SettingsRepository,
     private val okHttpClient: OkHttpClient = NetworkClient.sharedOkHttpClient
 ) : AuthRepository {
+
+    @Inject
+    constructor(settingsRepository: SettingsRepository) : this(
+        settingsRepository = settingsRepository,
+        okHttpClient = NetworkClient.sharedOkHttpClient
+    )
     private val gson = Gson()
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 

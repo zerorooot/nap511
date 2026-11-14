@@ -54,11 +54,15 @@ import java.util.Locale
 import java.util.StringJoiner
 import kotlin.time.Duration.Companion.milliseconds
 
+import javax.inject.Inject
+import javax.inject.Singleton
+
 /**
  * 生产环境默认的文件数据仓库实现
  * 依赖显式注入的 [FileService] 与 [OfflineService]，内部杜绝任何静态单例调用。
  */
-class DefaultFileRepository(
+@Singleton
+class DefaultFileRepository @Inject constructor(
     private val fileService: FileService,
     private val offlineService: OfflineService
 ) : FileRepository {

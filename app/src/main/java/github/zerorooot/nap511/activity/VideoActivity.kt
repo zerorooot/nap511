@@ -47,11 +47,12 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.helper.ExoPlayerInitializer
 import github.zerorooot.nap511.activity.helper.SubtitlePanelController
 import github.zerorooot.nap511.activity.helper.VideoDrawerController
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import github.zerorooot.nap511.bean.LaunchVideoParams
 import github.zerorooot.nap511.bean.VideoUiState
 import github.zerorooot.nap511.dialog.CaptchaVideoContent
 import github.zerorooot.nap511.player.MyGSYVideoPlayer
-import github.zerorooot.nap511.di.toast
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.findMatchingSubtitle
 import github.zerorooot.nap511.util.network.UserSessionManager
@@ -59,6 +60,7 @@ import github.zerorooot.nap511.util.network.VideoErrorMapper
 import github.zerorooot.nap511.util.network.isHandledException
 import github.zerorooot.nap511.viewmodel.VideoUiEvent
 import github.zerorooot.nap511.viewmodel.VideoViewModel
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
@@ -74,10 +76,14 @@ import androidx.core.view.isVisible
  * 4. 结合 SubtitlePanelController 与 VideoDrawerController 实现字幕设置与侧边抽屉菜单；
  * 5. 处理横竖屏旋转与返回按键逻辑。
  */
+@AndroidEntryPoint
 class VideoActivity : AppCompatActivity() {
 
+    @Inject
+    lateinit var toastProvider: ToastProvider
+
     /** 视频播放业务逻辑与状态管理 ViewModel */
-    private val viewModel: VideoViewModel by viewModels { VideoViewModel.Factory }
+    private val viewModel: VideoViewModel by viewModels()
 
     /** 自定义 GSY 视频播放器控件 */
     private lateinit var videoPlayer: MyGSYVideoPlayer
@@ -295,7 +301,7 @@ class VideoActivity : AppCompatActivity() {
         // ----------------------------------------------------
         // 6. 控制器初始化（字幕与侧边抽屉）
         // ----------------------------------------------------
-        subtitlePanelController = SubtitlePanelController(this, videoPlayer, viewModel)
+        subtitlePanelController = SubtitlePanelController(this, videoPlayer, viewModel, toastProvider)
         videoDrawerController =
             VideoDrawerController(this, videoPlayer, viewModel, subtitlePanelController)
 
@@ -366,7 +372,7 @@ class VideoActivity : AppCompatActivity() {
                                 }
                                 videoPlayer.playNext(event.videoUrl, event.title)
                                 if (event.videoUrl.isEmpty()) {
-                                    toast("获取视频链接失败，视频可能被删除，请刷新重试！")
+                                    toastProvider.showToast("获取视频链接失败，视频可能被删除，请刷新重试！")
                                     viewModel.onEpisodeLoadError()
                                 } else if (event.isEpisodeSwitch) {
                                     // 切换集数时的字幕联动：为新集数匹配并自动加载对应字幕
@@ -376,7 +382,7 @@ class VideoActivity : AppCompatActivity() {
 
                             // 弹出 Toast 消息
                             is VideoUiEvent.Toast -> {
-                                toast(event.message)
+                                toastProvider.showToast(event.message)
                             }
 
                             // 旋转屏幕

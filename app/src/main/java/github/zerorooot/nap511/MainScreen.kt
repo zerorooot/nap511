@@ -45,16 +45,15 @@ fun MainScreen(
     settingUiState: SettingUiState,
     onMoveTaskToBack: (Boolean) -> Unit
 ) {
-    val fileViewModel: FileViewModel = viewModel(factory = FileViewModel.Factory)
-    val audioViewModel: AudioViewModel = viewModel(factory = AudioViewModel.Factory)
+    val fileViewModel: FileViewModel = viewModel()
+    val audioViewModel: AudioViewModel = viewModel()
 
     LaunchedEffect(settingUiState.positionAfterAt, settingUiState.automaticSubtitle) {
         audioViewModel.positionAfterAt = settingUiState.positionAfterAt
         audioViewModel.automaticSubtitle = settingUiState.automaticSubtitle
     }
 
-    val offlineFileViewModel: OfflineFileViewModel =
-        viewModel(factory = OfflineFileViewModel.Factory)
+    val offlineFileViewModel: OfflineFileViewModel = viewModel()
 
     val context = LocalContext.current
     val toastProvider = LocalToastProvider.current

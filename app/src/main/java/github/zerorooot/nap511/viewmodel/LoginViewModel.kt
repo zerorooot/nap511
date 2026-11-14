@@ -6,9 +6,10 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.elvishew.xlog.XLog
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
-import github.zerorooot.nap511.di.appContainer
 import github.zerorooot.nap511.repository.AuthRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.screen.auth.LoginCredential
@@ -18,23 +19,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class LoginViewModel(
+@HiltViewModel
+class LoginViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val authRepository: AuthRepository,
     private val toastProvider: ToastProvider,
 ) : ViewModel() {
-    companion object {
-        val Factory: ViewModelProvider.Factory = viewModelFactory {
-            initializer {
-                val container = appContainer
-                LoginViewModel(
-                    container.settingsRepository,
-                    container.authRepository,
-                    container.toastProvider
-                )
-            }
-        }
-    }
 
     fun performLogin(credential: LoginCredential, onLoginSuccess: () -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {

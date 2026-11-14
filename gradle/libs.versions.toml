@@ -31,6 +31,10 @@ junit = "4.13.2"
 camerax = "1.6.2"
 zxing = "3.5.4"
 material = "1.14.0"
+hilt = "2.60.1"
+ksp = "2.3.12"
+androidxHilt = "1.2.0"
+robolectric = "4.14.1"
 
 [libraries]
 android-request-inspector-webview = { module = "com.github.acsbendi:Android-Request-Inspector-WebView", version.ref = "androidRequestInspectorWebview" }
@@ -86,8 +90,16 @@ zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 google-material = { module = "com.google.android.material:material", version.ref = "material" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
+hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
+androidx-hilt-work = { module = "androidx.hilt:hilt-work", version.ref = "androidxHilt" }
+androidx-hilt-compiler = { module = "androidx.hilt:hilt-compiler", version.ref = "androidxHilt" }
+hilt-android-testing = { module = "com.google.dagger:hilt-android-testing", version.ref = "hilt" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 

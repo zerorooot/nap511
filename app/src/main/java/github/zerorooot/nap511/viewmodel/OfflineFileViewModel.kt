@@ -17,7 +17,8 @@ import github.zerorooot.nap511.bean.OfflineListCount
 import github.zerorooot.nap511.bean.OfflineTask
 import github.zerorooot.nap511.bean.OfflineTaskType
 import github.zerorooot.nap511.bean.QuotaBean
-import github.zerorooot.nap511.di.appContainer
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -49,23 +50,12 @@ data class OfflineFileUiState(
     val completedList: List<OfflineTask> = emptyList(),
 )
 
-class OfflineFileViewModel(
+@HiltViewModel
+class OfflineFileViewModel @Inject constructor(
     private val fileRepository: FileRepository,
     private val toastProvider: ToastProvider,
     private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
-    companion object {
-        val Factory: ViewModelProvider.Factory = viewModelFactory {
-            initializer {
-                val container = appContainer
-                OfflineFileViewModel(
-                    container.fileRepository,
-                    container.toastProvider,
-                    container.settingsRepository
-                )
-            }
-        }
-    }
 
     private val _isRefreshing = MutableStateFlow(false)
     private var downloadingTask by mutableStateOf(OfflineInfo())

@@ -9,8 +9,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
-import github.zerorooot.nap511.di.appContainer
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import github.zerorooot.nap511.bean.LocationBean
@@ -32,23 +32,12 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class SettingViewModel(
+@HiltViewModel
+class SettingViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val authRepository: AuthRepository,
     private val toastProvider: ToastProvider,
 ) : ViewModel() {
-    companion object {
-        val Factory: ViewModelProvider.Factory = viewModelFactory {
-            initializer {
-                val container = appContainer
-                SettingViewModel(
-                    container.settingsRepository,
-                    container.authRepository,
-                    container.toastProvider
-                )
-            }
-        }
-    }
     private val gson = GsonBuilder().setPrettyPrinting().create()
     internal val _currentLocation = MutableStateFlow(LocationBean(0, 0))
     var currentLocation = _currentLocation.asStateFlow()

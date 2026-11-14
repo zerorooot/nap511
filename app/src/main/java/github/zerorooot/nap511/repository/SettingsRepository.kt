@@ -1,5 +1,7 @@
 package github.zerorooot.nap511.repository
 
+import javax.inject.Inject
+import javax.inject.Singleton
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -70,7 +72,8 @@ interface SettingsRepository {
 /**
  * 基于 Jetpack DataStore 的设置仓储默认生产实现
  */
-class DataStoreSettingsRepository(
+@Singleton
+class DataStoreSettingsRepository @Inject constructor(
     private val dataStore: DataStore<Preferences> // 核心：构造注入 DataStore 实例
 ) : SettingsRepository {
 

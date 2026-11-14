@@ -20,11 +20,15 @@ import java.net.URLEncoder
 import java.util.Locale
 import kotlin.math.abs
 
+import javax.inject.Inject
+import javax.inject.Singleton
+
 /**
  * 字幕 Repository
  * 负责从迅雷 API 与 115 网盘同目录获取字幕列表、进行距离排序以及处理字幕文件下载与格式转换。
  */
-open class SubtitleRepository(
+@Singleton
+open class SubtitleRepository @Inject constructor(
     private val fileRepository: FileRepository
 ) {
 

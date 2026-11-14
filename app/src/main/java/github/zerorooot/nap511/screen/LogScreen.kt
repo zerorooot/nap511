@@ -92,7 +92,7 @@ import github.zerorooot.nap511.screen.components.AppTopBarLogScreen
 import github.zerorooot.nap511.screen.components.MenuItemAction
 import github.zerorooot.nap511.screen.components.TopAppBarSearch
 import github.zerorooot.nap511.screen.components.TopBarAction
-import github.zerorooot.nap511.di.toast
+import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
 import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
 import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import github.zerorooot.nap511.util.ConfigKeyUtil
@@ -363,7 +363,10 @@ object LogParser {
  *
  * 封装日志文件读取、变动检测、清空以及外部存储导出逻辑，与 UI 层解耦。
  */
-class LogFileManager(context: Context) {
+class LogFileManager(
+    context: Context,
+    private val toastProvider: ToastProvider = AndroidToastProvider(context)
+) {
     // 统一使用 applicationContext，防止外部误传 Activity Context 导致内存泄漏
     private val appContext: Context = context.applicationContext ?: context
     /** 获取本地日志文件对象 */
@@ -407,7 +410,7 @@ class LogFileManager(context: Context) {
                 uri?.let {
                     resolver.openOutputStream(it)?.use { outputStream ->
                         outputStream.write(content.toByteArray())
-                        appContext.toast("导出成功，日志文件保存至Downloads目录，文件名为:$fileName")
+                        toastProvider.showToast("日志文件已保存至Downloads目录，文件名为：$fileName", true)
                         XLog.i("FileWrite File written to Downloads: $uri")
                     }
                 }

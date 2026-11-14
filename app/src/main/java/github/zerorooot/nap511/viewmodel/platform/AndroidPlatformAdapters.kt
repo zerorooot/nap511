@@ -4,6 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.runtime.staticCompositionLocalOf
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 import androidx.concurrent.futures.await
 import androidx.work.Constraints
 import androidx.work.Data
@@ -102,8 +105,9 @@ val LocalToastProvider = staticCompositionLocalOf<ToastProvider> {
  * 统管主线程切换、Toast 连续触发时的及时取消，保证体验平滑。
  * 强制仅持有 ApplicationContext，杜绝 Context 泄漏。
  */
-class AndroidToastProvider(
-    context: Context
+@Singleton
+class AndroidToastProvider @Inject constructor(
+    @ApplicationContext context: Context
 ) : ToastProvider {
     private val appContext: Context = context.applicationContext ?: context
     private var currentToast: Toast? = null
@@ -254,7 +258,10 @@ class AndroidBackgroundScheduler(
     }
 }
 
-class AndroidAppStringProvider(private val context: Context) : AppStringProvider {
+@Singleton
+class AndroidAppStringProvider @Inject constructor(
+    @ApplicationContext private val context: Context
+) : AppStringProvider {
     override val defaultAppName: String
         get() = context.getString(R.string.app_name)
 

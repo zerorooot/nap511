@@ -15,16 +15,19 @@ import androidx.work.ForegroundInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.elvishew.xlog.XLog
+import androidx.hilt.work.HiltWorker
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
 import github.zerorooot.nap511.MainActivity
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.ZipBeanList
 import github.zerorooot.nap511.bean.ZipStatus
 import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.di.appContainer
-import github.zerorooot.nap511.di.toast
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileCacheManager
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -33,8 +36,14 @@ import kotlinx.coroutines.withContext
 import java.util.StringJoiner
 import kotlin.time.Duration.Companion.milliseconds
 
-class UnzipAllFileWorker(
-    appContext: Context, workerParams: WorkerParameters
+@HiltWorker
+class UnzipAllFileWorker @AssistedInject constructor(
+    @Assisted appContext: Context,
+    @Assisted workerParams: WorkerParameters,
+    private val fileRepository: FileRepository,
+    private val unzipQueueManager: UnzipQueueManager,
+    private val settingsRepository: SettingsRepository,
+    private val toastProvider: ToastProvider
 ) : CoroutineWorker(appContext, workerParams) {
     private val NOTIFICATION_ID = 1001
     private val CHANNEL_ID = "unzip_completion_channel"
@@ -46,14 +55,6 @@ class UnzipAllFileWorker(
 
     private val notificationManager =
         applicationContext.getSystemService(NotificationManager::class.java)
-
-    private val fileRepository: FileRepository by lazy {
-        applicationContext.appContainer.fileRepository
-    }
-
-    private val unzipQueueManager by lazy {
-        applicationContext.appContainer.unzipQueueManager
-    }
 
     private val cancelPendingIntent: PendingIntent =
         WorkManager.getInstance(applicationContext).createCancelPendingIntent(id)
@@ -409,7 +410,7 @@ class UnzipAllFileWorker(
         // 2. 统一处理通知、日志和 Toast
         showCompletionNotification(isAllSuccess, message, unzipResult, targetCid)
         XLog.i("UnzipAllFileWorker 完成提示: $message $unzipResult")
-        applicationContext.toast(message)
+        toastProvider.showToast(message)
 
         // 3. 统一处理失败文件的移动（仅对明确判负的文件归类）
         val moveFailResult = handleFailedFiles(unzipFailList, targetCid, explicitErrorCid)
@@ -444,7 +445,7 @@ class UnzipAllFileWorker(
         defaultCid: String,
         explicitErrorCid: String?
     ): MoveFailResult? {
-        val data = applicationContext.appContainer.settingsRepository
+        val data = settingsRepository
             .getDataSuspend(ConfigKeyUtil.MOVE_FAIL_FILE, "")
         if (data.isEmpty()) {
             XLog.d("handleFailedFiles 不移动解压失败的文件")

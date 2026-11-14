@@ -7,12 +7,16 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.elvishew.xlog.XLog
+import dagger.hilt.android.lifecycle.HiltViewModel
 import github.zerorooot.nap511.screen.LogEntry
 import github.zerorooot.nap511.screen.LogFileManager
 import github.zerorooot.nap511.screen.LogLevel
 import github.zerorooot.nap511.screen.LogParser
 import github.zerorooot.nap511.screen.LogUiState
 import github.zerorooot.nap511.util.findSearchMatches
+import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
+import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -40,28 +44,28 @@ import kotlin.time.Duration.Companion.milliseconds
  * @param ioDispatcher IO 协程调度器，支持单测注入模拟
  * @param autoStartWatcher 是否在初始化时自动启动文件监听轮询
  */
-class LogViewModel @JvmOverloads constructor(
+@HiltViewModel
+class LogViewModel(
     application: Application,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val autoStartWatcher: Boolean = true
+    private val autoStartWatcher: Boolean = true,
+    private val toastProvider: ToastProvider = AndroidToastProvider(application),
 ) : AndroidViewModel(application) {
-    companion object {
-        val Factory: ViewModelProvider.Factory = viewModelFactory {
-            initializer {
-                val application = checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY])
-                LogViewModel(
-                    application = application,
-                    ioDispatcher = Dispatchers.IO,
-                    autoStartWatcher = true
-                )
-            }
-        }
-    }
+    @Inject
+    constructor(
+        application: Application,
+        toastProvider: ToastProvider,
+    ) : this(
+        application = application,
+        ioDispatcher = Dispatchers.IO,
+        autoStartWatcher = true,
+        toastProvider = toastProvider,
+    )
 
     private val _uiState = MutableStateFlow(LogUiState())
     val uiState: StateFlow<LogUiState> = _uiState.asStateFlow()
-    // 创建 LogViewModel 时传入 Application Context 初始化 LogFileManager
-    private val logFileManager = LogFileManager(application)
+    // 创建 LogViewModel 时传入 Application Context 和 toastProvider 初始化 LogFileManager
+    private val logFileManager = LogFileManager(application, toastProvider)
 
     init {
         if (autoStartWatcher) {

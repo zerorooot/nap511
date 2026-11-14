@@ -30,13 +30,36 @@ import java.io.InputStream
  * 为全部接口方法提供无副作用的安全默认返回值，方便各类单测按需仅仅 override 感兴趣的目标方法。
  */
 open class FakeFileRepository : FileRepository {
-    override suspend fun getOfflineSign(): SignBean = SignBean(state = true, sign = "mock_sign")
+    var offlineSignResult: SignBean = SignBean(state = true, sign = "mock_sign")
+    var offlineTaskCountResult: OfflineListCount = OfflineListCount(state = true)
+    var offlineTaskListDownloading: OfflineInfo = OfflineInfo(state = true)
+    var offlineTaskListFailed: OfflineInfo = OfflineInfo(state = true)
+    var offlineTaskListCompleted: OfflineInfo = OfflineInfo(state = true)
+    var clearOfflineFinishResult: BaseReturnMessage = BaseReturnMessage(state = true)
+    var clearOfflineErrorResult: BaseReturnMessage = BaseReturnMessage(state = true)
+    var quotaResult: QuotaBean = QuotaBean(count = 0, surplus = 0)
+    var addOfflineTaskResult: Pair<Boolean, String> = Pair(true, "mock_task_id")
+    var deleteOfflineTaskResult: BaseReturnMessage = BaseReturnMessage(state = true)
 
-    override suspend fun getOfflineTaskCount(): OfflineListCount = OfflineListCount(state = true)
+    var lastDeletedTaskMap: Map<String, String>? = null
+    var throwExceptionOnSign: Throwable? = null
+
+    override suspend fun getOfflineSign(): SignBean {
+        throwExceptionOnSign?.let { throw it }
+        return offlineSignResult
+    }
+
+    override suspend fun getOfflineTaskCount(): OfflineListCount = offlineTaskCountResult
 
     override suspend fun getOfflineTaskList(
         uid: String, sign: String, page: Int, offlineTaskType: OfflineTaskType
-    ): OfflineInfo = OfflineInfo(state = true)
+    ): OfflineInfo {
+        return when (offlineTaskType) {
+            OfflineTaskType.DownloadingList -> offlineTaskListDownloading
+            OfflineTaskType.FailedList -> offlineTaskListFailed
+            OfflineTaskType.CompletedList -> offlineTaskListCompleted
+        }
+    }
 
     override suspend fun getOfflineTorrentTaskList(
         sha1: String, sign: String, uid: String
@@ -46,18 +69,20 @@ open class FakeFileRepository : FileRepository {
         infoHash: String, wanted: String, savePath: String, uid: String, sign: String
     ): BaseReturnMessage = BaseReturnMessage(state = true)
 
-    override suspend fun quota(): QuotaBean = QuotaBean(count = 0, surplus = 0)
+    override suspend fun quota(): QuotaBean = quotaResult
 
     override suspend fun addOfflineTask(
         list: List<String>, currentCid: String, offlinePath: String, handle: (Boolean) -> Unit
-    ): Pair<Boolean, String> = Pair(true, "mock_task_id")
+    ): Pair<Boolean, String> = addOfflineTaskResult
 
-    override suspend fun deleteOfflineTask(body: HashMap<String, String>): BaseReturnMessage =
-        BaseReturnMessage(state = true)
+    override suspend fun deleteOfflineTask(body: HashMap<String, String>): BaseReturnMessage {
+        lastDeletedTaskMap = body
+        return deleteOfflineTaskResult
+    }
 
-    override suspend fun clearOfflineError(): BaseReturnMessage = BaseReturnMessage(state = true)
+    override suspend fun clearOfflineError(): BaseReturnMessage = clearOfflineErrorResult
 
-    override suspend fun clearOfflineFinish(): BaseReturnMessage = BaseReturnMessage(state = true)
+    override suspend fun clearOfflineFinish(): BaseReturnMessage = clearOfflineFinishResult
 
     override suspend fun getFiles(
         cid: String,

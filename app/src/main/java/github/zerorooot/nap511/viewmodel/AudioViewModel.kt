@@ -16,8 +16,8 @@ import com.shuyu.gsyvideoplayer.player.PlayerFactory
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.SubtitleItem
 import github.zerorooot.nap511.bean.SubtitleUiState
-import github.zerorooot.nap511.di.app
-import github.zerorooot.nap511.di.appContainer
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import github.zerorooot.nap511.player.AudioGSYManager
 import github.zerorooot.nap511.repository.FileRepository
 import github.zerorooot.nap511.repository.SubtitleRepository
@@ -57,25 +57,13 @@ data class AudioUiState(
     val subtitle: SubtitleUiState = SubtitleUiState()
 )
 
-class AudioViewModel(
+@HiltViewModel
+class AudioViewModel @Inject constructor(
     application: Application,
     val fileRepository: FileRepository,
     val subtitleRepository: SubtitleRepository,
     private val toastProvider: ToastProvider,
 ) : AndroidViewModel(application) {
-    companion object {
-        val Factory: ViewModelProvider.Factory = viewModelFactory {
-            initializer {
-                val container = appContainer
-                AudioViewModel(
-                    application = app,
-                    fileRepository = container.fileRepository,
-                    subtitleRepository = container.subtitleRepository,
-                    toastProvider = container.toastProvider
-                )
-            }
-        }
-    }
 
     var positionAfterAt: Boolean = false
     var automaticSubtitle: Boolean = false

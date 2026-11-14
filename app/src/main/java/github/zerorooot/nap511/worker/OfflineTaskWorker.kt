@@ -19,22 +19,27 @@ import androidx.work.WorkerParameters
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import androidx.hilt.work.HiltWorker
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
 import github.zerorooot.nap511.MainActivity
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.OfflineTaskActivity
 import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.di.appContainer
-import github.zerorooot.nap511.di.toast
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.FileCacheManager
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import java.util.StringJoiner
 
-class OfflineTaskWorker(
-    appContext: Context, workerParams: WorkerParameters
+@HiltWorker
+class OfflineTaskWorker @AssistedInject constructor(
+    @Assisted appContext: Context,
+    @Assisted workerParams: WorkerParameters,
+    private val fileRepository: FileRepository,
+    private val settingsRepository: SettingsRepository,
+    private val toastProvider: ToastProvider
 ) : CoroutineWorker(appContext, workerParams) {
-    private val fileRepository: FileRepository by lazy {
-        applicationContext.appContainer.fileRepository
-    }
 
     companion object {
         const val PROGRESS_NOTIFICATION_ID = 2001
@@ -66,7 +71,6 @@ class OfflineTaskWorker(
         }
 
 
-        val settingsRepository = applicationContext.appContainer.settingsRepository
         val cid = settingsRepository.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_CID, "")
         val path =
             settingsRepository.getDataSuspend(ConfigKeyUtil.DEFAULT_OFFLINE_PATH, "/根目录/云下载")
@@ -88,7 +92,7 @@ class OfflineTaskWorker(
         XLog.v("OfflineTaskWorker checkOfflineTask $message")
 
         if (state) {
-            applicationContext.toast(message)
+            toastProvider.showToast(message)
         } else {
             //只有失败才弹通知
             toast(message, a, cid)

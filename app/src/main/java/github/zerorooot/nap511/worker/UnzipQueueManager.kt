@@ -18,13 +18,20 @@ import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
 
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
+
 /**
  * 全局解压队列管理器 (SSOT 单一数据源)
  * 职责：
  * 1. 内存高性能待办池 + 磁盘原子落盘，防止进程被杀 (LMK) 后解压任务丢失；
  * 2. 状态机互斥与 Double-Check 退出机制，彻底杜绝 Worker 退出临界点与新追加任务产生的假死竞态。
  */
-class UnzipQueueManager(context: Context) {
+@Singleton
+class UnzipQueueManager @Inject constructor(
+    @ApplicationContext context: Context
+) {
     val lock = Any()
     private val queue = ConcurrentLinkedQueue<UnzipTaskItem>()
     private val totalCount = AtomicInteger(0)

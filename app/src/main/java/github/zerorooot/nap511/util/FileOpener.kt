@@ -6,7 +6,8 @@ import android.content.res.Configuration
 import com.google.gson.Gson
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.activity.VideoActivity
-import github.zerorooot.nap511.di.toast
+import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import github.zerorooot.nap511.bean.FileBean
 import github.zerorooot.nap511.bean.LaunchVideoParams
 import github.zerorooot.nap511.bean.Route
@@ -101,7 +102,8 @@ class FileOpener(
     private val settingUiState: () -> SettingUiState,
     private val onOpenFolder: ((String) -> Unit)? = null,
     private val onNavigate: (Route) -> Unit,
-    private val onLaunchVideoIntent: ((Intent) -> Unit)
+    private val onLaunchVideoIntent: ((Intent) -> Unit),
+    private val toastProvider: ToastProvider = AndroidToastProvider(context),
 ) {
 
     /**
@@ -224,7 +226,7 @@ class FileOpener(
         }
 
         if (video == null) {
-            context.toast("获取视频播放信息失败")
+            toastProvider.showToast("获取视频播放信息失败")
             return false
         }
 
@@ -305,12 +307,12 @@ class FileOpener(
         when (val validation =
             TextFileHelper.validate(fileBean, txtSize, checkType = !isForceOpen)) {
             is TextValidationResult.ExceedsSizeLimit -> {
-                context.toast("仅支持打开${validation.limitKb}kb以下的文件")
+                toastProvider.showToast("仅支持打开${validation.limitKb}kb以下的文件")
                 return false
             }
 
             is TextValidationResult.NotTextFile -> {
-                context.toast("非文本类型文件")
+                toastProvider.showToast("非文本类型文件")
                 return false
             }
 
@@ -330,7 +332,7 @@ class FileOpener(
             }
             return true
         } else {
-            context.toast("文件加载失败！")
+            toastProvider.showToast("文件加载失败！")
             return false
         }
     }
@@ -342,7 +344,7 @@ class FileOpener(
         val settings = settingUiState()
         val txtSize = settings.txtSize.toIntOrNull() ?: 200
         if (fileBean.size.toLong() >= txtSize * 1024) {
-            context.toast("仅支持打开${txtSize}kb以下的文件")
+            toastProvider.showToast("仅支持打开${txtSize}kb以下的文件")
             return false
         }
 
@@ -368,7 +370,7 @@ class FileOpener(
             }
             return true
         } else {
-            context.toast("文件加载失败！")
+            toastProvider.showToast("文件加载失败！")
             return false
         }
     }

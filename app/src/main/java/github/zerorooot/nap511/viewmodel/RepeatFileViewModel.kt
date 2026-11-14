@@ -11,7 +11,8 @@ import github.zerorooot.nap511.bean.CategoryDetailResponse
 import github.zerorooot.nap511.bean.RepeatFileItem
 import github.zerorooot.nap511.bean.RepeatListResponse
 import github.zerorooot.nap511.bean.RepeatStatusData
-import github.zerorooot.nap511.di.appContainer
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import github.zerorooot.nap511.screen.file.formatBytes
 import github.zerorooot.nap511.service.RepeatService
 import github.zerorooot.nap511.util.onFailureToastAndLog
@@ -38,18 +39,11 @@ data class RepeatUiState(
     val categoryDetail: CategoryDetailResponse? = null
 )
 
-class RepeatFileViewModel(
+@HiltViewModel
+class RepeatFileViewModel @Inject constructor(
     private val repeatService: RepeatService,
     private val toastProvider: ToastProvider,
 ) : ViewModel() {
-    companion object {
-        val Factory: ViewModelProvider.Factory = viewModelFactory {
-            initializer {
-                val container = appContainer
-                RepeatFileViewModel(container.repeatService, container.toastProvider)
-            }
-        }
-    }
 
     private val _uiState = MutableStateFlow(RepeatUiState())
 

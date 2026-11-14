@@ -10,8 +10,8 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
 import github.zerorooot.nap511.bean.RecycleBean
 import github.zerorooot.nap511.bean.RecycleInfo
-import github.zerorooot.nap511.di.app
-import github.zerorooot.nap511.di.appContainer
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.screen.file.RecycleUiState
 import github.zerorooot.nap511.service.FileService
@@ -30,25 +30,13 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-class RecycleViewModel(
+@HiltViewModel
+class RecycleViewModel @Inject constructor(
     application: Application,
     private val fileService: FileService,
     private val toastProvider: ToastProvider,
     private val settingsRepository: SettingsRepository,
 ) : AndroidViewModel(application) {
-    companion object {
-        val Factory: ViewModelProvider.Factory = viewModelFactory {
-            initializer {
-                val container = appContainer
-                RecycleViewModel(
-                    application = app,
-                    fileService = container.fileService,
-                    toastProvider = container.toastProvider,
-                    settingsRepository = container.settingsRepository
-                )
-            }
-        }
-    }
 
     private val _isRefreshing = MutableStateFlow(false)
     private val _recycleInfo = MutableStateFlow(RecycleInfo())

@@ -17,13 +17,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import github.zerorooot.nap511.di.toastProvider
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.ui.theme.Nap511Theme
-import github.zerorooot.nap511.util.App
 import github.zerorooot.nap511.util.SplashScreenManager
 import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 
+@AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
+
+    @Inject
+    lateinit var toastProvider: ToastProvider
+
+    @Inject
+    lateinit var settingsRepository: SettingsRepository
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // 统一通过 SplashScreenManager 管理动态启动屏的安装、挂起判断与渐隐退场
         // 确保必须在 super.onCreate 之前调用
@@ -35,7 +45,6 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
 
         setContent {
-            val settingsRepository = (application as App).container.settingsRepository
             val settingUiState by settingsRepository.settingUiStateFlow
                 .collectAsStateWithLifecycle()
 

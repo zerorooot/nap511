@@ -22,18 +22,20 @@ import androidx.work.WorkQuery
 import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.di.appContainer
-import github.zerorooot.nap511.di.toast
 import github.zerorooot.nap511.repository.SettingsRepository
 import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.handleText
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import github.zerorooot.nap511.worker.OfflineTaskWorker
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
+@AndroidEntryPoint
 class OfflineTaskActivity : ComponentActivity() {
 
     companion object {
@@ -42,7 +44,11 @@ class OfflineTaskActivity : ComponentActivity() {
         const val PENDING_NOTIFICATION_ID = 1000
     }
 
-    private val settingsRepository: SettingsRepository by lazy { appContainer.settingsRepository }
+    @Inject
+    lateinit var settingsRepository: SettingsRepository
+
+    @Inject
+    lateinit var toastProvider: ToastProvider
 
     @SuppressLint("EnqueueWork")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -146,7 +152,7 @@ class OfflineTaskActivity : ComponentActivity() {
                     val notificationManager =
                         getSystemService(NOTIFICATION_SERVICE) as NotificationManager
                     notificationManager.cancel(PENDING_NOTIFICATION_ID)
-                    toast("开始离线下载")
+                    toastProvider.showToast("开始离线下载")
                 }
             } finally {
                 finishAndRemoveTask()
@@ -198,11 +204,11 @@ class OfflineTaskActivity : ComponentActivity() {
                         val path = allPath.substringAfterLast("/")
                         val size = currentOfflineTaskList.size
 
-                        toast("已添加到’$path‘，共${size}个链接，${offlineTime}分钟后开始离线下载")
+                        toastProvider.showToast("已添加到’$path‘，共${size}个链接，${offlineTime}分钟后开始离线下载")
                         showPendingNotification(allPath, path, size)
                         addOfflineTaskByTime(currentOfflineTaskList.toList(), offlineTime)
                     } else {
-                        toast("仅支持以http、ftp、magnet、ed2k开头的链接")
+                        toastProvider.showToast("仅支持以http、ftp、magnet、ed2k开头的链接")
                     }
                 }
             } finally {

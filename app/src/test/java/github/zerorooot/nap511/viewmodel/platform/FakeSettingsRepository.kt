@@ -21,6 +21,7 @@ class FakeSettingsRepository(
     override val settingUiStateFlow: StateFlow<SettingUiState> = _settingUiStateFlow.asStateFlow()
 
     private val dataMap = mutableMapOf<String, Any>()
+    var lastImportedConfig: JsonObject? = null
 
     override fun <T : Any> getDataFlow(key: String, defaultValue: T): Flow<T> = flow {
         @Suppress("UNCHECKED_CAST")
@@ -36,7 +37,19 @@ class FakeSettingsRepository(
         dataMap[key] = newValue
     }
 
-    override suspend fun importConfig(jsonObject: JsonObject) {}
+    override suspend fun importConfig(jsonObject: JsonObject) {
+        lastImportedConfig = jsonObject
+        jsonObject.entrySet().forEach { (key, element) ->
+            if (element.isJsonPrimitive) {
+                val primitive = element.asJsonPrimitive
+                when {
+                    primitive.isBoolean -> saveData(key, primitive.asBoolean)
+                    primitive.isString -> saveData(key, primitive.asString)
+                    primitive.isNumber -> saveData(key, primitive.asNumber)
+                }
+            }
+        }
+    }
 
     override suspend fun resetConfig() {
         dataMap.clear()

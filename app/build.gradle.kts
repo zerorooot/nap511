@@ -4,6 +4,8 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt.android)
     id("kotlin-parcelize")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
@@ -207,5 +209,18 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+
+    // Hilt 依赖注入与组件生命周期整合
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
+
+    // WorkManager Hilt 扩展支持
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
+
+    // Hilt 测试套件支持
+    testImplementation(libs.hilt.android.testing)
+    kspTest(libs.hilt.compiler)
+    testImplementation(libs.robolectric)
 
 }

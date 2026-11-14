@@ -20,13 +20,14 @@ import github.zerorooot.nap511.bean.SubtitleItem
 import github.zerorooot.nap511.bean.SubtitleStyleBean
 import github.zerorooot.nap511.bean.VideoUiState
 import github.zerorooot.nap511.player.MyGSYVideoPlayer
-import github.zerorooot.nap511.di.toast
 import github.zerorooot.nap511.viewmodel.VideoViewModel
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 
 class SubtitlePanelController(
     private val context: Context,
     private val videoPlayer: MyGSYVideoPlayer,
-    private val viewModel: VideoViewModel
+    private val viewModel: VideoViewModel,
+    private val toastProvider: ToastProvider
 ) {
     private val ACTIVE_COLOR = "#42A5F5".toColorInt()
 
@@ -81,9 +82,9 @@ class SubtitlePanelController(
             videoPlayer.setSubtitleSource(source)
             videoPlayer.setSubtitleEnabled(true)
             if (showToast) {
-                context.toast("字幕切换成功")
+                toastProvider.showToast("字幕切换成功")
             } else {
-                context.toast("自动加载字幕: ${subtitleItem.simpleName}")
+                toastProvider.showToast("自动加载字幕: ${subtitleItem.simpleName}")
             }
         }
     }

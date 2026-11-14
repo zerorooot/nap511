@@ -4,7 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import com.elvishew.xlog.XLog
-import github.zerorooot.nap511.di.toast
+import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
+import github.zerorooot.nap511.viewmodel.platform.ToastProvider
 import androidx.core.net.toUri
 
 /**
@@ -47,7 +48,11 @@ data class DisclaimerClause(
 /**
  * 打开外部浏览器辅助方法
  */
-fun openExternalUrl(context: Context, url: String) {
+fun openExternalUrl(
+    context: Context,
+    url: String,
+    toastProvider: ToastProvider = AndroidToastProvider(context)
+) {
     try {
         XLog.i("准备打开外部链接: $url")
         val intent = Intent(Intent.ACTION_VIEW, url.toUri()).apply {
@@ -56,7 +61,7 @@ fun openExternalUrl(context: Context, url: String) {
         context.startActivity(intent)
     } catch (e: Exception) {
         XLog.e("打开外部链接失败: $url", e)
-        context.toast("无法打开外部链接: ${e.message}")
+        toastProvider.showToast("无法打开外部链接: ${e.message}")
     }
 }
 

@@ -27,7 +27,6 @@ import github.zerorooot.nap511.bean.SettingUiState
 import github.zerorooot.nap511.bean.SubtitleItem
 import github.zerorooot.nap511.bean.VideoBean
 import github.zerorooot.nap511.bean.VideoStarAction
-import github.zerorooot.nap511.di.appContainer
 import github.zerorooot.nap511.dialog.ExitApp
 import github.zerorooot.nap511.screen.about.AboutScreen
 import github.zerorooot.nap511.screen.about.DisclaimerScreen
@@ -162,11 +161,12 @@ fun AppNavHost(
         fileDialogController,
         uiState,
         fileViewModel,
+        toastProvider,
         onNavigate
     ) {
         FileOpener(
             context = context,
-            fileRepository = context.appContainer.fileRepository,
+            fileRepository = fileViewModel.fileRepository,
             mediaViewerStateHolder = mediaViewerStateHolder,
             audioPlayerController = audioPlayerController,
             fileDialogController = fileDialogController,
@@ -177,7 +177,8 @@ fun AppNavHost(
             onNavigate = onNavigate,
             onLaunchVideoIntent = { intent ->
                 videoActivityLauncher.launch(intent)
-            }
+            },
+            toastProvider = toastProvider
         )
     }
 
@@ -186,7 +187,7 @@ fun AppNavHost(
         onBack = onPopBack,
         entryProvider = entryProvider {
             entry<Route.Login> {
-                val loginViewModel: LoginViewModel = viewModel(factory = LoginViewModel.Factory)
+                val loginViewModel: LoginViewModel = viewModel()
                 onSetGesturesEnabled(false)
                 LoginScreen { credential ->
                     loginViewModel.performLogin(credential) {
@@ -289,7 +290,7 @@ fun AppNavHost(
             }
 
             entry<Route.AdvancedSettings> {
-                val settingViewModel: SettingViewModel = viewModel(factory = SettingViewModel.Factory)
+                val settingViewModel: SettingViewModel = viewModel()
                 SettingScreen(
                     viewModel = settingViewModel,
                     isExpandedScreen = isExpandedScreen,
@@ -330,7 +331,7 @@ fun AppNavHost(
             }
 
             entry<Route.Terminal> {
-                val terminalViewModel: TerminalViewModel = viewModel(factory = TerminalViewModel.Factory)
+                val terminalViewModel: TerminalViewModel = viewModel()
                 onSetGesturesEnabled(false)
                 terminalViewModel.initDirectoryIfNeeded(fileViewModel.pathList)
                 terminalViewModel.updateFileOpener(fileOpener)
@@ -346,7 +347,7 @@ fun AppNavHost(
             }
 
             entry<Route.RecycleBin> {
-                val recycleViewModel: RecycleViewModel = viewModel(factory = RecycleViewModel.Factory)
+                val recycleViewModel: RecycleViewModel = viewModel()
                 RecycleScreen(recycleViewModel, isGridScreen, gridCellMinSize) {
                     onOpenDrawer()
                 }
@@ -398,7 +399,7 @@ fun AppNavHost(
             }
 
             entry<Route.RepeatFile> {
-                val repeatViewModel: RepeatFileViewModel = viewModel(factory = RepeatFileViewModel.Factory)
+                val repeatViewModel: RepeatFileViewModel = viewModel()
                 RepeatFileScreen(
                     viewModel = repeatViewModel,
                     isGridScreen = isGridScreen,
