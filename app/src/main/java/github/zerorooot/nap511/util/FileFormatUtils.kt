@@ -2,7 +2,7 @@ package github.zerorooot.nap511.util
 
 import android.annotation.SuppressLint
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.data.model.FileBean
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.math.roundToInt

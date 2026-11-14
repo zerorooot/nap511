@@ -15,11 +15,11 @@ import android.content.Context
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
-import github.zerorooot.nap511.bean.AvatarBean
-import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.bean.PathBean
-import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.repository.SettingsRepository
+import github.zerorooot.nap511.data.model.AvatarBean
+import github.zerorooot.nap511.data.model.FileBean
+import github.zerorooot.nap511.data.model.PathBean
+import github.zerorooot.nap511.data.repository.FileRepository
+import github.zerorooot.nap511.data.repository.SettingsRepository
 import github.zerorooot.nap511.terminal.commands.CommandRegistryFactory
 import github.zerorooot.nap511.terminal.context.TerminalContext
 import github.zerorooot.nap511.terminal.context.currentCid
@@ -35,7 +35,7 @@ import github.zerorooot.nap511.terminal.engine.TerminalLineEditor
 import github.zerorooot.nap511.terminal.engine.completion.FileFilters
 import github.zerorooot.nap511.terminal.engine.completion.StandardCompleter
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.FileOpener
+import github.zerorooot.nap511.ui.navigation.FileOpener
 import github.zerorooot.nap511.util.TextFileHelper
 import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.CoroutineDispatcher

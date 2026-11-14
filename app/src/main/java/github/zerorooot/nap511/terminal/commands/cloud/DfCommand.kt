@@ -1,7 +1,7 @@
 package github.zerorooot.nap511.terminal.commands.cloud
 
 import com.google.gson.Gson
-import github.zerorooot.nap511.bean.RemainingSpaceBean
+import github.zerorooot.nap511.data.model.RemainingSpaceBean
 import github.zerorooot.nap511.terminal.commands.util.TableAlignment
 import github.zerorooot.nap511.terminal.commands.util.TableFormatter
 import github.zerorooot.nap511.terminal.context.TerminalContext

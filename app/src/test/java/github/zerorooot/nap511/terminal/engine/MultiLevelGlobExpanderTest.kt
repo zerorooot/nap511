@@ -1,6 +1,6 @@
 package github.zerorooot.nap511.terminal.engine
 
-import github.zerorooot.nap511.bean.PathBean
+import github.zerorooot.nap511.data.model.PathBean
 import github.zerorooot.nap511.terminal.commands.createMockFile
 import github.zerorooot.nap511.terminal.commands.createMockFolder
 import github.zerorooot.nap511.terminal.commands.createTestContext

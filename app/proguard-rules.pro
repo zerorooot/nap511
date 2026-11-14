@@ -27,14 +27,18 @@
 # Application Data Beans & Serialization (Gson / Kotlinx Serialization)
 # -------------------------------------------------------------------------
 # Keep model bean class names, fields, and constructors for reflection-based deserialization
-# (涵盖 bean.sync 局域网同步实体、bean.cache 磁盘缓存实体等全部业务 Bean)
 #noinspection ProguardRuleBroadKeep
--keep class github.zerorooot.nap511.bean.** {
+-keep class github.zerorooot.nap511.data.model.** {
     <fields>;
     public <init>(...);
 }
--keepclassmembers enum github.zerorooot.nap511.bean.** { *; }
+-keepclassmembers enum github.zerorooot.nap511.data.model.** { *; }
 
+# 保护参与持久化与网络同步的配置模型
+-keep class github.zerorooot.nap511.ui.model.SettingUiState {
+    <fields>;
+    public <init>(...);
+}
 # Keep worker tasks reflection / serialization models (后台解压缩任务持久化)
 -keep class github.zerorooot.nap511.worker.UnzipTaskItem {
     <fields>;
@@ -78,7 +82,7 @@
 # Network: Retrofit & OkHttp (含 OkHttp 5.x 及嵌入式 MockWebServer)
 # -------------------------------------------------------------------------
 # 1) Retrofit 业务接口定义与方法签名保护
--keep interface github.zerorooot.nap511.service.** { *; }
+-keep interface github.zerorooot.nap511.data.network.api.** { *; }
 -keepclassmembers,allowshrinking,allowobfuscation interface * {
     @retrofit2.http.* <methods>;
 }

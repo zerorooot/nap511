@@ -10,9 +10,9 @@ import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.IBinder
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.player.AudioGSYManager
-import github.zerorooot.nap511.util.AudioEvent
-import github.zerorooot.nap511.util.AudioEventBus
+import github.zerorooot.nap511.ui.player.AudioGSYManager
+import github.zerorooot.nap511.platform.AudioEvent
+import github.zerorooot.nap511.platform.AudioEventBus
 
 /**
  */

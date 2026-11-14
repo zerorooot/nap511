@@ -67,7 +67,7 @@ class ConfigKeyUtil {
 
         /**
          * 头像信息bean的json信息,包含头像url、过期时间、用户名、过期时间等
-         * @see github.zerorooot.nap511.bean.AvatarBean
+         * @see github.zerorooot.nap511.data.model.AvatarBean
          */
         const val AVATAR_BEAN = "AVATAR_BEAN"
 

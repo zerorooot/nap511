@@ -1,8 +1,9 @@
 package github.zerorooot.nap511.util
 
 import com.elvishew.xlog.XLog
-import github.zerorooot.nap511.bean.SubtitleItem
-import github.zerorooot.nap511.bean.SubtitleSourceType
+import github.zerorooot.nap511.data.model.SubtitleItem
+import github.zerorooot.nap511.data.model.SubtitleSourceType
+import github.zerorooot.nap511.ui.navigation.findMatchingSubtitle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull

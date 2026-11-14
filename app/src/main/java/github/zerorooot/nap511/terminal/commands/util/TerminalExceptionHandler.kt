@@ -1,7 +1,7 @@
 package github.zerorooot.nap511.terminal.commands.util
 
-import github.zerorooot.nap511.bean.BaseReturnMessage
-import github.zerorooot.nap511.bean.CreateFolderMessage
+import github.zerorooot.nap511.data.model.BaseReturnMessage
+import github.zerorooot.nap511.data.model.CreateFolderMessage
 import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException
 import java.io.IOException

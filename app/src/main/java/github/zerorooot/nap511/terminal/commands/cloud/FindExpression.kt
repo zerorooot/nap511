@@ -1,7 +1,7 @@
 package github.zerorooot.nap511.terminal.commands.cloud
 
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.data.model.FileBean
 import github.zerorooot.nap511.terminal.commands.util.ComparisonFilter
 import github.zerorooot.nap511.terminal.commands.util.SizeParser
 import github.zerorooot.nap511.terminal.commands.util.TimeParser

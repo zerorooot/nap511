@@ -31,7 +31,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.zerorooot.nap511.screen.components.BaseTopAppBar
+import github.zerorooot.nap511.ui.components.bar.BaseTopAppBar
 
 /**
  * 终端顶部导航栏组件 (Terminal Top Bar)

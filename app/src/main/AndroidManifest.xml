@@ -22,7 +22,7 @@
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
     <application
-        android:name=".util.App"
+        android:name=".NapApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:enableOnBackInvokedCallback="true"
@@ -66,7 +66,7 @@
         </provider>
 
         <activity
-            android:name=".activity.OfflineTaskActivity"
+            android:name=".ui.activity.OfflineTaskActivity"
             android:excludeFromRecents="true"
             android:exported="true"
             android:launchMode="singleInstance"
@@ -109,7 +109,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".activity.TorrentTaskActivity"
+            android:name=".ui.activity.TorrentTaskActivity"
             android:exported="true"
             android:launchMode="singleTask"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
@@ -154,7 +154,7 @@
         </activity> <!-- android:screenOrientation="reverseLandscape" -->
         <!--        android:screenOrientation="sensorLandscape"-->
         <activity
-            android:name=".activity.VideoActivity"
+            android:name=".ui.activity.VideoActivity"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar.FullScreen" />
         <activity

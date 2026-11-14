@@ -1,8 +1,8 @@
 package github.zerorooot.nap511.terminal.commands
 
 import com.elvishew.xlog.XLog
-import github.zerorooot.nap511.bean.FilesBean
-import github.zerorooot.nap511.bean.PathBean
+import github.zerorooot.nap511.data.model.FilesBean
+import github.zerorooot.nap511.data.model.PathBean
 import github.zerorooot.nap511.terminal.commands.file.BatchTargetItem
 import github.zerorooot.nap511.terminal.commands.file.TerminalBatchFileOps
 import github.zerorooot.nap511.terminal.commands.file.resolveEffectiveParentCid
@@ -429,11 +429,11 @@ class BatchDeleteTest {
     fun testDeleteGroupChunkNetworkExceptionPartialSuccess() = runBlocking {
         var callCount = 0
         val mockRepo = object : TestMockFileRepository() {
-            override suspend fun deleteMultiple(data: Map<String, String>): github.zerorooot.nap511.bean.BaseReturnMessage {
+            override suspend fun deleteMultiple(data: Map<String, String>): github.zerorooot.nap511.data.model.BaseReturnMessage {
                 callCount++
                 if (callCount == 1) {
                     // 第 1 批成功
-                    return github.zerorooot.nap511.bean.BaseReturnMessage(state = true)
+                    return github.zerorooot.nap511.data.model.BaseReturnMessage(state = true)
                 } else {
                     // 第 2 批网络异常超时
                     throw java.io.IOException("Socket timeout")

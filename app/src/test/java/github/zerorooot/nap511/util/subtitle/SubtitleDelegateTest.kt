@@ -1,12 +1,12 @@
 package github.zerorooot.nap511.util.subtitle
 
 import com.elvishew.xlog.XLog
-import github.zerorooot.nap511.bean.SubtitleItem
-import github.zerorooot.nap511.bean.SubtitleSourceType
-import github.zerorooot.nap511.bean.SubtitleStyleBean
-import github.zerorooot.nap511.repository.FakeFileRepository
-import github.zerorooot.nap511.repository.SubtitleRepository
-import github.zerorooot.nap511.viewmodel.platform.FakeToastProvider
+import github.zerorooot.nap511.data.model.SubtitleItem
+import github.zerorooot.nap511.data.model.SubtitleSourceType
+import github.zerorooot.nap511.ui.model.SubtitleStyleBean
+import github.zerorooot.nap511.data.repository.FakeFileRepository
+import github.zerorooot.nap511.data.repository.SubtitleRepository
+import github.zerorooot.nap511.platform.FakeToastProvider
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

@@ -24,12 +24,12 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import github.zerorooot.nap511.MainActivity
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.activity.OfflineTaskActivity
-import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.repository.SettingsRepository
+import github.zerorooot.nap511.platform.PlatformConstants
+import github.zerorooot.nap511.platform.ToastProvider
+import github.zerorooot.nap511.data.repository.FileRepository
+import github.zerorooot.nap511.data.repository.SettingsRepository
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.FileCacheManager
-import github.zerorooot.nap511.viewmodel.platform.ToastProvider
+import github.zerorooot.nap511.data.local.cache.FileCacheManager
 import java.util.StringJoiner
 
 @HiltWorker
@@ -61,7 +61,7 @@ class OfflineTaskWorker @AssistedInject constructor(
 
         val notificationManager =
             applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.cancel(OfflineTaskActivity.PENDING_NOTIFICATION_ID)
+        notificationManager.cancel(PlatformConstants.NOTIFICATION_ID_OFFLINE_PENDING)
 
         try {
             setForeground(getForegroundInfo())

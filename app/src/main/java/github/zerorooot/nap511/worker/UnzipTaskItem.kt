@@ -1,7 +1,7 @@
 package github.zerorooot.nap511.worker
 
 import com.google.gson.annotations.SerializedName
-import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.data.model.FileBean
 import java.util.UUID
 
 data class UnzipTaskItem(

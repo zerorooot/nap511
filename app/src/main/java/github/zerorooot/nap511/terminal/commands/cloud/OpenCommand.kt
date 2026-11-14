@@ -8,7 +8,7 @@ import github.zerorooot.nap511.terminal.engine.ast.CommandInvocationAst
 import github.zerorooot.nap511.terminal.viewmodel.TerminalOutput
 import github.zerorooot.nap511.terminal.viewmodel.emitError
 import github.zerorooot.nap511.terminal.viewmodel.emitText
-import github.zerorooot.nap511.util.FileOpenResult
+import github.zerorooot.nap511.ui.navigation.FileOpenResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 

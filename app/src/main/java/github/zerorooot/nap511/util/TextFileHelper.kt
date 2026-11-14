@@ -1,8 +1,9 @@
 package github.zerorooot.nap511.util
 
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.repository.FileRepository
+import github.zerorooot.nap511.data.model.FileBean
+import github.zerorooot.nap511.data.repository.FileRepository
+import github.zerorooot.nap511.ui.model.MediaViewerStateHolder
 import github.zerorooot.nap511.util.TextFileHelper.DEFAULT_TXT_SIZE_KB
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

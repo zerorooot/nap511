@@ -2,15 +2,15 @@ package github.zerorooot.nap511.terminal.viewmodel
 
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
-import github.zerorooot.nap511.bean.AvatarBean
-import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.bean.FilesBean
-import github.zerorooot.nap511.bean.PathBean
-import github.zerorooot.nap511.bean.RecycleBean
-import github.zerorooot.nap511.bean.RecycleInfo
-import github.zerorooot.nap511.repository.FakeFileRepository
-import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.repository.SettingsRepository
+import github.zerorooot.nap511.data.model.AvatarBean
+import github.zerorooot.nap511.data.model.FileBean
+import github.zerorooot.nap511.data.model.FilesBean
+import github.zerorooot.nap511.data.model.PathBean
+import github.zerorooot.nap511.data.model.RecycleBean
+import github.zerorooot.nap511.data.model.RecycleInfo
+import github.zerorooot.nap511.data.repository.FakeFileRepository
+import github.zerorooot.nap511.data.repository.FileRepository
+import github.zerorooot.nap511.data.repository.SettingsRepository
 import github.zerorooot.nap511.terminal.engine.CompletionResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -33,7 +33,7 @@ class TerminalViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var viewModel: TerminalViewModel
     private lateinit var tempHistoryFile: java.io.File
-    private val fakeSettingsRepo = github.zerorooot.nap511.viewmodel.platform.FakeSettingsRepository()
+    private val fakeSettingsRepo = github.zerorooot.nap511.data.repository.FakeSettingsRepository()
 
     @Before
     fun setup() {

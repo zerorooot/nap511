@@ -1,6 +1,6 @@
 package github.zerorooot.nap511.terminal.engine
 
-import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.data.model.FileBean
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

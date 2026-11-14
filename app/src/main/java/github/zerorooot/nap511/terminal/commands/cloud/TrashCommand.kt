@@ -1,6 +1,6 @@
 package github.zerorooot.nap511.terminal.commands.cloud
 
-import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.data.model.FileBean
 import github.zerorooot.nap511.terminal.commands.util.TableAlignment
 import github.zerorooot.nap511.terminal.commands.util.TableFormatter
 import github.zerorooot.nap511.terminal.commands.util.TerminalExceptionHandler

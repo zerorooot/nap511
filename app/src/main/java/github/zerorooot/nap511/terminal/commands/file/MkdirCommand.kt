@@ -1,6 +1,6 @@
 package github.zerorooot.nap511.terminal.commands.file
 
-import github.zerorooot.nap511.bean.PathBean
+import github.zerorooot.nap511.data.model.PathBean
 import github.zerorooot.nap511.terminal.commands.util.CommandMessages
 import github.zerorooot.nap511.terminal.commands.util.TerminalExceptionHandler
 import github.zerorooot.nap511.terminal.context.TerminalContext

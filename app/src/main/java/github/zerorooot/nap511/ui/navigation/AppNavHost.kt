@@ -1,0 +1,458 @@
+package github.zerorooot.nap511.ui.navigation
+
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.ui.NavDisplay
+import androidx.window.core.layout.WindowSizeClass
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import github.zerorooot.nap511.data.model.AvatarBean
+import github.zerorooot.nap511.data.model.FileBean
+import github.zerorooot.nap511.data.model.OfflineTask
+import github.zerorooot.nap511.ui.navigation.Route
+import github.zerorooot.nap511.ui.model.SettingUiState
+import github.zerorooot.nap511.data.model.SubtitleItem
+import github.zerorooot.nap511.data.model.VideoBean
+import github.zerorooot.nap511.data.model.VideoStarAction
+import github.zerorooot.nap511.ui.dialog.ExitApp
+import github.zerorooot.nap511.ui.screen.about.AboutScreen
+import github.zerorooot.nap511.ui.screen.about.DisclaimerScreen
+import github.zerorooot.nap511.ui.screen.about.OpenSourceLicenseScreen
+import github.zerorooot.nap511.ui.screen.auth.LoginScreen
+import github.zerorooot.nap511.ui.screen.file.FileScreen
+import github.zerorooot.nap511.ui.screen.file.OfflineDownloadScreen
+import github.zerorooot.nap511.ui.screen.file.OfflineFileScreen
+import github.zerorooot.nap511.ui.screen.file.RecycleScreen
+import github.zerorooot.nap511.ui.screen.file.RepeatFileScreen
+import github.zerorooot.nap511.ui.screen.file.TaskDetailPane
+import github.zerorooot.nap511.ui.screen.log.LogScreen
+import github.zerorooot.nap511.ui.screen.setting.SettingScreen
+import github.zerorooot.nap511.ui.screen.viewer.MusicDetailScreen
+import github.zerorooot.nap511.ui.screen.viewer.MyPhotoScreen
+import github.zerorooot.nap511.ui.screen.viewer.TxtReaderScreen
+import github.zerorooot.nap511.ui.screen.web.CaptchaVideoWebViewScreen
+import github.zerorooot.nap511.ui.screen.web.CaptchaWebViewScreen
+import github.zerorooot.nap511.ui.screen.web.HtmlWebViewScreen
+import github.zerorooot.nap511.ui.screen.web.WebViewScreen
+import github.zerorooot.nap511.terminal.ui.TerminalScreen
+import github.zerorooot.nap511.terminal.viewmodel.TerminalViewModel
+import github.zerorooot.nap511.platform.LocalToastProvider
+import github.zerorooot.nap511.ui.model.AudioPlayerController
+import github.zerorooot.nap511.ui.model.FileDialogController
+import github.zerorooot.nap511.ui.navigation.FileOpener
+import github.zerorooot.nap511.ui.model.MediaViewerStateHolder
+import github.zerorooot.nap511.ui.viewmodel.AudioViewModel
+import github.zerorooot.nap511.ui.viewmodel.FileViewModel
+import github.zerorooot.nap511.ui.viewmodel.LoginViewModel
+import github.zerorooot.nap511.ui.viewmodel.OfflineFileViewModel
+import github.zerorooot.nap511.ui.viewmodel.LogViewModel
+import github.zerorooot.nap511.ui.viewmodel.RecycleViewModel
+import github.zerorooot.nap511.ui.viewmodel.RepeatFileViewModel
+import github.zerorooot.nap511.ui.viewmodel.SettingViewModel
+import java.lang.reflect.Type
+
+/**
+ * 应用全局根导航容器 (AppNavHost)
+ *
+ * 基于 Jetpack Navigation 3 (Nav3) 构建：
+ * - 使用强类型 [NavKey] 替代旧版基于 URI/字符串的 NavGraph；
+ * - 使用 [NavDisplay] 与 [entryProvider] 注册各个目标页面的渲染逻辑；
+ * - 集中处理各页面的手势开启/禁用、深层链接、文件点击及全局抽屉联动。
+ */
+@Composable
+fun AppNavHost(
+    backStack: NavBackStack<NavKey>,
+    onNavigate: (Route) -> Unit,
+    onPopBack: () -> Unit,
+    avatarBeanProvider: () -> AvatarBean,
+    fileViewModel: FileViewModel,
+    audioViewModel: AudioViewModel,
+    offlineFileViewModel: OfflineFileViewModel,
+    uiState: SettingUiState,
+    isDrawerOpen: () -> Boolean,
+    onOpenDrawer: () -> Unit,
+    onCloseDrawer: () -> Unit,
+    onSetGesturesEnabled: (Boolean) -> Unit
+) {
+    val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
+    val isExpandedScreen =
+        uiState.expandedScreenEnabled && windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
+    val gridCellMinSize =
+        (uiState.gridCellMinSize.toIntOrNull()?.takeIf { i -> i > 0 } ?: 340).dp
+    val isGridScreen = uiState.gridScreenEnabled
+    val context = LocalContext.current
+    val toastProvider = LocalToastProvider.current
+    val mediaViewerStateHolder = remember { MediaViewerStateHolder() }
+    val audioPlayerController = remember(audioViewModel) {
+        object : AudioPlayerController {
+            override fun playAudio(fileBean: FileBean, localSubtitles: List<SubtitleItem>) {
+                audioViewModel.playAudio(fileBean, localSubtitles)
+            }
+
+            override fun pauseAudio() {
+                audioViewModel.pause()
+            }
+        }
+    }
+    val fileDialogController = remember(fileViewModel) {
+        object : FileDialogController {
+            override fun openTorrent(fileBean: FileBean) {
+                fileViewModel.getTorrentTask(fileBean.sha1)
+            }
+
+            override fun openZip(fileBean: FileBean) {
+                // 直接传递目标 fileBean，避免索引脆弱性与越界异常
+                fileViewModel.getZipListFile(fileBean)
+            }
+        }
+    }
+
+    val videoActivityLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val data = result.data
+        val message = data?.getStringExtra("toast") ?: ""
+        if (message.isNotEmpty()) {
+            toastProvider.showToast(message)
+        }
+        if (data != null) {
+            val videoHistoryJson = data.getStringExtra("videoHistory") ?: "{}"
+            val type: Type = object : TypeToken<MutableMap<String, VideoBean>>() {}.type
+            val videoHistoryMap: MutableMap<String, VideoBean> =
+                Gson().fromJson(videoHistoryJson, type) ?: mutableMapOf()
+            val pickCode = data.getStringExtra("pickCode") ?: ""
+            val cid = data.getStringExtra("cid") ?: fileViewModel.currentCid
+
+            // 解析星标差分操作列表
+            val starJson = data.getStringExtra("star") ?: "[]"
+            val starType: Type = object : TypeToken<List<VideoStarAction>>() {}.type
+            val starList: List<VideoStarAction> =
+                Gson().fromJson(starJson, starType) ?: emptyList()
+
+            // 统一交给 fileViewModel 处理（更新进度 + 触发滚动事件 + 星标同步）
+            fileViewModel.onVideoActivityResult(pickCode, cid, videoHistoryMap, starList)
+
+            // 处理移除批量确认弹窗
+            val discardJson = data.getStringExtra("discard") ?: "[]"
+            val discardType: Type = object : TypeToken<List<VideoBean>>() {}.type
+            val discardList: List<VideoBean> =
+                Gson().fromJson(discardJson, discardType) ?: emptyList()
+            if (discardList.isNotEmpty()) {
+                fileViewModel.openDiscardVideosDialog(discardList, cid)
+            }
+        }
+    }
+
+    val fileOpener = remember(
+        mediaViewerStateHolder,
+        audioPlayerController,
+        fileDialogController,
+        uiState,
+        fileViewModel,
+        toastProvider,
+        onNavigate
+    ) {
+        FileOpener(
+            context = context,
+            fileRepository = fileViewModel.fileRepository,
+            mediaViewerStateHolder = mediaViewerStateHolder,
+            audioPlayerController = audioPlayerController,
+            fileDialogController = fileDialogController,
+            settingUiState = { uiState },
+            onOpenFolder = { cid ->
+                fileViewModel.getFiles(cid)
+            },
+            onNavigate = onNavigate,
+            onLaunchVideoIntent = { intent ->
+                videoActivityLauncher.launch(intent)
+            },
+            toastProvider = toastProvider
+        )
+    }
+
+    NavDisplay(
+        backStack = backStack,
+        onBack = onPopBack,
+        entryProvider = entryProvider {
+            entry<Route.Login> {
+                val loginViewModel: LoginViewModel = viewModel()
+                onSetGesturesEnabled(false)
+                LoginScreen { credential ->
+                    loginViewModel.performLogin(credential) {
+                        fileViewModel.getRemainingSpace()
+                        fileViewModel.getFiles("0")
+                        onNavigate(Route.MyFile)
+                    }
+                }
+            }
+
+            entry<Route.MyFile> {
+                onSetGesturesEnabled(true)
+                FileScreen(
+                    fileViewModel = fileViewModel,
+                    settingUiState = uiState,
+                    audioViewModel = audioViewModel,
+                    isGridScreen = isGridScreen,
+                    gridCellMinSize = gridCellMinSize,
+                    onNav = { route -> onNavigate(route) },
+                    openDrawer = {
+                        onSetGesturesEnabled(true)
+                        onOpenDrawer()
+                    },
+                    drawerState = {
+                        val open = isDrawerOpen()
+                        if (open) {
+                            onCloseDrawer()
+                        }
+                        open
+                    },
+                    fileOpener = fileOpener
+                )
+            }
+
+            entry<Route.OfflineDownload> {
+                LaunchedEffect(Unit) {
+                    offlineFileViewModel.quota()
+                }
+
+                val path = "/" + fileViewModel.pathList.joinToString("/") { it.name }
+                val quotaBean by offlineFileViewModel.quotaBean.collectAsStateWithLifecycle()
+                val urlText by offlineFileViewModel.urlText
+
+                OfflineDownloadScreen(
+                    path = path,
+                    quotaBean = quotaBean,
+                    url = urlText,
+                    onClick = { onOpenDrawer() }
+                ) { list ->
+                    offlineFileViewModel.addTask(
+                        list,
+                        fileViewModel.currentCid,
+                        path.substringAfterLast("/")
+                    ) { needVerify ->
+                        if (needVerify) {
+                            onNavigate(Route.VerifyMagnetLinkAccount)
+                        }
+                    }
+                }
+            }
+
+            entry<Route.OfflineList> {
+                LaunchedEffect(Unit) {
+                    offlineFileViewModel.getOfflineFileList()
+                }
+                OfflineFileScreen(
+                    offlineFileViewModel = offlineFileViewModel,
+                    isExpandedScreen = isExpandedScreen,
+                    isGridScreen = isGridScreen,
+                    gridCellMinSize = gridCellMinSize,
+                    getFiles = {
+                        fileViewModel.getFiles(it)
+                        onNavigate(Route.MyFile)
+                    },
+                    onNavigate = onNavigate,
+                    onClick = onOpenDrawer
+                )
+            }
+            entry<Route.OfflineFileInfoDialog> {
+                val task = it.task
+                TaskDetailPane(
+                    task,
+                    onDeleteTask = { offlineTask: OfflineTask ->
+                        offlineFileViewModel.delete(offlineTask)
+                        onPopBack()
+                    },
+                    onOpenFile = {
+                        fileViewModel.getFiles(task.fileId.ifEmpty { task.wpPathId })
+                        onNavigate(Route.MyFile)
+                    },
+                    onBack = onPopBack
+                )
+            }
+
+            entry<Route.WebScreen> {
+                onSetGesturesEnabled(false)
+                WebViewScreen(isLogEnabled = uiState.logEnabled) {
+                    onOpenDrawer()
+                }
+            }
+
+            entry<Route.AdvancedSettings> {
+                val settingViewModel: SettingViewModel = viewModel()
+                SettingScreen(
+                    viewModel = settingViewModel,
+                    isExpandedScreen = isExpandedScreen,
+                    onDrawerClick = onOpenDrawer,
+                    onActionClick = { action ->
+                        when (action) {
+                            "topAppBarActionButtonOnClick" -> onOpenDrawer()
+                            "VerifyVideoAccount" -> onNavigate(Route.VerifyVideoAccount)
+                            "VerifyMagnetLinkAccount" -> onNavigate(Route.VerifyMagnetLinkAccount)
+                            "handleOfflineTask" -> fileViewModel.handleOfflineTask(true)
+                            "RepeatFile" -> onNavigate(Route.RepeatFile)
+                            "Login" -> onNavigate(Route.Login)
+                            "Web" -> onNavigate(Route.WebScreen)
+                            "Terminal" -> onNavigate(Route.Terminal)
+                        }
+                    }
+                )
+            }
+
+            entry<Route.AboutApp> {
+                AboutScreen(
+                    onDrawerClick = onOpenDrawer,
+                    onNavigateToLicense = { onNavigate(Route.OpenSourceLicense) },
+                    onNavigateToDisclaimer = { onNavigate(Route.Disclaimer) }
+                )
+            }
+
+            entry<Route.OpenSourceLicense> {
+                OpenSourceLicenseScreen(
+                    onBack = onPopBack
+                )
+            }
+
+            entry<Route.Disclaimer> {
+                DisclaimerScreen(
+                    onBack = onPopBack
+                )
+            }
+
+            entry<Route.Terminal> {
+                val terminalViewModel: TerminalViewModel = viewModel()
+                onSetGesturesEnabled(false)
+                terminalViewModel.initDirectoryIfNeeded(fileViewModel.pathList)
+                terminalViewModel.updateFileOpener(fileOpener)
+                terminalViewModel.avatarBean = avatarBeanProvider()
+                TerminalScreen(
+                    viewModel = terminalViewModel,
+                    onBack = onPopBack,
+                    openDrawer = {
+                        onSetGesturesEnabled(true)
+                        onOpenDrawer()
+                    }
+                )
+            }
+
+            entry<Route.RecycleBin> {
+                val recycleViewModel: RecycleViewModel = viewModel()
+                RecycleScreen(recycleViewModel, isGridScreen, gridCellMinSize) {
+                    onOpenDrawer()
+                }
+            }
+
+            entry<Route.VerifyMagnetLinkAccount> {
+                CaptchaWebViewScreen({ fileViewModel.handleOfflineTask() }) { action ->
+                    when (action) {
+                        "topAppBarActionButtonOnClick" -> onOpenDrawer()
+                        "select" -> onNavigate(Route.MyFile)
+                    }
+                }
+            }
+
+            entry<Route.VerifyVideoAccount> {
+                CaptchaVideoWebViewScreen { action ->
+                    when (action) {
+                        "topAppBarActionButtonOnClick" -> onOpenDrawer()
+                        "select" -> onNavigate(Route.MyFile)
+                    }
+                }
+            }
+
+            entry<Route.ExitApp> {
+                ExitApp {
+                    onPopBack()
+                }
+            }
+
+            entry<Route.LogScreen> {
+                val logViewModel: LogViewModel = viewModel()
+                LogScreen(isDualPane = isExpandedScreen, viewModel = logViewModel) {
+                    onOpenDrawer()
+                }
+            }
+
+            entry<Route.Photo> {
+                val photoList = mediaViewerStateHolder.photoFileBeanList
+                val photoIndex = mediaViewerStateHolder.photoIndexOf
+                val photoCid = mediaViewerStateHolder.photoCid.ifEmpty { fileViewModel.currentCid }
+                MyPhotoScreen(
+                    photoList = photoList,
+                    currentIndex = photoIndex,
+                    cid = photoCid,
+                    imageCache = fileViewModel.imageBeanCache[photoCid] ?: emptyMap(),
+                    onLoadImage = { fileViewModel.getImage(it) },
+                    onNav = onPopBack
+                )
+            }
+
+            entry<Route.RepeatFile> {
+                val repeatViewModel: RepeatFileViewModel = viewModel()
+                RepeatFileScreen(
+                    viewModel = repeatViewModel,
+                    isGridScreen = isGridScreen,
+                    gridCellMinSize = gridCellMinSize,
+                    onClick = { onOpenDrawer() }
+                ) { targetCid ->
+                    fileViewModel.getFiles(targetCid)
+                    onNavigate(Route.MyFile)
+                }
+            }
+
+            entry<Route.TxtReader> { route ->
+                val byteArray = mediaViewerStateHolder.textBodyByteArray
+
+                LaunchedEffect(byteArray) {
+                    if (byteArray == null) {
+                        onPopBack()
+                    }
+                }
+
+                if (byteArray != null) {
+                    onSetGesturesEnabled(false)
+                    TxtReaderScreen(byteArray, title = route.title) {
+                        onSetGesturesEnabled(true)
+                        onPopBack()
+                    }
+                }
+            }
+
+            entry<Route.MusicDetail> {
+                MusicDetailScreen(audioViewModel) {
+                    onPopBack()
+                }
+            }
+
+            entry<Route.HtmlWebViewScreen> { route ->
+                val byteArray = mediaViewerStateHolder.webBodyByteArray
+
+                LaunchedEffect(byteArray) {
+                    if (byteArray == null) {
+                        onPopBack()
+                    }
+                }
+
+                if (byteArray != null) {
+                    onSetGesturesEnabled(false)
+                    HtmlWebViewScreen(byteArray, title = route.title) {
+                        onSetGesturesEnabled(true)
+                        onPopBack()
+                    }
+                }
+            }
+        }
+    )
+}

@@ -1,0 +1,815 @@
+package github.zerorooot.nap511.ui.viewmodel
+
+import android.app.Activity
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.elvishew.xlog.XLog
+import com.google.gson.Gson
+import com.google.gson.JsonObject
+import github.zerorooot.nap511.data.model.LaunchVideoParams
+import github.zerorooot.nap511.data.model.SubtitleItem
+import github.zerorooot.nap511.ui.model.SubtitleStyleBean
+import github.zerorooot.nap511.data.model.VideoBean
+import github.zerorooot.nap511.data.model.VideoInfoBean
+import github.zerorooot.nap511.data.model.VideoStarAction
+import github.zerorooot.nap511.ui.model.VideoUiState
+import github.zerorooot.nap511.data.model.getVisualDimensions
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+import github.zerorooot.nap511.data.repository.FileRepository
+import github.zerorooot.nap511.data.repository.SubtitleRepository
+import github.zerorooot.nap511.data.local.cache.FileCacheManager
+import github.zerorooot.nap511.ui.navigation.findMatchingSubtitle
+import github.zerorooot.nap511.util.keyWord
+import github.zerorooot.nap511.data.network.client.parseOssErrorWithDom
+import github.zerorooot.nap511.util.subtitle.SubtitleDelegate
+import github.zerorooot.nap511.platform.ToastProvider
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.SendChannel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import okhttp3.MediaType
+import java.io.File
+
+// 单行扩展：平滑适配原有 12 处 _uiEvent.emit(...) 调用，保证兼容性
+private suspend fun SendChannel<VideoUiEvent>.emit(event: VideoUiEvent) = send(event)
+
+/**
+ * 移除操作的历史记录单元（用于 LIFO 撤回栈）
+ * @param video 被标记移除的视频对象（保留原 fileId、pickCode、name 等完整元数据）
+ * @param originalIndex 被移除时在原动态播放列表中的下标索引
+ */
+data class DiscardRecord(
+    val video: VideoBean,
+    val originalIndex: Int
+)
+
+/**
+ * 视频播放页面的一次性 UI 事件定义
+ */
+sealed class VideoUiEvent {
+    /** 播放下一个视频事件，包含视频链接和标题，isEpisodeSwitch 区分是否为切集操作 */
+    data class PlayNext(
+        val videoUrl: String,
+        val title: String,
+        val isEpisodeSwitch: Boolean = true
+    ) : VideoUiEvent()
+
+    /** 显示 Toast 提示消息事件 */
+    data class Toast(val message: String) : VideoUiEvent()
+
+    /**
+     * 请求调整屏幕朝向
+     * @param targetIsLandscape true 表示目标为横屏，false 表示目标为竖屏
+     */
+    data class RequestOrientation(val targetIsLandscape: Boolean) : VideoUiEvent()
+
+    /** 触发屏幕旋转事件 */
+    object RotateScreen : VideoUiEvent()
+
+    /** 结束当前页面并带回结果事件 */
+    data class FinishWithResult(
+        val resultCode: Int,
+        val videoHistoryJson: String,
+        val toast: String = "",
+        //当前文件所在目录的cid，用于更新ui显示时间
+        val cid: String = "",
+        /**
+         * 最后一个视频的pickCode，方便selectIndex定位到视频
+         */
+        val pickCode: String,
+        val discardJson: String = "[]",
+        val starJson: String = "[]"
+    ) : VideoUiEvent()
+
+    /** 触发 115 视频账号验证码弹窗事件 */
+    object ShowCaptchaDialog : VideoUiEvent()
+
+    /** 通知选集列表发生变化，刷新抽屉 */
+    data object EpisodeListUpdated : VideoUiEvent()
+
+    /** 单个视频移出列表事件，弹出撤回提示 Snackbar */
+    data object SingleVideoDiscarded : VideoUiEvent()
+
+    /** 列表中所有视频均已被移除，进入延时退出流程 */
+    data class AllVideosDiscarded(val autoExitDelayMs: Long = 5000L) : VideoUiEvent()
+}
+
+/**
+ * 视频播放页面的 ViewModel
+ *
+ * 负责管理视频播放状态、切换视频、同步播放历史、处理请求拦截异常以及通过代理 [SubtitleDelegate] 管理字幕业务。
+ */
+@HiltViewModel
+class VideoViewModel @Inject constructor(
+    application: Application,
+    internal val fileRepository: FileRepository,
+    internal val subtitleRepository: SubtitleRepository,
+    private val toastProvider: ToastProvider,
+) : AndroidViewModel(application) {
+
+    /** 字幕业务逻辑代理类 */
+    private val subtitleDelegate =
+        SubtitleDelegate(subtitleRepository, toastProvider) { newSubtitleState ->
+            _uiState.update { it.copy(subtitle = newSubtitleState) }
+        }
+
+    /** 启动视频播放页面时的配置参数 */
+    lateinit var launchVideoParams: LaunchVideoParams
+        private set
+
+    private val _uiState = MutableStateFlow(VideoUiState())
+
+    /** 视频播放页面的 UI 状态流 */
+    val uiState: StateFlow<VideoUiState> = _uiState.asStateFlow()
+
+    /** 移除撤回栈 (LIFO 结构) */
+    private val discardRecords = ArrayDeque<DiscardRecord>()
+
+    /** 当前播放列表中的所有视频（动态维护，支持移除剔除与撤回恢复） */
+    /** 当前播放列表（外部只读） */
+    val videoList: List<VideoBean>
+        field = mutableListOf<VideoBean>()
+
+    // 采用带缓冲的 Channel 替代 SharedFlow，确保在 Activity 未完成订阅前发射的事件零丢失
+    private val _uiEvent = Channel<VideoUiEvent>(Channel.BUFFERED)
+
+    /** 视频播放页面的一次性 UI 事件流 */
+    val uiEvent: Flow<VideoUiEvent> = _uiEvent.receiveAsFlow()
+
+    /** 视频配置属性 */
+    val videoAttribute by lazy { launchVideoParams.videoAttribute }
+
+    /** 是否根据视频宽高比自动旋转屏幕 */
+    val isAutoRotate by lazy { videoAttribute.isAutoRotate }
+
+    // 记录当前剧集已决断派发的朝向目标 (true:横屏, false:竖屏)，用于消除 90° 竞态纠偏
+    private var lastEmittedTargetLandscape: Boolean? = null
+
+    /**
+     * 根据视觉宽高计算推荐屏幕朝向
+     * @return true 横屏，false 竖屏，null 表示无效尺寸或 1:1 比例无需调整
+     */
+    private fun calculateTargetOrientation(visualWidth: Int, visualHeight: Int): Boolean? {
+        if (!isAutoRotate || visualWidth <= 0 || visualHeight <= 0) return null
+        // 1:1 正方形视频不强制扭转当前屏幕朝向
+        if (visualWidth == visualHeight) return null
+        return visualWidth > visualHeight
+    }
+
+    private fun emitOrientationRequestIfNeed(visualWidth: Int, visualHeight: Int) {
+        val targetIsLandscape = calculateTargetOrientation(visualWidth, visualHeight) ?: return
+        if (lastEmittedTargetLandscape != targetIsLandscape) {
+            XLog.i("VideoViewModel emitOrientationRequestIfNeed: visualWidth=$visualWidth, visualHeight=$visualHeight, targetIsLandscape=$targetIsLandscape (last=$lastEmittedTargetLandscape)")
+            lastEmittedTargetLandscape = targetIsLandscape
+            viewModelScope.launch {
+                _uiEvent.send(VideoUiEvent.RequestOrientation(targetIsLandscape))
+            }
+        }
+    }
+
+    /** 视频链接模式（true 为解析模式，false 为直接拼接 m3u8 模式） */
+    val videoLinkMode by lazy { videoAttribute.videoLinkMode }
+
+    /** 播放失败时是否自动重试跳转获取新链接 */
+    val autoJumpRetry by lazy { videoAttribute.autoJumpRetry }
+
+    /** 是否隐藏加载框 */
+    val hideLoading by lazy { videoAttribute.hideLoading }
+
+    /** 记录播放过的视频历史信息（pickCode -> VideoBean） */
+    private val videoHistoryMap = mutableMapOf<String, VideoBean>()
+
+    /** 标记是否正在重新加载获取新视频地址，防止重复发起 */
+    @Volatile
+    private var isReloadingVideo = false
+
+    /** 进入视频播放页面时的初始星标状态快照 (fileId -> isStar)，用于状态抵消与差分计算 */
+    private val initialStarMap = mutableMapOf<String, Boolean>()
+
+    /** 记录用户针对各视频变更的星标差分结果 (fileId -> isStar) */
+    private val starChanges = mutableMapOf<String, Boolean>()
+
+    /**
+     * 初始化视频播放参数及 UI 状态
+     *
+     * @param params 启动视频播放所需参数（包含视频信息、播放列表等）
+     */
+    fun initParams(params: LaunchVideoParams) {
+        lastEmittedTargetLandscape = null
+        launchVideoParams = params
+        videoList.clear()
+        videoList.addAll(params.videoList)
+        discardRecords.clear()
+
+        // 收集所有视频初始星标状态快照，用于差分抵消
+        initialStarMap.clear()
+        params.videoList.forEach {
+            if (it.fileId.isNotEmpty()) {
+                initialStarMap[it.fileId] = it.isStar
+            }
+        }
+        starChanges.clear()
+
+        val initialVideoInfo = params.videoInfo
+        val currentIndex = initialVideoInfo.index
+        val listSize = videoList.size
+        val initialIsStar = videoList.getOrNull(currentIndex)?.isStar ?: false
+        val initialKeyword =
+            initialVideoInfo.fileName.keyWord(params.videoAttribute.positionAfterAt)
+        subtitleDelegate.resetForNewMedia(initialKeyword)
+
+        _uiState.update { currentState ->
+            currentState.copy(
+                videoInfo = initialVideoInfo,
+                fileBeanIndex = currentIndex,
+                hasPrev = currentIndex - 1 in 0 until listSize,
+                hasNext = currentIndex + 1 in 0 until listSize,
+                isCurrentVideoStar = initialIsStar
+            )
+        }
+
+        // 首播自适应：若已有 API 先验有效尺寸，结合 userRotate 发送自适应请求
+        val (visualWidth, visualHeight) = initialVideoInfo.getVisualDimensions()
+        if (visualWidth > 0 && visualHeight > 0) {
+            emitOrientationRequestIfNeed(visualWidth, visualHeight)
+        }
+    }
+
+    /**
+     * 切换播放上一个或下一个视频
+     *
+     * @param isNext true 表示播放下一个视频，false 表示播放上一个视频
+     * @param currentPositionMs 当前视频已播放进度（毫秒），用于保存历史记录
+     */
+    fun playNextVideo(isNext: Boolean, currentPositionMs: Long) {
+        if (_uiState.value.isLoadingEpisode) return
+        val currentIndex = _uiState.value.fileBeanIndex
+        val nextIndex = if (isNext) currentIndex + 1 else currentIndex - 1
+        playVideoAtIndex(nextIndex, currentPositionMs)
+    }
+
+    /**
+     * 切换播放列表中指定索引位置的视频
+     *
+     * @param targetIndex 目标视频在列表中的索引
+     * @param currentPositionMs 当前视频已播放进度（毫秒），用于保存历史记录
+     */
+    fun playVideoAtIndex(targetIndex: Int, currentPositionMs: Long) {
+        // 防抖与重复点击拦截：正在加载中或已处于目标集，直接忽略，避免死锁假死
+        if (_uiState.value.isLoadingEpisode || targetIndex == _uiState.value.fileBeanIndex) return
+
+        val currentInfo = _uiState.value.videoInfo ?: VideoInfoBean()
+        val pickCode = currentInfo.pickCode
+        val currentDuration = (currentPositionMs / 1000).toInt()
+        // 仅在真实有效播放时保存并上报 115 云端历史
+        if (pickCode.isNotEmpty()) {
+            val bean = VideoBean(currentDuration, pickCode, name = currentInfo.fileName)
+            videoHistoryMap[pickCode] = bean
+            // 异步启动：委托 FileRepository 同步云端，内部含 IO + NonCancellable
+            viewModelScope.launch {
+                fileRepository.updateVideoHistory(bean.pickCode, bean.currentDuration, bean.name)
+            }
+        }
+
+        _uiState.update { it.copy(isLoadingEpisode = true) }
+        loadVideoAt(targetIndex)
+    }
+
+    /**
+     * 核心加载并播放指定索引视频的内部实现
+     *
+     * @param targetIndex 目标视频在 currentVideoList 中的索引
+     */
+    private fun loadVideoAt(targetIndex: Int) {
+        lastEmittedTargetLandscape = null // 切集加载重置朝向判定快照
+        val fileBean = videoList.getOrNull(targetIndex)
+        if (fileBean == null) {
+            toastProvider.showToast("找不到视频")
+            // 防假死：索引异常时恢复 loading 状态
+            _uiState.update { it.copy(isLoadingEpisode = false) }
+            return
+        }
+        val videoName = fileBean.name
+        val listSize = videoList.size
+        _uiState.update { currentState ->
+            currentState.copy(
+                fileBeanIndex = targetIndex,
+                hasPrev = targetIndex - 1 in 0 until listSize,
+                hasNext = targetIndex + 1 in 0 until listSize,
+                isCurrentVideoStar = fileBean.isStar
+            )
+        }
+        // 默认将视频文件名去除后缀作为初始搜索关键字
+        val keyword = videoName.keyWord(launchVideoParams.videoAttribute.positionAfterAt)
+        // 切集前置：重置字幕代理状态（清空候选列表与选中项、任务取消、保留样式）
+        subtitleDelegate.resetForNewMedia(keyword)
+
+        viewModelScope.launch {
+            runCatching {
+                val pickCode = fileBean.pickCode
+                val name = fileBean.name
+                val video = if (videoLinkMode) {
+                    fileRepository.video(pickCode)
+                } else {
+                    // 直链模式初始宽高统一置 0，由底层解码器解析真实物理尺寸与旋转角度后精准自适应
+                    VideoInfoBean(
+                        width = 0,
+                        height = 0,
+                        index = targetIndex,
+                        fileName = name,
+                        pickCode = pickCode,
+                        videoUrl = "http://115.com/api/video/m3u8/${pickCode}.m3u8"
+                    )
+                }
+                _uiState.update {
+                    it.copy(videoInfo = video)
+                }
+                _uiEvent.emit(
+                    VideoUiEvent.PlayNext(
+                        video.videoUrl,
+                        video.fileName,
+                        isEpisodeSwitch = true
+                    )
+                )
+
+                // 切集自适应：若通过 API 获取到了有效先验尺寸，派发自适应事件
+                val (visualWidth, visualHeight) = video.getVisualDimensions()
+                if (visualWidth > 0 && visualHeight > 0) {
+                    emitOrientationRequestIfNeed(visualWidth, visualHeight)
+                }
+            }.onFailure { e ->
+                XLog.e("加载视频失败 pickCode: ${fileBean.pickCode}", e)
+                toastProvider.showToast("加载视频失败，请重试")
+                // 防假死：网络异常时重置 loading 状态
+                _uiState.update { it.copy(isLoadingEpisode = false) }
+            }
+        }
+    }
+
+    /**
+     * 底层解码器解析出真实尺寸与旋转角后的回调
+     */
+    fun onRealVideoDimensionsLoaded(rawWidth: Int, rawHeight: Int, effectiveRotation: Int) {
+        if (rawWidth <= 0 || rawHeight <= 0) return
+
+        val isSwapped = (effectiveRotation % 180 != 0)
+        val visualWidth = if (isSwapped) rawHeight else rawWidth
+        val visualHeight = if (isSwapped) rawWidth else rawHeight
+
+        XLog.d("VideoViewModel onRealVideoDimensionsLoaded: rawWidth=$rawWidth, rawHeight=$rawHeight, rotation=$effectiveRotation, visualWidth=$visualWidth, visualHeight=$visualHeight")
+
+        // 同步最新的真实视觉宽高到 UIState
+        _uiState.update { state ->
+            state.videoInfo?.let { info ->
+                if (info.width != visualWidth || info.height != visualHeight) {
+                    state.copy(videoInfo = info.copy(width = visualWidth, height = visualHeight))
+                } else state
+            } ?: state
+        }
+
+        // 无论是直链模式无尺寸，还是 90° 旋转信息稍后到达，均触发朝向核验与自纠正
+        emitOrientationRequestIfNeed(visualWidth, visualHeight)
+    }
+
+    /**
+     * 「移除」核心处理：
+     * 1. 防重入保护；
+     * 2. 赋予 VideoBean 精确 currentDuration；
+     * 3. 记录入撤回栈 (discardRecords)；
+     * 4. 上层防御（0秒防冲刷）：仅当时长 > 0 时才写入 videoHistoryMap，避免撤回后退出把原有历史进度清零；
+     * 5. 自动切至下一集并开启防抖 loading 状态。
+     */
+    fun discardCurrentVideo(currentPositionMs: Long) {
+        if (_uiState.value.isLoadingEpisode) return
+        if (videoList.isEmpty()) return
+        val currentIndex = _uiState.value.fileBeanIndex
+        if (currentIndex !in videoList.indices) return
+
+        val currentVideo = videoList[currentIndex]
+        val currentDuration = (currentPositionMs / 1000).toInt()
+        val updatedVideo = currentVideo.copy(currentDuration = currentDuration)
+
+        // 记录入撤回栈（携带精确播放时长，以便取消弹窗或撤回时使用）
+        discardRecords.addLast(DiscardRecord(updatedVideo, currentIndex))
+
+        // 关键防御：仅当播放时长 > 0 时暂存进 videoHistoryMap
+        // 彻底杜绝刚打开 0 秒即移除时，把昨日已有历史进度冲刷为 0%
+        if (currentDuration > 0) {
+            videoHistoryMap[updatedVideo.pickCode] = updatedVideo
+        }
+
+        _uiState.update { it.copy(isLoadingEpisode = true) }
+        videoList.removeAt(currentIndex)
+
+        if (currentIndex < videoList.size) {
+            // 移除当前元素后，原本的“下一集”自动前移填补到 currentIndex 处，继续播放
+            loadVideoAt(currentIndex)
+            viewModelScope.launch {
+                _uiEvent.emit(VideoUiEvent.EpisodeListUpdated)
+                _uiEvent.emit(VideoUiEvent.SingleVideoDiscarded)
+            }
+        } else {
+            // 移除的是最后一个视频（列表已空，或没有后续可播放视频），停播并触发全部移除流程
+            _uiState.update {
+                it.copy(
+                    fileBeanIndex = -1,
+                    hasPrev = false,
+                    hasNext = false,
+                    isLoadingEpisode = false,
+                    isCurrentVideoStar = false
+                )
+            }
+            viewModelScope.launch {
+                _uiEvent.emit(VideoUiEvent.EpisodeListUpdated)
+                _uiEvent.emit(VideoUiEvent.AllVideosDiscarded(autoExitDelayMs = 3000L))
+            }
+        }
+    }
+
+    /**
+     * 「撤回移除」处理：
+     * 1. 弹出最近一次移除记录并插回原位（支持多级撤回与边界保护）；
+     * 2. 关键补齐：用户明确选择撤回保留，立即向 115 补发之前被惰性跳过的云端历史同步；
+     * 3. 保持当前画面正常播放不中断；
+     * 4. 若之前全部被弃导致暂停，撤回后自动恢复播放刚插回的视频。
+     */
+    fun undoDiscard() {
+        val lastRecord = discardRecords.removeLastOrNull() ?: return
+        val (restoredVideo, originalIndex) = lastRecord
+
+        // 关键补齐：撤回等于确认保留该视频，立即向 115 补发云端历史同步
+        viewModelScope.launch {
+            fileRepository.updateVideoHistory(
+                pickCode = restoredVideo.pickCode,
+                currentDuration = restoredVideo.currentDuration,
+                name = restoredVideo.name
+            )
+        }
+
+        val insertIndex = originalIndex.coerceIn(0, videoList.size)
+        videoList.add(insertIndex, restoredVideo)
+
+        // 查找当前正在播放视频在新列表中的最新索引（若 fileBeanIndex == -1 表示出于停播状态）
+        val currentPlayingPickCode =
+            if (_uiState.value.fileBeanIndex == -1) null else _uiState.value.videoInfo?.pickCode
+        val newPlayingIndex =
+            if (currentPlayingPickCode == null) -1 else videoList.indexOfFirst { it.pickCode == currentPlayingPickCode }
+        val listSize = videoList.size
+
+        if (newPlayingIndex >= 0) {
+            // 当前仍在播放某视频，保持播放不中断，仅更新索引与上下集状态
+            _uiState.update {
+                it.copy(
+                    fileBeanIndex = newPlayingIndex,
+                    hasPrev = newPlayingIndex - 1 in 0 until listSize,
+                    hasNext = newPlayingIndex + 1 in 0 until listSize,
+                    isCurrentVideoStar = videoList.getOrNull(newPlayingIndex)?.isStar ?: false
+                )
+            }
+        } else {
+            // 之前所有视频全被移除（停播），撤回后自动恢复播放刚插回的视频
+            _uiState.update { it.copy(isLoadingEpisode = true) }
+            loadVideoAt(insertIndex)
+        }
+
+        viewModelScope.launch {
+            _uiEvent.emit(VideoUiEvent.EpisodeListUpdated)
+        }
+        toastProvider.showToast("已撤回：${restoredVideo.name}")
+    }
+
+    /**
+     * 当视频地址错误或失效时，重新从服务器获取新链接并重新播放
+     */
+    fun rePlayNewVideo() {
+        if (isReloadingVideo) return
+        isReloadingVideo = true
+        toastProvider.showToast("视频地址错误！正在重新获取新链接")
+        viewModelScope.launch {
+            try {
+                val currentInfo = _uiState.value.videoInfo ?: return@launch
+                val video = fileRepository.video(currentInfo.pickCode)
+                _uiEvent.emit(
+                    VideoUiEvent.PlayNext(
+                        videoUrl = video.downloadUrl,
+                        title = video.fileName.ifBlank { "获取视频链接失败，视频可能被删除，请刷新重试" },
+                        isEpisodeSwitch = false
+                    )
+                )
+            } catch (_: Exception) {
+            } finally {
+                isReloadingVideo = false
+            }
+        }
+    }
+
+    /**
+     * 视频完成准备回调（播放器 onPrepared），重置切集防抖状态
+     */
+    fun onEpisodeLoaded() {
+        _uiState.update { it.copy(isLoadingEpisode = false) }
+    }
+
+    /**
+     * 视频加载或播放异常回调（播放器 onPlayError），重置切集防抖状态（防御界面假死）
+     */
+    fun onEpisodeLoadError() {
+        _uiState.update { it.copy(isLoadingEpisode = false) }
+    }
+
+    /**
+     * 切换当前正在播放视频的星标状态（加星/取消星）
+     *
+     * 1. 动态翻转当前视频的 isStar 状态；
+     * 2. 更新 starChanges 差分集合：若翻转后的状态与进入页面时的初始状态一致，则自动移除差分记录，彻底避免向服务端提交无意义网络请求；
+     * 3. 同步更新 _uiState.isCurrentVideoStar，驱动顶栏按钮图标及高亮状态；
+     * 4. 触发 EpisodeListUpdated 事件，同步更新侧边栏抽屉中的选集前缀标识。
+     */
+    fun toggleCurrentVideoStar() {
+        val currentIndex = _uiState.value.fileBeanIndex
+        if (currentIndex !in videoList.indices) return
+        val currentVideo = videoList[currentIndex]
+        val targetStar = !currentVideo.isStar
+        val fid = currentVideo.fileId
+        if (fid.isEmpty()) {
+            XLog.w("toggleCurrentVideoStar: fileId is empty for video ${currentVideo.name}")
+            return
+        }
+
+        XLog.d("toggleCurrentVideoStar: fid=$fid, name=${currentVideo.name}, targetStar=$targetStar")
+        videoList[currentIndex] = currentVideo.copy(isStar = targetStar)
+
+        val initial = initialStarMap[fid] ?: false
+        if (targetStar == initial) {
+            starChanges.remove(fid)
+            XLog.d("toggleCurrentVideoStar: fid=$fid restored to initial=$initial, removed from starChanges")
+        } else {
+            starChanges[fid] = targetStar
+            XLog.d("toggleCurrentVideoStar: fid=$fid changed to targetStar=$targetStar, recorded in starChanges")
+        }
+
+        _uiState.update { it.copy(isCurrentVideoStar = targetStar) }
+
+        viewModelScope.launch {
+            _uiEvent.emit(VideoUiEvent.EpisodeListUpdated)
+        }
+    }
+
+    /**
+     * 退出当前视频播放页，更新播放历史记录，并触发带有播放历史结果的退出事件
+     *
+     * @param currentPositionMs 当前播放进度（毫秒）
+     * @param toast 退出时提示的信息（可选）
+     * @param resultCode Activity 结果代码，默认为 [Activity.RESULT_OK]
+     */
+    fun back(
+        currentPositionMs: Long,
+        toast: String = "",
+        resultCode: Int = Activity.RESULT_OK
+    ) {
+        val discardedPickCodes = discardRecords.map { it.video.pickCode }.toSet()
+        val currentInfo = _uiState.value.videoInfo ?: VideoInfoBean()
+        val pickCode = currentInfo.pickCode
+
+        // 仅在当前视频未被移除、有效且有效播放时长 > 0 时记录播放进度并上报云端
+        val currentDuration = (currentPositionMs / 1000).toInt()
+        if (pickCode !in discardedPickCodes && pickCode.isNotEmpty()) {
+            val bean = VideoBean(currentDuration, pickCode, name = currentInfo.fileName)
+            videoHistoryMap[pickCode] = bean
+            viewModelScope.launch {
+                fileRepository.updateVideoHistory(bean.pickCode, bean.currentDuration, bean.name)
+            }
+        }
+
+        // 过滤掉所有已移除的播放历史，避免本地缓存回写进度
+        val finalHistoryMap = videoHistoryMap.filterKeys { it !in discardedPickCodes }
+        val videoHistoryMapJson = Gson().toJson(finalHistoryMap)
+
+        // 定位 pickCode：若当前视频已被移除，则定位到动态列表中最后剩余的视频
+        val returnPickCode = if (pickCode in discardedPickCodes) {
+            videoList.lastOrNull()?.pickCode ?: ""
+        } else {
+            pickCode
+        }
+
+        val discardedVideoList = discardRecords.map { it.video }
+        val discardJson = Gson().toJson(discardedVideoList)
+
+        // 计算差分星标列表，仅携带与进入播放页前状态不同的操作记录
+        val starList = starChanges.map { (fid, isStar) ->
+            VideoStarAction(fid = fid, star = isStar)
+        }
+        val starJson = Gson().toJson(starList)
+        XLog.d("VideoViewModel.back: starList count=${starList.size}, starJson=$starJson, discardJson count=${discardedVideoList.size}, discardJson=${discardJson}")
+
+        viewModelScope.launch {
+            _uiEvent.emit(
+                VideoUiEvent.FinishWithResult(
+                    resultCode = resultCode,
+                    videoHistoryJson = videoHistoryMapJson,
+                    toast = toast,
+                    cid = launchVideoParams.categoryId,
+                    pickCode = returnPickCode,
+                    discardJson = discardJson,
+                    starJson = starJson
+                )
+            )
+        }
+    }
+
+    /**
+     * 处理网络拦截器捕获到的播放错误（如地址无效、账号未验证、OSS 错误等）
+     *
+     * @param currentPositionMs 当前播放进度（毫秒）
+     * @param url 请求错误的 URL
+     * @param contentType 响应体的 MediaType
+     * @param errorBody 错误响应体文本
+     * @return true 表示错误已成功处理（如重新加载或退出页面），false 表示未匹配到特定错误规则
+     */
+    fun handleInterceptorError(
+        currentPositionMs: Long, url: String, contentType: MediaType, errorBody: String
+    ): Boolean {
+        XLog.e(
+            "GSY Player 网络请求 $url 失败: [$contentType] -> Body: ${
+                errorBody.replace(
+                    "\n", ""
+                )
+            }"
+        )
+        if (errorBody.isEmpty()) {
+            if (!videoLinkMode && autoJumpRetry) {
+                rePlayNewVideo()
+                return true
+            }
+
+            back(
+                currentPositionMs = currentPositionMs,
+                toast = "视频地址错误！请打开\"视频解析模式\"请求正确链接",
+                resultCode = Activity.RESULT_CANCELED
+            )
+            return true
+        }
+
+        runCatching { Gson().fromJson(errorBody, JsonObject::class.java) }
+            .onSuccess { fromJson ->
+                if (fromJson.has("error")) {
+                    viewModelScope.launch {
+                        _uiEvent.emit(VideoUiEvent.ShowCaptchaDialog)
+                    }
+                    return true
+                }
+            }
+        runCatching { parseOssErrorWithDom(errorBody).message }
+            .onSuccess { message ->
+                back(
+                    currentPositionMs = currentPositionMs,
+                    toast = message,
+                    resultCode = Activity.RESULT_CANCELED
+                )
+                return true
+            }
+
+        return false
+    }
+
+    // --- 字幕业务函数代理 ---
+
+    /**
+     * 首次或默认初始化加载字幕列表（从迅雷 API 与 115 同目录获取）
+     *
+     * @param videoDurationMs 视频总时长（毫秒）
+     * @param searchedSubtitle 是否标识为已搜索过字幕，默认为 true
+     */
+    fun loadSubtitles(videoDurationMs: Long, searchedSubtitle: Boolean = true) {
+        fetchSubtitles(videoDurationMs = videoDurationMs, searchedSubtitle = searchedSubtitle)
+    }
+
+    /**
+     * 根据自定义输入的关键字进行字幕搜索
+     *
+     * @param keyword 搜索关键字
+     * @param videoDurationMs 视频总时长（毫秒）
+     */
+    fun searchSubtitlesByName(keyword: String, videoDurationMs: Long) {
+        fetchSubtitles(videoDurationMs = videoDurationMs, searchKeyword = keyword)
+    }
+
+
+    /**
+     * 私有通用字幕加载与检索辅助函数
+     *
+     * 负责统一组装视频信息、匹配同目录字幕并向 [subtitleDelegate] 发起字幕获取请求。
+     *
+     * @param videoDurationMs 视频总时长（毫秒）
+     * @param searchedSubtitle 是否标识为已搜索过字幕
+     * @param searchKeyword 搜索关键字，留空时默认取视频文件名进行模糊搜索
+     */
+    private fun fetchSubtitles(
+        videoDurationMs: Long,
+        searchedSubtitle: Boolean = true,
+        searchKeyword: String = ""
+    ) {
+        val currentInfo = _uiState.value.videoInfo ?: return
+        val localSubtitleItem = launchVideoParams.localSubtitleItem
+        val findMatchingSubtitle =
+            listOfNotNull(findMatchingSubtitle(currentInfo.fileName, localSubtitleItem))
+        subtitleDelegate.loadSubtitles(
+            scope = viewModelScope,
+            mediaName = currentInfo.fileName,
+            searchKeyword = searchKeyword,
+            localSubtitles = findMatchingSubtitle,
+            mediaDurationMs = videoDurationMs,
+            searchedSubtitle = searchedSubtitle,
+            positionAfterAt = launchVideoParams.videoAttribute.positionAfterAt
+        )
+    }
+
+    /**
+     * 下载选中的字幕文件并在准备好本地 File 后进行回调
+     *
+     * @param cacheDirFile 字幕缓存目录文件
+     * @param item 选中的字幕项
+     * @param onReady 下载并处理成功后的回调函数，参数为准备好的本地字幕 File（失败时为 null）
+     */
+    fun selectSubtitle(cacheDirFile: File, item: SubtitleItem, onReady: (File?) -> Unit) {
+        subtitleDelegate.selectSubtitle(
+            scope = viewModelScope,
+            cacheDirFile = cacheDirFile,
+            item = item,
+            onSuccess = onReady
+        )
+    }
+
+    /**
+     * 设置字幕的精确时间偏移量 (ms)
+     *
+     * @param offsetMs 时间偏移量（毫秒）
+     */
+    fun setSubtitleOffset(offsetMs: Long) {
+        subtitleDelegate.setSubtitleOffset(offsetMs)
+    }
+
+    /**
+     * 微调字幕的时间偏移量 (ms)
+     *
+     * @param deltaMs 偏移增量（毫秒）
+     */
+    fun addSubtitleOffset(deltaMs: Long) {
+        subtitleDelegate.addSubtitleOffset(deltaMs)
+    }
+
+    /**
+     * 更新字幕样式（字号、颜色、字体、加粗、底色等）
+     *
+     * @param styleBean 字幕样式配置对象
+     */
+    fun updateSubtitleStyle(styleBean: SubtitleStyleBean) {
+        subtitleDelegate.updateSubtitleStyle(styleBean)
+    }
+
+    /**
+     * 清除/移除当前加载的字幕
+     */
+    fun removeSubtitle() {
+        subtitleDelegate.removeSubtitle()
+    }
+
+    /**
+     * 保存并上传当前字幕至当前视频所在的 115 目录
+     *
+     * @param cacheDirFile 字幕缓存目录文件
+     * @param customFileName 可选的自定义文件名（若为空则优先使用当前搜索关键字 defaultSearchKeyword）
+     */
+    fun saveAndUploadSubtitle(cacheDirFile: File, customFileName: String? = null) {
+        val parentCid = launchVideoParams.categoryId
+        // 优先级：外部指定名称 -> 搜索关键字 -> 原始视频文件名兜底
+        val finalFileName = customFileName?.trim()?.takeIf { it.isNotEmpty() }
+            ?: _uiState.value.defaultSearchKeyword.ifBlank {
+                _uiState.value.videoInfo?.fileName ?: launchVideoParams.videoInfo.fileName
+            }
+        subtitleDelegate.saveAndUploadCurrentSubtitle(
+            scope = viewModelScope,
+            cacheDirFile = cacheDirFile,
+            videoFileName = finalFileName,
+            targetCid = parentCid,
+            onSuccess = {
+                viewModelScope.launch {
+                    FileCacheManager.notifyRemoteRefresh(parentCid)
+                }
+            }
+        )
+    }
+}

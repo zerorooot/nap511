@@ -1,15 +1,15 @@
 package github.zerorooot.nap511.terminal.context
 
-import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.bean.PathBean
-import github.zerorooot.nap511.bean.OrderBean
-import github.zerorooot.nap511.bean.OrderEnum
-import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinator
-import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinatorImpl
-import github.zerorooot.nap511.repository.paging.PagingOptions
-import github.zerorooot.nap511.util.FileCacheManager
-import github.zerorooot.nap511.util.FileOpener
+import github.zerorooot.nap511.data.model.FileBean
+import github.zerorooot.nap511.data.model.PathBean
+import github.zerorooot.nap511.data.model.OrderBean
+import github.zerorooot.nap511.data.model.OrderEnum
+import github.zerorooot.nap511.data.repository.FileRepository
+import github.zerorooot.nap511.data.repository.paging.DirectoryPagingCoordinator
+import github.zerorooot.nap511.data.repository.paging.DirectoryPagingCoordinatorImpl
+import github.zerorooot.nap511.data.repository.paging.PagingOptions
+import github.zerorooot.nap511.data.local.cache.FileCacheManager
+import github.zerorooot.nap511.ui.navigation.FileOpener
 import github.zerorooot.nap511.util.TextFileHelper
 import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.Dispatchers

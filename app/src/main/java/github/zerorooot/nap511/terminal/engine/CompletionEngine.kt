@@ -1,6 +1,6 @@
 package github.zerorooot.nap511.terminal.engine
 
-import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.data.model.FileBean
 import github.zerorooot.nap511.terminal.context.TerminalPath
 import github.zerorooot.nap511.terminal.engine.completion.CommandCompleter
 import github.zerorooot.nap511.terminal.engine.completion.DefaultCompleterRegistry

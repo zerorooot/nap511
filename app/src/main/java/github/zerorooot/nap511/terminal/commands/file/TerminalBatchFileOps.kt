@@ -1,10 +1,10 @@
 package github.zerorooot.nap511.terminal.commands.file
 
-import github.zerorooot.nap511.bean.BaseReturnMessage
-import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.data.model.BaseReturnMessage
+import github.zerorooot.nap511.data.model.FileBean
 import github.zerorooot.nap511.terminal.commands.util.TerminalExceptionHandler
 import github.zerorooot.nap511.terminal.context.TerminalContext
-import github.zerorooot.nap511.util.FileCacheManager
+import github.zerorooot.nap511.data.local.cache.FileCacheManager
 import kotlinx.coroutines.CancellationException
 
 /**

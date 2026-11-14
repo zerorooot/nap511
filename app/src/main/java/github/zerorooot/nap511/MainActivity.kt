@@ -19,11 +19,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
-import github.zerorooot.nap511.repository.SettingsRepository
+import github.zerorooot.nap511.data.repository.SettingsRepository
 import github.zerorooot.nap511.ui.theme.Nap511Theme
-import github.zerorooot.nap511.util.SplashScreenManager
-import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
-import github.zerorooot.nap511.viewmodel.platform.ToastProvider
+import github.zerorooot.nap511.ui.navigation.SplashScreenManager
+import github.zerorooot.nap511.platform.LocalToastProvider
+import github.zerorooot.nap511.platform.ToastProvider
+import github.zerorooot.nap511.ui.screen.MainScreen
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {

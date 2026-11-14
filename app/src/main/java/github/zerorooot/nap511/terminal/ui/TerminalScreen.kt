@@ -49,7 +49,7 @@ import github.zerorooot.nap511.terminal.engine.CompletionCandidate
 import github.zerorooot.nap511.terminal.viewmodel.TerminalLine
 import github.zerorooot.nap511.terminal.viewmodel.TerminalViewModel
 import github.zerorooot.nap511.util.copy
-import github.zerorooot.nap511.viewmodel.platform.LocalToastProvider
+import github.zerorooot.nap511.platform.LocalToastProvider
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 import kotlinx.coroutines.CoroutineScope

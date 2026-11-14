@@ -1,14 +1,13 @@
 package github.zerorooot.nap511.util.subtitle
 
 import com.elvishew.xlog.XLog
-import github.zerorooot.nap511.bean.SubtitleItem
-import github.zerorooot.nap511.bean.SubtitleSourceType
-import github.zerorooot.nap511.bean.SubtitleStyleBean
-import github.zerorooot.nap511.bean.SubtitleUiState
-import github.zerorooot.nap511.repository.SubtitleRepository
-import github.zerorooot.nap511.util.App
+import github.zerorooot.nap511.data.model.SubtitleItem
+import github.zerorooot.nap511.data.model.SubtitleSourceType
+import github.zerorooot.nap511.ui.model.SubtitleStyleBean
+import github.zerorooot.nap511.ui.model.SubtitleUiState
+import github.zerorooot.nap511.data.repository.SubtitleRepository
 import github.zerorooot.nap511.util.keyWord
-import github.zerorooot.nap511.viewmodel.platform.ToastProvider
+import github.zerorooot.nap511.platform.ToastProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow

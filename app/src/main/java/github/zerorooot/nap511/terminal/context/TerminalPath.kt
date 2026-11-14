@@ -1,6 +1,6 @@
 package github.zerorooot.nap511.terminal.context
 
-import github.zerorooot.nap511.bean.PathBean
+import github.zerorooot.nap511.data.model.PathBean
 
 /**
  * 网盘根目录常量配置与标准模型定义

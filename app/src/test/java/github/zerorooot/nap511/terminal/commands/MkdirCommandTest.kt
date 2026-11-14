@@ -1,8 +1,8 @@
 package github.zerorooot.nap511.terminal.commands
 
-import github.zerorooot.nap511.bean.CreateFolderMessage
-import github.zerorooot.nap511.bean.FilesBean
-import github.zerorooot.nap511.repository.FileRepository
+import github.zerorooot.nap511.data.model.CreateFolderMessage
+import github.zerorooot.nap511.data.model.FilesBean
+import github.zerorooot.nap511.data.repository.FileRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

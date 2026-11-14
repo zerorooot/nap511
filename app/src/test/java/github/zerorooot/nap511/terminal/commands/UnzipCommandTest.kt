@@ -3,7 +3,7 @@ package github.zerorooot.nap511.terminal.commands
 import android.app.Application
 import android.content.Context
 import com.elvishew.xlog.XLog
-import github.zerorooot.nap511.bean.FilesBean
+import github.zerorooot.nap511.data.model.FilesBean
 import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -350,10 +350,10 @@ class UnzipCommandTest {
         ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(folderA, folderB), cid = "0", count = 2, order = "", path = emptyList()))
 
         val zipA = createMockFile("a.zip", "101", categoryId = "10").copy(pickCode = "PK_A")
-        ctx.fileCacheManager.put("10", FilesBean(fileBeanList = arrayListOf(zipA), cid = "10", count = 1, order = "", path = listOf(github.zerorooot.nap511.bean.PathBean("0", "根目录", "0"), github.zerorooot.nap511.bean.PathBean("10", "dirA", "0"))))
+        ctx.fileCacheManager.put("10", FilesBean(fileBeanList = arrayListOf(zipA), cid = "10", count = 1, order = "", path = listOf(github.zerorooot.nap511.data.model.PathBean("0", "根目录", "0"), github.zerorooot.nap511.data.model.PathBean("10", "dirA", "0"))))
 
         val zipB = createMockFile("b.zip", "201", categoryId = "20").copy(pickCode = "PK_B")
-        ctx.fileCacheManager.put("20", FilesBean(fileBeanList = arrayListOf(zipB), cid = "20", count = 1, order = "", path = listOf(github.zerorooot.nap511.bean.PathBean("0", "根目录", "0"), github.zerorooot.nap511.bean.PathBean("20", "dirB", "0"))))
+        ctx.fileCacheManager.put("20", FilesBean(fileBeanList = arrayListOf(zipB), cid = "20", count = 1, order = "", path = listOf(github.zerorooot.nap511.data.model.PathBean("0", "根目录", "0"), github.zerorooot.nap511.data.model.PathBean("20", "dirB", "0"))))
 
         val out = engine.executeStrings("unzip dirA/a.zip dirB/b.zip", ctx)
         if (!out.any { it.contains("已成功提交 2 个解压任务到后台") }) {

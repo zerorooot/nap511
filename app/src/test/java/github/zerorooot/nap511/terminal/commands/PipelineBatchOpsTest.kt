@@ -1,6 +1,6 @@
 package github.zerorooot.nap511.terminal.commands
 
-import github.zerorooot.nap511.bean.FilesBean
+import github.zerorooot.nap511.data.model.FilesBean
 import github.zerorooot.nap511.terminal.engine.StreamTargetCollector
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf

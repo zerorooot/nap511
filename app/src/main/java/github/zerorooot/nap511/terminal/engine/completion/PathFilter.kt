@@ -1,6 +1,6 @@
 package github.zerorooot.nap511.terminal.engine.completion
 
-import github.zerorooot.nap511.bean.FileBean
+import github.zerorooot.nap511.data.model.FileBean
 
 /**
  * 文件/路径补全过滤器函数式接口

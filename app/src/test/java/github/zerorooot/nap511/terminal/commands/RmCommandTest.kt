@@ -1,9 +1,9 @@
 package github.zerorooot.nap511.terminal.commands
 
 import com.elvishew.xlog.XLog
-import github.zerorooot.nap511.bean.FileBean
-import github.zerorooot.nap511.bean.FilesBean
-import github.zerorooot.nap511.bean.PathBean
+import github.zerorooot.nap511.data.model.FileBean
+import github.zerorooot.nap511.data.model.FilesBean
+import github.zerorooot.nap511.data.model.PathBean
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -303,10 +303,10 @@ class RmCommandTest {
     @Test
     fun testRmForceSurfacesNetworkError() = runBlocking {
         val mockRepo = object : TestMockFileRepository() {
-            override suspend fun delete(pid: String, fid: String): github.zerorooot.nap511.bean.BaseReturnMessage {
+            override suspend fun delete(pid: String, fid: String): github.zerorooot.nap511.data.model.BaseReturnMessage {
                 throw java.io.IOException("Connection timed out")
             }
-            override suspend fun deleteMultiple(data: Map<String, String>): github.zerorooot.nap511.bean.BaseReturnMessage {
+            override suspend fun deleteMultiple(data: Map<String, String>): github.zerorooot.nap511.data.model.BaseReturnMessage {
                 throw java.io.IOException("Connection timed out")
             }
         }
@@ -444,12 +444,12 @@ class RmCommandTest {
     @Test
     fun testRmSingleItemAndBatchDeleteFailureFeedback() = runBlocking {
         val mockRepo = object : TestMockFileRepository() {
-            override suspend fun delete(pid: String, fid: String): github.zerorooot.nap511.bean.BaseReturnMessage {
-                return github.zerorooot.nap511.bean.BaseReturnMessage(state = false, error = "服务端拒绝删除")
+            override suspend fun delete(pid: String, fid: String): github.zerorooot.nap511.data.model.BaseReturnMessage {
+                return github.zerorooot.nap511.data.model.BaseReturnMessage(state = false, error = "服务端拒绝删除")
             }
 
-            override suspend fun deleteMultiple(data: Map<String, String>): github.zerorooot.nap511.bean.BaseReturnMessage {
-                return github.zerorooot.nap511.bean.BaseReturnMessage(state = false, error = "批量操作权限不足")
+            override suspend fun deleteMultiple(data: Map<String, String>): github.zerorooot.nap511.data.model.BaseReturnMessage {
+                return github.zerorooot.nap511.data.model.BaseReturnMessage(state = false, error = "批量操作权限不足")
             }
         }
         val engine = createTestEngine()

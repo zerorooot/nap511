@@ -4,14 +4,16 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import github.zerorooot.nap511.repository.AuthRepository
-import github.zerorooot.nap511.repository.DataStoreSettingsRepository
-import github.zerorooot.nap511.repository.DefaultAuthRepository
-import github.zerorooot.nap511.repository.DefaultFileRepository
-import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.repository.SettingsRepository
-import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinator
-import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinatorImpl
+import github.zerorooot.nap511.data.repository.AuthRepository
+import github.zerorooot.nap511.data.repository.DataStoreSettingsRepository
+import github.zerorooot.nap511.data.repository.DefaultAuthRepository
+import github.zerorooot.nap511.data.repository.DefaultFileRepository
+import github.zerorooot.nap511.data.repository.FileRepository
+import github.zerorooot.nap511.data.repository.RepeatRepository
+import github.zerorooot.nap511.data.repository.DefaultRepeatRepository
+import github.zerorooot.nap511.data.repository.SettingsRepository
+import github.zerorooot.nap511.data.repository.paging.DirectoryPagingCoordinator
+import github.zerorooot.nap511.data.repository.paging.DirectoryPagingCoordinatorImpl
 import javax.inject.Singleton
 
 /**
@@ -34,6 +36,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindSettingsRepository(impl: DataStoreSettingsRepository): SettingsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindRepeatRepository(impl: DefaultRepeatRepository): RepeatRepository
 
     @Binds
     @Singleton

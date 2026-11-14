@@ -1,8 +1,8 @@
 package github.zerorooot.nap511.terminal.commands
 
-import github.zerorooot.nap511.bean.BaseReturnMessage
-import github.zerorooot.nap511.bean.FilesBean
-import github.zerorooot.nap511.bean.PathBean
+import github.zerorooot.nap511.data.model.BaseReturnMessage
+import github.zerorooot.nap511.data.model.FilesBean
+import github.zerorooot.nap511.data.model.PathBean
 import github.zerorooot.nap511.terminal.commands.file.BatchTargetItem
 import github.zerorooot.nap511.terminal.commands.file.TerminalBatchFileOps
 import kotlinx.coroutines.runBlocking

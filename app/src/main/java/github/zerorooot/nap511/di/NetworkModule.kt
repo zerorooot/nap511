@@ -5,12 +5,12 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import github.zerorooot.nap511.service.FileService
-import github.zerorooot.nap511.service.OfflineService
-import github.zerorooot.nap511.service.RepeatService
+import github.zerorooot.nap511.data.network.api.FileApi
+import github.zerorooot.nap511.data.network.api.OfflineApi
+import github.zerorooot.nap511.data.network.api.RepeatApi
 import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.util.network.NetworkClient
-import github.zerorooot.nap511.util.network.UserSessionManager
+import github.zerorooot.nap511.data.network.client.NetworkClient
+import github.zerorooot.nap511.data.network.client.UserSessionManager
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -56,19 +56,19 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideFileService(): FileService {
-        return createRetrofitService("https://webapi.115.com/", FileService::class.java)
+    fun provideFileApi(): FileApi {
+        return createRetrofitService("https://webapi.115.com/", FileApi::class.java)
     }
 
     @Provides
     @Singleton
-    fun provideRepeatService(): RepeatService {
-        return createRetrofitService("https://aps.115.com/repeat/", RepeatService::class.java)
+    fun provideRepeatApi(): RepeatApi {
+        return createRetrofitService("https://aps.115.com/repeat/", RepeatApi::class.java)
     }
 
     @Provides
     @Singleton
-    fun provideOfflineService(): OfflineService {
-        return createRetrofitService("https://115.com/", OfflineService::class.java)
+    fun provideOfflineApi(): OfflineApi {
+        return createRetrofitService("https://115.com/", OfflineApi::class.java)
     }
 }

@@ -1,0 +1,531 @@
+package github.zerorooot.nap511.ui.player;
+
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.graphics.Typeface;
+import android.os.BatteryManager;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.AttributeSet;
+import android.util.DisplayMetrics;
+import android.view.MotionEvent;
+import android.view.View;
+import android.widget.TextView;
+
+import androidx.constraintlayout.widget.ConstraintLayout;
+import androidx.constraintlayout.widget.ConstraintSet;
+import androidx.transition.TransitionManager;
+
+import com.elvishew.xlog.XLog;
+import com.shuyu.gsyvideoplayer.subtitle.GSYSubtitleStyle;
+import com.shuyu.gsyvideoplayer.utils.CommonUtil;
+import com.shuyu.gsyvideoplayer.utils.GSYVideoType;
+import com.shuyu.gsyvideoplayer.video.StandardGSYVideoPlayer;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+import java.util.Objects;
+
+import github.zerorooot.nap511.R;
+import github.zerorooot.nap511.ui.model.SubtitleStyleBean;
+
+public class MyGSYVideoPlayer extends StandardGSYVideoPlayer {
+    // 顶部右侧胶囊控制区：倍速与比例控件（支持单行/双行灵活适配）
+    private View mMoreScale;
+    private View switchSpeed;
+    private TextView tvScaleVal;
+    private TextView tvSpeedVal;
+
+    // 统一的合并抽屉面板组件
+    private View layoutDrawer;
+    private TextView tvDrawerTitle;
+    private DrawerType mCurrentDrawerType = null;
+    private OnDrawerOpenListener mOnDrawerOpenListener;
+
+    /**
+     * 抽屉类型枚举：选集、倍速、画面比例、字幕
+     */
+    public enum DrawerType {
+        EPISODE, SPEED, SCALE, SUBTITLE
+    }
+
+    /**
+     * 抽屉打开监听接口，用于 Activity/Fragment 动态切换 RecyclerView 适配器
+     */
+    public interface OnDrawerOpenListener {
+        void onDrawerOpen(DrawerType type);
+    }
+
+    /**
+     * 底层解码真实尺寸与旋转角度解析回调接口
+     */
+    public interface OnVideoDimensionResolvedListener {
+        void onDimensionResolved(int width, int height, int effectiveRotation);
+    }
+
+    private OnVideoDimensionResolvedListener mOnVideoDimensionResolvedListener;
+
+    public void setOnVideoDimensionResolvedListener(OnVideoDimensionResolvedListener listener) {
+        this.mOnVideoDimensionResolvedListener = listener;
+    }
+
+    private int mType = 0;
+
+    // 画面旋转控制：视频原生角度（元数据）与用户手动旋转偏移角度
+    private int mIntrinsicRotation = 0;
+    private int mCustomRotation = 0;
+
+    long forwardRewindIncrementMs = 15000;
+    private TextView batteryTextView;
+    private TextView timeTextView;
+    private View layoutStatusInfo;
+    private ConstraintLayout mLayoutBottom;
+    private ConstraintSet mBottomConstraintLand;
+    private ConstraintSet mBottomConstraintPort;
+    public static String TAG = "MyGSYVideoPlayer";
+
+    // 独立的 UI 主线程定时器，独立于 GSY 播放状态
+    private final Handler mClockHandler = new Handler(Looper.getMainLooper());
+    private final Runnable mClockRunnable = new Runnable() {
+        @Override
+        public void run() {
+            setBatteryAndTime();
+            // 每 1000ms 刷新一次，确保即使暂停也能每秒更新
+            mClockHandler.postDelayed(this, 1000);
+        }
+    };
+
+    public MyGSYVideoPlayer(Context context) {
+        super(context);
+    }
+
+    public MyGSYVideoPlayer(Context context, AttributeSet attrs) {
+        super(context, attrs);
+    }
+
+    @Override
+    public String getPlayTag() {
+        return TAG;
+    }
+
+    @Override
+    protected void init(Context context) {
+        super.init(context);
+        GSYVideoType.setShowType(GSYVideoType.SCREEN_TYPE_DEFAULT);
+        initView();
+    }
+
+    public void setHideLoadingView(boolean hide) {
+        if (hide && findViewById(R.id.startAndLoadLayout) != null) {
+            XLog.d("MyGSYVideoPlayer hide video start view");
+            findViewById(R.id.startAndLoadLayout).setVisibility(GONE);
+        }
+    }
+
+    /**
+     * 设置抽屉打开监听器
+     */
+    public void setOnDrawerOpenListener(OnDrawerOpenListener listener) {
+        this.mOnDrawerOpenListener = listener;
+    }
+
+    /**
+     * 获取当前打开的抽屉类型
+     */
+    public DrawerType getCurrentDrawerType() {
+        return mCurrentDrawerType;
+    }
+
+    private void initView() {
+        batteryTextView = findViewById(R.id.batteryTextView);
+        timeTextView = findViewById(R.id.timeTextView);
+        layoutStatusInfo = findViewById(R.id.layout_status_info);
+        mLayoutBottom = findViewById(R.id.layout_bottom);
+
+        mMoreScale = findViewById(R.id.moreScale);
+        switchSpeed = findViewById(R.id.switchSpeed);
+        tvScaleVal = findViewById(R.id.tv_scale_val);
+        tvSpeedVal = findViewById(R.id.tv_speed_val);
+        TextView switchEpisode = findViewById(R.id.switchEpisode);
+        TextView switchSubtitle = findViewById(R.id.switchSubtitle);
+
+        // 绑定统一的右侧抽屉面板及其组件
+        layoutDrawer = findViewById(R.id.layout_drawer);
+        tvDrawerTitle = findViewById(R.id.tv_drawer_title);
+        View closeDrawer = findViewById(R.id.close_drawer);
+
+        // 底部各按钮绑定点击事件，打开对应类型的抽屉
+        if (switchEpisode != null) {
+            switchEpisode.setOnClickListener(v -> openDrawer(DrawerType.EPISODE, "选集"));
+        }
+        if (switchSpeed != null) {
+            switchSpeed.setOnClickListener(v -> openDrawer(DrawerType.SPEED, "播放倍速"));
+        }
+        if (mMoreScale != null) {
+            mMoreScale.setOnClickListener(v -> openDrawer(DrawerType.SCALE, "画面比例"));
+        }
+        if (switchSubtitle != null) {
+            switchSubtitle.setOnClickListener(v -> openDrawer(DrawerType.SUBTITLE, mTitleTextView.getText() + " " + CommonUtil.stringForTime(getDuration())));
+        }
+
+        // 抽屉关闭按钮事件
+        if (closeDrawer != null) {
+            closeDrawer.setOnClickListener(v -> hideAllDrawers());
+        }
+
+        if (mLayoutBottom != null) {
+            mBottomConstraintLand = new ConstraintSet();
+            mBottomConstraintPort = new ConstraintSet();
+            mBottomConstraintLand.clone(getContext(), R.layout.video_layout_bottom_land);
+            mBottomConstraintPort.clone(getContext(), R.layout.video_layout_bottom_port);
+        }
+
+        updateLayoutForOrientation();
+    }
+
+    @Override
+    protected void onConfigurationChanged(android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        updateLayoutForOrientation();
+    }
+
+    private void updateLayoutForOrientation() {
+        boolean isPortrait = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT;
+        if (layoutStatusInfo != null) {
+            layoutStatusInfo.setVisibility(isPortrait ? GONE : VISIBLE);
+        }
+        if (mLayoutBottom != null) {
+            TransitionManager.beginDelayedTransition(mLayoutBottom);
+            if (isPortrait && mBottomConstraintPort != null) {
+                mBottomConstraintPort.applyTo(mLayoutBottom);
+                mLayoutBottom.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+            } else if (!isPortrait && mBottomConstraintLand != null) {
+                mBottomConstraintLand.applyTo(mLayoutBottom);
+                mLayoutBottom.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+            }
+        }
+    }
+
+    /**
+     * View 挂载到窗口时启动定时器
+     */
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        startClockTimer();
+    }
+
+    /**
+     * View 销毁离开窗口时停止定时器，防止内存泄漏
+     */
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        stopClockTimer();
+    }
+
+    private void startClockTimer() {
+        stopClockTimer();
+        mClockHandler.post(mClockRunnable);
+    }
+
+    private void stopClockTimer() {
+        mClockHandler.removeCallbacks(mClockRunnable);
+    }
+
+
+    @Override
+    public int getLayoutId() {
+        return R.layout.video_layout_preview;
+    }
+
+    private void setBatteryAndTime() {
+        if (batteryTextView == null || timeTextView == null || getContext() == null) {
+            return;
+        }
+
+        // 获取电量与充电状态
+        Intent batteryStatus = getContext().registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        if (batteryStatus != null) {
+            int level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+            int scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+            int status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+            boolean isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING
+                    || status == BatteryManager.BATTERY_STATUS_FULL;
+
+            int batteryPct = (scale > 0) ? (level * 100 / scale) : 100;
+            batteryTextView.setText(batteryPct + "%" + (isCharging ? " ⚡" : ""));
+        }
+
+        // 规范为设计图样式的极简 HH:mm
+        timeTextView.setText(new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date()));
+    }
+
+    private void resolveTypeUI() {
+        if (!mHadPlay) return;
+        String scaleText = "默认";
+        if (mType == 1) {
+            scaleText = "16:9";
+            GSYVideoType.setShowType(GSYVideoType.SCREEN_TYPE_16_9);
+        } else if (mType == 2) {
+            scaleText = "4:3";
+            GSYVideoType.setShowType(GSYVideoType.SCREEN_TYPE_4_3);
+        } else if (mType == 3) {
+            scaleText = "全屏";
+            GSYVideoType.setShowType(GSYVideoType.SCREEN_TYPE_FULL);
+        } else if (mType == 4) {
+            scaleText = "拉伸";
+            GSYVideoType.setShowType(GSYVideoType.SCREEN_MATCH_FULL);
+        } else if (mType == 0) {
+            scaleText = "默认";
+            GSYVideoType.setShowType(GSYVideoType.SCREEN_TYPE_DEFAULT);
+        }
+
+        // 优先更新双行胶囊中的比例数值，兼容原单行 TextView 模式
+        if (tvScaleVal != null) {
+            tvScaleVal.setText(scaleText);
+        } else if (mMoreScale instanceof TextView) {
+            ((TextView) mMoreScale).setText(scaleText);
+        }
+
+        changeTextureViewShowType();
+        if (mTextureView != null) mTextureView.requestLayout();
+    }
+
+    public void forwardOrRewind(long time) {
+        long totalTimeDuration = getDuration();
+        mSeekTimePosition = (int) (getGSYVideoManager().getCurrentPosition() + time);
+        if (mSeekTimePosition > totalTimeDuration) {
+            mSeekTimePosition = totalTimeDuration;
+        }
+        String seekTime = CommonUtil.stringForTime(mSeekTimePosition);
+        String totalTime = CommonUtil.stringForTime(totalTimeDuration);
+        getGSYVideoManager().seekTo(mSeekTimePosition);
+
+        new Handler(Objects.requireNonNull(Looper.myLooper())).postDelayed(() -> {
+            showProgressDialog(time, seekTime, mSeekTimePosition, totalTime, totalTimeDuration);
+        }, 100);
+        new Handler(Objects.requireNonNull(Looper.myLooper())).postDelayed(this::dismissProgressDialog, 600);
+    }
+
+    private void checkAndNotifyDimensions() {
+        int w = getCurrentVideoWidth();
+        int h = getCurrentVideoHeight();
+        if (w > 0 && h > 0 && mOnVideoDimensionResolvedListener != null) {
+            mOnVideoDimensionResolvedListener.onDimensionResolved(w, h, getEffectiveRotation());
+        }
+    }
+
+    @Override
+    public void onVideoSizeChanged() {
+        super.onVideoSizeChanged();
+        checkAndNotifyDimensions();
+    }
+
+    @Override
+    public void onInfo(int what, int extra) {
+        if (getGSYVideoManager() != null && what == getGSYVideoManager().getRotateInfoFlag()) {
+            XLog.d(TAG + " 收到视频原生旋转信息: " + extra);
+            mIntrinsicRotation = extra;
+            applyEffectiveRotation();
+            // 原生旋转角度更新后重新核验视觉宽高，确保 90° 旋转视频能够成功纠正为竖屏
+            checkAndNotifyDimensions();
+            return;
+        }
+        super.onInfo(what, extra);
+    }
+
+    @Override
+    protected boolean setUp(String url, boolean cacheWithPlay, java.io.File cachePath, String title, boolean changeState) {
+        // 装载或切换新视频时，自动复位画面旋转角度
+        XLog.d(TAG + " setUp 自动复位画面旋转角度为 0");
+        mIntrinsicRotation = 0;
+        mCustomRotation = 0;
+        mRotate = 0;
+        return super.setUp(url, cacheWithPlay, cachePath, title, changeState);
+    }
+
+    /**
+     * 相对增减视频画面旋转角度（顺时针为正，逆时针为负）
+     *
+     * @param deltaDegrees 旋转增量（例如 90, -90）
+     */
+    public void rotateVideo(int deltaDegrees) {
+        mCustomRotation = (mCustomRotation + deltaDegrees) % 360;
+        if (mCustomRotation < 0) {
+            mCustomRotation += 360;
+        }
+        XLog.d(TAG + " rotateVideo: delta=" + deltaDegrees + ", customRotation=" + mCustomRotation);
+        applyEffectiveRotation();
+    }
+
+    /**
+     * 重置自定义视频画面旋转角度为 0°
+     */
+    public void resetVideoRotation() {
+        XLog.d(TAG + " resetVideoRotation: 重置自定义旋转为 0");
+        mCustomRotation = 0;
+        applyEffectiveRotation();
+    }
+
+    /**
+     * 合成原生角度与用户自定义角度并应用到渲染视图 (TextureView)
+     */
+    private void applyEffectiveRotation() {
+        int effective = (mIntrinsicRotation + mCustomRotation) % 360;
+        if (effective < 0) {
+            effective += 360;
+        }
+        mRotate = effective;
+        XLog.d(TAG + " applyEffectiveRotation: intrinsic=" + mIntrinsicRotation
+                + ", custom=" + mCustomRotation + ", effective=" + effective);
+        if (mTextureView != null) {
+            mTextureView.setRotation(effective);
+            mTextureView.requestLayout();
+        }
+    }
+
+    public int getCustomRotation() {
+        return mCustomRotation;
+    }
+
+    public int getIntrinsicRotation() {
+        return mIntrinsicRotation;
+    }
+
+    public int getEffectiveRotation() {
+        return (mIntrinsicRotation + mCustomRotation) % 360;
+    }
+
+    public void playNext(String url, String title) {
+        setUp(url, mCache, null, title, true);
+        mTitleTextView.setText(title);
+        startPlayLogic();
+    }
+
+    @Override
+    protected void changeUiToPreparingShow() {
+        super.changeUiToPreparingShow();
+        setViewShowState(mStartButton, VISIBLE);
+    }
+
+    @Override
+    protected void changeUiToPlayingBufferingShow() {
+        super.changeUiToPlayingBufferingShow();
+        setViewShowState(mStartButton, VISIBLE);
+    }
+
+    @Override
+    protected void changeUiToPlayingBufferingClear() {
+        super.changeUiToPlayingBufferingClear();
+        setViewShowState(mStartButton, VISIBLE);
+    }
+
+    @Override
+    public void touchDoubleUp(MotionEvent event) {
+        float x = event.getX();
+        DisplayMetrics displayMetrics = mContext.getResources().getDisplayMetrics();
+        int screenWidth = displayMetrics.widthPixels;
+
+        if (x <= screenWidth * 0.3) {
+            forwardOrRewind(forwardRewindIncrementMs * (-1));
+        } else if (x > screenWidth * 0.3 && x < screenWidth * 0.6) {
+            if (!mHadPlay) return;
+            clickStartIcon();
+        } else if (x >= screenWidth * 0.6) {
+            forwardOrRewind(forwardRewindIncrementMs);
+        }
+    }
+
+    /**
+     * 打开指定类型的抽屉并更新标题
+     *
+     * @param type  抽屉类型 (选集/倍速/画面比例)
+     * @param title 抽屉标题文本
+     */
+    public void openDrawer(DrawerType type, String title) {
+        if (layoutDrawer != null) {
+            // 如果当前点击的抽屉已经处于显示状态，再次点击时则进行关抽屉切换
+            if (layoutDrawer.getVisibility() == VISIBLE && mCurrentDrawerType == type) {
+                hideAllDrawers();
+                return;
+            }
+            if (tvDrawerTitle != null) {
+                tvDrawerTitle.setText(title);
+            }
+            mCurrentDrawerType = type;
+            layoutDrawer.setVisibility(VISIBLE);
+            if (mOnDrawerOpenListener != null) {
+                mOnDrawerOpenListener.onDrawerOpen(type);
+            }
+        }
+    }
+
+    /**
+     * 隐藏抽屉面板
+     */
+    public void hideAllDrawers() {
+        if (layoutDrawer != null) {
+            layoutDrawer.setVisibility(GONE);
+        }
+        mCurrentDrawerType = null;
+    }
+
+    /**
+     * 判断当前抽屉面板是否正在显示
+     */
+    public boolean isAnyDrawerShowing() {
+        return layoutDrawer != null && layoutDrawer.getVisibility() == VISIBLE;
+    }
+
+    @Override
+    protected void onClickUiToggle(MotionEvent e) {
+        if (isAnyDrawerShowing()) {
+            hideAllDrawers();
+            return;
+        }
+        super.onClickUiToggle(e);
+    }
+
+    public void setAspectScale(int type) {
+        mType = type;
+        resolveTypeUI();
+    }
+
+    /**
+     * 设置倍速按钮展示文案
+     * 针对双行胶囊布局进行智能格式化（如 1.0x / 1.5x），避免顶部数值与底部“倍速”标签重复
+     */
+    public void setSpeedText(String text) {
+        if (tvSpeedVal != null) {
+            if ("倍速".equals(text) || "1.0X".equalsIgnoreCase(text) || "1.0".equalsIgnoreCase(text)) {
+                tvSpeedVal.setText("1.0x");
+            } else {
+                tvSpeedVal.setText(text.toLowerCase(Locale.ROOT));
+            }
+        } else if (switchSpeed instanceof TextView) {
+            ((TextView) switchSpeed).setText(text);
+        }
+    }
+
+    /**
+     * 应用字幕样式设置 (字号、颜色、背景色、字体、加粗)
+     */
+    public void applySubtitleStyle(SubtitleStyleBean styleBean) {
+        if (styleBean == null) return;
+        GSYSubtitleStyle style = new GSYSubtitleStyle.Builder()
+                .setTextSizeSp(styleBean.getTextSizeSp())
+                .setTextColor(styleBean.getTextColor())
+                .setBackgroundColor(styleBean.getBackgroundColor())
+                .build();
+        setSubtitleStyle(style);
+
+        if (mSubtitleView != null) {
+            int styleFlags = styleBean.isBold() ? Typeface.BOLD : Typeface.NORMAL;
+            mSubtitleView.setTypeface(styleBean.getFontFamily().getTypeface(), styleFlags);
+        }
+    }
+
+}

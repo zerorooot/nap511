@@ -1,6 +1,6 @@
 package github.zerorooot.nap511.terminal.commands.file
 
-import github.zerorooot.nap511.bean.RenameBean
+import github.zerorooot.nap511.data.model.RenameBean
 import github.zerorooot.nap511.terminal.commands.util.CommandMessages
 import github.zerorooot.nap511.terminal.commands.util.MoveValidationResult
 import github.zerorooot.nap511.terminal.commands.util.TargetItemResolver

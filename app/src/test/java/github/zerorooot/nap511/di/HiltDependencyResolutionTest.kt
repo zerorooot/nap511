@@ -4,16 +4,17 @@ import com.elvishew.xlog.XLog
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
-import github.zerorooot.nap511.repository.AuthRepository
-import github.zerorooot.nap511.repository.FileRepository
-import github.zerorooot.nap511.repository.SettingsRepository
-import github.zerorooot.nap511.repository.SubtitleRepository
-import github.zerorooot.nap511.repository.paging.DirectoryPagingCoordinator
-import github.zerorooot.nap511.service.FileService
-import github.zerorooot.nap511.service.OfflineService
-import github.zerorooot.nap511.service.RepeatService
-import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
-import github.zerorooot.nap511.viewmodel.platform.ToastProvider
+import github.zerorooot.nap511.data.repository.AuthRepository
+import github.zerorooot.nap511.data.repository.FileRepository
+import github.zerorooot.nap511.data.repository.RepeatRepository
+import github.zerorooot.nap511.data.repository.SettingsRepository
+import github.zerorooot.nap511.data.repository.SubtitleRepository
+import github.zerorooot.nap511.data.repository.paging.DirectoryPagingCoordinator
+import github.zerorooot.nap511.data.network.api.FileApi
+import github.zerorooot.nap511.data.network.api.OfflineApi
+import github.zerorooot.nap511.data.network.api.RepeatApi
+import github.zerorooot.nap511.platform.AppStringProvider
+import github.zerorooot.nap511.platform.ToastProvider
 import github.zerorooot.nap511.worker.UnzipQueueManager
 import org.junit.Assert.assertNotNull
 import org.junit.Before
@@ -28,7 +29,7 @@ import javax.inject.Inject
  * Hilt 依赖图完整性集成测试
  *
  * 通过 Robolectric 与 HiltTestApplication 验证全图依赖绑定：
- * 包括所有 Repository、Service、PagingCoordinator、Platform 抽象及单例 Manager。
+ * 包括所有 Repository、API、PagingCoordinator、Platform 抽象及单例 Manager。
  */
 @HiltAndroidTest
 @RunWith(RobolectricTestRunner::class)
@@ -42,12 +43,13 @@ class HiltDependencyResolutionTest {
     @Inject lateinit var authRepository: AuthRepository
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var subtitleRepository: SubtitleRepository
+    @Inject lateinit var repeatRepository: RepeatRepository
     @Inject lateinit var pagingCoordinator: DirectoryPagingCoordinator
     @Inject lateinit var toastProvider: ToastProvider
     @Inject lateinit var stringProvider: AppStringProvider
-    @Inject lateinit var fileService: FileService
-    @Inject lateinit var repeatService: RepeatService
-    @Inject lateinit var offlineService: OfflineService
+    @Inject lateinit var fileApi: FileApi
+    @Inject lateinit var repeatApi: RepeatApi
+    @Inject lateinit var offlineApi: OfflineApi
     @Inject lateinit var unzipQueueManager: UnzipQueueManager
 
     @Before
@@ -64,12 +66,13 @@ class HiltDependencyResolutionTest {
         assertNotNull(authRepository)
         assertNotNull(settingsRepository)
         assertNotNull(subtitleRepository)
+        assertNotNull(repeatRepository)
         assertNotNull(pagingCoordinator)
         assertNotNull(toastProvider)
         assertNotNull(stringProvider)
-        assertNotNull(fileService)
-        assertNotNull(repeatService)
-        assertNotNull(offlineService)
+        assertNotNull(fileApi)
+        assertNotNull(repeatApi)
+        assertNotNull(offlineApi)
         assertNotNull(unzipQueueManager)
     }
 }

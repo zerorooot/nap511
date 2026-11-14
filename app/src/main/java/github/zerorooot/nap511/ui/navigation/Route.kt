@@ -1,0 +1,82 @@
+package github.zerorooot.nap511.ui.navigation
+
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.navigation3.runtime.NavKey
+import github.zerorooot.nap511.data.model.OfflineTask
+import kotlinx.serialization.Serializable
+
+// 导航配置项辅助类
+data class DrawerMenuItem(val iconVector: ImageVector, val label: String, val route: Route)
+
+sealed interface Route : NavKey {
+    // 抽屉导航页面
+    @Serializable
+    data object Login : Route
+
+    @Serializable
+    data object MyFile : Route
+
+    @Serializable
+    data object OfflineDownload : Route
+
+    @Serializable
+    data object OfflineList : Route
+
+    @Serializable
+    data class OfflineFileInfoDialog(val task: OfflineTask) : Route
+
+
+    @Serializable
+    data object RecycleBin : Route
+
+    @Serializable
+    data object AdvancedSettings : Route
+
+    @Serializable
+    data object Terminal : Route
+
+    @Serializable
+    data object LogScreen : Route
+
+    @Serializable
+    data object Photo : Route
+
+    @Serializable
+    data object WebScreen : Route
+
+    @Serializable
+    data object ExitApp : Route
+
+    @Serializable
+    data object VerifyMagnetLinkAccount : Route
+
+    @Serializable
+    data object VerifyVideoAccount : Route
+
+
+    @Serializable
+    data object RepeatFile : Route
+
+    @Serializable
+    data class TxtReader(val title: String = "文本阅读") : Route
+
+    @Serializable
+    data object MusicDetail : Route
+
+    @Serializable
+    data class HtmlWebViewScreen(val title: String = "网页") : Route
+
+    @Serializable
+    data object AboutApp : Route
+
+    @Serializable
+    data object OpenSourceLicense : Route
+
+    @Serializable
+    data object Disclaimer : Route
+}
+
+// 定义导航事件
+sealed interface NavEvent {
+    data class NavigateToScreen(val route: Route) : NavEvent
+}

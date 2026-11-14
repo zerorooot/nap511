@@ -4,8 +4,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".activity.VideoActivity">
-    <github.zerorooot.nap511.player.MyGSYVideoPlayer
+    tools:context=".ui.activity.VideoActivity">
+    <github.zerorooot.nap511.ui.player.MyGSYVideoPlayer
         android:id="@+id/pre_video_player"
         android:layout_width="match_parent"
         android:layout_height="match_parent"

@@ -1,7 +1,7 @@
 package github.zerorooot.nap511.terminal.commands
 
-import github.zerorooot.nap511.bean.FilesBean
-import github.zerorooot.nap511.bean.PathBean
+import github.zerorooot.nap511.data.model.FilesBean
+import github.zerorooot.nap511.data.model.PathBean
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

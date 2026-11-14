@@ -10,11 +10,11 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import github.zerorooot.nap511.repository.settingDataStore
-import github.zerorooot.nap511.viewmodel.platform.AndroidAppStringProvider
-import github.zerorooot.nap511.viewmodel.platform.AndroidToastProvider
-import github.zerorooot.nap511.viewmodel.platform.AppStringProvider
-import github.zerorooot.nap511.viewmodel.platform.ToastProvider
+import github.zerorooot.nap511.data.repository.settingDataStore
+import github.zerorooot.nap511.platform.AndroidAppStringProvider
+import github.zerorooot.nap511.platform.AndroidToastProvider
+import github.zerorooot.nap511.platform.AppStringProvider
+import github.zerorooot.nap511.platform.ToastProvider
 import javax.inject.Singleton
 
 /**

@@ -23,7 +23,7 @@ import coil.ImageLoader
 import coil.annotation.ExperimentalCoilApi
 import coil.memory.MemoryCache
 import com.elvishew.xlog.XLog
-import github.zerorooot.nap511.viewmodel.platform.ToastProvider
+import github.zerorooot.nap511.platform.ToastProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
