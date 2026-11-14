@@ -29,7 +29,6 @@ import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.data.local.cache.FileCacheManager
 import github.zerorooot.nap511.util.cleanExpiredCoilDiskCache
 import github.zerorooot.nap511.data.network.client.NetworkClient
-import github.zerorooot.nap511.data.network.client.OneOneFiveImageExpirationInterceptor
 import github.zerorooot.nap511.data.network.client.UserSessionManager
 import github.zerorooot.nap511.util.resolveCallerTag
 import kotlinx.coroutines.CoroutineScope
@@ -155,7 +154,7 @@ class NapApplication : Application(), ImageLoaderFactory, Configuration.Provider
 
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
-            .okHttpClient(NetworkClient.imageOkHttpClient) // 使用独立 Dispatcher(maxRequestsPerHost=20) 与独立连接池的专属客户端
+            .okHttpClient(NetworkClient.coilOkHttpClient)
             .components {
                 // 注册 GIF 解码器
                 if (Build.VERSION.SDK_INT >= 28) {
