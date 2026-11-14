@@ -11,7 +11,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -32,7 +31,6 @@ import github.zerorooot.nap511.ui.navigation.AppNavHost
 import github.zerorooot.nap511.ui.screen.file.CreateDialogs
 import github.zerorooot.nap511.ui.components.item.AppDrawer
 import github.zerorooot.nap511.ui.components.item.DrawerMenuItems
-import github.zerorooot.nap511.platform.LocalToastProvider
 import github.zerorooot.nap511.ui.viewmodel.AudioViewModel
 import github.zerorooot.nap511.ui.viewmodel.FileViewModel
 import github.zerorooot.nap511.ui.viewmodel.OfflineFileViewModel
@@ -43,7 +41,6 @@ import kotlinx.coroutines.launch
 fun MainScreen(
     intent: Intent,
     settingUiState: SettingUiState,
-    onMoveTaskToBack: (Boolean) -> Unit
 ) {
     val fileViewModel: FileViewModel = viewModel()
     val audioViewModel: AudioViewModel = viewModel()
@@ -56,12 +53,10 @@ fun MainScreen(
     val offlineFileViewModel: OfflineFileViewModel = viewModel()
 
     val context = LocalContext.current
-    val toastProvider = LocalToastProvider.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
     var navGesturesEnabled by remember { mutableStateOf(true) }
-    var lastBackPressTime by remember { mutableLongStateOf(0L) }
 
     // 使用 State 结合 Provider lambda 传递，防止数据更新时倒灌导致 MainScreen 顶级全量重组
     val remainingSpaceState = fileViewModel.remainingSpace.collectAsStateWithLifecycle()
@@ -146,19 +141,6 @@ fun MainScreen(
         }
     }
 
-    /**
-     * 滑动两次返回桌面
-     */
-    fun slideTwoBackHome(fileViewModel: FileViewModel?) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastBackPressTime < 1500L) {
-            fileViewModel?.deleteOrphansAndExpiredFile()
-            onMoveTaskToBack(true)
-        } else {
-            lastBackPressTime = currentTime
-            toastProvider.showToast("再滑一次返回桌面")
-        }
-    }
 
     LaunchedEffect(Unit) {
         fileViewModel.loadCacheFile()
@@ -195,16 +177,6 @@ fun MainScreen(
     BackHandler(drawerState.isClosed && backStack.size > 1) {
         popBack()
     }
-    //登陆页面的再滑一次返回桌面
-    BackHandler(backStack.size == 1 && backStack[0] == Route.Login) {
-        slideTwoBackHome(null)
-    }
-    // MyFile页面的再滑一次返回桌面（隔离在单独 Composable 中，防止 contentState 变化引起 MainScreen 重组）
-    MyFileRootBackHandler(
-        enabled = drawerState.isClosed && backStack.size == 1,
-        fileViewModel = fileViewModel,
-        onBack = { slideTwoBackHome(it) }
-    )
 
     AppDrawer(
         drawerState = drawerState,
@@ -235,20 +207,5 @@ fun MainScreen(
 
     CreateDialogs(fileViewModel, settingUiState) {
         navigateTo(it)
-    }
-}
-
-/**
- * 局部隔离的 MyFile 根目录返回监听器，避免 contentState 频繁发射导致全局 MainScreen 重组
- */
-@Composable
-private fun MyFileRootBackHandler(
-    enabled: Boolean,
-    fileViewModel: FileViewModel,
-    onBack: (FileViewModel?) -> Unit
-) {
-    val fileContentState by fileViewModel.contentState.collectAsStateWithLifecycle()
-    BackHandler(enabled && fileContentState.pathList.size == 1) {
-        onBack(fileViewModel)
     }
 }
