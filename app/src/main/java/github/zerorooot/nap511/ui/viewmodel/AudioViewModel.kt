@@ -30,9 +30,13 @@ import github.zerorooot.nap511.data.network.client.UserSessionManager
 import github.zerorooot.nap511.util.subtitle.SubtitleDelegate
 import github.zerorooot.nap511.util.subtitle.SubtitleEntry
 import github.zerorooot.nap511.platform.ToastProvider
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import github.zerorooot.nap511.data.model.uniqueId
+import github.zerorooot.nap511.util.ConfigKeyUtil
 import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
 import java.io.File
 import kotlin.time.Duration.Companion.milliseconds
@@ -94,6 +98,7 @@ class AudioViewModel @Inject constructor(
     val currentLocalSubtitles: List<SubtitleItem> get() = uiState.subtitle.currentLocalSubtitles
 
     private var progressJob: Job? = null
+    private var playJob: Job? = null
     private val videoManger: AudioGSYManager = AudioGSYManager.instance()
 
     val durationMs: Long
@@ -105,7 +110,8 @@ class AudioViewModel @Inject constructor(
 
     private val listener = object : GSYMediaPlayerListener {
         override fun onPrepared() {
-            viewModelScope.launch {
+            viewModelScope.launch(Dispatchers.Main.immediate) {
+                XLog.i("AudioViewModel: onPrepared 触发，启动播放并同步服务，name=${currentMusic?.name}")
                 updatePlayback { copy(isLoading = false, isPlaying = true) }
                 videoManger.start() // 真正的启动播放
                 startProgressTracker()
@@ -210,9 +216,36 @@ class AudioViewModel @Inject constructor(
     }
 
     fun playAudio(fileBean: FileBean, localSubtitles: List<SubtitleItem>) {
-        // 防止在同一个文件加载中重复点击
-        if (isLoading || currentMusic?.fileId == fileBean.fileId) return
+        val targetUniqueId = fileBean.uniqueId
+        val currentUniqueId = currentMusic?.uniqueId
+
+        XLog.i("AudioViewModel.playAudio: name=${fileBean.name}, uniqueId=$targetUniqueId, currentUniqueId=$currentUniqueId, isPlaying=$isPlaying, isLoading=$isLoading")
+
+        // 1. 同音频点击处理
+        if (targetUniqueId.isNotEmpty() && targetUniqueId == currentUniqueId) {
+            if (isLoading) return
+            if (isPlaying) {
+                videoManger.seekTo(0)
+                updateAudioTime()
+            } else {
+                if (progress >= 0.99f) {
+                    videoManger.seekTo(0)
+                }
+                videoManger.start()
+                updatePlayback { copy(isPlaying = true) }
+                startProgressTracker()
+                startAudioService(currentMusic?.name ?: "")
+            }
+            return
+        }
+
+        // 2. 切换新音频
+        playJob?.cancel()
+        videoManger.pause()
+        stopProgressTracker()
         removeSubtitle()
+        videoManger.setListener(listener)
+
         updatePlayback {
             copy(
                 currentMusic = fileBean,
@@ -232,18 +265,22 @@ class AudioViewModel @Inject constructor(
             )
         )
 
-        viewModelScope.launch {
+        playJob = viewModelScope.launch {
             try {
                 val playUrl = fileRepository.music(fileBean.pickCode)
                 if (playUrl.isNotEmpty()) {
+                    val headers = mapOf(
+                        "Cookie" to UserSessionManager.cookie,
+                        "User-Agent" to ConfigKeyUtil.USER_AGENT
+                    )
                     videoManger.prepare(
                         playUrl,        // url
-                        mapOf("Cookie" to UserSessionManager.cookie),           // headers (Map<String, String>?)
+                        headers,        // headers (Map<String, String>?)
                         false,          // loop (是否循环播放)
-                        playbackSpeed,           // speed (播放速度)
-                        false,           // cache (是否开启缓存)
+                        playbackSpeed,  // speed (播放速度)
+                        false,          // cache (是否开启缓存)
                         null,           // cachePath (缓存路径，传 null 为默认)
-                        fileBean.name   // title
+                        null            // overrideExtension (传 null 走自动媒体推断，切勿传 fileBean.name)
                     )
 
                     // 自动匹配并加载同名本地字幕（与视频播放逻辑完全对齐）
@@ -262,14 +299,15 @@ class AudioViewModel @Inject constructor(
                     }
                 } else {
                     toastProvider.showToast("无法获取音频播放地址")
-                    updatePlayback { copy(currentMusic = null) }
+                    updatePlayback { copy(currentMusic = null, isLoading = false) }
                 }
+            } catch (e: CancellationException) {
+                // 协程被取消时正常向外抛出，不弹 Toast，不破坏当前已启动的新音频状态
+                throw e
             } catch (e: Exception) {
                 e.printStackTrace()
                 toastProvider.showToast("加载失败: ${e.message}")
-                updatePlayback { copy(currentMusic = null) }
-            } finally {
-                updatePlayback { copy(isLoading = false) }
+                updatePlayback { copy(currentMusic = null, isLoading = false) }
             }
         }
     }
@@ -313,6 +351,7 @@ class AudioViewModel @Inject constructor(
     }
 
     private fun stop() {
+        playJob?.cancel()
         stopProgressTracker()
         removeSubtitle()
         updatePlayback {

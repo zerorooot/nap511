@@ -28,6 +28,7 @@ import github.zerorooot.nap511.ui.navigation.NavEvent
 import github.zerorooot.nap511.ui.navigation.Route
 import github.zerorooot.nap511.ui.model.SettingUiState
 import github.zerorooot.nap511.ui.navigation.AppNavHost
+import github.zerorooot.nap511.ui.system.ProvideSystemBars
 import github.zerorooot.nap511.ui.screen.file.CreateDialogs
 import github.zerorooot.nap511.ui.components.item.AppDrawer
 import github.zerorooot.nap511.ui.components.item.DrawerMenuItems
@@ -178,31 +179,40 @@ fun MainScreen(
         popBack()
     }
 
-    AppDrawer(
-        drawerState = drawerState,
-        gesturesEnabled = navGesturesEnabled,
-        remainingSpaceProvider = { remainingSpaceState.value },
-        avatarBeanProvider = { avatarBeanState.value },
-        menuItems = menuItems,
+    val isDrawerActive = drawerState.targetValue == DrawerValue.Open || drawerState.isOpen
+    val activeRoutes = remember(backStack.size) { backStack.filterIsInstance<Route>().toSet() }
+
+    ProvideSystemBars(
         currentRoute = currentRoute,
-        onMenuItemClick = { route ->
-            navigateTo(route)
-        }
+        isDrawerActive = isDrawerActive,
+        activeRoutes = activeRoutes
     ) {
-        AppNavHost(
-            backStack = backStack,
-            onNavigate = { navigateTo(it) },
-            onPopBack = { popBack() },
+        AppDrawer(
+            drawerState = drawerState,
+            gesturesEnabled = navGesturesEnabled,
+            remainingSpaceProvider = { remainingSpaceState.value },
             avatarBeanProvider = { avatarBeanState.value },
-            fileViewModel = fileViewModel,
-            offlineFileViewModel = offlineFileViewModel,
-            audioViewModel = audioViewModel,
-            uiState = settingUiState,
-            isDrawerOpen = { drawerState.isOpen },
-            onOpenDrawer = { scope.launch { drawerState.open() } },
-            onCloseDrawer = { scope.launch { drawerState.close() } },
-            onSetGesturesEnabled = { navGesturesEnabled = it }
-        )
+            menuItems = menuItems,
+            currentRoute = currentRoute,
+            onMenuItemClick = { route ->
+                navigateTo(route)
+            }
+        ) {
+            AppNavHost(
+                backStack = backStack,
+                onNavigate = { navigateTo(it) },
+                onPopBack = { popBack() },
+                avatarBeanProvider = { avatarBeanState.value },
+                fileViewModel = fileViewModel,
+                offlineFileViewModel = offlineFileViewModel,
+                audioViewModel = audioViewModel,
+                uiState = settingUiState,
+                isDrawerOpen = { drawerState.isOpen },
+                onOpenDrawer = { scope.launch { drawerState.open() } },
+                onCloseDrawer = { scope.launch { drawerState.close() } },
+                onSetGesturesEnabled = { navGesturesEnabled = it }
+            )
+        }
     }
 
     CreateDialogs(fileViewModel, settingUiState) {

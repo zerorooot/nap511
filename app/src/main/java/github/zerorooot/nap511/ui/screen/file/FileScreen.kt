@@ -34,9 +34,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
+import github.zerorooot.nap511.ui.system.SystemBarsVisibility
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.annotation.ExperimentalCoilApi
 import coil.imageLoader
@@ -184,20 +182,8 @@ fun FileScreen(
     var isBottomBarShow by rememberSaveable { mutableStateOf(true) }
     var isTopBarShow by rememberSaveable { mutableStateOf(true) }
 
-    val view = LocalView.current
-    LaunchedEffect(isTopBarShow) {
-        val window = (view.context as? Activity)?.window
-        val insetsController =
-            window?.let { WindowCompat.getInsetsController(it, window.decorView) }
-
-        if (!isTopBarShow) {
-            insetsController?.hide(WindowInsetsCompat.Type.systemBars())
-            insetsController?.systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        } else {
-            insetsController?.show(WindowInsetsCompat.Type.systemBars())
-        }
-    }
+    // 声明式绑定当前页面系统状态栏与控制栏的沉浸可见性（全局由 ProvideSystemBars 统一仲裁，返回时无缝恢复）
+    SystemBarsVisibility(visible = isTopBarShow)
 
     // 嵌套滚动监听
     val nestedScrollConnection = rememberFileNestedScrollConnection(

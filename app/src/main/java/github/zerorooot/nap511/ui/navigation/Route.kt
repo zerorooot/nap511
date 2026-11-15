@@ -9,6 +9,9 @@ import kotlinx.serialization.Serializable
 data class DrawerMenuItem(val iconVector: ImageVector, val label: String, val route: Route)
 
 sealed interface Route : NavKey {
+    /** 路由固有默认系统栏可见性，默认 true；大图/沉浸等特定页面可按需重写为 false */
+    val defaultSystemBarsVisible: Boolean get() = true
+
     // 抽屉导航页面
     @Serializable
     data object Login : Route
@@ -39,7 +42,9 @@ sealed interface Route : NavKey {
     data object LogScreen : Route
 
     @Serializable
-    data object Photo : Route
+    data object Photo : Route {
+        override val defaultSystemBarsVisible: Boolean get() = false
+    }
 
     @Serializable
     data object WebScreen : Route

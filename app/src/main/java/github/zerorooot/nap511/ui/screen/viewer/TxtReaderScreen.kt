@@ -65,9 +65,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
+import github.zerorooot.nap511.ui.system.SystemBarsVisibility
 import github.zerorooot.nap511.ui.components.bar.TopAppBarTxtReaderNormal
 import github.zerorooot.nap511.ui.components.bar.TopAppBarTxtReaderSearch
 import github.zerorooot.nap511.util.buildSearchHighlightedText
@@ -119,8 +117,6 @@ fun TxtReaderScreen(
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var currentMatchIndex by rememberSaveable { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
-    // 获取当前 Window 实例
-    val view = LocalView.current
 
     LaunchedEffect(byteArray, currentEncoding) {
         isDecoding = true
@@ -159,26 +155,8 @@ fun TxtReaderScreen(
             listState.animateScrollToItem(targetMatch.itemIndex)
         }
     }
-    // 监听 showControls 状态，同步隐藏/显示状态栏和导航栏
-    DisposableEffect(showControls) {
-        val window = (view.context as? Activity)?.window
-        val insetsController = window?.let { WindowCompat.getInsetsController(it, view) }
-
-        if (showControls) {
-            // 显示系统状态栏与导航栏
-            insetsController?.show(WindowInsetsCompat.Type.systemBars())
-        } else {
-            // 隐藏系统状态栏与导航栏（进入全屏沉浸模式）
-            insetsController?.hide(WindowInsetsCompat.Type.systemBars())
-            insetsController?.systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
-
-        // 当用户返回上一页 / 当前 Screen 离开 Composition 时自动执行清理
-        onDispose {
-            insetsController?.show(WindowInsetsCompat.Type.systemBars())
-        }
-    }
+    // 监听 showControls 状态，声明式同步隐藏/显示状态栏和导航栏，离开时不进行破坏性全局重置
+    SystemBarsVisibility(visible = showControls)
 
     // 主题配色逻辑
     val bgContainerColor = MaterialTheme.colorScheme.background

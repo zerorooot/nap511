@@ -45,9 +45,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
+import github.zerorooot.nap511.ui.system.SystemBarsVisibility
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.request.ImageRequest
@@ -103,20 +101,8 @@ private fun ImageBrowserScreen(
         controlsVisible = !controlsVisible
     }
 
-    val view = LocalView.current
-    LaunchedEffect(controlsVisible) {
-        val window = (view.context as? Activity)?.window
-        val insetsController = window?.let { WindowCompat.getInsetsController(it, window.decorView) }
-
-        // 根据 controlsVisible 动态控制系统栏显隐
-        if (!controlsVisible) {
-            insetsController?.hide(WindowInsetsCompat.Type.systemBars())
-            insetsController?.systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        } else {
-            insetsController?.show(WindowInsetsCompat.Type.systemBars())
-        }
-    }
+    // 声明式绑定相册大图预览页面的系统栏显隐
+    SystemBarsVisibility(visible = controlsVisible)
 
     Box(
         modifier = Modifier

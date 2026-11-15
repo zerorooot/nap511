@@ -38,13 +38,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.imageLoader
+import coil.request.ImageRequest
+import github.zerorooot.nap511.R
 import github.zerorooot.nap511.data.model.FileBean
+import github.zerorooot.nap511.util.getCoilCacheUrl
+import kotlin.text.ifEmpty
 
 /**
  * 专辑封面组件
@@ -66,8 +72,19 @@ fun AlbumCover(
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         if (fileBean.photoThumb.isNotEmpty()) {
+            val cacheKey = fileBean.fileId
+            val context = LocalContext.current
+            val imageLoader = context.imageLoader
+            val imageData = getCoilCacheUrl(imageLoader, cacheKey) ?: fileBean.photoThumb
             AsyncImage(
-                model = fileBean.photoThumb,
+                model = ImageRequest.Builder(context)
+                    .data(imageData)
+                    .memoryCacheKey(cacheKey.ifEmpty { null })
+                    .diskCacheKey(cacheKey.ifEmpty { null })
+                    .placeholder(fileBean.fileIco)
+                    .error(R.drawable.ic_image_broken)
+                    .crossfade(true)
+                    .build(),
                 contentDescription = "Album Cover",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop

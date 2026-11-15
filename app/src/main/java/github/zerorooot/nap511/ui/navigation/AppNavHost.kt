@@ -5,9 +5,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import github.zerorooot.nap511.ui.system.LocalSystemBarsRoute
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -200,27 +202,29 @@ fun AppNavHost(
             }
 
             entry<Route.MyFile> {
-                onSetGesturesEnabled(true)
-                FileScreen(
-                    fileViewModel = fileViewModel,
-                    settingUiState = uiState,
-                    audioViewModel = audioViewModel,
-                    isGridScreen = isGridScreen,
-                    gridCellMinSize = gridCellMinSize,
-                    onNav = { route -> onNavigate(route) },
-                    openDrawer = {
-                        onSetGesturesEnabled(true)
-                        onOpenDrawer()
-                    },
-                    drawerState = {
-                        val open = isDrawerOpen()
-                        if (open) {
-                            onCloseDrawer()
-                        }
-                        open
-                    },
-                    fileOpener = fileOpener
-                )
+                CompositionLocalProvider(LocalSystemBarsRoute provides Route.MyFile) {
+                    onSetGesturesEnabled(true)
+                    FileScreen(
+                        fileViewModel = fileViewModel,
+                        settingUiState = uiState,
+                        audioViewModel = audioViewModel,
+                        isGridScreen = isGridScreen,
+                        gridCellMinSize = gridCellMinSize,
+                        onNav = { route -> onNavigate(route) },
+                        openDrawer = {
+                            onSetGesturesEnabled(true)
+                            onOpenDrawer()
+                        },
+                        drawerState = {
+                            val open = isDrawerOpen()
+                            if (open) {
+                                onCloseDrawer()
+                            }
+                            open
+                        },
+                        fileOpener = fileOpener
+                    )
+                }
             }
 
             entry<Route.OfflineDownload> {
@@ -386,17 +390,19 @@ fun AppNavHost(
             }
 
             entry<Route.Photo> {
-                val photoList = mediaViewerStateHolder.photoFileBeanList
-                val photoIndex = mediaViewerStateHolder.photoIndexOf
-                val photoCid = mediaViewerStateHolder.photoCid.ifEmpty { fileViewModel.currentCid }
-                MyPhotoScreen(
-                    photoList = photoList,
-                    currentIndex = photoIndex,
-                    cid = photoCid,
-                    imageCache = fileViewModel.imageBeanCache[photoCid] ?: emptyMap(),
-                    onLoadImage = { fileViewModel.getImage(it) },
-                    onNav = onPopBack
-                )
+                CompositionLocalProvider(LocalSystemBarsRoute provides Route.Photo) {
+                    val photoList = mediaViewerStateHolder.photoFileBeanList
+                    val photoIndex = mediaViewerStateHolder.photoIndexOf
+                    val photoCid = mediaViewerStateHolder.photoCid.ifEmpty { fileViewModel.currentCid }
+                    MyPhotoScreen(
+                        photoList = photoList,
+                        currentIndex = photoIndex,
+                        cid = photoCid,
+                        imageCache = fileViewModel.imageBeanCache[photoCid] ?: emptyMap(),
+                        onLoadImage = { fileViewModel.getImage(it) },
+                        onNav = onPopBack
+                    )
+                }
             }
 
             entry<Route.RepeatFile> {
@@ -413,19 +419,21 @@ fun AppNavHost(
             }
 
             entry<Route.TxtReader> { route ->
-                val byteArray = mediaViewerStateHolder.textBodyByteArray
+                CompositionLocalProvider(LocalSystemBarsRoute provides route) {
+                    val byteArray = mediaViewerStateHolder.textBodyByteArray
 
-                LaunchedEffect(byteArray) {
-                    if (byteArray == null) {
-                        onPopBack()
+                    LaunchedEffect(byteArray) {
+                        if (byteArray == null) {
+                            onPopBack()
+                        }
                     }
-                }
 
-                if (byteArray != null) {
-                    onSetGesturesEnabled(false)
-                    TxtReaderScreen(byteArray, title = route.title) {
-                        onSetGesturesEnabled(true)
-                        onPopBack()
+                    if (byteArray != null) {
+                        onSetGesturesEnabled(false)
+                        TxtReaderScreen(byteArray, title = route.title) {
+                            onSetGesturesEnabled(true)
+                            onPopBack()
+                        }
                     }
                 }
             }

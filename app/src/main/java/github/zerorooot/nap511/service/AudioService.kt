@@ -13,6 +13,7 @@ import github.zerorooot.nap511.R
 import github.zerorooot.nap511.ui.player.AudioGSYManager
 import github.zerorooot.nap511.platform.AudioEvent
 import github.zerorooot.nap511.platform.AudioEventBus
+import com.elvishew.xlog.XLog
 
 /**
  */
@@ -70,10 +71,12 @@ class AudioService : Service() {
 
         when (action) {
             ACTION_PLAY -> {
+                XLog.i("AudioService: onStartCommand ACTION_PLAY")
                 videoManger.start()
             }
 
             ACTION_PAUSE -> {
+                XLog.i("AudioService: onStartCommand ACTION_PAUSE")
                 videoManger.pause()
             }
 
@@ -93,14 +96,17 @@ class AudioService : Service() {
             }
 
             ACTION_STOP -> {
+                XLog.i("AudioService: onStartCommand ACTION_STOP")
                 stopForeground(STOP_FOREGROUND_REMOVE)
-                AudioEventBus.sendEvent(AudioEvent.Stop)
+                // 核心修改：移除 AudioEventBus.sendEvent(AudioEvent.Stop)，从源头彻底切断回波污染
                 stopSelf()
                 return START_NOT_STICKY
             }
         }
 
-        updateMediaState(title, notifyUi = true)
+        // 核心修改：仅在有显式外部 action（如锁屏/通知栏操作）时才反向通知 UI，避免拉起服务时把未就绪的 false 倒灌给 UI
+        val shouldNotifyUi = action != null
+        updateMediaState(title, notifyUi = shouldNotifyUi)
         startForeground(NOTIFICATION_ID, buildNotification(title))
         return START_STICKY
     }

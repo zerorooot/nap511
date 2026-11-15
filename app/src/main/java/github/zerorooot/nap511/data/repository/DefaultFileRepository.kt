@@ -642,7 +642,9 @@ class DefaultFileRepository @Inject constructor(
 
 
     override suspend fun music(pickCode: String): String {
-        return fileApi.music(pickCode, "weixin", "json").url
+        val musicBean = fileApi.music(pickCode, "weixin", "json")
+        XLog.d("DefaultFileRepository.music pickCode=$pickCode, state=${musicBean.state}, url=${musicBean.url}, audioUrl=${musicBean.audioUrl}")
+        return musicBean.url.ifBlank { musicBean.audioUrl }
     }
 
     /**
