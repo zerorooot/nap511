@@ -40,14 +40,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.imageLoader
+import coil.memory.MemoryCache
 import coil.request.ImageRequest
 import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.data.model.FileBean
+import github.zerorooot.nap511.data.model.ImageBean
 import github.zerorooot.nap511.ui.model.FileItemActions
 import github.zerorooot.nap511.ui.model.FileItemUiModel
-import github.zerorooot.nap511.data.model.ImageBean
-import github.zerorooot.nap511.util.getCoilCacheUrl
 
 // 全局内存缓存图片宽高比，避免快速滑动和 Item 离屏复用时高度重置引发瀑布流跳动闪烁
 // 限定最多保存 1150 张图片的宽高比，超过后自动淘汰最久未使用的条目
@@ -123,19 +122,23 @@ fun ImageCellItem(
                 } else {
                     val context = LocalContext.current
                     val coilCacheKey = if (isHdLoaded) fileBean.pickCode else fileBean.fileId
-                    val imageData = getCoilCacheUrl(context.imageLoader, coilCacheKey)
-                        ?: if (isHdLoaded) hdUrl else fileBean.photoThumb
+                    val targetUrl = if (isHdLoaded) hdUrl else fileBean.photoThumb
 
                     val imageRequestBuilder = ImageRequest.Builder(context)
-                        .data(imageData)
+                        .data(targetUrl)
                         .memoryCacheKey(coilCacheKey)
                         .diskCacheKey(coilCacheKey)
                         .error(R.drawable.ic_image_broken)
                         .crossfade(false) // 关闭淡入淡出动画，避免快速滑动时图片闪烁
 
-                    // 当 isHdLoaded 为 true 时，优先使用内存缓存中 key 为 fileBean.fileId 的缩略图作为占位符
-                    if (isHdLoaded && fileBean.photoThumb.isNotEmpty()) {
-                        imageRequestBuilder.placeholderMemoryCacheKey(fileBean.fileId)
+                    // 极致平滑占位：优先高清图内存，次优缩略图内存（未命中时 Coil 内部自动回退至静态图标）
+                    val memoryCache = context.imageLoader.memoryCache
+                    val hasHdInMemory = isHdLoaded && fileBean.pickCode.isNotEmpty() &&
+                            memoryCache?.get(MemoryCache.Key(fileBean.pickCode)) != null
+
+                    val placeholderKey = if (hasHdInMemory) fileBean.pickCode else fileBean.fileId
+                    if (placeholderKey.isNotEmpty()) {
+                        imageRequestBuilder.placeholderMemoryCacheKey(placeholderKey)
                     }
                     // 兜底占位图标
                     imageRequestBuilder.placeholder(image)
@@ -148,12 +151,12 @@ fun ImageCellItem(
                             if (name != fileBean.name) {
                                 name = fileBean.name
                             }
-                            XLog.d("ImageCellItem [图片加载成功] name=${fileBean.name}, isLoaded=$isHdLoaded, imageData=$imageData, source=${successState.result.dataSource}")
+                            XLog.d("ImageCellItem [图片加载成功] name=${fileBean.name}, isLoaded=$isHdLoaded, targetUrl=$targetUrl, source=${successState.result.dataSource}")
                             val drawable = successState.result.drawable
                             if (drawable.intrinsicWidth > 0 && drawable.intrinsicHeight > 0) {
                                 val newRatio =
                                     drawable.intrinsicWidth.toFloat() / drawable.intrinsicHeight.toFloat()
-                                if (!aspectRatioCache.snapshot().containsKey(cacheKey)) {
+                                if (aspectRatioCache[cacheKey] == null) {
                                     aspectRatioCache.put(cacheKey, newRatio)
                                     aspectRatio = newRatio
                                 }
@@ -162,7 +165,7 @@ fun ImageCellItem(
                         onError = { errorState ->
                             name = EXPIRED_IMAGE_TIP
                             XLog.e(
-                                "ImageCellItem [图片加载失败] name=${fileBean.name}, isLoaded=$isHdLoaded, url=$imageData, error=${errorState.result.throwable.message}"
+                                "ImageCellItem [图片加载失败] name=${fileBean.name}, isLoaded=$isHdLoaded, url=$targetUrl, error=${errorState.result.throwable.message}"
                             )
                         },
                         modifier = Modifier.fillMaxSize(),
@@ -181,7 +184,10 @@ fun ImageCellItem(
                         if (isTop) {
                             Box(
                                 modifier = Modifier
-                                    .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(4.dp))
+                                    .background(
+                                        Color.Black.copy(alpha = 0.65f),
+                                        RoundedCornerShape(4.dp)
+                                    )
                                     .padding(2.5.dp)
                             ) {
                                 Icon(
@@ -195,7 +201,10 @@ fun ImageCellItem(
                         if (isStar) {
                             Box(
                                 modifier = Modifier
-                                    .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(4.dp))
+                                    .background(
+                                        Color.Black.copy(alpha = 0.65f),
+                                        RoundedCornerShape(4.dp)
+                                    )
                                     .padding(2.5.dp)
                             ) {
                                 Icon(

@@ -278,7 +278,7 @@ class FileBrowserModule(
      * 获取文件列表
      * 保持挂起函数公开签名不变，双重守卫保留缓存兜底，被取消的任务绝不修改 UI 状态
      */
-    suspend fun getFiles(cid: String, fcMix: Int = currentFcMix) {
+    suspend fun getFiles(cid: String, fcMix: Int = currentFcMix, forceCache: Boolean = false) {
         stateHolder.setRefreshing(true)
         // 1. 尝试读取缓存（内存与磁盘双级读取，支持冷启动、测试及 LRU 淘汰后从磁盘恢复）
         val cached = FileCacheManager[cid]
@@ -302,9 +302,24 @@ class FileBrowserModule(
             }
             val formatted = files.copy(fileBeanList = formatFileBeanList(files.fileBeanList))
 
-            // 网络请求返回最新文件列表后，同步清空该目录旧的高清图缓存，
-            // 避免在等待网络期间提前清空导致屏幕上的旧列表条目闪烁或抢跑发起重复请求
-            imageCacheStore.clear(cid)
+            // 智能差量对齐高清图缓存：
+            // 强制刷新时全量清空；普通刷新时仅保留仍在列表且已成功落盘的项（未落盘/过期项自动剔除并重拉自愈）
+            if (settingUiState.forceLoadCache || forceCache) {
+                XLog.d("FileBrowserModule.getFiles: force refresh, clearing imageCacheStore for cid=$cid")
+                imageCacheStore.clear(cid)
+            } else {
+                val cachedKeys = imageCacheStore.imageBeanCache[cid]?.keys
+                if (!cachedKeys.isNullOrEmpty()) {
+                    val currentPickCodes = formatted.fileBeanList.asSequence().map { it.pickCode }.toSet()
+                    val validPickCodes = withContext(Dispatchers.IO) {
+                        cachedKeys.filter { key ->
+                            key in currentPickCodes && coilCacheCleaner.getCachedUrl(key) != null
+                        }.toSet()
+                    }
+                    XLog.d("FileBrowserModule.getFiles: syncValidKeys for cid=$cid, retained=${validPickCodes.size}, totalCached=${cachedKeys.size}")
+                    imageCacheStore.syncValidKeys(cid, validPickCodes)
+                }
+            }
             // 3. 网络请求成功后写入缓存
             FileCacheManager[cid] = formatted
             setFiles(formatted) // 成功出口：在 setFiles 内部负责复位 isLoadingFolder = false
@@ -571,8 +586,11 @@ class FileBrowserModule(
         }
 
         if (refreshCurrent) {
-            // 当前目录由 getFiles(currentCid) 在新列表返回时同步调用 clearImageCache(currentCid)
-            getFiles(stateHolder.currentContentState.currentCid, fcMix = targetFcMix)
+            getFiles(
+                cid = stateHolder.currentContentState.currentCid,
+                fcMix = targetFcMix,
+                forceCache = forceCache
+            )
         } else {
             imageCacheStore.clear(cid)
             updateFileCache(cid)
@@ -845,7 +863,7 @@ class FileBrowserModule(
             val count = newSelectedIds.size
             copy(
                 selectedFileIds = newSelectedIds,
-                appBarTitle = if (count >= 0) count.toString() else source.appName
+                appBarTitle = count.toString()
             )
         }
     }

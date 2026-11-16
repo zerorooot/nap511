@@ -1,7 +1,9 @@
 package github.zerorooot.nap511.ui.viewmodel.store
 
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.snapshots.SnapshotStateMap
+import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.data.model.ImageBean
 import java.util.concurrent.ConcurrentHashMap
 
@@ -51,5 +53,21 @@ class ImageCacheStore {
      */
     fun clear(cid: String) {
         imageBeanCache[cid]?.clear()
+    }
+
+    /**
+     * 事务级原子差量对齐：
+     * 仅移除不在 validKeys 中的无效/过期/已删除项；保留现有有效项，避免刷新引发大面积跳闪。
+     * 使用 Snapshot.withMutableSnapshot 确保批量修改单次提交，消除中间重组震荡。
+     */
+    fun syncValidKeys(cid: String, validKeys: Set<String>) {
+        val map = imageBeanCache[cid] ?: return
+        Snapshot.withMutableSnapshot {
+            val toRemove = map.keys.filterNot { it in validKeys }
+            if (toRemove.isNotEmpty()) {
+                XLog.d("ImageCacheStore.syncValidKeys: cid=$cid, removing ${toRemove.size} stale/expired keys: $toRemove")
+                toRemove.forEach { map.remove(it) }
+            }
+        }
     }
 }
