@@ -291,7 +291,7 @@ class OneOneFiveAuthManager {
         try {
             val formBody = FormBody.Builder()
                 .add("user_id", userId.toString())
-                .add("tpl", "verify_code")
+                .add("tpl", "login_from_two_step")
                 .add("cv21", "2")
                 .build()
 

@@ -43,6 +43,11 @@ enum class ForceOpenType(
 
 @Immutable
 data class FilesBean(
+    // 业务状态与错误字段（正常返回时如果也有 state=true 则默认 true）
+    val state: Boolean = true,
+    val error: String = "error",
+    @SerializedName("errNo", alternate = ["errno"]) val errNo: Int = 0,
+
     @SerializedName("data") val fileBeanList: List<FileBean> = emptyList(),
     val cid: String = "",
     val count: Int = 0,
@@ -60,6 +65,10 @@ data class FilesBean(
      */
     @SerializedName("fc_mix") val fcMix: Int = 0,
 ) {
+    /** 当前请求是否成功且未过期 */
+    val isSuccess: Boolean
+        get() = state && errNo == 0
+
     /** 当前缓存是否已完整拉取全部条目 */
     val isComplete: Boolean
         get() = count <= 0 || fileBeanList.size >= count

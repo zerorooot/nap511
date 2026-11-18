@@ -1,8 +1,5 @@
 package github.zerorooot.nap511.ui.screen.auth
 
-import github.zerorooot.nap511.ui.dialog.CaptchaPromptDialog
-import github.zerorooot.nap511.ui.screen.web.LoginWebViewScreen
-
 import android.net.Uri
 import android.view.WindowManager
 import android.view.autofill.AutofillManager
@@ -41,8 +38,6 @@ import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import github.zerorooot.nap511.ui.dialog.sync.LanSyncReceiverDialog
-import github.zerorooot.nap511.data.model.sync.SyncPayload
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -93,11 +88,15 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
+import github.zerorooot.nap511.data.model.sync.SyncPayload
 import github.zerorooot.nap511.data.network.client.LoginResult
 import github.zerorooot.nap511.data.network.client.OneOneFiveAuthManager
 import github.zerorooot.nap511.data.network.client.UserSessionManager
 import github.zerorooot.nap511.platform.LocalToastProvider
 import github.zerorooot.nap511.platform.ToastProvider
+import github.zerorooot.nap511.ui.dialog.CaptchaPromptDialog
+import github.zerorooot.nap511.ui.dialog.sync.LanSyncReceiverDialog
+import github.zerorooot.nap511.ui.screen.web.LoginWebViewScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
@@ -289,6 +288,7 @@ fun handleLoginSyncPayload(
         !cookie.isNullOrBlank() -> {
             onSuccessLogin(LoginCredential.Cookie(cookie))
         }
+
         else -> {
             toastProvider?.showToast("同步数据为空")
         }
@@ -492,7 +492,13 @@ fun TwoFactorVerifyDialog(
         }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            dismissOnClickOutside = false, // 点击弹窗外部（旁边遮罩）不关闭
+            dismissOnBackPress = false      // 按系统返回键/侧滑手势不关闭，确保只能点击确认或取消
+        ),
+    ) {
         Card(
             modifier = Modifier
                 .widthIn(max = 480.dp)

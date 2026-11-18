@@ -1,30 +1,30 @@
 package github.zerorooot.nap511.ui.viewmodel.module
 
 import com.elvishew.xlog.XLog
+import github.zerorooot.nap511.data.local.cache.FileCacheManager
 import github.zerorooot.nap511.data.model.FileBean
-import github.zerorooot.nap511.data.model.uniqueId
-import github.zerorooot.nap511.ui.model.FileDialogState
-import github.zerorooot.nap511.ui.model.FileListSource
 import github.zerorooot.nap511.data.model.FilesBean
-import github.zerorooot.nap511.ui.navigation.NavEvent
 import github.zerorooot.nap511.data.model.OrderBean
 import github.zerorooot.nap511.data.model.OrderType
-import github.zerorooot.nap511.ui.navigation.Route
-import github.zerorooot.nap511.ui.model.SettingUiState
+import github.zerorooot.nap511.data.model.PathBean
+import github.zerorooot.nap511.data.model.uniqueId
+import github.zerorooot.nap511.data.network.client.UserSessionManager
 import github.zerorooot.nap511.data.repository.FileRepository
 import github.zerorooot.nap511.data.repository.paging.DirectoryPagingCoordinator
-import github.zerorooot.nap511.data.local.cache.FileCacheManager
-import github.zerorooot.nap511.util.formatFileBeanList
-import github.zerorooot.nap511.data.network.client.UserSessionManager
-import github.zerorooot.nap511.util.onFailureToastAndLog
 import github.zerorooot.nap511.platform.AppStringProvider
 import github.zerorooot.nap511.platform.CoilCacheCleaner
 import github.zerorooot.nap511.platform.ToastProvider
+import github.zerorooot.nap511.ui.model.FileDialogState
+import github.zerorooot.nap511.ui.model.FileListSource
+import github.zerorooot.nap511.ui.model.SettingUiState
+import github.zerorooot.nap511.ui.navigation.NavEvent
+import github.zerorooot.nap511.ui.navigation.Route
 import github.zerorooot.nap511.ui.viewmodel.store.FileUiStateHolder
 import github.zerorooot.nap511.ui.viewmodel.store.ImageCacheStore
 import github.zerorooot.nap511.ui.viewmodel.store.PagingStateStore
 import github.zerorooot.nap511.ui.viewmodel.store.ScrollPositionStore
-import github.zerorooot.nap511.data.model.PathBean
+import github.zerorooot.nap511.util.formatFileBeanList
+import github.zerorooot.nap511.util.onFailureToastAndLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -225,7 +225,11 @@ class FileBrowserModule(
             val displayName = targetName.ifEmpty {
                 if (targetCid == "0") "根目录" else "加载中..."
             }
-            currentState.pathList + PathBean(name = displayName, cid = targetCid, pid = currentState.currentCid)
+            currentState.pathList + PathBean(
+                name = displayName,
+                cid = targetCid,
+                pid = currentState.currentCid
+            )
         }
 
         val targetSource = FileListSource.Folder(targetCid, stringProvider)
@@ -283,7 +287,9 @@ class FileBrowserModule(
         // 1. 尝试读取缓存（内存与磁盘双级读取，支持冷启动、测试及 LRU 淘汰后从磁盘恢复）
         val cached = FileCacheManager[cid]
         if (cached != null) {
-            val files = cached.copy(fileBeanList = formatFileBeanList(cached.fileBeanList))
+            val files = cached.copy(
+                fileBeanList = formatFileBeanList(cached.fileBeanList),
+                cid = cid.ifEmpty { "0" })
             setFiles(files)
             stateHolder.setRefreshing(false)
             return
@@ -296,6 +302,12 @@ class FileBrowserModule(
                 asc = serverOrderBean.asc,
                 fcMix = fcMix
             )
+
+            //cookie校验
+            if (!files.isSuccess) {
+                throw NullPointerException(files.error)
+            }
+
             // 请求的 cid 不是 0, 但返回的 cid 是 0。证明请求的 cid 不存在
             if (cid != "0" && files.cid == "0") {
                 throw IllegalStateException("当前文件夹已被删除！")
@@ -310,7 +322,8 @@ class FileBrowserModule(
             } else {
                 val cachedKeys = imageCacheStore.imageBeanCache[cid]?.keys
                 if (!cachedKeys.isNullOrEmpty()) {
-                    val currentPickCodes = formatted.fileBeanList.asSequence().map { it.pickCode }.toSet()
+                    val currentPickCodes =
+                        formatted.fileBeanList.asSequence().map { it.pickCode }.toSet()
                     val validPickCodes = withContext(Dispatchers.IO) {
                         cachedKeys.filter { key ->
                             key in currentPickCodes && coilCacheCleaner.getCachedUrl(key) != null
@@ -331,7 +344,9 @@ class FileBrowserModule(
             }
             XLog.e("getFiles error for cid=$cid", ex)
 
-            val expiredTip = if (ex is NullPointerException) "获取文件列表失败，建议更新您的Cookie" else null
+            val expiredTip =
+                if (ex is NullPointerException) ex.message
+                    ?: "获取文件列表失败，建议更新您的Cookie" else null
             if (expiredTip != null) {
                 FileCacheManager.clearAll()
                 UserSessionManager.clearSession()
@@ -887,7 +902,7 @@ class FileBrowserModule(
             val count = newSelectedIds.size
             copy(
                 selectedFileIds = newSelectedIds,
-                appBarTitle = if (count >= 0) count.toString() else source.appName
+                appBarTitle = count.toString()
             )
         }
     }
@@ -913,7 +928,8 @@ class FileBrowserModule(
 
     fun toggleSelectAll() {
         stateHolder.updateContentState {
-            val isAll = fileBeanList.isNotEmpty() && fileBeanList.all { it.uniqueId in selectedFileIds }
+            val isAll =
+                fileBeanList.isNotEmpty() && fileBeanList.all { it.uniqueId in selectedFileIds }
             val newSelectedIds = if (isAll) emptySet() else fileBeanList.map { it.uniqueId }.toSet()
             val count = newSelectedIds.size
             copy(
@@ -952,7 +968,8 @@ class FileBrowserModule(
             val currentCid = state.currentCid
             val cache = FileCacheManager.getDate(currentCid)
             if (cache != null) {
-                val formattedCache = cache.copy(fileBeanList = formatFileBeanList(cache.fileBeanList))
+                val formattedCache =
+                    cache.copy(fileBeanList = formatFileBeanList(cache.fileBeanList))
                 setFiles(formattedCache)
                 stateHolder.updateContentState {
                     copy(
