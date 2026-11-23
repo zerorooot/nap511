@@ -384,6 +384,15 @@ class FileViewModel @Inject constructor(
     }
 
     fun starFileScreen() {
+        // 约束：剪切态下不允许进入星标视图；保留 cutFileList / isCutState，只中止本次进入。
+        // 星标视图不携带可粘贴的目标目录语义（currentCid 仍是进入前的目录），
+        // 在此继续剪切会让用户在星标页误判粘贴目标。
+        // 守卫必须在 cancel Job 之前：否则拦截会把进行中的分页/搜索 Job 一并杀掉，
+        // 产生「点了没反应但列表卡住」的次生故障。
+        if (stateHolder.currentContentState.isCutState) {
+            toastProvider.showToast("剪切状态下不能进入星标视图")
+            return
+        }
         getFilesJob?.cancel()
         queryJob?.cancel()
         if (stateHolder.currentContentState.isLoadingFolder) {

@@ -532,6 +532,36 @@ object FileCacheManager {
     }
 
     /**
+     * 跨目录批量操作（剪切移动、非目录视图下的批量删除）后的**唯一**多源缓存订正入口。
+     *
+     * 复用 [removeItems]：自动继承文件夹级联清子树缓存、LocalUiUpdated 广播、磁盘 FIFO 延迟删除。
+     * 源目录缓存不存在时 `engine.update` 返回 null（见 `TwoLevelCacheEngine.update`），静默无害；
+     * 空 fid 分组由 [removeItems] 自身的空集合短路吞掉。
+     *
+     * 为什么要按来源父目录分组而不是只订正一个目录：115 的 filter/搜索接口返回的条目天然跨多个
+     * 父目录（`ui/viewmodel/module/FileBrowserModule.kt` 的 filterFile/search、`FileApi.files/search`
+     * 在 cid 下递归检索），单目录订正会让其余源目录缓存残留已移走的条目。
+     *
+     * @param beans 参与本次操作的条目（来自 [github.zerorooot.nap511.util.formatFileBeanList] 归一后的数据）
+     * @param fallbackParentCid 来源未知（parentId 为空）时的兜底目录；剪切传目标 cid，删除传 null（不订正不可定位项）
+     */
+    suspend fun removeItemsBySourceParents(
+        beans: Collection<FileBean>,
+        fallbackParentCid: String? = null
+    ) {
+        // 分组结果在真正发请求前先落日志：源目录数 / 条目数，便于排查「某个源目录没被订正」
+        val groups = beans.groupBySourceParentCid(fallbackParentCid)
+        XLog.d(
+            "FileCacheManager.removeItemsBySourceParents: sources=${groups.size}, " +
+                    "items=${beans.size}, fallback=$fallbackParentCid, cids=${groups.keys}"
+        )
+        groups.forEach { (parentCid, group) ->
+            // 空 fileId 不能当剔除键提交（否则会以空串去匹配条目），就地过滤
+            removeItems(parentCid, group.map { it.fileId }.filter(String::isNotEmpty))
+        }
+    }
+
+    /**
      * 递归深度清理目录及其所有子孙目录在 FileCacheManager 中的缓存。
      *
      * @param folderCid 待清理的目录 CID
@@ -635,3 +665,23 @@ object FileCacheManager {
         _cacheEvents.tryEmit(CacheEvent.AllCleared)
     }
 }
+
+/**
+ * 按「来源父目录」为条目分组 —— 全仓唯一实现。
+ *
+ * 契约前提（[github.zerorooot.nap511.util.formatFileBeanList] 已完成归一）：
+ * - 普通文件：parentId == categoryId == 所在目录；
+ * - 文件夹：parentId == 上级目录，fileId == 自身 cid。
+ *
+ * 取代散落的 `groupBy { it.parentId.ifEmpty { cid } }`（剪切/删除/标星/批量重命名共用），
+ * 禁止再写第 2 份实现。
+ *
+ * @param fallback 来源缺失（parentId 为空）时的兜底目录；传 null 表示「来源不可定位，丢弃该项」
+ * @return key 为来源父目录 cid 的分组表（LinkedHashMap 保序）；空 key 分组已被丢弃
+ */
+fun Collection<FileBean>.groupBySourceParentCid(
+    fallback: String? = null
+): Map<String, List<FileBean>> =
+    // 空 parentId 先落到 fallback（null 则落空串），再统一用 filterKeys 丢掉空 key 分组，
+    // 这样「传 null 丢弃」与「传兜底并入」共用同一条表达式，无需两套分支
+    groupBy { it.parentId.ifEmpty { fallback.orEmpty() } }.filterKeys { it.isNotEmpty() }

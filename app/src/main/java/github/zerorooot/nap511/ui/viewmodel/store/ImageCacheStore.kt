@@ -70,4 +70,27 @@ class ImageCacheStore {
             }
         }
     }
+
+    /**
+     * 跨目录移动/删除后按 pickCode 清除**任意 cid** 下的高清图缓存（单次原子提交）。
+     *
+     * 为什么不能只清某一固定 cid：大图缓存写在「加载时的 currentCid」下
+     * （见 `FileMediaModule` 的大图加载链路），filter/搜索/星标视图下它与条目真实父目录不同，
+     * 所以必须扫全部目录桶。
+     *
+     * 不处理 loadingKeys：大图加载的 finally 在成功/失败/取消三路径都会清标记，且 put() 写入前
+     * 不复检该集合，扫它既不能阻止回写也无实际收益。极端并发下的 1 帧脏图由
+     * `FileBrowserModule.getFiles` 的 syncValidKeys 自愈。
+     *
+     * 相比逐项调用 `remove(cid, pickCode)`（N 次 Snapshot 提交），这里一次装填全部键、
+     * **一次** withMutableSnapshot 提交：快照更少、无中间可见态。
+     */
+    fun removeByPickCodes(pickCodes: Collection<String>) {
+        val keys = pickCodes.filterTo(HashSet()) { it.isNotEmpty() }
+        if (keys.isEmpty()) return
+        XLog.d("ImageCacheStore.removeByPickCodes: keys=${keys.size}, buckets=${imageBeanCache.size}")
+        Snapshot.withMutableSnapshot {
+            imageBeanCache.values.forEach { inner -> keys.forEach { inner.remove(it) } }
+        }
+    }
 }

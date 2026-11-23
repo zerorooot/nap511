@@ -614,17 +614,10 @@ class FileBrowserModule(
 
     /**
      * 在 IO 调度器下彻底清理指定文件列表对应的 Coil 内存与磁盘缓存
+     * 双键（fileId 缩略图 + pickCode 高清图）规则已下沉到 platform 扩展，全仓唯一实现，
+     * 此处只做委托，避免本模块与 mutator 各写一份。
      */
-    suspend fun cleanFileListCoilCache(list: List<FileBean>) = withContext(Dispatchers.IO) {
-        list.forEach { bean ->
-            if (bean.fileId.isNotEmpty()) {
-                coilCacheCleaner.deleteCoilCache(bean.fileId)
-            }
-            if (bean.pickCode.isNotEmpty()) {
-                coilCacheCleaner.deleteCoilCache(bean.pickCode)
-            }
-        }
-    }
+    suspend fun cleanFileListCoilCache(list: List<FileBean>) = coilCacheCleaner.cleanFileCaches(list)
 
     suspend fun removeFolderCacheRecursively(categoryId: String) = withContext(Dispatchers.IO) {
         if (categoryId == "0") return@withContext

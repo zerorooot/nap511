@@ -11,13 +11,16 @@ import github.zerorooot.nap511.data.repository.FileRepository
 import github.zerorooot.nap511.data.local.cache.CacheEvent
 import github.zerorooot.nap511.data.local.cache.CacheRollback
 import github.zerorooot.nap511.data.local.cache.FileCacheManager
+import github.zerorooot.nap511.data.local.cache.groupBySourceParentCid
 import github.zerorooot.nap511.util.onFailureToastAndLog
+import github.zerorooot.nap511.util.toUserFriendlyMessage
 import github.zerorooot.nap511.platform.CoilCacheCleaner
 import github.zerorooot.nap511.platform.FileNavigator
 import github.zerorooot.nap511.platform.ToastProvider
 import github.zerorooot.nap511.ui.viewmodel.store.FileUiStateHolder
 import github.zerorooot.nap511.ui.viewmodel.store.ImageCacheStore
 import github.zerorooot.nap511.ui.viewmodel.store.ScrollPositionStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import okhttp3.FormBody
@@ -72,38 +75,111 @@ class FileMutatorModule(
         }
     }
 
+    /**
+     * 粘贴：把剪切列表里的条目移动到当前目录。
+     *
+     * 关键点（对应 bug「跨目录剪切粘贴后源目录缓存不同步」）：
+     * 1. 剪切列表可能来自 filter/搜索视图，条目天然跨多个父目录，**不能**用 cutList[0] 反推唯一源目录；
+     * 2. 原地判定、缓存订正都基于条目自身的 parentId（[github.zerorooot.nap511.util.formatFileBeanList]
+     *    已把普通文件的 parentId 归一为 categoryId、文件夹保留真实 parentId）；
+     * 3. 只有网络成功后才订正缓存，失败只提示，不做乐观回滚。
+     */
     suspend fun removeFile() {
-        val cutList = stateHolder.currentContentState.cutFileList
+        val state = stateHolder.currentContentState
+        // 同一 fid 可能被重复选中（filter 结果里同名项），按 uniqueId 去重后再判断
+        val cutList = state.cutFileList.distinctBy { it.uniqueId }
         if (cutList.isEmpty()) {
+            XLog.d("removeFile: cutFileList empty, only reset isCutState")
             stateHolder.updateContentState { copy(isCutState = false) }
             return
         }
 
-        val targetCid = stateHolder.currentContentState.currentCid
-        stateHolder.updateContentState { copy(isCutState = false) }
-
-        val fileCid = cutList[0].let { if (it.isFolder) it.parentId else it.categoryId }
-        if (fileCid == targetCid) {
-            toastProvider.showToast("禁止原地移动～")
+        // 约束1：仅 Folder 视图允许粘贴；filter/搜索/星标一律拦截，剪切态与 cutFileList 原样保留。
+        // 显式覆盖 Star 是为了「粘贴校验只有这一处」的内聚性——即便将来放开进入守卫也不会漏。
+        if (state.source !is FileListSource.Folder) {
+            XLog.d("removeFile: blocked by source=${state.source.javaClass.simpleName}")
+            toastProvider.showToast("当前模式下无法粘贴，退出后再粘贴")
             return
         }
 
+        val targetCid = state.currentCid
+        // 原地判定：parentId 即来源目录（formatFileBeanList 已归一）。
+        // 前置 isNotEmpty 仅防 currentCid 为空的理论态（默认 "0"）：来源未知的项不算原地，照常移动。
+        val (inPlace, movable) = cutList.partition { it.parentId.isNotEmpty() && it.parentId == targetCid }
+        XLog.d(
+            "removeFile: target=$targetCid, cut=${cutList.size}, " +
+                    "movable=${movable.size}, inPlace=${inPlace.size}"
+        )
+
+        // 约束3：全部在当前目录 → 清空剪切态，不发请求、不动缓存
+        if (movable.isEmpty()) {
+            stateHolder.updateContentState { copy(isCutState = false, cutFileList = emptyList()) }
+            toastProvider.showToast("所选文件已在当前目录，已取消剪切")
+            return
+        }
+
+        // 沿用现状：发起即退出剪切态（失败后 cutFileList 残留，属既有行为，本次不修）
+        stateHolder.updateContentState { copy(isCutState = false) }
         stateHolder.setRefreshing(true)
-        runCatching {
-            val move = fileRepository.removeAllFile(targetCid, cutList)
-            if (move.state) {
-                // 统一委托 FileCacheManager 移除剪切的文件并清理子文件夹缓存
-                FileCacheManager.removeItems(fileCid, cutList.map { it.fileId })
-                stateHolder.updateContentState { copy(cutFileList = emptyList()) }
-                navigator.refresh(targetCid)
-                "移动${cutList.size}个文件成功"
-            } else {
-                "移动失败~"
+
+        val result = runCatching { fileRepository.removeAllFile(targetCid, movable) }
+
+        // 【转圈时序说明】成功路径**不在这里**复位 isRefreshing：
+        // 复位后紧接 refresh → getFiles 会立刻再置 true，中间必被绘制一帧「转圈消失」，
+        // 表现为下拉指示器抽搐一下。因此让 isRefreshing 一直保持 true，
+        // 由收尾的 refresh → getFiles 连续持有，最后在它自己的出口复位。
+        // 但这也意味着：凡是不走 refresh 的退出路径，都必须在本地显式复位，否则转圈永久残留。
+
+        result.exceptionOrNull()?.let { e ->
+            stateHolder.setRefreshing(false)
+            // 取消必须冒泡：不订正缓存、不弹 toast
+            if (e is CancellationException) {
+                XLog.d("removeFile: cancelled, rethrow after resetting refreshing")
+                throw e
             }
-        }.onSuccess { message ->
-            toastProvider.showToast(message)
-        }.onFailureToastAndLog(toastProvider)
-        stateHolder.setRefreshing(false)
+            XLog.e("removeFile failed: target=$targetCid, items=${movable.size}", e)
+            toastProvider.showToast(e.toUserFriendlyMessage())
+            return
+        }
+        // 上面 let 已对异常路径做了 return / throw，能走到这里说明 result 必为 Success，
+        // 因此 getOrThrow() 不会再抛，可以直接取出业务体判断 state。
+        val move = result.getOrThrow()
+        if (!move.state) {
+            // 业务失败同样不会再走 refresh，转圈无人接管 → 本分支自己收尾
+            stateHolder.setRefreshing(false)
+            XLog.w("removeFile: server returned state=false, target=$targetCid, items=${movable.size}")
+            toastProvider.showToast("移动失败~")
+            return
+        }
+
+        // 约束 5/6：仅对参与移动的项，按来源父目录分组订正（本 Bug 根因所在）。
+        // 跳过项（inPlace）不参与订正，避免误剔目标目录里的同 fid 条目。
+        FileCacheManager.removeItemsBySourceParents(movable, fallbackParentCid = targetCid)
+        // 约束 7：双键 Coil 清理（唯一实现见 platform/ServiceBridge.kt）+ 高清图按 pickCode 精准清除
+        coilCacheCleaner.cleanFileCaches(movable)
+        imageCacheStore.removeByPickCodes(movable.map { it.pickCode })
+
+        stateHolder.updateContentState { copy(cutFileList = emptyList()) }
+        val toastMsg = if (inPlace.isEmpty()) "移动${movable.size}个文件成功"
+        else "移动${movable.size}个文件成功（已跳过${inPlace.size}个在本目录）"
+        XLog.d("removeFile success: $toastMsg")
+        toastProvider.showToast(toastMsg)
+
+        // 约束9：仍在目标目录 → 既有 refresh（remove + 回源）负责收尾；
+        // 用户已离开 → 只失效该目录缓存，不导航、不 refresh：
+        //   · navigateTo 会 cancel getFilesJob 并清空列表把视角拉回，等于抢走用户的返回操作；
+        //   · refresh(targetCid) 在漂移态会无条件把 source 改写为 Folder(targetCid)，
+        //     与 currentCid 错位后 loadMoreFiles 会拿错分页键。
+        // 图片缓存按 pickCode 的精准清理已在上面做过，漂移态不再整块 clear(targetCid)。
+        if (stateHolder.currentContentState.currentCid == targetCid) {
+            // 走 refresh：isRefreshing 由 refresh → getFiles 连续持有，无需在此复位。
+            navigator.refresh(targetCid)
+        } else {
+            // 漂移态不调 refresh，没有人接管转圈 → 必须显式复位，否则永久转圈。
+            XLog.d("removeFile: user drifted away from target=$targetCid, invalidating cache only")
+            FileCacheManager.remove(targetCid)
+            stateHolder.setRefreshing(false)
+        }
     }
 
     suspend fun createFolder(folderName: String) {
@@ -159,10 +235,10 @@ class FileMutatorModule(
         }
 
 
-        // 2. 按 parentId 分组更新 FileCacheManager 内存/磁盘缓存，并收集回滚闭包
+        // 2. 按来源父目录分组更新 FileCacheManager 内存/磁盘缓存，并收集回滚闭包
+        // 复用全仓唯一的来源分组实现（filter/搜索视图下同一批条目的 parentId 可能各不相同）
         val rollbacks = mutableListOf<CacheRollback>()
-        val groupByParent = filter.groupBy { it.parentId.ifEmpty { currentCid } }
-        groupByParent.forEach { (pid, beans) ->
+        filter.groupBySourceParentCid(currentCid).forEach { (pid, beans) ->
             FileCacheManager.starItems(pid, beans.map { it.fileId }, targetStar)?.let {
                 rollbacks.add(it)
             }
@@ -332,15 +408,17 @@ class FileMutatorModule(
                 )
             }
 
-            // 2. 按 parentId 分组更新各父目录本地缓存（支持搜索/标星跨目录及常规目录）
+            // 2. 按来源父目录分组更新各父目录本地缓存（支持搜索/标星跨目录及常规目录）
             val affectedItems = currentList.filter { validMap.containsKey(it.fileId) }
-            val groupByParent = affectedItems.groupBy { it.parentId.ifEmpty { cid } }
-            groupByParent.forEach { (pid, items) ->
-                val parentRenameMap = items.mapNotNull { item ->
-                    val newName = validMap[item.fileId]
-                    if (newName != null) item.fileId to newName else null
-                }.toMap()
-                FileCacheManager.renameItems(pid, parentRenameMap)
+            affectedItems.groupBySourceParentCid(cid).forEach { (pid, items) ->
+                // 内层 let 的参数必须显式命名，否则内层 it 会遮蔽外层的 item
+                // （那会让 mapNotNull 的 it.fileId 解析到 String 上，编译期报 unresolved reference）
+                FileCacheManager.renameItems(
+                    pid,
+                    items.mapNotNull { item ->
+                        validMap[item.fileId]?.let { newName -> item.fileId to newName }
+                    }.toMap()
+                )
             }
 
             toastProvider.showToast("成功重命名 ${validMap.size} 个文件")
@@ -351,8 +429,8 @@ class FileMutatorModule(
             if (completedChunks > 0) {
                 // 存在部分批次已提交云端成功，强制触发远端全量刷新避免缓存分裂
                 val affectedItems = currentList.filter { validMap.containsKey(it.fileId) }
-                val parentIds = affectedItems.map { it.parentId.ifEmpty { cid } }.distinct()
-                parentIds.forEach { pid ->
+                // 来源分组统一走 groupBySourceParentCid（兜底 cid）：只取 key 即各来源父目录
+                affectedItems.groupBySourceParentCid(cid).keys.forEach { pid ->
                     FileCacheManager.notifyCacheEvent(CacheEvent.RemoteRefreshRequired(pid))
                 }
             }
@@ -370,6 +448,9 @@ class FileMutatorModule(
         val paginationKey = stateHolder.currentContentState.source.paginationKey
         val beforeList = stateHolder.currentContentState.fileBeanList
         val beforeHighlight = scrollPositionStore.getHighlight(paginationKey)
+        // 发起前就捕获数据源模式快照：若在请求飞行中用户退出了搜索/过滤回到 Folder，
+        // 回包时再读 source 会翻转判定，导致该做的跨目录订正被漏掉（或反之）。
+        val wasFolderMode = stateHolder.currentContentState.source is FileListSource.Folder
         val mapOf = hashMapOf<String, String>()
         mapOf["ignore_warn"] = "1"
         mapOf["pid"] = targetCid
@@ -405,6 +486,12 @@ class FileMutatorModule(
             check(deleteMultipleResult.state) { deleteMultipleResult.errorMsg.ifEmpty { "删除失败" } }
             deleteMultipleResult
         }.onSuccess {
+            // 约束 4：仅网络成功后才订正。搜索/过滤/星标视图下条目真实父目录 ≠ targetCid，
+            // 需按来源父目录逐目录剔除（currentCid 那一份已由上面的 removeItems 处理）。
+            // 用发起前的 wasFolderMode 快照判定，避免请求飞行中切换视图造成误判。
+            if (!wasFolderMode) {
+                FileCacheManager.removeItemsBySourceParents(selectedFiles)
+            }
             // 仅在网络成功后才物理清理 Coil 缩略图
             selectedFiles.forEach { fileBean ->
                 if (fileBean.photoThumb.isNotEmpty()) {
@@ -471,16 +558,9 @@ class FileMutatorModule(
         }
 
         deleteMultiple(currentCid, toDelete, skippedCount = skipped.size)
-        // 搜索/过滤模式中，因为被删除文件/文件夹的 cid 不是当前 cid，所以只会删除文件，而不会删除缓存，要手动删除
-        if (stateHolder.currentContentState.source !is FileListSource.Folder) {
-            val groupBy = toDelete.groupBy { it.parentId }
-            groupBy.forEach { (pid, beans) ->
-                /**
-                 * 在 [github.zerorooot.nap511.util.formatFileBeanList] 中已经把文件、文件夹的 cid、fid 统一做了转换，这里直接使用 fid
-                 */
-                FileCacheManager.removeItems(pid, beans.map { it.fileId })
-            }
-        }
+        // 注意：搜索/过滤模式下「被删条目真实父目录 ≠ currentCid」的多源缓存订正
+        // 已移入 deleteMultiple(targetCid, …) 的 onSuccess 成功分支（失败不再误剔源目录缓存），
+        // 此处不再重复订正。
     }
 
     /**

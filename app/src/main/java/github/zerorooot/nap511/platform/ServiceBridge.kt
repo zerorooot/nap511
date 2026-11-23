@@ -22,6 +22,8 @@ import github.zerorooot.nap511.util.deleteCoilCache
 import github.zerorooot.nap511.util.getCoilCacheUrl
 import github.zerorooot.nap511.util.isIgnoringBatteryOptimizations
 import github.zerorooot.nap511.worker.OfflineTaskWorker
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * 图片及文件缓存清理平台抽象
@@ -39,6 +41,39 @@ interface CoilCacheCleaner {
 
     /** 优先匹配 Coil 缓存（按 MemoryCache -> DiskCache 顺序短路判断） */
     fun getCachedUrl(key: String): String?
+
+    /**
+     * 按「列表缩略图键 fileId + 高清图键 pickCode」双键清理 Coil 内存与磁盘缓存。
+     *
+     * 键的事实来源：
+     * - 列表缩略图：`ui/components/item/FileCellItem.kt` 的 cacheKey = fileId，最终落到
+     *   `BaseCellItem` 的 memoryCacheKey / diskCacheKey；
+     * - 高清图：`ui/components/item/ImageCellItem.kt` 使用 pickCode 作为请求 key。
+     *
+     * 全仓唯一实现：FileBrowserModule.cleanFileListCoilCache、FileMutatorModule.removeFile 共用。
+     *
+     * 【为什么是接口默认实现，而不是顶层扩展函数】
+     * 1. 语义归属：这是「Coil 清理器」自身的批量能力，放在契约里调用点无需 import，
+     *    也不必去别处找扩展定义；
+     * 2. 防静默切换：Kotlin 解析成员优先于扩展，一旦将来有人补一个同名成员，
+     *    扩展版会被静默顶掉、编译不报错。写成成员就只有一个实现入口；
+     * 3. 测试零负担：默认实现由接口提供，现有全部 Fake（`object : CoilCacheCleaner {}`）
+     *    无需补任何方法，只覆盖 4 个抽象成员即可。
+     *
+     * 【为什么不把 Dispatch 策略外提】IO 边界属于实现细节：调用方只想「清干净」，
+     * 不该关心用什么调度器。若将来需要别的调度器，再抽参数而非反向污染调用点。
+     */
+    suspend fun cleanFileCaches(beans: Collection<FileBean>) {
+        // 空集合直接返回，省掉一次 IO 上下文切换
+        if (beans.isEmpty()) return
+        withContext(Dispatchers.IO) {
+            beans.forEach { bean ->
+                // 双键都要清：fileId 管列表缩略图，pickCode 管高清图
+                if (bean.fileId.isNotEmpty()) deleteCoilCache(bean.fileId)
+                if (bean.pickCode.isNotEmpty()) deleteCoilCache(bean.pickCode)
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalCoilApi::class)
