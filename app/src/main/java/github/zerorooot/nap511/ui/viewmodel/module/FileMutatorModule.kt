@@ -8,7 +8,6 @@ import github.zerorooot.nap511.ui.model.FileListSource
 import github.zerorooot.nap511.data.model.RenameBean
 import github.zerorooot.nap511.data.model.VideoBean
 import github.zerorooot.nap511.data.repository.FileRepository
-import github.zerorooot.nap511.data.local.cache.CacheEvent
 import github.zerorooot.nap511.data.local.cache.CacheRollback
 import github.zerorooot.nap511.data.local.cache.FileCacheManager
 import github.zerorooot.nap511.data.local.cache.groupBySourceParentCid
@@ -428,10 +427,12 @@ class FileMutatorModule(
             XLog.e("batchRename failed: $errorMsg, completedChunks: $completedChunks", ex)
             if (completedChunks > 0) {
                 // 存在部分批次已提交云端成功，强制触发远端全量刷新避免缓存分裂
+                // 走 notifyRemoteRefresh ：先采集排序快照 → 删缓存 → 再发事件，
+                // 早退不再命中，且与其他 4 个调用点（Offline/Video/Audio/Recycle）共用同一条正确路径。
                 val affectedItems = currentList.filter { validMap.containsKey(it.fileId) }
                 // 来源分组统一走 groupBySourceParentCid（兜底 cid）：只取 key 即各来源父目录
                 affectedItems.groupBySourceParentCid(cid).keys.forEach { pid ->
-                    FileCacheManager.notifyCacheEvent(CacheEvent.RemoteRefreshRequired(pid))
+                    FileCacheManager.notifyRemoteRefresh(pid)
                 }
             }
             toastProvider.showToast(errorMsg)

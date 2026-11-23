@@ -4,39 +4,21 @@ import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
+import dagger.hilt.android.lifecycle.HiltViewModel
+import github.zerorooot.nap511.data.local.cache.FileCacheManager
 import github.zerorooot.nap511.data.model.FileBean
-import github.zerorooot.nap511.ui.model.FileContentUiState
-import github.zerorooot.nap511.ui.model.FileDialogUiState
 import github.zerorooot.nap511.data.model.LocationBean
-import github.zerorooot.nap511.data.model.uniqueId
-import github.zerorooot.nap511.ui.navigation.NavEvent
 import github.zerorooot.nap511.data.model.OrderBean
 import github.zerorooot.nap511.data.model.PathBean
 import github.zerorooot.nap511.data.model.RemainingSpaceBean
-import github.zerorooot.nap511.ui.model.SettingUiState
 import github.zerorooot.nap511.data.model.VideoBean
 import github.zerorooot.nap511.data.model.VideoStarAction
-import dagger.hilt.android.lifecycle.HiltViewModel
-import github.zerorooot.nap511.worker.UnzipQueueManager
-import javax.inject.Inject
+import github.zerorooot.nap511.data.model.uniqueId
 import github.zerorooot.nap511.data.repository.AuthRepository
 import github.zerorooot.nap511.data.repository.FileRepository
 import github.zerorooot.nap511.data.repository.SettingsRepository
 import github.zerorooot.nap511.data.repository.paging.DirectoryPagingCoordinator
-import github.zerorooot.nap511.util.ConfigKeyUtil
-import github.zerorooot.nap511.data.local.cache.FileCacheManager
-import github.zerorooot.nap511.util.LazyScrollState
-import github.zerorooot.nap511.util.copy
-import github.zerorooot.nap511.ui.viewmodel.module.BackResult
-import github.zerorooot.nap511.ui.viewmodel.module.FileBrowserModule
-import github.zerorooot.nap511.ui.viewmodel.module.FileCacheSyncModule
-import github.zerorooot.nap511.ui.viewmodel.module.FileIntegrationModule
-import github.zerorooot.nap511.ui.viewmodel.module.FileMediaModule
-import github.zerorooot.nap511.ui.viewmodel.module.FileMutatorModule
 import github.zerorooot.nap511.platform.AndroidBackgroundScheduler
 import github.zerorooot.nap511.platform.AndroidCoilCacheCleaner
 import github.zerorooot.nap511.platform.AndroidServiceBridge
@@ -44,11 +26,25 @@ import github.zerorooot.nap511.platform.AppStringProvider
 import github.zerorooot.nap511.platform.FileNavigator
 import github.zerorooot.nap511.platform.ToastProvider
 import github.zerorooot.nap511.platform.parseDeepLink
+import github.zerorooot.nap511.ui.model.FileContentUiState
+import github.zerorooot.nap511.ui.model.FileDialogUiState
+import github.zerorooot.nap511.ui.model.SettingUiState
+import github.zerorooot.nap511.ui.navigation.NavEvent
+import github.zerorooot.nap511.ui.viewmodel.module.BackResult
+import github.zerorooot.nap511.ui.viewmodel.module.FileBrowserModule
+import github.zerorooot.nap511.ui.viewmodel.module.FileCacheSyncModule
+import github.zerorooot.nap511.ui.viewmodel.module.FileIntegrationModule
+import github.zerorooot.nap511.ui.viewmodel.module.FileMediaModule
+import github.zerorooot.nap511.ui.viewmodel.module.FileMutatorModule
 import github.zerorooot.nap511.ui.viewmodel.store.FileUiStateHolder
 import github.zerorooot.nap511.ui.viewmodel.store.ImageCacheStore
 import github.zerorooot.nap511.ui.viewmodel.store.PagingStateStore
 import github.zerorooot.nap511.ui.viewmodel.store.ScrollPositionStore
 import github.zerorooot.nap511.ui.viewmodel.store.TorrentCacheStore
+import github.zerorooot.nap511.util.ConfigKeyUtil
+import github.zerorooot.nap511.util.LazyScrollState
+import github.zerorooot.nap511.util.copy
+import github.zerorooot.nap511.worker.UnzipQueueManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
@@ -59,7 +55,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.util.concurrent.ConcurrentHashMap
+import javax.inject.Inject
 
 /**
  * 文件管理门面 ViewModel (Facade)
@@ -207,7 +203,10 @@ class FileViewModel @Inject constructor(
         imageCacheStore = imageCacheStore,
         pagingStateStore = pagingStateStore,
         coilCacheCleaner = coilCacheCleaner,
-        onUpdateFileCache = { cid -> browserModule.updateFileCache(cid) },
+        // 非当前展示目录的静默预拉：把事件携带的目标目录排序快照（order / isAsc / fcMix）
+        // 透传给 browserModule，并用 force = true 穿透「已有缓存即早退」保护，
+        // 防止同一 cid 并发 notify 时后到的快照被早退吞掉。
+        onUpdateFileCache = { cid, sort -> browserModule.updateFileCache(cid, sort, force = true) },
         toastProvider = toastProvider
     )
 
@@ -439,7 +438,6 @@ class FileViewModel @Inject constructor(
     }
 
     fun cut(targetBean: FileBean? = null) = mutatorModule.cut(targetBean)
-    fun cut(index: Int) = mutatorModule.cut(index)
     fun cancelCut() = mutatorModule.cancelCut()
     fun removeFile() = viewModelScope.launch { mutatorModule.removeFile() }
     fun confirmDiscardVideos(discardList: List<VideoBean>, targetCid: String) =

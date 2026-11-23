@@ -4,6 +4,7 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.ui.model.FileListSource
 import github.zerorooot.nap511.data.local.cache.CacheEvent
 import github.zerorooot.nap511.data.local.cache.FileCacheManager
+import github.zerorooot.nap511.data.model.FilesBean
 import github.zerorooot.nap511.util.formatFileBeanList
 import github.zerorooot.nap511.platform.AppStringProvider
 import github.zerorooot.nap511.platform.CoilCacheCleaner
@@ -24,7 +25,15 @@ class FileCacheSyncModule(
     private val imageCacheStore: ImageCacheStore,
     private val pagingStateStore: PagingStateStore,
     private val coilCacheCleaner: CoilCacheCleaner,
-    private val onUpdateFileCache: suspend (String) -> Unit,
+    /**
+     * 非当前展示目录的静默预拉回调。
+     *
+     * @param cid  目标目录 cid
+     * @param sort 目标目录的排序上下文快照（order / isAsc / fcMix），
+     *             由 [FileCacheManager.notifyRemoteRefresh] 在删缓存前采集；
+     *             为 null 时由实现方回退到「当前展示目录排序 + 全局 fcmix」兜底。
+     */
+    private val onUpdateFileCache: suspend (String, FilesBean?) -> Unit,
     private val toastProvider: ToastProvider
 ) {
 
@@ -90,12 +99,23 @@ class FileCacheSyncModule(
                 /**不需要删除缓存，因为在 [FileCacheManager.notifyRemoteRefresh] 里已经删除了**/
                 if (stateHolder.currentContentState.source is FileListSource.Folder) {
                     if (event.cid == currentCid) {
-                        // 当前展示目录变动，刷新当前 UI 页面
+                        // 当前展示目录变动，刷新当前 UI 页面。
+                        // 当前目录永远以 stateHolder 里的本目录权威排序为准，不需要也不应该用快照覆盖，
+                        // 所以这里继续沿用不带 sort 的整页刷新路径。
                         navigator.refresh(currentCid, true)
                     } else {
                         // 非当前展示目录：FileCacheManager 在 notifyRemoteRefresh 中已清空对应 cid 的缓存
                         // 此时无需修改 UI 的 source，后台静默拉取/更新该 cid 缓存即可（或等切入时懒加载）
-                        onUpdateFileCache(event.cid)
+                        // 关键修复点：把事件里携带的**目标目录排序快照**透传下去，
+                        // 让静默预拉使用「目标目录自己的 order / isAsc / fcMix」而不是当前展示目录的排序，
+                        // 从而修复解压完成后自动刷新跳序 / 不遵循 fcmix 的问题。
+                        // 快照为 null（冷目录）时由 onUpdateFileCache 实现方回退兜底，与修复前行为一致。
+                        XLog.d(
+                            "RemoteRefreshRequired: non-current cid=${event.cid}, " +
+                                    "currentCid=$currentCid, " +
+                                    "sort=${event.sort?.let { "order=${it.order}, isAsc=${it.isAsc}, fcMix=${it.fcMix}" } ?: "null"}"
+                        )
+                        onUpdateFileCache(event.cid, event.sort)
                     }
                 }
             }

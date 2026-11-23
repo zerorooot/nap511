@@ -1,6 +1,7 @@
 package github.zerorooot.nap511.data.local.cache
 
 import com.elvishew.xlog.XLog
+import github.zerorooot.nap511.data.local.cache.FileCacheManager.engine
 import github.zerorooot.nap511.data.model.FileBean
 import github.zerorooot.nap511.data.model.FilesBean
 import github.zerorooot.nap511.data.model.VideoBean
@@ -22,8 +23,21 @@ import kotlin.math.roundToInt
  * 缓存数据变更通知事件
  */
 sealed interface CacheEvent {
-    /** 需请求远端 115 API 全量刷新指定目录（新增文件、解压、离线下载完成、字幕上传、回收站还原等） */
-    data class RemoteRefreshRequired(val cid: String) : CacheEvent
+    /**
+     * 需请求远端 115 API 全量刷新指定目录（新增文件、解压、离线下载完成、字幕上传、回收站还原等）
+     *
+     * @param sort 目标目录的排序上下文快照（仅 [FilesBean.order] / [FilesBean.isAsc] / [FilesBean.fcMix]
+     *             三字段有效，其余字段均为占位值，不得当作真实文件列表使用）。
+     *             该快照由 [FileCacheManager.notifyRemoteRefresh] 在**删除缓存之前**采集，
+     *             用于让「非当前展示目录」的静默预拉按目标目录自己的 order / isAsc / fcMix 请求，
+     *             而不是错用当前展示目录的排序（跳序 / 不遵循 fcmix 的根因）。
+     *             默认 null 以兼容所有旧构造点；null 表示无缓存快照，刷新层回退到
+     *             serverOrderBean + currentFcMix 兜底。
+     */
+    data class RemoteRefreshRequired(
+        val cid: String,
+        val sort: FilesBean? = null
+    ) : CacheEvent
 
     /** 本地缓存已就地同步完毕，仅需刷新 UI 列表，严禁发起远程 API 请求（删除、重命名、播放进度更新、终端预拉取等） */
     data class LocalUiUpdated(val cid: String) : CacheEvent
@@ -82,7 +96,10 @@ object FileCacheManager {
         }
         return scope.launch {
             if (maxMemoryDirs != null || saveRequestCache != null) {
-                engine.updateConfig(maxMemoryDirs = maxMemoryDirs, saveRequestCache = saveRequestCache)
+                engine.updateConfig(
+                    maxMemoryDirs = maxMemoryDirs,
+                    saveRequestCache = saveRequestCache
+                )
                 XLog.d("FileCacheManager.updateConfig applied: maxMemoryDirs=$maxMemoryDirs, saveRequestCache=$saveRequestCache")
             }
         }
@@ -107,13 +124,58 @@ object FileCacheManager {
     /**
      * 通知远端数据发生变动（新增文件、解压完成、离线下载完成、字幕上传、回收站还原等）。
      * 清理本地缓存并广播 RemoteRefreshRequired 事件，促使 FileViewModel 在对应目录下发起 115 API 全量刷新。
+     *
+     * 【为什么要在删缓存前抢一份排序快照】
+     * [engine.remove] 会同步删掉内存 + 磁盘两级缓存并 join 物理删除，删完之后 [get] 必为 null。
+     * 而该目录的 order / isAsc / fcMix 唯一权威来源就是这份缓存里的 [FilesBean]（服务端回显）。
+     * 若先删后发事件，刷新层就只能拿到「当前展示目录」的排序去请求「目标目录」，
+     * 导致解压完成后的自动刷新跳序 / 不遵循 fcmix。
+     *
+     * 【快照为什么瘦身】
+     * 事件进入 [cacheEvents]（extraBufferCapacity = 64）的缓冲区，且 UI 侧会打印 event.toString()。
+     * 全程只需三个排序字段，所以这里只携带 order / isAsc / fcMix（外加 cid 便于日志交叉校验），
+     * 避免大目录的 fileBeanList 长期滞留在事件缓冲里被反复 toString。
+     *
+     * 【读-删为什么不做原子化】
+     * 排序元数据在秒级尺度上稳定，读与删之间的窄竞态最坏只会拿到一份略旧的排序快照，
+     * 属于可接受误差；为此引入 takeWithMeta 之类的原子读删，收益远小于复杂度（见方案 §八）。
      */
     suspend fun notifyRemoteRefresh(cid: String) =
         withContext(Dispatchers.IO) {
+            // 1. 先读排序快照（必须在 remove 之前！）
+            //    这里不加 runCatching：TwoLevelCacheEngine.getSync → getDiskCacheSync 内部已吞掉
+            //    FileNotFoundException / 损坏文件异常并返回 null，仅 CancellationException 会重抛（应当向上传播）。
+            val snap = get(cid)
+            val sortSnapshot = snap?.toSortSnapshot(cid)
+
+            // 2. 再删缓存（内存 + 磁盘两级，内部 join 物理删除）
             engine.remove(cid)
-            XLog.d("FileCacheManager.notifyRemoteRefresh: cid=$cid disk file deleted, emitting RemoteRefreshRequired")
-            _cacheEvents.tryEmit(CacheEvent.RemoteRefreshRequired(cid))
+
+            XLog.d(
+                "FileCacheManager.notifyRemoteRefresh: cid=$cid, " +
+                        "snapshot=${sortSnapshot?.let { "order=${it.order}, isAsc=${it.isAsc}, fcMix=${it.fcMix}" } ?: "null(冷目录/无缓存)"}, " +
+                        "disk file deleted, emitting RemoteRefreshRequired"
+            )
+
+            // 3. 最后广播事件，把排序上下文一并带出去
+            _cacheEvents.tryEmit(CacheEvent.RemoteRefreshRequired(cid, sortSnapshot))
         }
+
+    /**
+     * 把完整缓存对象裁剪为「仅排序上下文」的轻量快照。
+     *
+     * 只保留 cid / order / isAsc / fcMix：
+     * - order 为空白串时（旧版本缓存或非列表来源写入）保留原值，由刷新层决定是否回退兜底，
+     *   这样「快照是否可用」的判断权集中在唯一一处刷新层，本函数保持纯粹的数据裁剪职责；
+     * - fileBeanList / count / path 等字段一律丢弃，避免过期文件列表被误当作真实数据。
+     */
+    private fun FilesBean.toSortSnapshot(cid: String): FilesBean =
+        FilesBean(
+            cid = cid,
+            order = order,
+            isAsc = isAsc,
+            fcMix = fcMix
+        )
 
     /**
      * 通知本地缓存已完成就地更新（删除、重命名、视频进度更新等）。
@@ -179,8 +241,8 @@ object FileCacheManager {
             }
 
             val folderList = cacheWrapper.fileBeanList.filter { it.isFolder }
-            for (item in folderList) {
-                val subCid = item.categoryId.ifEmpty { item.fileId }
+            for ((categoryId, fileId) in folderList) {
+                val subCid = categoryId.ifEmpty { fileId }
                 if (subCid.isNotEmpty() && subCid != "0" && !reachableKeys.contains(subCid)) {
                     walk(subCid)
                 }
@@ -351,6 +413,7 @@ object FileCacheManager {
             val newList = ArrayList(cache.fileBeanList)
             for (index in newList.indices) {
                 val item = newList[index]
+
                 /**
                  * fid与cid已经在 [github.zerorooot.nap511.util.formatFileBeanList] 中统一了，同时兼容 categoryId 容错
                  */
@@ -595,7 +658,10 @@ object FileCacheManager {
             if (item.isFolder) {
                 val subFolderCid = item.categoryId.ifEmpty { item.fileId }
                 // 严格边界保护：非空、非根目录且未访问过
-                if (subFolderCid.isNotEmpty() && subFolderCid != "0" && !visited.contains(subFolderCid)) {
+                if (subFolderCid.isNotEmpty() && subFolderCid != "0" && !visited.contains(
+                        subFolderCid
+                    )
+                ) {
                     collectSubFoldersRecursively(subFolderCid, visited)
                 }
             }
@@ -682,6 +748,6 @@ object FileCacheManager {
 fun Collection<FileBean>.groupBySourceParentCid(
     fallback: String? = null
 ): Map<String, List<FileBean>> =
-    // 空 parentId 先落到 fallback（null 则落空串），再统一用 filterKeys 丢掉空 key 分组，
+// 空 parentId 先落到 fallback（null 则落空串），再统一用 filterKeys 丢掉空 key 分组，
     // 这样「传 null 丢弃」与「传兜底并入」共用同一条表达式，无需两套分支
     groupBy { it.parentId.ifEmpty { fallback.orEmpty() } }.filterKeys { it.isNotEmpty() }

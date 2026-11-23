@@ -168,20 +168,56 @@ class FileBrowserModule(
 
     /**
      * 预加载指定 cid 的缓存
+     *
+     * 静默预拉该 cid 的目录缓存，不触碰当前 UI 展示状态。
+     *
+     * @param cid    目标目录 cid
+     * @param sort   目标目录的排序上下文快照（来自 [github.zerorooot.nap511.data.local.cache.CacheEvent.RemoteRefreshRequired.sort]）。
+     *               为 null 时回退到「当前展示目录的 serverOrderBean + 全局 currentFcMix」，
+     *               与修复前的旧行为一致（冷目录兜底，不劣化）。
+     *               注意：快照里的 [FilesBean.cid] 仅作日志校验，请求始终以入参 cid 为准。
+     * @param force  true 时穿透「已有缓存即早退」的保护。用于并发多次 notify 的场景：
+     *               A 的预拉先写回缓存后，B 的预拉不应被早退跳过，否则 B 携带的快照会丢失。
      */
-    suspend fun updateFileCache(cid: String) {
-        if (FileCacheManager[cid] != null) {
+    suspend fun updateFileCache(cid: String, sort: FilesBean? = null, force: Boolean = false) {
+        // 缓存已存在则跳过网络请求
+        // force = true 时穿透，保证并发 notify 场景下每次携带的排序快照都能落地。
+        if (!force && FileCacheManager[cid] != null) {
+            XLog.d("updateFileCache: cid=$cid already cached, skip (force=false)")
             return
         }
+
+        // 排序参数优先级：目标目录快照 > 当前展示目录的兜底值
+        // order 额外加空串守卫：FilesBean.order 默认值为 ""，旧缓存/非列表来源可能写入空串，
+        // 直接透传会在 115 请求里发出 o= 空参数（比修复前更糟），所以空白时回退兜底。
+        // isAsc / fcMix 是 Int 无法表达「缺失」，存在快照即直接采用（快照来自服务端回显，同源可信）。
+        val targetOrder = sort?.order?.takeIf { it.isNotBlank() } ?: serverOrderBean.type
+        val targetAsc = sort?.isAsc ?: serverOrderBean.asc
+        val targetFcMix = sort?.fcMix ?: currentFcMix
+
+        XLog.d(
+            "updateFileCache: cid=$cid, force=$force, " +
+                    "snapshot=[order=${sort?.order}, isAsc=${sort?.isAsc}, fcMix=${sort?.fcMix}] (snapCid=${sort?.cid}), " +
+                    "fallback=[order=${serverOrderBean.type}, asc=${serverOrderBean.asc}, fcMix=$currentFcMix], " +
+                    "applied=[order=$targetOrder, asc=$targetAsc, fcMix=$targetFcMix]"
+        )
+
         runCatching {
             val files = fileRepository.getFiles(
                 cid = cid,
-                order = serverOrderBean.type,
-                asc = serverOrderBean.asc,
-                fcMix = currentFcMix
+                order = targetOrder,
+                asc = targetAsc,
+                fcMix = targetFcMix
             )
+            // 写回缓存时**不覆盖** order / isAsc / fcMix：
+            // getFiles 返回的 FilesBean 自带服务端回显的排序字段，它才是最新权威值。
+            // 快照只是「请求参数」的来源，不是「响应结果」的修正项。
             val formatted = files.copy(fileBeanList = formatFileBeanList(files.fileBeanList))
             FileCacheManager[cid] = formatted
+            XLog.d(
+                "updateFileCache: cid=$cid cached, echo=[order=${formatted.order}, isAsc=${formatted.isAsc}, fcMix=${formatted.fcMix}], " +
+                        "items=${formatted.fileBeanList.size}, count=${formatted.count}"
+            )
         }.onFailureToastAndLog(toastProvider)
     }
 

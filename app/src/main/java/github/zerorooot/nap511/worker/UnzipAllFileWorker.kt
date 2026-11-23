@@ -416,13 +416,28 @@ class UnzipAllFileWorker @AssistedInject constructor(
         val moveFailResult = handleFailedFiles(unzipFailList, targetCid, explicitErrorCid)
 
         // 4.  刷新所有受影响目录的缓存
-        affectedCids.forEach { cid ->
+        // （两段刷新合并去重，见下方注释）
+        //
+        // 【为什么要合并】
+        // 原实现分两段：先遍历 affectedCids，再单独处理 moveFailResult?.targetErrorCid。
+        // 若失败文件的错误目录恰好就是本次解压的目标目录之一（例如用户把错误目录设在同一目录下的子目录，
+        // 或显式 errorCid 与 targetCid 相同），同一 cid 会被刷新两次：
+        // 第一次采集到排序快照并删除缓存，第二次则读到 null 快照并再删一次，
+        // 后一次的空快照会覆盖掉前一次的有效排序上下文。
+        //
+        // 【为什么先拼 List 再 distinct】
+        // affectedCids 是 MutableSet<String>，targetErrorCid 是 String?。
+        // 直接把单值拼到集合上不成立（Set + String 无法解析），所以先经 listOf + orEmpty 归一成 List，
+        // 过滤空串后再 distinct。
+        val refreshCids = (affectedCids.toList() + listOf(moveFailResult?.targetErrorCid.orEmpty()))
+            .filter { it.isNotEmpty() }
+            .distinct()
+        XLog.d(
+            "UnzipAllFileWorker 刷新受影响目录: affectedCids=$affectedCids, " +
+                    "errorCid=${moveFailResult?.targetErrorCid}, refreshCids=$refreshCids"
+        )
+        refreshCids.forEach { cid ->
             FileCacheManager.notifyRemoteRefresh(cid)
-        }
-        moveFailResult?.targetErrorCid?.let { errorCid ->
-            if (errorCid.isNotEmpty()) {
-                FileCacheManager.notifyRemoteRefresh(errorCid)
-            }
         }
 
         // 5. 统一构建返回的 Data
