@@ -156,26 +156,66 @@ class FileMediaModule(
             handleVideoStarActions(cid, starList)
         }
         if (pickCode.isNotEmpty()) {
-            val fileList = FileCacheManager.getDate(cid)?.fileBeanList
-            val index = fileList?.indexOfFirst { it.pickCode == pickCode } ?: -1
-            if (index >= 0) {
-                val foundBean = fileList?.get(index)
-                val paginationKey = FileListSource.folderKey(cid)
-                if (foundBean != null) {
-                    scrollPositionStore.setHighlight(paginationKey, foundBean.uniqueId)
-                }
-                scrollPositionStore.setLocation(
-                    paginationKey,
-                    LocationBean(firstVisibleItemIndex = index, firstVisibleItemScrollOffset = 0)
-                )
-                // 可能被终端页面影响。所以只有在当前目录才滚动。
-                // 无法更新非当前页的位置，未被布局，不知道非当前页面的 firstVisibleItemIndex 和 firstVisibleItemScrollOffset
-                if (cid == stateHolder.currentContentState.currentCid) {
-                    if (foundBean != null) {
-                        stateHolder.updateContentState { copy(highlightedFileId = foundBean.uniqueId) }
+            val state = stateHolder.currentContentState
+            // 定位账本按「列表身份」分流，而不是硬编码 Folder：
+            // - Folder 源：目标可能不在当前目录（例如在 Filter/Star 里跨目录播放），
+            //   索引取自该 cid 的目录缓存，key 写 folderKey(cid)，交由下次进场恢复；
+            // - 其余源（Search / Filter / Star）：目标就是当前展示的列表，
+            //   索引取自 state.fileBeanList，key 用该源自己的 paginationKey
+            //   （原实现恒用 folderKey(cid)，导致搜索态索引来自 folder 缓存、顺序不同 → 定位错位）。
+            val isFolderSource = state.source is FileListSource.Folder
+            val list = if (isFolderSource) FileCacheManager.getDate(cid)?.fileBeanList else state.fileBeanList
+            val key = if (isFolderSource) FileListSource.folderKey(cid) else state.source.paginationKey
+            val index = list?.indexOfFirst { it.pickCode == pickCode } ?: -1
+            XLog.d(
+                "FileMediaModule.onVideoActivityResult locate: pickCode=$pickCode, cid=$cid, " +
+                        "source=${state.source.paginationKey}, isFolderSource=$isFolderSource, key=$key, " +
+                        "listSize=${list?.size ?: -1}, index=$index"
+            )
+            if (index >= 0 && list != null) {
+                val bean = list[index]
+                // 账本始终落盘：即便目标列表现并不在屏，也要保证之后回到它时能高亮
+                scrollPositionStore.setHighlight(key, bean.uniqueId)
+                scrollPositionStore.setLocation(key, LocationBean(index, 0))
+                // 非 Folder 源额外补写一份 folderKey(cid) 账本（只写账本、不动 UI）：
+                // 列表项携带的是真实父目录 cid，用户在 Filter/Star/Search 里播完后往往会退回该目录的
+                // Folder 列表，此时 FileBrowserModule 进场恢复读的是 getHighlight(folderKey(cid))，
+                // 若这里不补写，Folder 回屏高亮与定位就会丢。
+                if (!isFolderSource) {
+                    val folderKey = FileListSource.folderKey(cid)
+                    val folderList = FileCacheManager.getDate(cid)?.fileBeanList
+                    val folderIndex = folderList?.indexOfFirst { it.pickCode == pickCode } ?: -1
+                    if (folderIndex >= 0) {
+                        val folderBean = folderList!![folderIndex]
+                        scrollPositionStore.setHighlight(folderKey, folderBean.uniqueId)
+                        scrollPositionStore.setLocation(folderKey, LocationBean(folderIndex, 0))
+                        XLog.d(
+                            "FileMediaModule.onVideoActivityResult: mirror ledger to folderKey=$folderKey, " +
+                                    "folderIndex=$folderIndex"
+                        )
+                    } else {
+                        XLog.w(
+                            "FileMediaModule.onVideoActivityResult: folder cache miss for mirror ledger, " +
+                                    "cid=$cid, pickCode=$pickCode, folderSize=${folderList?.size ?: -1}"
+                        )
                     }
-                    _videoResultEvent.tryEmit(index)
                 }
+                // 可能被终端页面影响。所以只有正在展示的列表（key 相等）才滚动并动 UI。
+                // 无法更新非当前页的位置，未被布局，不知道非当前页面的 firstVisibleItemIndex 和 firstVisibleItemScrollOffset
+                // （原判定是 cid == 当前 cid，会漏掉 Filter/Star 这类「cid 是父目录、但列表身份不同」的态）
+                if (key == state.source.paginationKey) {
+                    stateHolder.updateContentState { copy(highlightedFileId = bean.uniqueId) }
+                    val emitted = _videoResultEvent.tryEmit(index)
+                    if (!emitted) {
+                        // extraBufferCapacity = 1 且无 replay：上次值未消费时会被静默丢弃
+                        XLog.w("FileMediaModule.onVideoActivityResult: videoResultEvent dropped, index=$index")
+                    }
+                }
+            } else if (index < 0) {
+                XLog.w(
+                    "FileMediaModule.onVideoActivityResult: pickCode not found in list, " +
+                            "pickCode=$pickCode, key=$key, listSize=${list?.size ?: -1}"
+                )
             }
         }
     }

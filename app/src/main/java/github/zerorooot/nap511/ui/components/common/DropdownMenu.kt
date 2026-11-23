@@ -30,6 +30,7 @@ import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Shuffle
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.VerticalAlignBottom
@@ -81,6 +82,8 @@ enum class MenuItemAction(
     // 文件页顶栏菜单项
     GALLERY_MODE("瀑布视图", Icons.Outlined.Image),
     FILE_SORT("文件排序", Icons.AutoMirrored.Outlined.Sort),
+    // 随机点开当前列表中任意一个可播放视频，连播队列仍保持列表原始顺序
+    RANDOM_PLAY("随机播放", Icons.Outlined.Shuffle),
     REFRESH_FILES("强制刷新", Icons.Outlined.Refresh),
     TOP_FILE("文件置顶", Icons.Outlined.PushPin),
     UN_TOP_FILE("取消置顶", Icons.Filled.PushPin),
@@ -250,6 +253,8 @@ fun FileAppTopBarDropdownMenu(onClick: (MenuItemAction, Int) -> Unit) {
     val listOf = listOf(
         MenuItemAction.GALLERY_MODE,
         MenuItemAction.FILE_SORT,
+        // 位次约定：文件排序之后、强制刷新之前
+        MenuItemAction.RANDOM_PLAY,
         MenuItemAction.REFRESH_FILES
     )
     BaseAppTorBarMenu(listOf = listOf, onClick = onClick)

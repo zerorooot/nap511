@@ -1,6 +1,5 @@
 package github.zerorooot.nap511.ui.screen.file
 
-import android.app.Activity
 import android.content.Intent
 import android.content.res.Configuration
 import android.provider.Settings
@@ -30,44 +29,44 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
-import github.zerorooot.nap511.ui.system.SystemBarsVisibility
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.annotation.ExperimentalCoilApi
 import coil.imageLoader
+import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.R
+import github.zerorooot.nap511.data.model.FileBean
+import github.zerorooot.nap511.data.model.ForceOpenType
+import github.zerorooot.nap511.data.model.uniqueId
+import github.zerorooot.nap511.platform.LocalToastProvider
+import github.zerorooot.nap511.ui.components.bar.TopBarAction
+import github.zerorooot.nap511.ui.components.common.AppBarAction
+import github.zerorooot.nap511.ui.components.common.MenuItemAction
+import github.zerorooot.nap511.ui.dialog.ForceOpenDialog
 import github.zerorooot.nap511.ui.model.FileBannerActions
 import github.zerorooot.nap511.ui.model.FileBannerState
-import github.zerorooot.nap511.data.model.FileBean
 import github.zerorooot.nap511.ui.model.FileContentActions
 import github.zerorooot.nap511.ui.model.FileDisplayConfig
 import github.zerorooot.nap511.ui.model.FileItemActions
 import github.zerorooot.nap511.ui.model.FileItemUiModel
 import github.zerorooot.nap511.ui.model.FileListDataState
-import github.zerorooot.nap511.data.model.uniqueId
 import github.zerorooot.nap511.ui.model.FileListScrollState
 import github.zerorooot.nap511.ui.model.FileListSource
 import github.zerorooot.nap511.ui.model.FilePathActions
 import github.zerorooot.nap511.ui.model.FileScaffoldActions
 import github.zerorooot.nap511.ui.model.FileScaffoldState
-import github.zerorooot.nap511.data.model.ForceOpenType
-import github.zerorooot.nap511.ui.navigation.Route
 import github.zerorooot.nap511.ui.model.SettingUiState
-import github.zerorooot.nap511.ui.dialog.ForceOpenDialog
-import github.zerorooot.nap511.ui.components.common.AppBarAction
-import github.zerorooot.nap511.ui.components.common.MenuItemAction
-import github.zerorooot.nap511.ui.components.bar.TopBarAction
-import github.zerorooot.nap511.platform.LocalToastProvider
-import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.ui.navigation.FileOpener
+import github.zerorooot.nap511.ui.navigation.Route
+import github.zerorooot.nap511.ui.system.SystemBarsVisibility
+import github.zerorooot.nap511.ui.viewmodel.AudioViewModel
+import github.zerorooot.nap511.ui.viewmodel.FileViewModel
+import github.zerorooot.nap511.util.ConfigKeyUtil
 import github.zerorooot.nap511.util.asScrollState
 import github.zerorooot.nap511.util.copy
 import github.zerorooot.nap511.util.isNotificationEnabled
-import github.zerorooot.nap511.ui.viewmodel.AudioViewModel
-import github.zerorooot.nap511.ui.viewmodel.FileViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
@@ -401,6 +400,23 @@ fun FileScreen(
                 }
             }
 
+            MenuItemAction.RANDOM_PLAY -> {
+                // 必须实时取值：本 lambda 被下方 remember(gridState, listState, staggeredGrid,
+                // contentState.source.paginationKey) 缓存，捕获组合层的 local val `fileBeanList`
+                // 会拿到「新目录骨架屏那一刻」的空列表快照（paginationKey 变化时重建，
+                // 之后数据到达只改 fileBeanList、不改 key，lambda 永不重建）。
+                val pool = fileViewModel.fileBeanList
+                // 加载态按 source 异构：isLoadingFolder 只在 Folder 乐观进场时置位，
+                // Search / Filter / Star 走的是 isRefreshing，故必须取或
+                val isLoading = contentState.isLoadingFolder || contentState.isRefreshing
+                XLog.d("FileScreen RANDOM_PLAY: source=${contentState.source.paginationKey}, poolSize=${pool.size}, isLoading=$isLoading")
+                scope.launch {
+                    // 不碰 setRefreshingStatus：该字段既驱动下拉转圈，又是 loadMoreFiles 的门禁，
+                    // 随机播放没有普通点播那样的成对置位，单方面复位会掐掉用户正在进行的刷新指示器
+                    fileOpener.openRandomVideo(pool, isLoading = isLoading)
+                }
+            }
+
             MenuItemAction.REFRESH_FILES -> {
                 refresh(true)
             }
@@ -572,7 +588,11 @@ fun FileScreen(
             onAddFolder = { fileViewModel.openCreateFolderDialog() })
     }
 
-    val fileItemList = remember(contentState.fileBeanList, contentState.selectedFileIds, contentState.highlightedFileId) {
+    val fileItemList = remember(
+        contentState.fileBeanList,
+        contentState.selectedFileIds,
+        contentState.highlightedFileId
+    ) {
         contentState.fileBeanList.map { bean ->
             val isSelected = bean.uniqueId in contentState.selectedFileIds
             FileItemUiModel(

@@ -2,27 +2,28 @@ package github.zerorooot.nap511.ui.navigation
 
 import android.content.Context
 import android.content.Intent
-import android.content.res.Configuration
+import com.elvishew.xlog.XLog
 import com.google.gson.Gson
 import github.zerorooot.nap511.R
-import github.zerorooot.nap511.ui.activity.VideoActivity
-import github.zerorooot.nap511.platform.AndroidToastProvider
-import github.zerorooot.nap511.platform.ToastProvider
 import github.zerorooot.nap511.data.model.FileBean
 import github.zerorooot.nap511.data.model.LaunchVideoParams
-import github.zerorooot.nap511.ui.navigation.Route
-import github.zerorooot.nap511.ui.model.SettingUiState
 import github.zerorooot.nap511.data.model.SubtitleItem
 import github.zerorooot.nap511.data.model.SubtitleSourceType
 import github.zerorooot.nap511.data.model.VideoAttributeBean
 import github.zerorooot.nap511.data.model.VideoBean
 import github.zerorooot.nap511.data.model.VideoInfoBean
+import github.zerorooot.nap511.data.model.isPlayableVideo
 import github.zerorooot.nap511.data.repository.FileRepository
+import github.zerorooot.nap511.platform.AndroidToastProvider
+import github.zerorooot.nap511.platform.ToastProvider
+import github.zerorooot.nap511.ui.activity.VideoActivity
 import github.zerorooot.nap511.ui.model.AudioPlayerController
 import github.zerorooot.nap511.ui.model.FileDialogController
 import github.zerorooot.nap511.ui.model.MediaViewerStateHolder
+import github.zerorooot.nap511.ui.model.SettingUiState
 import github.zerorooot.nap511.util.TextFileHelper
 import github.zerorooot.nap511.util.TextValidationResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -181,10 +182,16 @@ class FileOpener(
     /**
      * 打开视频文件并启动 [VideoActivity]
      */
-    suspend fun openVideo(fileBean: FileBean, siblingFiles: List<FileBean> = emptyList(), isForceOpen: Boolean = false): Boolean {
+    suspend fun openVideo(
+        fileBean: FileBean,
+        siblingFiles: List<FileBean> = emptyList(),
+        isForceOpen: Boolean = false
+    ): Boolean {
         audioPlayerController.pauseAudio()
         val videoList = siblingFiles.filter {
-            (it.isVideo == 1 && it.playLong != 0.0) || (isForceOpen && it.pickCode == fileBean.pickCode)
+            // 口径统一：与随机播放池共用 isPlayableVideo（playLong<=0 或 pickCode 为空的项留在队列里只会点到坏视频）
+            // 强行打开（isForceOpen）时例外保留被点项本身，保证它在队列中就地保序、下标可定位
+            it.isPlayableVideo || (isForceOpen && it.pickCode == fileBean.pickCode)
         }.map {
             VideoBean(
                 name = it.name,
@@ -207,6 +214,10 @@ class FileOpener(
         val fileBeanIndex =
             videoList.indexOfFirst { it.pickCode == fileBean.pickCode }.coerceAtLeast(0)
         val localSubtitleList = extractSubtitles(siblingFiles)
+        XLog.d(
+            "FileOpener.openVideo start: pickCode=${fileBean.pickCode}, name=${fileBean.name}, " +
+                    "queueSize=${videoList.size}, index=$fileBeanIndex, isForceOpen=$isForceOpen"
+        )
 
         val settings = settingUiState()
         val video = withContext(Dispatchers.IO) {
@@ -224,7 +235,12 @@ class FileOpener(
                         videoUrl = "http://115.com/api/video/m3u8/${fileBean.pickCode}.m3u8"
                     )
                 }
+            } catch (e: CancellationException) {
+                // 页面离开导致的协程取消不是业务失败：原样抛出，交给协程层收尾，
+                // 否则会被下面的 Exception 分支吞成 video == null，误弹「获取视频播放信息失败」
+                throw e
             } catch (e: Exception) {
+                XLog.w("FileOpener.openVideo failed to fetch video info: pickCode=${fileBean.pickCode}, error=${e.message}")
                 e.printStackTrace()
                 null
             }
@@ -259,6 +275,42 @@ class FileOpener(
     }
 
     /**
+     * 从已加载的同级列表随机挑一个可播放视频并启动播放器。
+     *
+     * - 池 = 传入列表（不补拉分页），纯随机不避重复；
+     * - 连播队列保持传入顺序（交给 [openVideo] 的 filter，不洗牌）；
+     * - [isLoading] 只作为事实入参：是否加载中由调用方判定（Query 源不置 isLoadingFolder，
+     *   故调用方需传 `isLoadingFolder || isRefreshing`），文案所有权留在本类。
+     *
+     * @return 是否成功启动播放器
+     */
+    suspend fun openRandomVideo(pool: List<FileBean>, isLoading: Boolean = false): Boolean {
+        val candidates = pool.filter { it.isPlayableVideo }
+        XLog.d("FileOpener.openRandomVideo: poolSize=${pool.size}, candidateSize=${candidates.size}, isLoading=$isLoading")
+
+        val picked = candidates.randomOrNull()
+        if (picked == null) {
+            // 空池才是真正无候选；加载中则提示稍候，避免骨架屏期误报「没有可播放的视频」
+            if (isLoading) {
+                XLog.w("FileOpener.openRandomVideo: candidate pool empty while loading, poolSize=${pool.size}")
+                toastProvider.showToast("列表加载中，请稍候")
+            } else {
+                XLog.w("FileOpener.openRandomVideo: no playable video in current list, poolSize=${pool.size}")
+                toastProvider.showToast("当前列表没有可播放的视频")
+            }
+            return false
+        }
+
+        XLog.d("FileOpener.openRandomVideo: picked pickCode=${picked.pickCode}, name=${picked.name}")
+        // 只有播放器确实启动后才弹成功提示，失败提示由 openVideo 自己负责
+        val launched = openVideo(picked, pool)
+        if (launched) {
+            toastProvider.showToast("随机播放：${picked.name}")
+        }
+        return launched
+    }
+
+    /**
      * 打开图片并导航至图片全屏浏览器
      */
     fun openPhoto(
@@ -267,7 +319,8 @@ class FileOpener(
         isForceOpen: Boolean = false
     ): Boolean {
         audioPlayerController.pauseAudio()
-        val validPhotoList = photoList.filter { it.photoThumb.isNotEmpty() || it.fileIco == R.drawable.png ||
+        val validPhotoList = photoList.filter {
+            it.photoThumb.isNotEmpty() || it.fileIco == R.drawable.png ||
                     //只把用户明确要求强制打开的那一个文件精准加进图片列表
                     // 而不要把同目录下的所有 .zip、.mp4 等杂七杂八的文件都强行加进图片画廊里。
                     (isForceOpen && (it.pickCode == fileBean.pickCode || it.fileId == fileBean.fileId))

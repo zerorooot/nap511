@@ -140,9 +140,10 @@ class TerminalPathTest {
         val dir1 = FileBean(name = "docs", categoryId = "10", isFolder = true)
         val dir2 = FileBean(name = "work", categoryId = "20", isFolder = true)
 
-        ctx.fileCacheManager.put("0", FilesBean(arrayListOf(dir1), cid = "0", count = 1, order = "", path = emptyList()))
-        ctx.fileCacheManager.put("10", FilesBean(arrayListOf(dir2), cid = "10", count = 1, order = "", path = emptyList()))
-        ctx.fileCacheManager.put("20", FilesBean(arrayListOf(), cid = "20", count = 0, order = "", path = emptyList()))
+        // FilesBean 首参已改为 state: Boolean，列表必须用具名参数传入
+        ctx.fileCacheManager.put("0", FilesBean(fileBeanList = arrayListOf(dir1), cid = "0", count = 1, order = "", path = emptyList()))
+        ctx.fileCacheManager.put("10", FilesBean(fileBeanList = arrayListOf(dir2), cid = "10", count = 1, order = "", path = emptyList()))
+        ctx.fileCacheManager.put("20", FilesBean(fileBeanList = arrayListOf(), cid = "20", count = 0, order = "", path = emptyList()))
 
         // 1. 解析目标目录 docs/work 并检查 pathList
         val resolved = ctx.resolveDirectory("docs/work")

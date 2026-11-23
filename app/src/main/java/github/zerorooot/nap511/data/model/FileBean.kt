@@ -239,6 +239,22 @@ data class FileBean(
 val FileBean.uniqueId: String
     get() = fileId.ifEmpty { categoryId.ifEmpty { pickCode } }
 
+/**
+ * 可播放视频的唯一判定口径：随机池与连播队列共用。
+ *
+ * - playLong <= 0：服务端媒体信息异常（时长缺失/未解析），点了必报视频错误；
+ * - pickCode 为空：URL 拼接与队列下标定位双双失败；
+ * - isFolder：文件夹点击走的是导航分支，不进入播放器。
+ *
+ * 刻意不做扩展名兜底——图标兜底见 [github.zerorooot.nap511.util.FileFormatUtils]，
+ * 点击分派也只认 isVideo == 1；若在此引入扩展名判断，会出现「随机池里有它、
+ * 但正常点击走不到视频分支」的不一致，并且在 data.model ⇄ util 之间形成包级循环依赖。
+ *
+ * 用 `val ... get()` 而非 `fun`：对齐仓内派生值惯例（如 [uniqueId]）。
+ */
+val FileBean.isPlayableVideo: Boolean
+    get() = !isFolder && isVideo == 1 && playLong > 0.0 && pickCode.isNotEmpty()
+
 @Immutable
 data class FileInfo(
     @SerializedName("count") val count: String = "",
