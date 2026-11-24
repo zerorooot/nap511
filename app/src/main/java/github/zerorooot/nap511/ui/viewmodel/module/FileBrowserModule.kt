@@ -5,6 +5,7 @@ import github.zerorooot.nap511.data.local.cache.FileCacheManager
 import github.zerorooot.nap511.data.model.FileBean
 import github.zerorooot.nap511.data.model.FilesBean
 import github.zerorooot.nap511.data.model.OrderBean
+import github.zerorooot.nap511.data.model.PagingCache
 import github.zerorooot.nap511.data.model.OrderType
 import github.zerorooot.nap511.data.model.PathBean
 import github.zerorooot.nap511.data.model.uniqueId
@@ -151,13 +152,16 @@ class FileBrowserModule(
             // 【首屏冷启动优化】：若首帧已直接从内存缓存注入了根目录 "0" 且数据不为空，无需重复覆盖重写 StateFlow 触发二次重组
             val currentState = stateHolder.currentContentState
             if (currentState.currentCid == "0" && currentState.fileBeanList.isNotEmpty()) {
-                XLog.d("FileBrowserModule.loadCacheFile: root files already populated from initial memory cache, items=${currentState.fileBeanList.size}")
-                val folderSource = currentState.source
-                val limit = UserSessionManager.requestLimitCount
-                if (currentState.fileBeanList.size < limit || (currentState.totalCount > 0 && currentState.fileBeanList.size >= currentState.totalCount)) {
-                    pagingStateStore.markComplete(folderSource.paginationKey)
+                // 冷启动首帧来自内存缓存，可能无物理游标锚点（旧缓存/Gson 缺字段）。
+                // 用 displayable 判定缓存是否自洽可信；不通过则回源重建，避免带着无锚点残卷继续分页。
+                // 注意：Folder 的 complete 已从 FilesBean.isComplete 派生，此处不再写 isLoadedCompleteMap（原为死写入）。
+                if (PagingCache.displayable(FileCacheManager.getDate("0"), "0")) {
+                    XLog.d("FileBrowserModule.loadCacheFile: root files already populated from initial memory cache, items=${currentState.fileBeanList.size}")
+                    stateHolder.setRefreshing(false)
+                    return@withContext
                 }
-                stateHolder.setRefreshing(false)
+                XLog.d("FileBrowserModule.loadCacheFile: root cache not displayable, reentry from network")
+                reentry("0")
                 return@withContext
             }
 
@@ -213,10 +217,12 @@ class FileBrowserModule(
             // getFiles 返回的 FilesBean 自带服务端回显的排序字段，它才是最新权威值。
             // 快照只是「请求参数」的来源，不是「响应结果」的修正项。
             val formatted = files.copy(fileBeanList = formatFileBeanList(files.fileBeanList))
-            FileCacheManager[cid] = formatted
+            // 静默预拉也是从 0 首屏消费，写入物理游标锚点供后续触底续拉使用。
+            val paged = PagingCache.fromHead(formatted, files.fileBeanList.size, formatted.fileBeanList)
+            FileCacheManager[cid] = paged
             XLog.d(
-                "updateFileCache: cid=$cid cached, echo=[order=${formatted.order}, isAsc=${formatted.isAsc}, fcMix=${formatted.fcMix}], " +
-                        "items=${formatted.fileBeanList.size}, count=${formatted.count}"
+                "updateFileCache: cid=$cid cached, echo=[order=${paged.order}, isAsc=${paged.isAsc}, fcMix=${paged.fcMix}], " +
+                        "items=${paged.fileBeanList.size}, count=${paged.count}, physicalOffset=${paged.physicalOffset}"
             )
         }.onFailureToastAndLog(toastProvider)
     }
@@ -232,9 +238,11 @@ class FileBrowserModule(
     fun prepareOptimisticNavigation(targetCid: String, targetName: String): Boolean {
         // 1. 缓存即时短路检查（0ms 直出）
         val cached = FileCacheManager.getDate(targetCid)
-        if (cached != null) {
+        // targetCid 是其它目录，其缓存 fcMix 是它自己的历史身份（用户改的设置只作用于当前目录），
+        // 故用 displayable 只验自洽即可，不拿当前流身份比对；不通过则走骨架屏网络路径。
+        if (PagingCache.displayable(cached, targetCid)) {
             XLog.d("prepareOptimisticNavigation: targetCid=$targetCid hit cache, instant rendering without skeleton")
-            val files = cached.copy(fileBeanList = formatFileBeanList(cached.fileBeanList))
+            val files = cached!!.copy(fileBeanList = formatFileBeanList(cached.fileBeanList))
             setFiles(files)
             return false
         }
@@ -321,14 +329,23 @@ class FileBrowserModule(
     suspend fun getFiles(cid: String, fcMix: Int = currentFcMix, forceCache: Boolean = false) {
         stateHolder.setRefreshing(true)
         // 1. 尝试读取缓存（内存与磁盘双级读取，支持冷启动、测试及 LRU 淘汰后从磁盘恢复）
+        //    进场主路径必须验流身份（resumable）：onSettingsChanged→order(false) 只改 fcMix 不删缓存，
+        //    若用宽松的 displayable 命中旧缓存，setFiles 会把 stateHolder.fcMix 覆盖回旧值 → 新流永远不生效。
+        //    失配时先 remove 再走网络首屏，杜绝假回源/设置回退。
         val cached = FileCacheManager[cid]
-        if (cached != null) {
+        if (cached != null && PagingCache.resumable(cached, cid, serverOrderBean, fcMix)) {
             val files = cached.copy(
                 fileBeanList = formatFileBeanList(cached.fileBeanList),
                 cid = cid.ifEmpty { "0" })
+            XLog.d("FileBrowserModule.getFiles: cache hit resumable for cid=$cid, offset=${cached.physicalOffset}")
             setFiles(files)
             stateHolder.setRefreshing(false)
             return
+        }
+        if (cached != null) {
+            XLog.d("FileBrowserModule.getFiles: cache exists but not resumable for cid=$cid, remove then refetch. " +
+                    "cacheStream=${cached.order}/${cached.isAsc}/${cached.fcMix}, want=${serverOrderBean.type}/${serverOrderBean.asc}/$fcMix")
+            FileCacheManager.remove(cid)
         }
 
         try {
@@ -370,8 +387,12 @@ class FileBrowserModule(
                 }
             }
             // 3. 网络请求成功后写入缓存
-            FileCacheManager[cid] = formatted
-            setFiles(formatted) // 成功出口：在 setFiles 内部负责复位 isLoadingFolder = false
+            //    首屏从 0 起消费：physicalOffset = 本次原始返回条数（format 只 map 不变长），
+            //    作为后续触底续拉的唯一权威游标，与缓存同生共死。
+            val paged = PagingCache.fromHead(formatted, files.fileBeanList.size, formatted.fileBeanList)
+            XLog.d("FileBrowserModule.getFiles: cache written for cid=$cid, physicalOffset=${paged.physicalOffset}, size=${paged.fileBeanList.size}, count=${paged.count}")
+            FileCacheManager[cid] = paged
+            setFiles(paged) // 成功出口：在 setFiles 内部负责复位 isLoadingFolder = false
         } catch (ex: Throwable) {
             // 取消异常：静默退出，绝不执行回滚快照与 Toast
             if (ex is CancellationException) {
@@ -408,6 +429,20 @@ class FileBrowserModule(
     }
 
     /**
+     * 统一回源：删除不合格缓存后走网络首屏重建。
+     *
+     * 供「进场主路径命中旧流缓存」「触底 resumable 失配」「冷启动首帧无锚点」共用。
+     * 必须先 remove 再 getFiles：否则 getFiles 的缓存命中会再次命中旧缓存（其 displayable 不验流身份），
+     * 造成假回源、把用户刚改的 fcMix 覆盖回旧值的设置回退。
+     * FileCacheManager.remove 同步等待物理删除且不广播 CacheEvent，也不触碰 scrollPositionStore 账本。
+     */
+    private suspend fun reentry(cid: String) {
+        XLog.d("FileBrowserModule.reentry: remove stale cache then refetch cid=$cid")
+        FileCacheManager.remove(cid)
+        getFiles(cid)
+    }
+
+    /**
      * 滑动触底自动加载下一页文件（分页加载更多）
      * UI 表现层专注状态机与人机交互门禁，数据分发、去重合并与游标递增完全委托协同器
      */
@@ -424,8 +459,19 @@ class FileBrowserModule(
             return
         }
 
-        // 检查是否此前已被标记为加载完成
-        if (pagingStateStore.isComplete(paginationKey)) {
+        // 单次读取 Folder 缓存快照：完成态、流身份门禁、游标、totalCount 全部基于它，
+        // 避免对同一 cid 多次 getDate 在并发淘汰/覆盖时拿到不同版本。
+        val folderCache =
+            if (source is FileListSource.Folder) FileCacheManager.getDate(source.cid) else null
+
+        // 检查是否此前已被标记为加载完成。
+        // Folder 源完成态从缓存的 isComplete 派生（与缓存同生死，LRU 淘汰后自然失效）；
+        // non-Folder 源（Search/Filter/Star）仍用 PagingStateStore —— 它们没有缓存回声/LRU 病灶。
+        val alreadyComplete = when (source) {
+            is FileListSource.Folder -> folderCache?.isComplete ?: false
+            else -> pagingStateStore.isComplete(paginationKey)
+        }
+        if (alreadyComplete) {
             pagingStateStore.releaseFetch(paginationKey)
             return
         }
@@ -436,10 +482,8 @@ class FileBrowserModule(
             return
         }
 
-        val cachedData =
-            if (source is FileListSource.Folder) FileCacheManager.getDate(source.cid) else null
         val totalCount = if (source is FileListSource.Folder) {
-            state.totalCount.takeIf { it > 0 } ?: (cachedData?.count ?: 0)
+            state.totalCount.takeIf { it > 0 } ?: (folderCache?.count ?: 0)
         } else {
             state.totalCount
         }
@@ -464,9 +508,22 @@ class FileBrowserModule(
         // 读取首屏已缓存的该目录 fcMix ,防止在 FileOrderDialog 设置了fcmix,但不生效
         val currentFcMix = stateHolder.currentContentState.fcMix
 
-        // 获取当前物理游标起点，若未记录则默认以当前列表大小作为初始物理游标
-        val currentPhysicalOffset =
-            pagingStateStore.getOrInitOffset(paginationKey, currentList.size)
+        // 获取当前物理游标起点。
+        // Folder：游标唯一权威是缓存的 physicalOffset，且必须先过 resumable 门禁（流身份+自洽）；
+        //         失配时先 remove 旧缓存再 reentry 回源，杜绝「假回源/设置回退」（onSettingsChanged 改 fcMix 场景）。
+        // non-Folder：沿用 PagingStateStore，首次触底以当前列表大小作为初始游标。
+        val currentPhysicalOffset = when (source) {
+            is FileListSource.Folder -> {
+                if (!PagingCache.resumable(folderCache, source.cid, serverOrderBean, currentFcMix)) {
+                    XLog.d("loadMoreFiles: folder cache not resumable for cid=${source.cid}, reentry")
+                    pagingStateStore.releaseFetch(paginationKey)
+                    reentry(source.cid)
+                    return
+                }
+                folderCache!!.physicalOffset
+            }
+            else -> pagingStateStore.getOrInitOffset(paginationKey, currentList.size)
+        }
 
         try {
             XLog.d("loadMoreFiles delegating to pagingCoordinator: source=$currentRequestSource, physicalOffset=$currentPhysicalOffset, limit=$limit")
@@ -481,8 +538,12 @@ class FileBrowserModule(
                 fcMix = currentFcMix
             )
 
-            // 推进记录服务端物理窗口游标，消灭因去重产生的游标倒退漂移
-            pagingStateStore.setOffset(paginationKey, result.nextPhysicalOffset)
+            // 推进记录服务端物理窗口游标，消灭因去重产生的游标倒退漂移。
+            // Folder 的游标由 coordinator 在 append 时写回缓存（唯一权威），此处不再写物理副本；
+            // non-Folder 仍由 PagingStateStore 维护。
+            if (source !is FileListSource.Folder) {
+                pagingStateStore.setOffset(paginationKey, result.nextPhysicalOffset)
+            }
 
             // 【并发竞争保护】：仅在当前屏幕仍停留在发起请求的模式与上下文时才更新 UI
             if (
@@ -537,7 +598,16 @@ class FileBrowserModule(
             XLog.d("order=$orderResult, map=$map")
             if (orderResult.state) {
                 // ★ 同时保存新选中的 orderBean 和 fcMix
+                // non-Folder 源（Filter/Star）的 paginationKey 含 order/fcMix，order(false) 成功后 key 变化，
+                // 旧 key 下的 offset/complete/lock 必须清理，否则新流会复用旧游标。
+                // Folder 源此处 key 不变，靠进场/触底的 resumable 门禁失配回源兜底，无需 reset。
+                val oldPaginationKey = stateHolder.currentContentState.source.paginationKey
+                val isNonFolder = stateHolder.currentContentState.source !is FileListSource.Folder
                 stateHolder.updateContentState { copy(orderBean = b, fcMix = fcMix) }
+                if (isNonFolder) {
+                    pagingStateStore.reset(oldPaginationKey)
+                    XLog.d("order: reset non-folder paging state for oldKey=$oldPaginationKey")
+                }
                 if (isRefresh) {
                     refresh(currentCid, fcMix = fcMix)
                 }
@@ -996,9 +1066,11 @@ class FileBrowserModule(
         if (state.isQueryState) {
             val currentCid = state.currentCid
             val cache = FileCacheManager.getDate(currentCid)
-            if (cache != null) {
+            // back 处于 query 态，UI 的 currentFcMix 不代表目录历史身份；
+            // 用 displayable 只验缓存自洽，:1029 仍显式沿用 cache.fcMix（既有设计选择）。
+            if (PagingCache.displayable(cache, currentCid)) {
                 val formattedCache =
-                    cache.copy(fileBeanList = formatFileBeanList(cache.fileBeanList))
+                    cache!!.copy(fileBeanList = formatFileBeanList(cache.fileBeanList))
                 setFiles(formattedCache)
                 stateHolder.updateContentState {
                     copy(
@@ -1063,9 +1135,9 @@ class FileBrowserModule(
                 appBarTitle = folderSource.appName
             )
         }
-        val limit = UserSessionManager.requestLimitCount
-        if (files.fileBeanList.size < limit || (files.count > 0 && files.fileBeanList.size >= files.count)) {
-            pagingStateStore.markComplete(folderSource.paginationKey)
-        }
+        // 这里原有一处 markComplete(folderSource.paginationKey) 已被移除：
+        // setFiles 的 source 恒为 Folder，而 Folder 的完成态唯一权威是 FilesBean.isComplete
+        // （触底 loadMoreFiles 从其缓存快照派生）。写 isLoadedCompleteMap 只会制造一份与缓存脱钩的死数据，
+        // LRU 淘汰缓存后该标记残留会导致重进目录触底被误拦截、永久漏页。
     }
 }

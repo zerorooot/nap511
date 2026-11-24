@@ -64,6 +64,16 @@ data class FilesBean(
      * fc_mix = 1：文件与文件夹混排。
      */
     @SerializedName("fc_mix") val fcMix: Int = 0,
+    /**
+     * 触底分页的物理游标：下一页应从服务端此处开始拉取。
+     *
+     * 严格按服务端原始返回条数（format/distinct 之前）累加，绝不等于去重后的 fileBeanList.size，
+     * 否则去重会导致游标倒退、重复拉取同一页。默认 0 表示「无有效锚点」（旧缓存/Gson 缺字段/瘦身快照），
+     * 此类缓存非完整时一律回源重建（见 PagingCache.displayable/resumable）。
+     *
+     * 该字段是 Folder 源游标的唯一权威来源，与缓存同生共死：缓存被 LRU 淘汰/删除时游标自然消失。
+     */
+    val physicalOffset: Int = 0,
 ) {
     /** 当前请求是否成功且未过期 */
     val isSuccess: Boolean

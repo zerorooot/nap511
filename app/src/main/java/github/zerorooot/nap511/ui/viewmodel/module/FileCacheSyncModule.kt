@@ -80,12 +80,13 @@ class FileCacheSyncModule(
                             )
                         }
 
-                        // 对齐复合键分页完成状态与物理游标（以 FilesBean.isComplete 为唯一信源 SSOT）
-                        val paginationKey = FileListSource.folderKey(event.cid)
-                        pagingStateStore.setOffset(paginationKey, updatedCache.fileBeanList.size)
-                        if (updatedCache.isComplete) {
-                            pagingStateStore.markComplete(paginationKey)
-                        }
+                        // 【分页游标不再在此写入】
+                        // 原实现有 setOffset(key, cache.size) 与 markComplete，二者都已删除：
+                        // 1) cache.fileBeanList.size 是去重后的展示条数，不等于服务端物理游标；
+                        //    本地加星/改名/删除/播放进度回写会改变 size，若拿它当 offset 会造成跳页/重复拉取。
+                        // 2) Folder 的 offset/complete 唯一权威已在 FilesBean.physicalOffset / isComplete，
+                        //    本地就地维护缓存时由 data class copy 天然沿用，无需也不应在此改写。
+                        // 这里只做「读缓存刷新 UI」，缓存丢失由下方 navigateTo 兜底重进。
                     } else {
                         // 若本地内存缓存意外丢失，兜底触发网络拉取
                         navigator.navigateTo(currentCid)

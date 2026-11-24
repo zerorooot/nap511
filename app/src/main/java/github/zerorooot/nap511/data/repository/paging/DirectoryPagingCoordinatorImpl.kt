@@ -5,6 +5,7 @@ import github.zerorooot.nap511.data.model.FileBean
 import github.zerorooot.nap511.ui.model.FileListSource
 import github.zerorooot.nap511.data.model.FilesBean
 import github.zerorooot.nap511.data.model.OrderBean
+import github.zerorooot.nap511.data.model.PagingCache
 import github.zerorooot.nap511.data.repository.FileRepository
 import github.zerorooot.nap511.data.local.cache.FileCacheManager
 import github.zerorooot.nap511.util.formatFileBeanList
@@ -63,6 +64,16 @@ class DirectoryPagingCoordinatorImpl(
             if (runningBatch != null) {
                 XLog.i("DirectoryPagingCoordinator: fetchNextPage detected in-flight batch task for cid=${source.cid}, joining...")
                 val allFiles = runningBatch.await()
+                // join-batch 拿到的是后台全量批处理的权威完整集：无条件写缓存，保持 UI 与缓存一致。
+                // batchKey 已含 order/asc/fcMix，命中的 runningBatch 即当前流，不会污染新流缓存。
+                val oldCache = fileCacheManager.getDate(source.cid)
+                fileCacheManager[source.cid] = PagingCache
+                    .fromHead(FilesBean(cid = source.cid), allFiles.size, allFiles)
+                    .copy(
+                        count = allFiles.size, order = order.type, isAsc = order.asc, fcMix = fcMix,
+                        path = oldCache?.path ?: emptyList()
+                    )
+                XLog.d("DirectoryPagingCoordinator: join-batch cache committed for cid=${source.cid}, items=${allFiles.size}, physicalOffset=${allFiles.size}")
                 return@withContext PageAppendResult(
                     rawNewItems = emptyList(),
                     combinedList = allFiles,
@@ -128,15 +139,23 @@ class DirectoryPagingCoordinatorImpl(
         // 4. 仅 Folder 模式就地更新内存与持久化缓存
         if (source is FileListSource.Folder) {
             val cachedData = fileCacheManager.getDate(source.cid)
-            val updatedFilesBean = (cachedData ?: res).copy(
-                fileBeanList = ArrayList(combinedList),
-                count = latestTotalCount,
-                order = order.type,
-                isAsc = order.asc,
-                fcMix = fcMix
-            )
-            fileCacheManager[source.cid] = updatedFilesBean
-            XLog.d("DirectoryPagingCoordinator: Updated cache for cid=${source.cid}, cachedSize=${combinedList.size}, count=$latestTotalCount, isComplete=$isComplete")
+            // 【链3 写入侧根防】基底只接受通过 resumable 的缓存：
+            // 绝不用网络响应 res 或 UI 残表 combinedList 当基底，否则会把「只有本页、count 却是全量」的残卷落盘，
+            // 下次进场被当首页展示，造成整段跳页/乱序。base 不合格时只更新 UI、不写缓存。
+            if (cachedData != null && PagingCache.resumable(cachedData, source.cid, order, fcMix)) {
+                val updatedFilesBean = PagingCache.append(
+                    base = cachedData,
+                    rawBatchSize = rawNewItems.size,   // 服务端原始返回条数，非去重后 combinedList.size
+                    merged = combinedList,
+                    count = latestTotalCount,
+                    order = order,
+                    fcMix = fcMix
+                )
+                fileCacheManager[source.cid] = updatedFilesBean
+                XLog.d("DirectoryPagingCoordinator: Updated cache for cid=${source.cid}, cachedSize=${combinedList.size}, count=$latestTotalCount, physicalOffset=${updatedFilesBean.physicalOffset}, isComplete=$isComplete")
+            } else {
+                XLog.w("DirectoryPagingCoordinator: base cache not resumable for cid=${source.cid}, skip cache write to avoid partial residue")
+            }
         }
 
         XLog.d("DirectoryPagingCoordinator.fetchNextPage done: rawCount=${rawNewItems.size}, combinedCount=${combinedList.size}, nextOffset=$nextPhysicalOffset, isComplete=$isComplete")
@@ -248,15 +267,18 @@ class DirectoryPagingCoordinatorImpl(
                 item.fileId.ifEmpty { item.categoryId.ifEmpty { item.pickCode } }
             }
 
-            val finalFilesBean = FilesBean(
-                fileBeanList = ArrayList(deduplicatedList),
-                cid = cid,
-                count = if (latestTotalCount > 0) latestTotalCount else deduplicatedList.size,
-                order = options.order.type,
-                isAsc = options.order.asc,
-                fcMix = options.fcMix,
-                path = lastPathList
-            )
+            // 全量拉取也是从头消费：physicalOffset = 原始累加条数（stagedRawList 未 distinct），
+            // 去重后的展示列表与服务端游标分离，保证后续触底不因去重而漂移。
+            val finalFilesBean = PagingCache
+                .fromHead(FilesBean(cid = cid), stagedRawList.size, deduplicatedList)
+                .copy(
+                    count = if (latestTotalCount > 0) latestTotalCount else deduplicatedList.size,
+                    order = options.order.type,
+                    isAsc = options.order.asc,
+                    fcMix = options.fcMix,
+                    path = lastPathList
+                )
+            XLog.d("DirectoryPagingCoordinator: full paging cache built for cid=$cid, physicalOffset=${finalFilesBean.physicalOffset}, size=${finalFilesBean.fileBeanList.size}")
 
             // 事务性分阶段落盘提交：
             // 若为多页全量模式（大于 FAST_MODE_PAGES），落盘并广播 LocalUiUpdated，驱动 UI 统一响应刷新；
@@ -328,17 +350,19 @@ class DirectoryPagingCoordinatorImpl(
                 val deduplicated = formatFileBeanList(stagedStreamList).distinctBy { item ->
                     item.fileId.ifEmpty { item.categoryId.ifEmpty { item.pickCode } }
                 }
-                val finalBean = FilesBean(
-                    fileBeanList = ArrayList(deduplicated),
-                    cid = options.cid,
-                    count = if (latestCount > 0) latestCount else deduplicated.size,
-                    order = options.order.type,
-                    isAsc = options.order.asc,
-                    fcMix = options.fcMix,
-                    path = lastPath
-                )
+                // 流式完整消费：同样从头累计，physicalOffset = stagedStreamList.size（原始，未 distinct）。
+                // stagedStreamList 定义在 flow 顶层，finally 作用域可见，无需依赖循环内的 batch 变量。
+                val finalBean = PagingCache
+                    .fromHead(FilesBean(cid = options.cid), stagedStreamList.size, deduplicated)
+                    .copy(
+                        count = if (latestCount > 0) latestCount else deduplicated.size,
+                        order = options.order.type,
+                        isAsc = options.order.asc,
+                        fcMix = options.fcMix,
+                        path = lastPath
+                    )
                 fileCacheManager.putAndNotify(options.cid, finalBean)
-                XLog.i("DirectoryPagingCoordinator: Stream fully consumed, cached ${deduplicated.size} items for cid=${options.cid}")
+                XLog.i("DirectoryPagingCoordinator: Stream fully consumed, cached ${deduplicated.size} items for cid=${options.cid}, physicalOffset=${finalBean.physicalOffset}")
             }
         }
     }
