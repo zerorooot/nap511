@@ -44,7 +44,9 @@ data class NavigationSnapshot(
     val previousPathList: List<PathBean>,
     val previousSource: FileListSource,
     val previousFileBeans: List<FileBean>,
-    val previousTotalCount: Int
+    val previousTotalCount: Int,
+    /** 快照时刻的本地展示序；回滚时必须一并恢复，否则列表是本地序而弹窗回退服务端序。 */
+    val previousLocalOrder: OrderBean? = null
 )
 
 /**
@@ -86,9 +88,6 @@ class FileBrowserModule(
     private val settingUiState: SettingUiState
         get() = settingUiStateFlow.value
 
-    /** 当前生效的本地自定义排序（仅在内存中针对当前视图生效，用于弹窗回显；刷新/切目录/分页时失效） */
-    private var activeLocalOrder: OrderBean? = null
-
     /** 乐观导航历史快照：记录进入乐观导航前的稳定状态，供网络/数据异常时瞬时平滑回滚 */
     internal var currentSnapshot: NavigationSnapshot? = null
 
@@ -106,9 +105,12 @@ class FileBrowserModule(
      * 获取当前活跃模式的排序规则：
      * - 若当前存在生效的本地自定义排序（标星/时长），优先返回以供排序弹窗高亮回显
      * - 否则回退为当前模式的服务端真实排序规则
+     *
+     * 本地序存放在 FileContentUiState 里，由 updateContentState 守卫随列表变化自动清空，
+     * 因此这里只读、不再手工维护生命周期。
      */
     val currentOrderBean: OrderBean
-        get() = activeLocalOrder ?: serverOrderBean
+        get() = stateHolder.currentContentState.localOrder ?: serverOrderBean
 
     /**
      * 115 文件夹/文件混排参数：
@@ -256,7 +258,8 @@ class FileBrowserModule(
                 previousPathList = currentState.pathList,
                 previousSource = currentState.source,
                 previousFileBeans = currentState.fileBeanList,
-                previousTotalCount = currentState.totalCount
+                previousTotalCount = currentState.totalCount,
+                previousLocalOrder = currentState.localOrder
             )
             XLog.d("prepareOptimisticNavigation: recorded stable snapshot for previousCid=${currentState.currentCid}")
         }
@@ -316,7 +319,12 @@ class FileBrowserModule(
                 totalCount = snapshot.previousTotalCount,
                 isLoadingFolder = false,
                 isRefreshing = false,
-                appBarTitle = snapshot.previousSource.appName
+                appBarTitle = snapshot.previousSource.appName,
+                // 必须随列表一起恢复：进子目录时骨架态已把列表置空并清序，
+                // 若不恢复，回滚后列表是本地序、弹窗却回退服务端序，正是本方案要修的 bug 在回滚路径上复现。
+                // 骨架态写入必然已把 localOrder 清成 null，故此处传入的快照值必然是「引用变化」，
+                // 守卫第一分支直接放行，不会被 source 判定误清。
+                localOrder = snapshot.previousLocalOrder
             )
         }
         currentSnapshot = null
@@ -550,8 +558,7 @@ class FileBrowserModule(
                 stateHolder.currentContentState.source == currentRequestSource &&
                 serverOrderBean == currentRequestOrder
             ) {
-                // 分页追加数据后重置本地排序，直接以服务端返回的数据集和排序覆盖
-                activeLocalOrder = null
+                // 分页追加后列表顺序由服务端数据集决定，本地序失效由 updateContentState 守卫自动判定
                 stateHolder.updateContentState {
                     copy(
                         fileBeanList = result.combinedList,
@@ -624,7 +631,9 @@ class FileBrowserModule(
             applyLocalOrder(order, fcMix)
             return
         }
-        activeLocalOrder = null
+        // 本地序不在这里手工清：下面每个分支都会换列表，守卫会据顺序/数据源变化自动失效。
+        // 唯一的例外是 Search 分支——它只弹 toast 不换列表，顺序未变，本地序保留才是正确的
+        // （否则会出现「列表是本地序、弹窗显示云端序」的自相矛盾）。
         when (val s = stateHolder.currentContentState.source) {
             is FileListSource.Search -> {
                 toastProvider.showToast("暂不支持搜索模式排序")
@@ -632,7 +641,9 @@ class FileBrowserModule(
 
             is FileListSource.Filter -> {
                 this.order(isRefresh = false, order = order, fcMix = fcMix)
-                filterFile(type = s.filterType, name = s.name, order = order)
+                // 显式传 fcMix：order() 失败（异常或 state=false）时 state.fcMix 未更新，
+                // 默认参数会取到旧值，导致「排序项已换、fcMix 未换」的错配。
+                filterFile(type = s.filterType, name = s.name, order = order, fcMix = fcMix)
             }
 
             is FileListSource.Folder -> {
@@ -777,7 +788,6 @@ class FileBrowserModule(
     }
 
     suspend fun starFileScreen(order: OrderBean, fcMix: Int = currentFcMix) {
-        activeLocalOrder = null
         val limit = UserSessionManager.requestLimitCount
 
         stateHolder.setRefreshing(true)
@@ -813,7 +823,6 @@ class FileBrowserModule(
         order: OrderBean,
         fcMix: Int = currentFilesBeanFcMix
     ) {
-        activeLocalOrder = null
         val currentCid = stateHolder.currentContentState.currentCid
         val limit = UserSessionManager.requestLimitCount
         stateHolder.setRefreshing(true)
@@ -930,11 +939,14 @@ class FileBrowserModule(
         }
 
         val sortedList = list.sortedWith(comparator)
-        activeLocalOrder = order
+        // 本地序与列表变更写在同一 reducer 内：守卫据 localOrder 引用变化识别为显式写入。
+        // fcMix 保留原写入：它是文件夹布局偏好（会进网络请求），不是本地序标识，
+        // 删掉会让用户的混排选择在下拉刷新时被静默吞掉。
         stateHolder.updateContentState {
             copy(
                 fileBeanList = sortedList,
-                fcMix = fcMix
+                fcMix = fcMix,
+                localOrder = order
             )
         }
         _scrollToTopEvent.tryEmit(Unit)
@@ -1113,7 +1125,6 @@ class FileBrowserModule(
     }
 
     private fun setFiles(files: FilesBean) {
-        activeLocalOrder = null
         currentSnapshot = null // 数据正式就绪，安全释放快照
         val currentOrder = OrderBean.from(files)
         val folderSource = FileListSource.Folder(files.cid, stringProvider)

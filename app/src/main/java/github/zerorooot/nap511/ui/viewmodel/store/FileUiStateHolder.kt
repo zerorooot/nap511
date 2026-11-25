@@ -4,6 +4,8 @@ import com.elvishew.xlog.XLog
 import github.zerorooot.nap511.ui.model.FileContentUiState
 import github.zerorooot.nap511.ui.model.FileDialogUiState
 import github.zerorooot.nap511.ui.model.FileListSource
+import github.zerorooot.nap511.data.model.FileBean
+import github.zerorooot.nap511.data.model.uniqueId
 import github.zerorooot.nap511.data.model.OrderBean
 import github.zerorooot.nap511.data.local.cache.FileCacheManager
 import github.zerorooot.nap511.util.formatFileBeanList
@@ -35,10 +37,48 @@ class FileUiStateHolder(stringProvider: AppStringProvider) {
     val currentDialogState: FileDialogUiState
         get() = _dialogState.value
 
-    /** 内部状态更新减速器助手 */
+    /**
+     * 唯一写列表入口：本地序与列表同生共死。
+     *
+     * 1. reducer 显式写了 localOrder（引用变化）→ 尊重，这是「应用本地序」的唯一途径。
+     *    `data class copy()` 对未传字段保持原引用，故「写了」等价于「引用变了」，
+     *    写入意图必须与列表变更写在同一 reducer 内，无法从外部隔空置位。
+     * 2. 当前无本地序 → 无需判定。
+     * 3. 同一个 source（同一分页流）且列表实例未换 / uniqueId 顺序未变
+     *    → 就地变换，保留本地序。
+     * 4. 其余情况（换了 source，或顺序变了）→ 本地序失效。
+     *
+     * 第 3 步必须同时校验 source：两个内容相同的目录会得到相同的 uniqueId 序列，
+     * 只比顺序会漏清；反过来只比 source 会漏掉「同目录下列表被整体替换」。
+     *
+     * 前提：localOrder 非 null 时 fileBeanList 必然非空（见 FileContentUiState.localOrder）。
+     */
     fun updateContentState(reducer: FileContentUiState.() -> FileContentUiState) {
-        _contentState.update(reducer)
+        _contentState.update { old ->
+            val new = old.reducer()
+            when {
+                new.localOrder !== old.localOrder -> new
+                old.localOrder == null -> new
+                new.source == old.source && (new.fileBeanList === old.fileBeanList ||
+                        sameOrder(old.fileBeanList, new.fileBeanList)) -> new
+                else -> {
+                    // 只在真正清掉本地序时打日志：这是排错时最需要的一条线索，
+                    // 正常就地变换不打，避免 46 处调用点把日志刷满。
+                    XLog.d(
+                        "FileUiStateHolder: 本地序失效并清空 localOrder=${old.localOrder}，" +
+                                "sourceChanged=${new.source != old.source}，" +
+                                "oldSize=${old.fileBeanList.size} newSize=${new.fileBeanList.size}，" +
+                                "paginationKey=${old.source.paginationKey}"
+                    )
+                    new.copy(localOrder = null)
+                }
+            }
+        }
     }
+
+    /** 两个列表的 uniqueId 序列是否完全一致（只判顺序，不判内容）。 */
+    private fun sameOrder(a: List<FileBean>, b: List<FileBean>): Boolean =
+        a.size == b.size && a.indices.all { a[it].uniqueId == b[it].uniqueId }
 
     /** 弹窗状态更新减速器助手 */
     fun updateDialogState(reducer: FileDialogUiState.() -> FileDialogUiState) {

@@ -127,6 +127,18 @@ data class FileContentUiState(
      */
     val fcMix: Int = 0,
 
+    /**
+     * 当前这批列表的本地展示序；`null` = 跟随服务端序。
+     *
+     * 由 FileUiStateHolder.updateContentState 在列表顺序或数据源变化时自动清空，
+     * 保证「本地序」与「列表内容」同生共死。
+     * 只承载排序标识，不承载 fcMix（后者是布局偏好，见 `fcMix` 字段）。
+     *
+     * 隐含前提：非 null ⇒ fileBeanList 非空。applyLocalOrder 在空列表时 early return，
+     * 因此不会出现「空列表却挂着本地序」的状态；守卫依赖这一前提。
+     */
+    val localOrder: OrderBean? = null,
+
     // 交互模式状态
     val isLongClickState: Boolean = false,
     val isCutState: Boolean = false,
